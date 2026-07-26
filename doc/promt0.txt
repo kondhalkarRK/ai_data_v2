@@ -1,0 +1,46 @@
+PROJECT: Capgemini AI Data Platform — Feature Addition
+BASE: Existing working Streamlit + DuckDB + GPT-5 app (attached separately)
+
+GOLDEN RULES ACROSS ALL 3 FEATURES:
+1. Existing code behavior must remain 100% unchanged for current
+   users/flows. Every integration point is described as a precise
+   before/after diff — never rewrite whole files.
+2. Token/cost discipline is non-negotiable:
+   - Materialized Views  → 0 extra LLM calls, 0 extra tokens
+   - RAG Query Memory    → 0 extra LLM calls, max +250 tokens on
+                            the EXISTING single call
+   - Vector Schema       → 0 extra LLM calls, REDUCES tokens for
+                            wide tables (>25 cols), zero impact on
+                            narrow tables
+3. All embeddings are LOCAL (sentence-transformers). No embedding
+   API calls, no OpenAI embedding usage, no added network cost.
+4. All 3 features must fail SILENTLY and gracefully — if ChromaDB,
+   the embedder, or any retrieval step throws an exception, the
+   app must fall back to ORIGINAL behavior without crashing or
+   showing errors to the end user.
+5. Reuse infrastructure across features — one embedder instance,
+   one Chroma client instance, shared via @st.cache_resource.
+   Do not create duplicate models or duplicate DB connections.
+6. Folder boundaries must be respected exactly as specified:
+   features/materialized_views/
+   features/rag_query_memory/
+   features/vector_schema_retrieval/
+   Nothing from one feature folder should be duplicated into another
+   — import and reuse instead.
+7. Every new function must have a one-line docstring explaining
+   whether it touches the LLM (should always say "NO LLM CALL" for
+   these 3 features except the single enrichment point in RAG).
+
+ORDER OF IMPLEMENTATION (strict):
+   Step 1 → Materialized Views (fully working + tested)
+   Step 2 → RAG Query Memory (fully working + tested)
+   Step 3 → Vector Schema Retrieval (fully working + tested)
+Do not begin Step 2 until Step 1 integration points are confirmed
+working. Do not begin Step 3 until Step 2 is confirmed working.
+
+DELIVERABLE FORMAT FOR EACH STEP:
+   a) New files — complete code
+   b) Modified files — ONLY the diff (before/after snippet), never
+      the full file re-pasted
+   c) One paragraph confirming zero regression to existing behavior
+   d) One paragraph confirming exact token/LLM-call impact

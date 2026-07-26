@@ -1,0 +1,255 @@
+# semantic_model.yaml
+# Enterprise Semantic Layer — Insurance Domain (Demo Pack)
+# AI Data Platform — Industry Pack
+
+version: "1.0"
+domain: "Insurance"
+description: "Demo semantic model for policy & claims analytics"
+
+# ══════════════════════════════════════════
+# TABLES
+# ══════════════════════════════════════════
+tables:
+
+  fact_claims:
+    type: fact
+    physical_name: fact_claims
+    display_name: "Claims"
+    grain: "One row per insurance claim"
+    description: "Core fact table containing all policy claims"
+    primary_key: claim_id
+    columns:
+      claim_id:
+        display_name: "Claim ID"
+        type: integer
+        role: key
+      agent_id:
+        display_name: "Agent ID"
+        type: integer
+        role: foreign_key
+        references: dim_agent.agent_id
+      policy_id:
+        display_name: "Policy ID"
+        type: integer
+        role: foreign_key
+        references: dim_policy.policy_id
+      claim_date:
+        display_name: "Claim Date"
+        type: date
+        role: date
+      claim_amount:
+        display_name: "Claim Amount"
+        type: decimal
+        role: measure
+      premium_amount:
+        display_name: "Premium Amount"
+        type: decimal
+        role: measure
+      claim_approved_flag:
+        display_name: "Claim Approved Flag"
+        type: boolean
+        role: measure
+
+  dim_agent:
+    type: dimension
+    physical_name: dim_agent
+    display_name: "Agent"
+    description: "Insurance agent dimension"
+    primary_key: agent_id
+    columns:
+      agent_id:
+        display_name: "Agent ID"
+        type: integer
+        role: key
+      first_name:
+        display_name: "First Name"
+        type: string
+        role: attribute
+      last_name:
+        display_name: "Last Name"
+        type: string
+        role: attribute
+      active:
+        display_name: "Active Status"
+        type: boolean
+        role: attribute
+
+  dim_policy:
+    type: dimension
+    physical_name: dim_policy
+    display_name: "Policy"
+    description: "Insurance policy dimension"
+    primary_key: policy_id
+    columns:
+      policy_id:
+        display_name: "Policy ID"
+        type: integer
+        role: key
+      policy_type:
+        display_name: "Policy Type"
+        type: string
+        role: attribute
+      coverage_tier:
+        display_name: "Coverage Tier"
+        type: string
+        role: attribute
+
+# ══════════════════════════════════════════
+# RELATIONSHIPS
+# ══════════════════════════════════════════
+relationships:
+  - name: claims_to_agent
+    from_table: fact_claims
+    from_column: agent_id
+    to_table: dim_agent
+    to_column: agent_id
+    type: many_to_one
+    display_name: "Claims to Agent"
+
+  - name: claims_to_policy
+    from_table: fact_claims
+    from_column: policy_id
+    to_table: dim_policy
+    to_column: policy_id
+    type: many_to_one
+    display_name: "Claims to Policy"
+
+# ══════════════════════════════════════════
+# MEASURES
+# ══════════════════════════════════════════
+measures:
+
+  total_claims_paid:
+    display_name: "Total Claims Paid"
+    description: "Total monetary value of all claims"
+    expression: "SUM(claim_amount)"
+    format: "currency"
+    aggregation: sum
+    source_table: fact_claims
+    source_column: claim_amount
+    synonyms:
+      - claims paid
+      - claim payout
+      - total payout
+      - claim spend
+
+  total_premium:
+    display_name: "Total Premium"
+    description: "Total monetary value of premiums collected"
+    expression: "SUM(premium_amount)"
+    format: "currency"
+    aggregation: sum
+    source_table: fact_claims
+    source_column: premium_amount
+    synonyms:
+      - premium collected
+      - premium income
+      - written premium
+
+  claim_count:
+    display_name: "Claim Count"
+    description: "Total number of claims filed"
+    expression: "COUNT(claim_id)"
+    format: "integer"
+    aggregation: count
+    source_table: fact_claims
+    source_column: claim_id
+    synonyms:
+      - number of claims
+      - total claims
+      - claims filed
+
+  loss_ratio:
+    display_name: "Loss Ratio"
+    description: "Claims paid divided by premium collected"
+    expression: "SUM(claim_amount) / NULLIF(SUM(premium_amount), 0)"
+    format: "percent"
+    aggregation: ratio
+    source_table: fact_claims
+    synonyms:
+      - claims ratio
+      - loss to premium ratio
+
+  approval_rate:
+    display_name: "Approval Rate"
+    description: "Percentage of claims approved"
+    expression: "AVG(CASE WHEN claim_approved_flag THEN 1.0 ELSE 0.0 END)"
+    format: "percent"
+    aggregation: ratio
+    source_table: fact_claims
+    synonyms:
+      - claim approval rate
+      - approved percentage
+
+  active_agents:
+    display_name: "Active Agents"
+    description: "Count of distinct active agents"
+    expression: "COUNT(DISTINCT agent_id)"
+    format: "integer"
+    aggregation: count_distinct
+    source_table: fact_claims
+    source_column: agent_id
+    synonyms:
+      - active reps
+      - agent headcount
+      - number of agents
+
+# ══════════════════════════════════════════
+# DIMENSIONS
+# ══════════════════════════════════════════
+dimensions:
+
+  Date:
+    display_name: "Date"
+    source_table: fact_claims
+    source_column: claim_date
+    type: date
+    synonyms:
+      - time
+      - period
+      - month
+      - year
+      - quarter
+      - claim date
+
+  Agent:
+    display_name: "Agent"
+    source_table: dim_agent
+    attributes:
+      - first_name
+      - last_name
+      - active
+    display_expression: "first_name || ' ' || last_name"
+    synonyms:
+      - broker
+      - underwriter
+      - sales agent
+      - rep
+
+  Policy:
+    display_name: "Policy"
+    source_table: dim_policy
+    attributes:
+      - policy_type
+      - coverage_tier
+    synonyms:
+      - plan
+      - coverage
+      - policy type
+
+# ══════════════════════════════════════════
+# BUSINESS ENTITIES
+# ══════════════════════════════════════════
+business_entities:
+
+  - name: "Claim"
+    table: fact_claims
+    description: "A single insurance claim event"
+
+  - name: "Agent"
+    table: dim_agent
+    description: "An insurance agent or broker"
+
+  - name: "Policy"
+    table: dim_policy
+    description: "An insurance policy or plan"

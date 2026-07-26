@@ -1,0 +1,83 @@
+# business_glossary.yaml
+# Business Glossary — Banking Domain (Demo Pack)
+
+version: "1.0"
+domain: "Banking"
+
+terms:
+
+  Transaction Value:
+    definition: "Total monetary value of all recorded transactions"
+    synonyms:
+      - transaction volume
+      - money moved
+      - turnover
+    maps_to_measure: total_transaction_value
+    category: Financial
+
+  Transactions:
+    definition: "Total count of distinct banking transactions"
+    synonyms:
+      - transfers
+      - deals
+      - number of transactions
+    maps_to_measure: transaction_count
+    category: Activity
+
+  Default Rate:
+    definition: "Share of transactions/loans flagged as in default"
+    synonyms:
+      - delinquency rate
+      - npa rate
+      - non performing rate
+    maps_to_measure: default_rate
+    category: Risk
+
+  Customer:
+    definition: "An individual or entity holding an account with the bank"
+    synonyms:
+      - client
+      - account holder
+      - depositor
+    maps_to_dimension: Customer
+    category: People
+
+  Branch:
+    definition: "A physical or digital location where banking services are delivered"
+    synonyms:
+      - location
+      - outlet
+      - region
+    maps_to_dimension: Branch
+    category: Organization
+
+  Banking Product:
+    definition: "A loan, deposit, or account offering provided to customers"
+    synonyms:
+      - loan product
+      - account type
+      - offering
+    maps_to_dimension: Product
+    category: Product
+
+  Active Customer:
+    definition: "A customer who has transacted within the current reporting period"
+    synonyms:
+      - active account
+      - active client
+    category: People
+
+  Ticket Size:
+    definition: "The average monetary value per transaction"
+    synonyms:
+      - average transaction size
+      - mean transaction value
+    maps_to_measure: average_transaction_value
+    category: Financial
+
+  Portfolio Trend:
+    definition: "The directional pattern of transaction volume or value over time"
+    synonyms:
+      - book trend
+      - volume trend
+    category: Analytics

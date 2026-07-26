@@ -1,0 +1,278 @@
+# semantic_model.yaml
+# Enterprise Semantic Layer — Banking Domain (Demo Pack)
+# AI Data Platform — Industry Pack
+
+version: "1.0"
+domain: "Banking"
+description: "Demo semantic model for loans & transaction analytics"
+
+# ══════════════════════════════════════════
+# TABLES
+# ══════════════════════════════════════════
+tables:
+
+  fact_transactions:
+    type: fact
+    physical_name: fact_transactions
+    display_name: "Transactions"
+    grain: "One row per banking transaction"
+    description: "Core fact table containing all customer transactions"
+    primary_key: transaction_id
+    columns:
+      transaction_id:
+        display_name: "Transaction ID"
+        type: integer
+        role: key
+      branch_id:
+        display_name: "Branch ID"
+        type: integer
+        role: foreign_key
+        references: dim_branch.branch_id
+      customer_id:
+        display_name: "Customer ID"
+        type: integer
+        role: foreign_key
+        references: dim_customer.customer_id
+      product_id:
+        display_name: "Product ID"
+        type: integer
+        role: foreign_key
+        references: dim_product.product_id
+      transaction_date:
+        display_name: "Transaction Date"
+        type: date
+        role: date
+      transaction_amount:
+        display_name: "Transaction Amount"
+        type: decimal
+        role: measure
+      loan_default_flag:
+        display_name: "Loan Default Flag"
+        type: boolean
+        role: measure
+
+  dim_branch:
+    type: dimension
+    physical_name: dim_branch
+    display_name: "Branch"
+    description: "Bank branch dimension"
+    primary_key: branch_id
+    columns:
+      branch_id:
+        display_name: "Branch ID"
+        type: integer
+        role: key
+      branch_name:
+        display_name: "Branch Name"
+        type: string
+        role: attribute
+      region:
+        display_name: "Region"
+        type: string
+        role: attribute
+
+  dim_customer:
+    type: dimension
+    physical_name: dim_customer
+    display_name: "Customer"
+    description: "Bank customer dimension"
+    primary_key: customer_id
+    columns:
+      customer_id:
+        display_name: "Customer ID"
+        type: integer
+        role: key
+      first_name:
+        display_name: "First Name"
+        type: string
+        role: attribute
+      last_name:
+        display_name: "Last Name"
+        type: string
+        role: attribute
+      segment:
+        display_name: "Customer Segment"
+        type: string
+        role: attribute
+
+  dim_product:
+    type: dimension
+    physical_name: dim_product
+    display_name: "Banking Product"
+    description: "Loan / account product dimension"
+    primary_key: product_id
+    columns:
+      product_id:
+        display_name: "Product ID"
+        type: integer
+        role: key
+      product_name:
+        display_name: "Product Name"
+        type: string
+        role: attribute
+      product_type:
+        display_name: "Product Type"
+        type: string
+        role: attribute
+
+# ══════════════════════════════════════════
+# RELATIONSHIPS
+# ══════════════════════════════════════════
+relationships:
+  - name: transactions_to_branch
+    from_table: fact_transactions
+    from_column: branch_id
+    to_table: dim_branch
+    to_column: branch_id
+    type: many_to_one
+    display_name: "Transactions to Branch"
+
+  - name: transactions_to_customer
+    from_table: fact_transactions
+    from_column: customer_id
+    to_table: dim_customer
+    to_column: customer_id
+    type: many_to_one
+    display_name: "Transactions to Customer"
+
+# ══════════════════════════════════════════
+# MEASURES
+# ══════════════════════════════════════════
+measures:
+
+  total_transaction_value:
+    display_name: "Total Transaction Value"
+    description: "Total monetary value of all transactions"
+    expression: "SUM(transaction_amount)"
+    format: "currency"
+    aggregation: sum
+    source_table: fact_transactions
+    source_column: transaction_amount
+    synonyms:
+      - transaction volume
+      - total value
+      - money moved
+      - turnover
+      - book value
+
+  transaction_count:
+    display_name: "Transaction Count"
+    description: "Total number of transactions"
+    expression: "COUNT(transaction_id)"
+    format: "integer"
+    aggregation: count
+    source_table: fact_transactions
+    source_column: transaction_id
+    synonyms:
+      - number of transactions
+      - total transactions
+      - deals
+      - transfers
+
+  average_transaction_value:
+    display_name: "Average Transaction Value"
+    description: "Average value per transaction"
+    expression: "SUM(transaction_amount) / NULLIF(COUNT(transaction_id), 0)"
+    format: "currency"
+    aggregation: ratio
+    source_table: fact_transactions
+    synonyms:
+      - avg transaction size
+      - mean transaction value
+      - ticket size
+
+  default_rate:
+    display_name: "Default Rate"
+    description: "Share of transactions flagged as loan defaults"
+    expression: "AVG(CASE WHEN loan_default_flag THEN 1.0 ELSE 0.0 END)"
+    format: "percent"
+    aggregation: ratio
+    source_table: fact_transactions
+    synonyms:
+      - defaults
+      - delinquency rate
+      - npa rate
+      - non performing rate
+
+  active_customers:
+    display_name: "Active Customers"
+    description: "Count of distinct customers transacting"
+    expression: "COUNT(DISTINCT customer_id)"
+    format: "integer"
+    aggregation: count_distinct
+    source_table: fact_transactions
+    source_column: customer_id
+    synonyms:
+      - customer base
+      - active accounts
+      - number of customers
+
+# ══════════════════════════════════════════
+# DIMENSIONS
+# ══════════════════════════════════════════
+dimensions:
+
+  Date:
+    display_name: "Date"
+    source_table: fact_transactions
+    source_column: transaction_date
+    type: date
+    synonyms:
+      - time
+      - period
+      - month
+      - year
+      - quarter
+      - transaction date
+
+  Customer:
+    display_name: "Customer"
+    source_table: dim_customer
+    attributes:
+      - first_name
+      - last_name
+      - segment
+    display_expression: "first_name || ' ' || last_name"
+    synonyms:
+      - client
+      - account holder
+      - depositor
+
+  Branch:
+    display_name: "Branch"
+    source_table: dim_branch
+    attributes:
+      - branch_name
+      - region
+    synonyms:
+      - location
+      - outlet
+      - region
+
+  Product:
+    display_name: "Banking Product"
+    source_table: dim_product
+    attributes:
+      - product_name
+      - product_type
+    synonyms:
+      - loan product
+      - account type
+      - offering
+
+# ══════════════════════════════════════════
+# BUSINESS ENTITIES
+# ══════════════════════════════════════════
+business_entities:
+
+  - name: "Transaction"
+    table: fact_transactions
+    description: "A single banking transaction event"
+
+  - name: "Customer"
+    table: dim_customer
+    description: "A bank customer or account holder"
+
+  - name: "Branch"
+    table: dim_branch
+    description: "A physical or digital bank branch"

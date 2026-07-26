@@ -1,0 +1,448 @@
+# semantic_model.yaml
+# Enterprise Semantic Layer — Automotive Sales Domain
+# Capgemini AI Data Platform V10
+
+version: "1.0"
+domain: "Automotive Sales"
+description: "Production semantic model for automotive sales analytics"
+
+# ══════════════════════════════════════════
+# TABLES
+# ══════════════════════════════════════════
+tables:
+
+  fact_sales:
+    type: fact
+    physical_name: fact_sales
+    display_name: "Sales Transactions"
+    grain: "One row per sales order"
+    description: "Core fact table containing all sales transactions"
+    primary_key: order_id
+    columns:
+      order_id:
+        display_name: "Order ID"
+        type: integer
+        role: key
+      carline_id:
+        display_name: "Car Line ID"
+        type: integer
+        role: foreign_key
+        references: dim_carline.carline_id
+      colour_id:
+        display_name: "Colour ID"
+        type: integer
+        role: foreign_key
+        references: dim_color.colour_id
+      sales_person_id:
+        display_name: "Salesperson ID"
+        type: integer
+        role: foreign_key
+        references: dim_salesman.sales_person_id
+      sales_date:
+        display_name: "Sales Date"
+        type: date
+        role: date
+      order_qty:
+        display_name: "Order Quantity"
+        type: integer
+        role: measure
+      price_per_unit:
+        display_name: "Price Per Unit"
+        type: decimal
+        role: measure
+      total_sales:
+        display_name: "Total Sales Value"
+        type: decimal
+        role: measure
+
+  dim_carline:
+    type: dimension
+    physical_name: dim_carline
+    display_name: "Vehicle / Car Line"
+    description: "Vehicle catalogue dimension"
+    primary_key: carline_id
+    columns:
+      carline_id:
+        display_name: "Car Line ID"
+        type: integer
+        role: key
+      carline_name:
+        display_name: "Car Line Name"
+        type: string
+        role: attribute
+      model:
+        display_name: "Model"
+        type: string
+        role: attribute
+      make:
+        display_name: "Make / Brand"
+        type: string
+        role: attribute
+      car_type:
+        display_name: "Car Type"
+        type: string
+        role: attribute
+      engine_capacity:
+        display_name: "Engine Capacity"
+        type: decimal
+        role: attribute
+      engine_type:
+        display_name: "Engine Type"
+        type: string
+        role: attribute
+
+  dim_color:
+    type: dimension
+    physical_name: dim_color
+    display_name: "Colour / Paint"
+    description: "Vehicle colour and paint dimension"
+    primary_key: colour_id
+    columns:
+      colour_id:
+        display_name: "Colour ID"
+        type: integer
+        role: key
+      colour_name:
+        display_name: "Colour Name"
+        type: string
+        role: attribute
+      RCG_combination:
+        display_name: "RCG Combination"
+        type: string
+        role: attribute
+      patent_number:
+        display_name: "Patent Number"
+        type: string
+        role: attribute
+
+  dim_salesman:
+    type: dimension
+    physical_name: dim_salesman
+    display_name: "Salesperson"
+    description: "Sales team member dimension"
+    primary_key: sales_person_id
+    columns:
+      sales_person_id:
+        display_name: "Salesperson ID"
+        type: integer
+        role: key
+      first_name:
+        display_name: "First Name"
+        type: string
+        role: attribute
+      last_name:
+        display_name: "Last Name"
+        type: string
+        role: attribute
+      email:
+        display_name: "Email"
+        type: string
+        role: attribute
+      corp_id:
+        display_name: "Corporate ID"
+        type: string
+        role: attribute
+      active:
+        display_name: "Active Status"
+        type: boolean
+        role: attribute
+
+# ══════════════════════════════════════════
+# RELATIONSHIPS
+# ══════════════════════════════════════════
+relationships:
+  - name: sales_to_carline
+    from_table: fact_sales
+    from_column: carline_id
+    to_table: dim_carline
+    to_column: carline_id
+    type: many_to_one
+    display_name: "Sales to Vehicle"
+
+  # - name: sales_to_colour
+  #   from_table: fact_sales
+  #   from_column: colour_id
+  #   to_table: dim_color
+  #   to_column: colour_id
+  #   type: many_to_one
+  #   display_name: "Sales to Colour"
+
+  - name: sales_to_salesman
+    from_table: fact_sales
+    from_column: sales_person_id
+    to_table: dim_salesman
+    to_column: sales_person_id
+    type: many_to_one
+    display_name: "Sales to Salesperson"
+
+# ══════════════════════════════════════════
+# MEASURES
+# ══════════════════════════════════════════
+measures:
+
+  revenue:
+    display_name: "Revenue"
+    description: "Total sales revenue generated"
+    expression: "SUM(total_sales)"
+    format: "currency"
+    aggregation: sum
+    source_table: fact_sales
+    source_column: total_sales
+    synonyms:
+      - sales
+      - turnover
+      - income
+      - total revenue
+      - total sales
+      - gross sales
+      - total income
+      - sales value
+      - sales amount
+      - revenue generated
+      - money made
+      - earnings
+
+  orders:
+    display_name: "Orders"
+    description: "Total number of orders placed"
+    expression: "COUNT(order_id)"
+    format: "integer"
+    aggregation: count
+    source_table: fact_sales
+    source_column: order_id
+    synonyms:
+      - order count
+      - number of orders
+      - total orders
+      - transactions
+      - purchases
+      - deals
+      - bookings
+      - sales count
+
+  units_sold:
+    display_name: "Units Sold"
+    description: "Total quantity of vehicles sold"
+    expression: "SUM(order_qty)"
+    format: "integer"
+    aggregation: sum
+    source_table: fact_sales
+    source_column: order_qty
+    synonyms:
+      - quantity sold
+      - volume
+      - units
+      - vehicles sold
+      - cars sold
+      - order quantity
+      - qty sold
+      - total units
+      - sales volume
+      - number sold
+
+  average_selling_price:
+    display_name: "Average Selling Price"
+    description: "Average price per unit sold"
+    expression: "SUM(total_sales) / NULLIF(SUM(order_qty), 0)"
+    format: "currency"
+    aggregation: ratio
+    source_table: fact_sales
+    synonyms:
+      - avg price
+      - average price
+      - mean price
+      - price per unit
+      - asp
+      - average unit price
+      - avg selling price
+
+  active_salespeople:
+    display_name: "Active Salespeople"
+    description: "Count of distinct active salespeople"
+    expression: "COUNT(DISTINCT sales_person_id)"
+    format: "integer"
+    aggregation: count_distinct
+    source_table: fact_sales
+    source_column: sales_person_id
+    synonyms:
+      - active reps
+      - active agents
+      - headcount
+      - sales team size
+      - number of salespeople
+      - distinct salespeople
+
+  revenue_per_salesperson:
+    display_name: "Revenue Per Salesperson"
+    description: "Average revenue generated per salesperson"
+    expression: "SUM(total_sales) / NULLIF(COUNT(DISTINCT sales_person_id), 0)"
+    format: "currency"
+    aggregation: ratio
+    source_table: fact_sales
+    synonyms:
+      - revenue per rep
+      - revenue per agent
+      - sales per person
+      - per head revenue
+      - productivity
+      - sales productivity
+
+  revenue_per_order:
+    display_name: "Revenue Per Order"
+    description: "Average revenue value per order"
+    expression: "SUM(total_sales) / NULLIF(COUNT(order_id), 0)"
+    format: "currency"
+    aggregation: ratio
+    source_table: fact_sales
+    synonyms:
+      - average order value
+      - avg order value
+      - aov
+      - order value
+      - basket size
+      - value per transaction
+
+# ══════════════════════════════════════════
+# DIMENSIONS
+# ══════════════════════════════════════════
+dimensions:
+
+  Date:
+    display_name: "Date"
+    source_table: fact_sales
+    source_column: sales_date
+    type: date
+    synonyms:
+      - time
+      - period
+      - when
+      - month
+      - year
+      - quarter
+      - day
+      - sales date
+      - order date
+      - transaction date
+
+  Salesperson:
+    display_name: "Salesperson"
+    source_table: dim_salesman
+    attributes:
+      - first_name
+      - last_name
+      - email
+      - corp_id
+      - active
+    display_expression: "first_name || ' ' || last_name"
+    synonyms:
+      - sales rep
+      - rep
+      - seller
+      - agent
+      - sales agent
+      - sales person
+      - employee
+      - staff
+      - associate
+      - consultant
+      - account manager
+
+  Car:
+    display_name: "Vehicle"
+    source_table: dim_carline
+    attributes:
+      - carline_name
+      - model
+      - make
+      - car_type
+      - engine_capacity
+      - engine_type
+    synonyms:
+      - vehicle
+      - automobile
+      - car
+      - model
+      - carline
+      - car line
+      - product
+      - make
+      - brand
+
+  Colour:
+    display_name: "Colour"
+    source_table: dim_color
+    attributes:
+      - colour_name
+      - RCG_combination
+      - patent_number
+    synonyms:
+      - color
+      - paint
+      - finish
+      - colour name
+      - color name
+      - vehicle color
+      - paint color
+
+# ══════════════════════════════════════════
+# HIERARCHIES
+# ══════════════════════════════════════════
+hierarchies:
+
+  Date_Hierarchy:
+    display_name: "Date Hierarchy"
+    dimension: Date
+    levels:
+      - name: Year
+        expression: "strftime('%Y', sales_date)"
+      - name: Quarter
+        expression: "strftime('%Y-Q', sales_date)"
+      - name: Month
+        expression: "strftime('%Y-%m', sales_date)"
+      - name: Day
+        expression: "sales_date"
+
+  Vehicle_Hierarchy:
+    display_name: "Vehicle Hierarchy"
+    dimension: Car
+    levels:
+      - name: Make
+        column: make
+      - name: Car Type
+        column: car_type
+      - name: Model
+        column: model
+      - name: Car Line
+        column: carline_name
+
+# ══════════════════════════════════════════
+# DRILL PATHS
+# ══════════════════════════════════════════
+drill_paths:
+
+  - name: "Time Drill"
+    path: [Year, Quarter, Month, Day]
+
+  - name: "Vehicle Drill"
+    path: [Make, Car Type, Model, Car Line]
+
+# ══════════════════════════════════════════
+# BUSINESS ENTITIES
+# ══════════════════════════════════════════
+business_entities:
+
+  - name: "Sales Transaction"
+    table: fact_sales
+    description: "A single vehicle sale event"
+
+  - name: "Vehicle"
+    table: dim_carline
+    description: "A vehicle product in the catalogue"
+
+  - name: "Salesperson"
+    table: dim_salesman
+    description: "A member of the sales team"
+
+  - name: "Colour Variant"
+    table: dim_color
+    description: "A colour option for a vehicle"

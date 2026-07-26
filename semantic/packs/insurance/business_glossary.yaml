@@ -1,0 +1,80 @@
+# business_glossary.yaml
+# Business Glossary — Insurance Domain (Demo Pack)
+
+version: "1.0"
+domain: "Insurance"
+
+terms:
+
+  Claims Paid:
+    definition: "Total monetary value of all claims paid out"
+    synonyms:
+      - claim payout
+      - total payout
+      - claim spend
+    maps_to_measure: total_claims_paid
+    category: Financial
+
+  Premium:
+    definition: "Total monetary value of premiums collected from policyholders"
+    synonyms:
+      - premium income
+      - written premium
+      - premium collected
+    maps_to_measure: total_premium
+    category: Financial
+
+  Loss Ratio:
+    definition: "Claims paid as a proportion of premium collected — a core profitability indicator"
+    synonyms:
+      - claims ratio
+      - loss to premium ratio
+    maps_to_measure: loss_ratio
+    category: Risk
+
+  Approval Rate:
+    definition: "Share of filed claims that were approved for payout"
+    synonyms:
+      - claim approval rate
+      - approved percentage
+    maps_to_measure: approval_rate
+    category: Operations
+
+  Agent:
+    definition: "An insurance agent or broker who sells and services policies"
+    synonyms:
+      - broker
+      - underwriter
+      - rep
+    maps_to_dimension: Agent
+    category: People
+
+  Policy:
+    definition: "A contract of insurance coverage held by a policyholder"
+    synonyms:
+      - plan
+      - coverage
+      - policy type
+    maps_to_dimension: Policy
+    category: Product
+
+  Active Agent:
+    definition: "An agent currently active and servicing policies"
+    synonyms:
+      - active broker
+      - active rep
+    category: People
+
+  Claims Trend:
+    definition: "The directional pattern of claim volume or value over time"
+    synonyms:
+      - claim volume trend
+      - payout trend
+    category: Analytics
+
+  Underwriting Performance:
+    definition: "How well the loss ratio and approval rate indicate profitable policy pricing"
+    synonyms:
+      - underwriting quality
+      - risk performance
+    category: Performance

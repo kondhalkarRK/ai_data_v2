@@ -1,0 +1,291 @@
+# semantic_model.yaml
+# Enterprise Semantic Layer — Healthcare Domain (Demo Pack)
+# AI Data Platform — Industry Pack
+
+version: "1.0"
+domain: "Healthcare"
+description: "Demo semantic model for patient encounter & claims analytics"
+
+# ══════════════════════════════════════════
+# TABLES
+# ══════════════════════════════════════════
+tables:
+
+  fact_encounters:
+    type: fact
+    physical_name: fact_encounters
+    display_name: "Patient Encounters"
+    grain: "One row per patient encounter / visit"
+    description: "Core fact table containing all patient encounters and claims"
+    primary_key: encounter_id
+    columns:
+      encounter_id:
+        display_name: "Encounter ID"
+        type: integer
+        role: key
+      department_id:
+        display_name: "Department ID"
+        type: integer
+        role: foreign_key
+        references: dim_department.department_id
+      physician_id:
+        display_name: "Physician ID"
+        type: integer
+        role: foreign_key
+        references: dim_physician.physician_id
+      diagnosis_id:
+        display_name: "Diagnosis ID"
+        type: integer
+        role: foreign_key
+        references: dim_diagnosis.diagnosis_id
+      admission_date:
+        display_name: "Admission Date"
+        type: date
+        role: date
+      length_of_stay_days:
+        display_name: "Length of Stay (Days)"
+        type: integer
+        role: measure
+      claim_amount:
+        display_name: "Claim Amount"
+        type: decimal
+        role: measure
+      readmitted_flag:
+        display_name: "Readmitted Flag"
+        type: boolean
+        role: measure
+
+  dim_department:
+    type: dimension
+    physical_name: dim_department
+    display_name: "Department"
+    description: "Hospital department dimension"
+    primary_key: department_id
+    columns:
+      department_id:
+        display_name: "Department ID"
+        type: integer
+        role: key
+      department_name:
+        display_name: "Department Name"
+        type: string
+        role: attribute
+      speciality:
+        display_name: "Speciality"
+        type: string
+        role: attribute
+
+  dim_physician:
+    type: dimension
+    physical_name: dim_physician
+    display_name: "Physician"
+    description: "Attending physician dimension"
+    primary_key: physician_id
+    columns:
+      physician_id:
+        display_name: "Physician ID"
+        type: integer
+        role: key
+      first_name:
+        display_name: "First Name"
+        type: string
+        role: attribute
+      last_name:
+        display_name: "Last Name"
+        type: string
+        role: attribute
+      active:
+        display_name: "Active Status"
+        type: boolean
+        role: attribute
+
+  dim_diagnosis:
+    type: dimension
+    physical_name: dim_diagnosis
+    display_name: "Diagnosis"
+    description: "Clinical diagnosis code dimension"
+    primary_key: diagnosis_id
+    columns:
+      diagnosis_id:
+        display_name: "Diagnosis ID"
+        type: integer
+        role: key
+      diagnosis_name:
+        display_name: "Diagnosis Name"
+        type: string
+        role: attribute
+      icd_code:
+        display_name: "ICD Code"
+        type: string
+        role: attribute
+
+# ══════════════════════════════════════════
+# RELATIONSHIPS
+# ══════════════════════════════════════════
+relationships:
+  - name: encounters_to_department
+    from_table: fact_encounters
+    from_column: department_id
+    to_table: dim_department
+    to_column: department_id
+    type: many_to_one
+    display_name: "Encounters to Department"
+
+  - name: encounters_to_physician
+    from_table: fact_encounters
+    from_column: physician_id
+    to_table: dim_physician
+    to_column: physician_id
+    type: many_to_one
+    display_name: "Encounters to Physician"
+
+# ══════════════════════════════════════════
+# MEASURES
+# ══════════════════════════════════════════
+measures:
+
+  total_claims:
+    display_name: "Total Claims"
+    description: "Total monetary value of all patient claims"
+    expression: "SUM(claim_amount)"
+    format: "currency"
+    aggregation: sum
+    source_table: fact_encounters
+    source_column: claim_amount
+    synonyms:
+      - claims
+      - claim total
+      - total claim amount
+      - billed amount
+      - claim spend
+      - reimbursement total
+
+  encounter_count:
+    display_name: "Encounter Count"
+    description: "Total number of patient encounters/visits"
+    expression: "COUNT(encounter_id)"
+    format: "integer"
+    aggregation: count
+    source_table: fact_encounters
+    source_column: encounter_id
+    synonyms:
+      - visits
+      - number of visits
+      - patient visits
+      - total encounters
+      - admissions
+
+  avg_length_of_stay:
+    display_name: "Average Length of Stay"
+    description: "Average number of days per patient stay"
+    expression: "AVG(length_of_stay_days)"
+    format: "decimal"
+    aggregation: avg
+    source_table: fact_encounters
+    source_column: length_of_stay_days
+    synonyms:
+      - avg los
+      - length of stay
+      - los
+      - average stay duration
+      - stay length
+
+  readmission_rate:
+    display_name: "Readmission Rate"
+    description: "Percentage of encounters resulting in readmission"
+    expression: "AVG(CASE WHEN readmitted_flag THEN 1.0 ELSE 0.0 END)"
+    format: "percent"
+    aggregation: ratio
+    source_table: fact_encounters
+    synonyms:
+      - readmissions
+      - readmit rate
+      - readmission percentage
+      - bounce back rate
+
+  active_physicians:
+    display_name: "Active Physicians"
+    description: "Count of distinct active physicians"
+    expression: "COUNT(DISTINCT physician_id)"
+    format: "integer"
+    aggregation: count_distinct
+    source_table: fact_encounters
+    source_column: physician_id
+    synonyms:
+      - active doctors
+      - physician headcount
+      - number of physicians
+
+# ══════════════════════════════════════════
+# DIMENSIONS
+# ══════════════════════════════════════════
+dimensions:
+
+  Date:
+    display_name: "Date"
+    source_table: fact_encounters
+    source_column: admission_date
+    type: date
+    synonyms:
+      - time
+      - period
+      - month
+      - year
+      - quarter
+      - admission date
+      - visit date
+
+  Physician:
+    display_name: "Physician"
+    source_table: dim_physician
+    attributes:
+      - first_name
+      - last_name
+      - active
+    display_expression: "first_name || ' ' || last_name"
+    synonyms:
+      - doctor
+      - clinician
+      - attending
+      - provider
+
+  Department:
+    display_name: "Department"
+    source_table: dim_department
+    attributes:
+      - department_name
+      - speciality
+    synonyms:
+      - unit
+      - ward
+      - clinic
+      - speciality
+
+  Diagnosis:
+    display_name: "Diagnosis"
+    source_table: dim_diagnosis
+    attributes:
+      - diagnosis_name
+      - icd_code
+    synonyms:
+      - condition
+      - illness
+      - icd code
+      - clinical diagnosis
+
+# ══════════════════════════════════════════
+# BUSINESS ENTITIES
+# ══════════════════════════════════════════
+business_entities:
+
+  - name: "Patient Encounter"
+    table: fact_encounters
+    description: "A single patient visit or admission"
+
+  - name: "Physician"
+    table: dim_physician
+    description: "A clinician responsible for patient care"
+
+  - name: "Department"
+    table: dim_department
+    description: "A hospital department or clinical unit"

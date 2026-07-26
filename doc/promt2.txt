@@ -1,0 +1,248 @@
+🔵 PROMPT 1 — Materialized Views
+CONTEXT:
+I have an existing Streamlit app (app.py) with a NLQ-to-SQL engine using
+DuckDB and GPT-5. The full existing code is provided below/attached.
+
+CRITICAL RULES — DO NOT VIOLATE:
+1. Do NOT modify, remove, or rewrite any existing function in app.py or
+   core/*.py. Only ADD new code inside features/materialized_views/.
+2. This feature must NOT call the LLM at all. Zero token cost.
+3. Materialized views are pure Pandas/DuckDB caching — no AI involved.
+4. Integration point: only ONE new check inserted into run_query()
+   (in core/nlq_engine.py) — a single "if materialized view exists,
+   return it" guard BEFORE the existing LLM call. Nothing after the
+   guard should change.
+
+TASK — Implement in features/materialized_views/:
+
+1. view_store.py
+   - A simple key-value store using st.session_state (in-memory) plus
+     optional disk persistence via pickle in rag_storage/materialized_cache/.
+   - Functions: save_view(key, df, ttl_minutes=60), get_view(key),
+     is_view_fresh(key), clear_expired_views().
+   - Key = hash of (question_text_normalized + working_df shape + working_df columns).
+
+2. view_manager.py
+   - build_view_key(question, df) -> str
+     Normalizes question (lowercase, strip whitespace) + df fingerprint.
+   - get_or_none(question, df) -> pd.DataFrame | None
+     Checks view_store, returns cached DataFrame if fresh, else None.
+   - materialize(question, df, result_df) -> None
+     Saves result_df into view_store after a successful query run.
+
+3. view_triggers.py
+   - should_materialize(question, df, result_df) -> bool
+     Simple heuristic: materialize if result_df has <= 5000 rows AND
+     the question does NOT contain words like "today", "now", "current"
+     (time-sensitive queries should not be cached).
+
+INTEGRATION (the only touch to existing code):
+   In core/nlq_engine.py inside run_query(), add these two lines:
+
+   a) At the very top of run_query(), right after the existing
+      "if working_df is None or working_df.empty" check, insert:
+        cached_view = view_manager.get_or_none(question, working_df)
+        if cached_view is not None:
+            return cached_view, "-- served from materialized view --", None
+
+   b) Right after the existing line that does:
+        if result is not None:
+            st.session_state.memory[cache_key] = (result, sql, None)
+      ADD immediately below it (do not replace, just add):
+        if view_triggers.should_materialize(question, working_df, result):
+            view_manager.materialize(question, working_df, result)
+
+   Do not touch any other line in run_query(). Do not change function
+   signatures. Import view_manager and view_triggers at the top of
+   nlq_engine.py only.
+
+4. Add a small sidebar indicator (in ui/sidebar.py, ADD only, do not
+   remove existing sidebar code):
+   - Show count of active materialized views and a
+     "🗑️ Clear Materialized Views" button that calls
+     view_store.clear_expired_views() and also a full clear option.
+
+OUTPUT EXPECTATION:
+- Provide complete code for all 3 files inside features/materialized_views/.
+- Provide ONLY the exact diff/lines to add to core/nlq_engine.py and
+  ui/sidebar.py — do not paste the entire files back.
+- Add inline comments explaining each function.
+- No LLM calls anywhere in this feature.
+🟢 PROMPT 2 — RAG Query Memory
+CONTEXT:
+Same existing Streamlit app as before. This is Prompt 2 of 3 — implement
+AFTER Materialized Views is already in place. Do not touch that feature.
+
+CRITICAL RULES — DO NOT VIOLATE:
+1. Do NOT modify any existing function bodies in app.py or core/*.py
+   except ONE specific insertion point described below.
+2. Use LOCAL embeddings only (sentence-transformers, all-MiniLM-L6-v2
+   model) — NEVER call an external embedding API. This must run 100%
+   offline with zero additional LLM/API cost.
+3. This feature must ADD AT MOST 150-200 extra tokens to the existing
+   SQL-generation prompt (via few-shot examples). It must NEVER trigger
+   an extra LLM call by itself — it only enriches the EXISTING single
+   call inside nlq_to_sql(). No new call_llm() invocations.
+4. Cap retrieved examples to top 2 (not 3, not 5) to keep token usage
+   minimal. Cap each retrieved SQL example to 200 characters max
+   (truncate with "...") before inserting into the prompt.
+5. If vector store is empty or retrieval fails for any reason, fail
+   silently and proceed with the ORIGINAL prompt unchanged — never
+   block or error out the existing flow.
+
+TASK — Implement in features/rag_query_memory/:
+
+1. embedder.py
+   - @st.cache_resource function get_embedder() loading
+     SentenceTransformer("all-MiniLM-L6-v2") once per session.
+   - embed_text(text: str) -> list[float]
+
+2. vector_store.py
+   - @st.cache_resource function get_chroma_client() using
+     chromadb.PersistentClient(path="rag_storage/chroma_db").
+   - Two collections: "query_memory" and "glossary".
+   - Wrap all chroma calls in try/except — never raise upward.
+
+3. query_memory.py
+   - store_successful_query(question, sql, max_len=200) -> None
+     Truncates sql to max_len before storing. Skips storing if SQL
+     starts with "-- served from materialized view --".
+   - retrieve_similar_queries(question, k=2) -> list[dict]
+     Returns at most k results, each capped to 200 chars. Returns
+     empty list on any failure (never raises).
+   - format_examples_for_prompt(examples: list[dict]) -> str
+     Returns a compact string block, or empty string if no examples.
+     Must produce AT MOST ~150 tokens of text (roughly 600 characters).
+
+4. glossary_store.py
+   - GLOSSARY_SEED: list of 5-8 (term, definition) tuples relevant to
+     sales/dealer/salesperson domain (e.g. "active dealer", "fleet
+     order", "churn", "YoY growth", "top performer").
+   - seed_glossary_once() -> None (checks count() first, only seeds if empty).
+   - retrieve_glossary_terms(question, k=2) -> list[dict], capped output.
+   - format_glossary_for_prompt(terms) -> str, max ~100 tokens.
+
+INTEGRATION (the only touch to existing code):
+   In core/nlq_engine.py, inside nlq_to_sql(), make ONLY these additions:
+
+   a) Near the top of the function, after computing `schema` and
+      `name_cols`, ADD:
+        rag_examples  = query_memory.retrieve_similar_queries(question, k=2)
+        rag_glossary  = glossary_store.retrieve_glossary_terms(question, k=2)
+        examples_block  = query_memory.format_examples_for_prompt(rag_examples)
+        glossary_block  = glossary_store.format_glossary_for_prompt(rag_glossary)
+
+   b) In the f-string prompt, insert `{glossary_block}` and
+      `{examples_block}` right after the `{schema}` line and BEFORE
+      the "RULES:" section — do not reorder or remove any existing
+      rule text.
+
+   c) After `sql_result = call_llm(prompt)` succeeds (sql_result is
+      not None), ADD one line:
+        query_memory.store_successful_query(question, sql_result)
+
+   Do not change the function's return value, signature, or any
+   existing rule text. Do not add a second call_llm() anywhere.
+
+5. Add app startup seeding (in app.py, ADD only — one line, right after
+   existing `if not st.session_state.dfs:` block, before the tabs are
+   created):
+        glossary_store.seed_glossary_once()
+
+OUTPUT EXPECTATION:
+- Complete code for all 4 files inside features/rag_query_memory/.
+- Exact lines to insert into core/nlq_engine.py's nlq_to_sql() function
+  (show before/after snippet, not the whole file).
+- One line to add to app.py.
+- Add a comment above each retrieval call noting: "LOCAL EMBEDDING —
+  ZERO LLM COST".
+- Confirm in your response: total added prompt size must stay under
+  ~250 tokens combined for glossary_block + examples_block.
+🟣 PROMPT 3 — Vector-Based Schema Retrieval
+CONTEXT:
+Same existing Streamlit app. This is Prompt 3 of 3 — implement AFTER
+Materialized Views and RAG Query Memory are already in place. Do not
+modify those two features.
+
+CRITICAL RULES — DO NOT VIOLATE:
+1. Do NOT modify any existing function bodies except ONE controlled
+   insertion point in core/schema_builder.py / nlq_engine.py.
+2. Use the SAME local embedder from features/rag_query_memory/embedder.py
+   — do NOT create a second embedding model or duplicate that code.
+   Import and reuse it.
+3. This feature is a FALLBACK/OPTIMIZATION only — it must NEVER reduce
+   accuracy for small datasets. Only activate schema retrieval (i.e.
+   only trim columns) when the working DataFrame has MORE than 25
+   columns. Below that threshold, the ORIGINAL full schema (from
+   build_rich_schema()) must be used unchanged — do not touch it.
+4. Zero extra LLM calls. This uses only local embeddings for similarity
+   search between the question and column descriptions.
+5. Must degrade gracefully: if vector search fails or returns nothing,
+   fall back to full schema automatically — never block the app.
+
+TASK — Implement in features/vector_schema_retrieval/:
+
+1. schema_indexer.py
+   - index_schema_columns(df: pd.DataFrame, table_name="df") -> None
+     For each column, build one short description line:
+       "{col} ({dtype}): {min/max or top values}"
+     Store in a NEW chroma collection called "schema_context" (reuse
+     get_chroma_client() from features/rag_query_memory/vector_store.py
+     — do not create a second Chroma client).
+     Use upsert (not add) so re-indexing the same df is safe/idempotent.
+     Only run indexing if df.shape[1] > 25 (skip entirely otherwise,
+     to avoid unnecessary embedding work on small datasets).
+
+2. schema_retriever.py
+   - retrieve_relevant_columns(question: str, all_columns: list[str],
+     k=12) -> list[str]
+     Queries "schema_context" collection, returns up to k column names
+     most relevant to the question. If collection is empty or query
+     fails, return all_columns unchanged (full fallback).
+   - build_trimmed_schema_text(df, relevant_columns) -> str
+     Reuses the EXACT same formatting logic as the existing
+     build_rich_schema() in core/schema_builder.py, but only for the
+     subset of columns. Do not duplicate formatting logic — refactor
+     build_rich_schema() internally to accept an optional
+     `columns_subset` parameter that defaults to None (uses all columns,
+     preserving 100% existing behavior when not passed).
+
+INTEGRATION (the only touch to existing code):
+   a) In core/schema_builder.py, modify build_rich_schema() signature
+      ONLY by adding one optional parameter with a safe default:
+        def build_rich_schema(df: pd.DataFrame, columns_subset: list[str] | None = None) -> str:
+      Then change the loop line:
+        for col in df.columns:
+      to:
+        cols_to_use = columns_subset if columns_subset else df.columns
+        for col in cols_to_use:
+      This preserves 100% of existing behavior when columns_subset is
+      None (which is every existing call site today — no other code
+      needs to change).
+
+   b) In core/nlq_engine.py inside nlq_to_sql(), where `schema = build_rich_schema(df)`
+      is currently called, REPLACE that single line with:
+        if len(df.columns) > 25:
+            relevant_cols = schema_retriever.retrieve_relevant_columns(
+                question, list(df.columns), k=12
+            )
+            schema = build_rich_schema(df, columns_subset=relevant_cols)
+        else:
+            schema = build_rich_schema(df)
+      This is the ONLY line being replaced. Nothing else in nlq_to_sql()
+      changes.
+
+   c) Add schema indexing trigger: in app.py, right after
+      `working_df = get_working_df()` (before st.tabs(...) line), ADD:
+        if working_df is not None and len(working_df.columns) > 25:
+            schema_indexer.index_schema_columns(working_df, "df")
+
+OUTPUT EXPECTATION:
+- Complete code for schema_indexer.py and schema_retriever.py.
+- Exact before/after diff for the 3 integration points listed above
+  (build_rich_schema signature change, nlq_to_sql schema line
+  replacement, app.py indexing trigger).
+- Confirm explicitly in your response: "For datasets with 25 or fewer
+  columns, zero behavior change occurs — full existing schema logic
+  runs exactly as before."
+- No new LLM calls introduced anywhere in this feature.

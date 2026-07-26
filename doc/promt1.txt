@@ -1,0 +1,122 @@
+CONTEXT:
+I have ONE large app.py file (attached/pasted below) containing everything:
+CSS, LLM init, session state, utilities, NLQ engine, auto-join engine,
+chart builder, analysis engine, KPI engine, data quality engine, and all
+4 Streamlit tabs (Join, Preview, KPI, Query) — all in a single file.
+
+The folder structure below already exists (created via scaffold script)
+with EMPTY stub files. Your job is ONLY to MOVE existing code into the
+correct files — NOT rewrite, NOT optimize, NOT change any logic,
+NOT rename any function, NOT change any variable name.
+
+TARGET FOLDER STRUCTURE (already created, files are empty):
+
+config/
+  settings.py       ← LLM init block + DEFAULTS session state dict
+  styles.py         ← the entire st.markdown("""<style>...""") CSS block
+  constants.py      ← _REV_CANDIDATES, _VOL_CANDIDATES, _DATE_CANDIDATES,
+                       _SEG_CANDIDATES, _MODEL_CANDIDATES, _REGION_CANDIDATES,
+                       _SALES_CANDIDATES, _MKTSH_CANDIDATES,
+                       _FIRST_NAME_CANDIDATES, _LAST_NAME_CANDIDATES
+
+core/
+  llm_client.py         ← call_llm() function only
+  sql_guardrails.py     ← _BLOCKED regex + sql_is_safe() function
+  schema_builder.py     ← build_rich_schema() function only
+  nlq_engine.py         ← nlq_to_sql(), run_sql(), enrich_query(),
+                           run_query(), update_history(), format_result_dates()
+  join_engine.py        ← _col_norm_map(), _join_score(), auto_join(),
+                           manual_join(), sql_join(), get_working_df()
+  chart_engine.py       ← auto_chart_type(), build_chart()
+  analysis_engine.py    ← generate_analysis(), _parse_analysis_response()
+  kpi_engine.py         ← _find_col(), _safe_sum(), _fmt_currency(),
+                           _fmt_number(), compute_kpis(), render_kpi_tab()
+  data_quality_engine.py← _is_metric_col(), compute_data_quality(),
+                           render_data_quality()
+  utils.py              ← clean_name(), norm(), load_files()
+
+ui/
+  sidebar.py         ← the entire "with st.sidebar:" block
+  tab_join.py         ← the entire "with tab_join:" block
+  tab_preview.py      ← the entire "with tab_preview:" block
+  tab_kpi.py          ← the entire "with tab_kpi:" block
+  tab_query.py        ← the entire "with tab_query:" block
+
+semantic/
+  business_glossary.yaml
+  semantic_context_builder.py
+  semantic_loader.py
+  semantic_model.yaml
+  semantic_vector_search.py
+
+app.py (rewritten to be THIN — only orchestration):
+  - imports from config/, core/, ui/
+  - st.set_page_config(...)
+  - apply styles
+  - session state init loop
+  - sidebar render call
+  - "if not st.session_state.dfs: st.stop()" guard
+  - tables = list(...) and working_df = get_working_df()
+  - st.tabs(...) creation
+  - calls into ui/tab_join.render(), ui/tab_preview.render(), etc.
+  - footer markdown
+
+CRITICAL RULES — DO NOT VIOLATE:
+1. Do NOT change any function name, parameter name, or logic.
+   This is a pure "cut and paste into new files" exercise, not a
+   refactor. Every line of logic must be byte-for-byte identical
+   to the original, only relocated.
+2. Do NOT change any variable names inside st.session_state.
+3. Do NOT optimize, simplify, combine, or "clean up" any code
+   during the move. If something looks messy in the original,
+   keep it exactly as messy in the new location.
+4. Every file that uses `st` must `import streamlit as st` at the
+   top. Every file that uses `pd` must `import pandas as pd`, etc.
+   Add ONLY the necessary imports — no unused imports.
+5. Cross-file dependencies must be wired with explicit imports.
+   Example: nlq_engine.py needs build_rich_schema from
+   schema_builder.py → add:
+     from core.schema_builder import build_rich_schema
+   And needs call_llm from llm_client.py → add:
+     from core.llm_client import call_llm
+   Map out ALL cross-file function calls and add the correct
+   imports — this is the most important part of this task.
+6. Each UI tab file (tab_join.py, tab_preview.py, tab_kpi.py,
+   tab_query.py) should expose ONE function:
+     def render(working_df, tables, dfs):
+   containing the exact original "with tab_x:" block content
+   (minus the "with tab_x:" wrapper itself, since app.py will
+   handle that). Pass in whatever variables that block originally
+   referenced from outer scope (working_df, st.session_state.dfs,
+   tables list, etc.) as function parameters.
+7. sidebar.py should expose:
+     def render():
+   containing the original "with st.sidebar:" block content.
+8. config/settings.py should expose:
+     def init_llm() -> object | None
+     DEFAULTS: dict
+     def init_session_state() -> None   (runs the existing for-loop)
+9. Keep the file header comment style consistent:
+     # ─────────────────────────────────────────────────────────
+     # SECTION NAME
+     # ─────────────────────────────────────────────────────────
+   exactly as it appears in the original file, at the top of each
+   new file, matching that section's original divider comment.
+10. After the split, app.py should be under 80 lines total.
+
+VERIFICATION STEP (do this after the split):
+   - List every function name from the original app.py.
+   - Confirm each one now exists in exactly ONE new file.
+   - Confirm no function was duplicated or dropped.
+   - Confirm streamlit run app.py would still produce IDENTICAL
+     UI behavior to the original single-file version.
+
+OUTPUT EXPECTATION:
+- Complete code for every new file listed above (config/, core/,
+  ui/, and the rewritten thin app.py).
+- A checklist table at the end mapping:
+     Original function/block → New file location
+  so I can verify nothing was missed or duplicated.
+- Do NOT proceed to implementing Materialized Views, RAG, or
+  Vector Schema Retrieval in this step — this prompt is ONLY the
+  file-splitting exercise. Those come in Prompts 1, 2, 3 afterward.

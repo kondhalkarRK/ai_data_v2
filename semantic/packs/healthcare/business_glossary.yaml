@@ -1,0 +1,86 @@
+# business_glossary.yaml
+# Business Glossary — Healthcare Domain (Demo Pack)
+
+version: "1.0"
+domain: "Healthcare"
+
+terms:
+
+  Claims:
+    definition: "Total monetary value billed across patient encounters"
+    synonyms:
+      - billed amount
+      - claim total
+      - reimbursement
+      - claim spend
+    maps_to_measure: total_claims
+    category: Financial
+
+  Visits:
+    definition: "Total number of patient encounters recorded"
+    synonyms:
+      - encounters
+      - admissions
+      - patient visits
+    maps_to_measure: encounter_count
+    category: Utilization
+
+  Length of Stay:
+    definition: "Average number of days a patient remains admitted per encounter"
+    synonyms:
+      - los
+      - avg los
+      - stay duration
+    maps_to_measure: avg_length_of_stay
+    category: Clinical
+
+  Readmission Rate:
+    definition: "Share of encounters where the patient was readmitted"
+    synonyms:
+      - readmit rate
+      - bounce back rate
+    maps_to_measure: readmission_rate
+    category: Quality
+
+  Physician:
+    definition: "A clinician who attends to and treats patients"
+    synonyms:
+      - doctor
+      - clinician
+      - provider
+      - attending
+    maps_to_dimension: Physician
+    category: People
+
+  Department:
+    definition: "A hospital department or clinical unit where care is delivered"
+    synonyms:
+      - unit
+      - ward
+      - clinic
+    maps_to_dimension: Department
+    category: Organization
+
+  Diagnosis:
+    definition: "The clinical condition identified for a patient encounter"
+    synonyms:
+      - condition
+      - illness
+      - icd code
+    maps_to_dimension: Diagnosis
+    category: Clinical
+
+  Active Physician:
+    definition: "A physician currently practicing and seeing patients"
+    synonyms:
+      - active doctor
+      - practicing clinician
+    category: People
+
+  Patient Volume Trend:
+    definition: "The directional pattern of patient encounter volume over time"
+    synonyms:
+      - volume trend
+      - admissions trend
+      - visit trend
+    category: Analytics

@@ -1,0 +1,99 @@
+1 .What percentage of our total salespeople sold more than one colour variant of the same car model in a single month?
+
+2. Show me the rolling 3-month average revenue and flag any month where revenue dropped more than 15% compared to the same month last year
+
+1.  What is the total revenue for all time?
+    → resolves: Revenue → SUM(total_sales)
+
+2.  How many orders were placed in 2023?
+    → resolves: Orders → COUNT(order_id), Date → sales_date
+
+3.  What is the total number of units sold by each car make?
+    → resolves: Units Sold → SUM(order_qty), Car → make
+Synonym Resolution (Where Semantic Layer Proves Its Value)
+4.  Who are the top 10 sellers by turnover?
+    → resolves: sellers   → Salesperson (dim_salesman)
+                turnover  → Revenue → SUM(total_sales)
+
+5.  Show me total earnings by automobile brand
+    → resolves: earnings  → Revenue → SUM(total_sales)
+                automobile → Vehicle → dim_carline
+                brand      → make (attribute of dim_carline)
+
+6.  Which agents generated the most income last year?
+    → resolves: agents    → Salesperson
+                income    → Revenue → SUM(total_sales)
+
+7.  What is the basket size per transaction by vehicle type?
+    → resolves: basket size      → Revenue Per Order
+                                   SUM(total_sales)/NULLIF(COUNT(order_id),0)
+                transaction      → Orders
+                vehicle type     → car_type (attribute of dim_carline)
+Multi-Dimension Complex Joins
+8.  Show monthly revenue breakdown by car type and paint colour
+    → resolves: monthly        → Date hierarchy → strftime('%Y-%m', sales_date)
+                revenue        → SUM(total_sales)
+                car type       → dim_carline.car_type
+                paint colour   → dim_color.colour_name
+    → requires: fact_sales
+                JOIN dim_carline ON carline_id
+                JOIN dim_color   ON colour_id
+                GROUP BY month, car_type, colour_name
+
+9.  Which salesperson sold the most vehicles in Q3 2023
+    and what was their average selling price?
+    → resolves: salesperson    → first_name || ' ' || last_name
+                vehicles       → Units Sold → SUM(order_qty)
+                Q3 2023        → Date → BETWEEN '2023-07-01' AND '2023-09-30'
+                avg price      → Average Selling Price
+                               → SUM(total_sales)/NULLIF(SUM(order_qty),0)
+    → requires: fact_sales JOIN dim_salesman ON sales_person_id
+
+10. Compare revenue per rep across all active salespeople
+    by engine type for the Ford make
+    → resolves: revenue per rep  → Revenue Per Salesperson
+                active           → dim_salesman.active = TRUE
+                engine type      → dim_carline.engine_type
+                Ford             → dim_carline.make = 'Ford'
+    → requires: fact_sales
+                JOIN dim_salesman ON sales_person_id
+                JOIN dim_carline  ON carline_id
+Hierarchy + Drill-Down Questions
+11. Show the vehicle drill from make down to car line
+    for the top 5 revenue-generating models
+    → resolves via Vehicle_Hierarchy:
+                make → car_type → model → carline_name
+                revenue → SUM(total_sales)
+
+12. Show year over year revenue trend
+    → resolves via Date_Hierarchy:
+                Year → strftime('%Y', sales_date)
+                revenue → SUM(total_sales)
+    → GPT generates:
+                SELECT strftime('%Y', sales_date) AS year,
+                       SUM(total_sales) AS revenue
+                FROM   fact_sales
+                GROUP BY year
+                ORDER BY year
+
+13. What is the quarterly sales volume by colour for 2022 and 2023?
+    → resolves: quarterly   → strftime('%Y-Q', sales_date)
+                sales volume → Units Sold → SUM(order_qty)
+                colour       → dim_color.colour_name
+    → requires: fact_sales JOIN dim_color ON colour_id
+Productivity & Ratio Measures
+14. What is the productivity of each sales consultant
+    broken down by car brand?
+    → resolves: productivity   → Revenue Per Salesperson
+                               → SUM(total_sales)/NULLIF(COUNT(DISTINCT
+                                 sales_person_id),0)
+                consultant     → Salesperson
+                car brand      → dim_carline.make
+
+15. Show headcount and revenue per agent
+    for each engine type ranked highest to lowest
+    → resolves: headcount      → Active Salespeople
+                               → COUNT(DISTINCT sales_person_id)
+                revenue per    → Revenue Per Salesperson
+                agent
+                engine type    → dim_carline.engine_type

@@ -1,0 +1,209 @@
+# business_glossary.yaml
+# Business Glossary — Automotive Sales Domain
+# Capgemini AI Data Platform V10
+
+version: "1.0"
+domain: "Automotive Sales"
+
+terms:
+
+  Revenue:
+    definition: "Total monetary value of all completed sales transactions"
+    synonyms:
+      - sales
+      - turnover
+      - income
+      - gross sales
+      - total sales
+      - earnings
+      - sales value
+      - top line
+    maps_to_measure: revenue
+    category: Financial
+
+  Units Sold:
+    definition: "Total count of vehicle units sold across all transactions"
+    synonyms:
+      - volume
+      - quantity sold
+      - vehicles sold
+      - cars sold
+      - units
+      - qty
+      - sales volume
+    maps_to_measure: units_sold
+    category: Sales Volume
+
+  Orders:
+    definition: "Total number of distinct sales orders placed"
+    synonyms:
+      - transactions
+      - deals
+      - bookings
+      - purchases
+      - order count
+      - sales count
+    maps_to_measure: orders
+    category: Sales Activity
+
+  Average Selling Price:
+    definition: "Revenue divided by units sold — average price achieved per vehicle"
+    synonyms:
+      - asp
+      - avg price
+      - average price
+      - price per unit
+      - mean selling price
+    maps_to_measure: average_selling_price
+    category: Pricing
+
+  Salesperson:
+    definition: "An individual member of the sales team responsible for closing vehicle sales"
+    synonyms:
+      - rep
+      - sales rep
+      - seller
+      - agent
+      - sales agent
+      - employee
+      - associate
+      - account manager
+      - consultant
+    maps_to_dimension: Salesperson
+    category: People
+
+  Vehicle:
+    definition: "A car or automobile product available in the sales catalogue"
+    synonyms:
+      - car
+      - automobile
+      - model
+      - carline
+      - product
+      - make
+      - brand
+    maps_to_dimension: Car
+    category: Product
+
+  Colour:
+    definition: "The exterior paint colour or finish of a vehicle"
+    synonyms:
+      - color
+      - paint
+      - finish
+      - colour variant
+      - paint color
+    maps_to_dimension: Colour
+    category: Product Attribute
+
+  Make:
+    definition: "The manufacturer or brand of a vehicle (e.g. Ford, Toyota)"
+    synonyms:
+      - brand
+      - manufacturer
+      - marque
+      - automaker
+    maps_to_attribute: dim_carline.make
+    category: Product
+
+  Model:
+    definition: "The specific vehicle model name within a make (e.g. Fiesta, Corolla)"
+    synonyms:
+      - car model
+      - vehicle model
+      - product name
+      - variant
+    maps_to_attribute: dim_carline.model
+    category: Product
+
+  Car Type:
+    definition: "The category or body style of a vehicle (e.g. SUV, Sedan, Hatchback)"
+    synonyms:
+      - body type
+      - vehicle type
+      - segment
+      - body style
+      - category
+      - class
+      - suv
+      - sedan
+      - hatchback
+      - estate
+      - coupe
+    maps_to_attribute: dim_carline.car_type
+    category: Product
+
+  Engine Type:
+    definition: "The powertrain or fuel type of the vehicle engine"
+    synonyms:
+      - powertrain
+      - fuel type
+      - drivetrain
+      - engine
+      - petrol
+      - diesel
+      - electric
+      - hybrid
+      - ev
+      - bev
+    maps_to_attribute: dim_carline.engine_type
+    category: Technical
+
+  Active Salesperson:
+    definition: "A salesperson currently employed and active in the sales team"
+    synonyms:
+      - active rep
+      - current employee
+      - active agent
+      - active staff
+    maps_to_measure: active_salespeople
+    category: People
+
+  YoY Growth:
+    definition: "Year-over-Year percentage change in a metric compared to the prior year"
+    synonyms:
+      - year on year
+      - annual growth
+      - yearly growth
+      - yoy
+      - year over year
+    category: Financial
+
+  Market Share:
+    definition: "Percentage of total market sales captured by a specific segment or model"
+    synonyms:
+      - share
+      - market portion
+      - share of market
+    category: Financial
+
+  Sales Trend:
+    definition: "The directional pattern of sales performance over a time period"
+    synonyms:
+      - trend
+      - trajectory
+      - performance over time
+      - monthly trend
+      - time series
+    category: Analytics
+
+  Top Performer:
+    definition: "The salesperson or product with the highest revenue or units sold"
+    synonyms:
+      - best seller
+      - top seller
+      - highest performer
+      - number one
+      - leading
+      - best performing
+    category: Performance
+
+  Productivity:
+    definition: "Revenue generated per salesperson — a measure of sales team efficiency"
+    synonyms:
+      - revenue per rep
+      - sales productivity
+      - per head revenue
+      - efficiency
+    maps_to_measure: revenue_per_salesperson
+    category: Performance

@@ -1,0 +1,10 @@
+# New dependency introduced by the OKF Knowledge Base feature
+# (features/okf_knowledge/). Nothing else in the app needs this.
+#
+# Install with: pip install -r requirements-okf.txt --break-system-packages
+#
+# Everything else the OKF feature uses (pyyaml, chromadb,
+# sentence-transformers, streamlit) is already required by the
+# existing app.
+
+pypdf>=4.0.0
