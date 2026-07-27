@@ -48,9 +48,9 @@ terms:
       - "Which make generates most revenue"
       - "Monthly revenue trend"
     disambiguation:
-      - If user says 'sales' without specifying count vs value, assume revenue (SUM total_sales) not order count
-      - 'sales performance' means revenue
-      - 'sales figures' means revenue
+      - "If user says 'sales' without specifying count vs value, assume revenue (SUM total_sales) not order count"
+      - "'sales performance' means revenue"
+      - "'sales figures' means revenue"
     category: Financial
     maps_to_measure: revenue
 
@@ -122,7 +122,7 @@ terms:
     disambiguation:
       - Different from Units Sold
       - One order can have multiple units
-      - Use when user asks 'how many orders' not 'how many units'
+      - "Use when user asks 'how many orders' not 'how many units'"
     category: Sales Activity
     maps_to_measure: orders
 
@@ -291,9 +291,9 @@ terms:
       year: "strftime('%Y', sales_date) AS year"
     calculation_rules:
       - QUARTER formula uses /3 not /4
-      - Month grouping always alias as 'month'
-      - Year grouping always alias as 'year'
-      - Quarter grouping always alias as 'quarter'
+      - "Month grouping always alias as 'month'"
+      - "Year grouping always alias as 'year'"
+      - "Quarter grouping always alias as 'quarter'"
       - For trend queries always ORDER BY time dim
     related_terms:
       - Revenue
@@ -490,7 +490,7 @@ domain_rules:
     - Never return more than 500 rows
     - Always concatenate first_name and last_name as salesperson_name
     - Always use meaningful column aliases
-    - For month grouping use strftime('%Y-%m') never DATE_TRUNC which returns timestamps
+    - "For month grouping use strftime('%Y-%m') never DATE_TRUNC which returns timestamps"
     - Quarter formula uses integer division by 3 not 4
   never_rules:
     - Never use price_per_unit for revenue
