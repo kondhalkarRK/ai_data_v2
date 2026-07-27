@@ -1,0 +1,1486 @@
+MASTER PROMPT: SEMANTIC-FIRST ARCHITECTURE + UI OVERHAUL
+==========================================================
+
+You are an expert Python/Streamlit engineer upgrading ai_data_v2.
+This prompt covers architecture simplification, UI redesign, and 
+feature enhancements. Follow every instruction precisely.
+
+════════════════════════════════════════════════════════════════
+SECTION 1 — ARCHITECTURE DECISION
+════════════════════════════════════════════════════════════════
+
+REMOVE deterministic SQL compilation layer for now.
+DO NOT use sql_compiler.py as the primary path.
+DO NOT use intent_resolver.py structured intent JSON.
+DO NOT use semantic_resolver.py execution contracts.
+
+PRIMARY PATH — use semantic layer only:
+  semantic_model.yaml     → business concepts
+  business_glossary.yaml  → term definitions + synonyms
+  semantic_vector_search  → resolve user terms
+  semantic_context_builder→ build rich LLM context
+  nlq_engine.nlq_to_sql() → LLM generates SQL with
+                             semantic context injected
+
+The semantic layer enriches the LLM prompt so it
+understands business terms, column mappings, and
+correct expressions BEFORE generating SQL.
+LLM still generates SQL but with full semantic grounding.
+
+KEEP these files working unchanged:
+  core/intent_cache.py        ← permanent cache
+  core/llm_client.py          ← LLM wrapper
+  core/sql_guardrails.py      ← safety checks
+  core/nlq_engine.run_sql()   ← DuckDB execution
+  features/rag_query_memory   ← RAG examples
+  features/materialized_views ← view caching
+  features/vector_schema_retrieval ← schema search
+
+════════════════════════════════════════════════════════════════
+SECTION 2 — BUSINESS GLOSSARY ENHANCEMENT
+════════════════════════════════════════════════════════════════
+
+FILE: semantic/business_glossary.yaml
+ACTION: Full enhancement — make it the most powerful
+        context source in the entire system
+
+The glossary must become a rich knowledge base that:
+  1. Defines every business term precisely
+  2. Maps synonyms to canonical terms
+  3. Provides correct SQL expressions
+  4. Specifies calculation rules
+  5. Defines display formats
+  6. Gives business context and rules
+  7. Provides example questions per term
+  8. Specifies related terms
+  9. Defines aggregation behaviour
+  10. Provides disambiguation rules
+
+ENHANCED GLOSSARY STRUCTURE:
+Each term must follow this shape:
+
+terms:
+  Revenue:
+    definition: >
+      Total monetary value of all completed 
+      sales transactions. Calculated as the 
+      sum of total_sales column across all 
+      orders. Represents top-line income.
+    
+    sql_expression: "SUM(total_sales)"
+    
+    aggregation: "SUM"
+    
+    source_column: "total_sales"
+    
+    format: "currency"
+    
+    display_label: "Revenue"
+    
+    synonyms:
+      - sales
+      - turnover
+      - income
+      - total revenue
+      - gross sales
+      - earnings
+      - money made
+      - sales value
+      - total sales
+      - revenue generated
+      - top line
+      - sales amount
+    
+    calculation_rules:
+      - Always use SUM aggregation
+      - Never average revenue unless
+        explicitly asked for average
+      - Include all order statuses
+        unless filtered
+      - Use total_sales column only
+        not price_per_unit
+    
+    related_terms:
+      - Units Sold
+      - Average Selling Price
+      - Revenue Per Order
+      - Revenue Per Salesperson
+    
+    example_questions:
+      - "Show revenue by colour"
+      - "Total revenue for 2023"
+      - "Revenue by salesperson"
+      - "Which make generates most revenue"
+      - "Monthly revenue trend"
+    
+    disambiguation:
+      - If user says 'sales' without 
+        specifying count vs value,
+        assume revenue (SUM total_sales)
+        not order count
+      - 'sales performance' means revenue
+      - 'sales figures' means revenue
+    
+    category: Financial
+
+ADD these fully enhanced terms following
+the same structure above:
+
+  Units Sold:
+    sql_expression: "SUM(order_qty)"
+    aggregation: SUM
+    source_column: order_qty
+    format: integer
+    synonyms: volume, quantity sold,
+      cars sold, vehicles sold, units,
+      qty, sales volume, number sold,
+      total units, how many sold
+    calculation_rules:
+      - Use order_qty not order count
+      - SUM not COUNT for quantity
+    example_questions:
+      - "How many units sold by colour"
+      - "Units sold per salesperson"
+      - "Total vehicles sold in 2023"
+
+  Orders:
+    sql_expression: "COUNT(order_id)"
+    aggregation: COUNT
+    source_column: order_id
+    format: integer
+    synonyms: order count, number of orders,
+      transactions, deals, bookings,
+      purchases, total orders, sales count
+    disambiguation:
+      - Different from Units Sold
+      - One order can have multiple units
+      - Use when user asks 'how many orders'
+        not 'how many units'
+
+  Average Selling Price:
+    sql_expression: >
+      SUM(total_sales) / NULLIF(SUM(order_qty), 0)
+    aggregation: ratio
+    format: currency
+    synonyms: avg price, average price,
+      mean price, price per unit, ASP,
+      average unit price, avg selling price,
+      typical price, price achieved
+    calculation_rules:
+      - Always derived — never direct column
+      - Must use NULLIF to avoid divide by zero
+      - Weighted average by quantity
+        not simple average of price column
+
+  Salesperson:
+    display_expression: >
+      first_name || ' ' || last_name
+    source_columns:
+      - first_name
+      - last_name
+    synonyms: sales rep, rep, seller,
+      agent, sales agent, sales person,
+      employee, staff, associate,
+      consultant, account manager,
+      who sold, which rep
+    calculation_rules:
+      - Always concatenate first + last name
+      - Never show ID alone
+      - Use AS salesperson_name alias
+
+  Vehicle / Car:
+    source_columns:
+      - carline_name
+      - model
+      - make
+      - car_type
+    synonyms: car, automobile, model,
+      carline, car line, product, make,
+      brand, vehicle type
+    dimension_columns:
+      make: manufacturer brand
+      model: specific vehicle model
+      car_type: SUV Sedan Hatchback etc
+      carline_name: full carline name
+
+  Colour:
+    source_column: colour_name
+    synonyms: color, paint, finish,
+      colour name, color name, vehicle color,
+      paint color, shade, hue
+    calculation_rules:
+      - Use colour_name column
+      - Case insensitive matching
+
+  Date / Time dimensions:
+    source_column: sales_date
+    synonyms: time, period, when, date,
+      sales date, order date, transaction date
+    time_grains:
+      day: "strftime('%Y-%m-%d', sales_date)"
+      month: "strftime('%Y-%m', sales_date) AS month"
+      quarter: >
+        strftime('%Y', sales_date) || '-Q' ||
+        CAST(((CAST(strftime('%m', sales_date)
+        AS INTEGER)-1)/3)+1 AS VARCHAR) AS quarter
+      year: "strftime('%Y', sales_date) AS year"
+    calculation_rules:
+      - QUARTER formula uses /3 not /4
+      - Month grouping always alias as 'month'
+      - Year grouping always alias as 'year'
+      - Quarter grouping always alias as 'quarter'
+      - For trend queries always ORDER BY time dim
+
+  Revenue Per Salesperson:
+    sql_expression: >
+      SUM(total_sales) /
+      NULLIF(COUNT(DISTINCT sales_person_id), 0)
+    format: currency
+    synonyms: revenue per rep, productivity,
+      sales per person, per head revenue,
+      revenue per agent, sales productivity
+
+  Revenue Per Order:
+    sql_expression: >
+      SUM(total_sales) /
+      NULLIF(COUNT(order_id), 0)
+    format: currency
+    synonyms: average order value, AOV,
+      order value, basket size,
+      value per transaction, avg order
+
+  Active Salespeople:
+    sql_expression: >
+      COUNT(DISTINCT sales_person_id)
+    format: integer
+    synonyms: active reps, headcount,
+      sales team size, number of salespeople,
+      distinct salespeople, how many reps
+
+ADD a new section to glossary:
+
+sql_patterns:
+  top_n_query:
+    description: "When user asks for top/best/highest N"
+    pattern: >
+      SELECT [dimensions], [measure]
+      FROM df
+      GROUP BY [dimensions]
+      ORDER BY [measure] DESC
+      LIMIT [n]
+    default_limit: 10
+    trigger_words:
+      - top, best, highest, most,
+        leading, greatest, maximum
+
+  bottom_n_query:
+    description: "When user asks for bottom/worst/lowest N"
+    pattern: >
+      ORDER BY [measure] ASC LIMIT [n]
+    trigger_words:
+      - bottom, worst, lowest, least,
+        minimum, poorest, weakest
+
+  time_series_query:
+    description: "When user asks for trend over time"
+    pattern: >
+      GROUP BY time_grain
+      ORDER BY time_grain ASC
+    trigger_words:
+      - trend, over time, by month,
+        by quarter, by year, monthly,
+        quarterly, yearly, time series,
+        how has changed, growth
+
+  comparison_query:
+    description: "When user compares two dimensions"
+    pattern: >
+      GROUP BY [dimension1], [dimension2]
+    trigger_words:
+      - compare, vs, versus, between,
+        difference, against
+
+ADD a domain_rules section:
+
+domain_rules:
+  always_rules:
+    - Never return more than 500 rows
+    - Always concatenate first_name and
+      last_name as salesperson_name
+    - Always use meaningful column aliases
+    - For month grouping use strftime('%Y-%m')
+      never DATE_TRUNC which returns timestamps
+    - Quarter formula uses integer division
+      by 3 not 4
+
+  never_rules:
+    - Never use price_per_unit for revenue
+    - Never average total_sales directly
+    - Never show raw IDs without labels
+    - Never use ORDER BY on unaggregated
+      columns when GROUP BY is present
+
+  default_behaviours:
+    - No LIMIT specified: add LIMIT 500
+    - Top/bottom without N: use 10
+    - Trend without grain: use monthly
+    - Date filter without year: use all years
+
+════════════════════════════════════════════════════════════════
+SECTION 3 — SEMANTIC CONTEXT BUILDER UPDATE
+════════════════════════════════════════════════════════════════
+
+FILE: semantic/semantic_context_builder.py
+ACTION: Update build_full_context() and 
+        build_base_context() to inject 
+        enhanced glossary into LLM prompts
+
+CHANGES:
+
+1. build_base_context() must include:
+   - All measures with sql_expression
+   - All dimensions with source columns
+   - All synonyms mapped to canonical names
+   - All sql_patterns from glossary
+   - All domain_rules from glossary
+   - All calculation_rules per term
+   - Example questions per term
+   Format as clear structured text block
+   that LLM can use as reference
+
+2. build_full_context(question, df) must:
+   - Call semantic vector search to find
+     terms relevant to THIS question
+   - Pull those terms' full definitions
+     from enhanced glossary
+   - Include their sql_expressions
+   - Include their calculation_rules
+   - Include disambiguation rules
+   - Format as "RESOLVED TERMS" block
+   This makes context question-specific
+   not just generic schema dump
+
+3. New method: build_glossary_sql_hints(
+     question: str
+   ) → str
+   
+   Scans question for known terms using
+   synonym matching from glossary.
+   Returns block like:
+   
+   "SQL HINTS FROM BUSINESS GLOSSARY:
+    - 'revenue' detected → use SUM(total_sales)
+    - 'by quarter' detected → use
+      strftime('%Y',sales_date)||'-Q'||
+      CAST(((CAST(strftime('%m',sales_date)
+      AS INTEGER)-1)/3)+1 AS VARCHAR)
+    - 'salesperson' detected → use
+      first_name || ' ' || last_name
+      AS salesperson_name"
+
+4. New method: build_domain_rules_block() → str
+   Returns formatted domain rules as
+   instruction block for LLM:
+   
+   "DOMAIN RULES (always follow):
+    - Concatenate first+last name for people
+    - Quarter uses /3 formula not /4
+    - Default LIMIT 500 if not specified
+    - strftime for month grouping always"
+
+════════════════════════════════════════════════════════════════
+SECTION 4 — NLQ ENGINE UPDATE
+════════════════════════════════════════════════════════════════
+
+FILE: core/nlq_engine.py
+ACTION: Update nlq_to_sql() to use full
+        semantic context as primary enrichment
+
+CHANGES to nlq_to_sql():
+
+1. Before building prompt:
+   - Call semantic_context_builder
+     .build_full_context(question, df)
+   - Call semantic_context_builder
+     .build_glossary_sql_hints(question)
+   - Call semantic_context_builder
+     .build_domain_rules_block()
+
+2. Update prompt structure:
+   Inject semantic context BEFORE schema:
+   
+   prompt = f"""
+   You are an expert DuckDB SQL generator.
+   
+   {semantic_context}
+   
+   {glossary_sql_hints}
+   
+   {domain_rules}
+   
+   TABLE NAME: df
+   {schema}
+   
+   {rag_glossary}
+   {rag_examples}
+   
+   RULES:
+   [existing rules kept]
+   [add: Follow all SQL HINTS above exactly]
+   [add: Apply all DOMAIN RULES above always]
+   
+   QUESTION: {question}
+   
+   SQL:"""
+
+3. Keep all existing fallback logic intact
+   Keep RAG memory intact
+   Keep guardrails intact
+   Keep cache intact
+
+════════════════════════════════════════════════════════════════
+SECTION 5 — TAB QUERY UI CHANGES
+════════════════════════════════════════════════════════════════
+
+FILE: ui/tab_query.py
+ACTION: Targeted changes only — do not full rewrite
+
+CHANGES:
+
+1. REMOVE mode selector entirely
+   No "Ask a Question" vs "Chat" toggle
+   The tab is only the query interface
+
+2. REMOVE suggested questions chips
+   Do not show any auto-suggested queries
+   below the input box
+
+3. KEEP the query input and run button
+
+4. ADD editable SQL panel:
+   After a query runs successfully,
+   show an editable SQL text area BELOW
+   the results with label:
+   "✏️ Edit SQL & Re-run"
+   
+   Implementation:
+   - Show st.text_area with the SQL used
+     key="editable_sql"
+     height=120
+     label="✏️ SQL (editable)"
+   
+   - Show button: "▶ Run Custom SQL"
+     key="run_custom_sql_btn"
+   
+   - When clicked:
+     custom_sql = st.session_state.editable_sql
+     result, err = run_sql(custom_sql, working_df)
+     If result: replace displayed result
+     If err: show error below button
+     Do NOT cache custom SQL runs
+     Do NOT update conversation state
+     Show badge: "🔧 Custom SQL"
+   
+   - Show helper text below:
+     "Tip: Edit the SQL above and click
+      Run to customise your query"
+
+5. KEEP existing result display:
+   Table view
+   Chart view
+   Download button
+   Query details expander
+
+6. REMOVE anomaly tab / anomaly features
+   from this tab entirely
+
+7. KEEP what-if detection:
+   When what-if query detected,
+   show scenario result card inline
+   in the same tab — no separate tab
+
+8. What-if result display — make interactive:
+   When WhatIfEngine returns result,
+   show:
+   
+   PANEL A — Scenario Inputs (editable):
+   Let user adjust the % change with
+   a st.slider() after initial result:
+   
+   "Adjust scenario: [slider -100 to +200%]"
+   
+   When slider moves: re-run scenario
+   with new value and update result live
+   using st.session_state
+   
+   PANEL B — Baseline vs Scenario metrics:
+   Side by side comparison cards
+   
+   PANEL C — Impact breakdown:
+   Show which dimensions are most affected
+   e.g. "Ford would gain most: +£48K"
+   
+   PANEL D — Narrative (always on for what-if):
+   Plain English explanation of scenario
+
+════════════════════════════════════════════════════════════════
+SECTION 6 — CHAT WITH DATA UI OVERHAUL
+════════════════════════════════════════════════════════════════
+
+FILE: ui/tab_query.py — chat section
+OR create: ui/components/chat_panel.py
+ACTION: Complete UI redesign of chat component
+
+REMOVE from chat:
+  - Suggestion buttons (💡 Suggest)
+  - What-if quick action button
+  - Anomaly quick action button
+  - Mode selector (Table/Narrative/Both radio)
+  - View mode complexity
+
+KEEP in chat:
+  - Narration toggle (simplified)
+  - Clear chat button
+  - Message history
+  - Chat input
+
+REDESIGN chat UI as follows:
+
+LAYOUT:
+┌──────────────────────────────────────────┐
+│  💬 Chat with Your Data                  │
+│  ─────────────────────────────────────── │
+│  [📖 Narration ON/OFF]    [🗑 Clear]     │
+│  ─────────────────────────────────────── │
+│                                          │
+│  [MESSAGE HISTORY AREA]                  │
+│   height: 480px                          │
+│   scrollable                             │
+│                                          │
+│  ─────────────────────────────────────── │
+│  ┌──────────────────────────────────┐    │
+│  │ Type your message...             │    │
+│  └──────────────────────────────────┘    │
+│  [Send ▶]  ← clearly visible button      │
+└──────────────────────────────────────────┘
+
+CONTROLS BAR:
+  Simple single row:
+  col1: st.toggle narration
+  col2: st.button clear chat
+  No other controls
+
+INPUT AREA:
+  Make input highly visible:
+  - Use st.chat_input() as primary input
+  - Style with clear border
+  - Placeholder: 
+    "Ask about your data, or just say hi..."
+  - Input must be at BOTTOM of chat container
+  - Always visible — not hidden below fold
+  - Use light contrasting colour for input area:
+    background: rgba(241, 245, 249, 0.05)
+    border: 1px solid rgba(148, 163, 184, 0.3)
+    NOT dark blue — use neutral light contrast
+
+MESSAGE COLOURS — replace all dark blue:
+  User bubble:
+    REMOVE: dark blue #4f46e5 gradient
+    USE: rgba(99, 102, 241, 0.15) — light indigo
+    border: 1px solid rgba(99, 102, 241, 0.3)
+    text: #e2e8f0
+    Feel: subtle, frosted glass look
+
+  Assistant bubble:
+    REMOVE: dark opaque backgrounds
+    USE: rgba(15, 23, 42, 0.4) — very subtle dark
+    border: 1px solid rgba(148, 163, 184, 0.12)
+    Feel: clean, minimal, content-forward
+
+  Narration card inside assistant bubble:
+    background: rgba(16, 185, 129, 0.06)
+    border-left: 3px solid #10b981
+    Feel: green accent, readable
+
+  Timestamp:
+    colour: #475569 — muted slate
+    font-size: 10px
+
+  Avatar circles:
+    User: rgba(99, 102, 241, 0.2) with
+          1px solid rgba(99, 102, 241, 0.4)
+          NOT solid dark blue fill
+    Assistant: rgba(16, 185, 129, 0.15) with
+               1px solid rgba(16,185,129,0.3)
+               NOT solid dark green fill
+
+GENERAL COLOUR PRINCIPLE:
+  Replace ALL solid dark blue buttons and
+  backgrounds with lighter alternatives:
+  
+  Primary action buttons:
+    background: rgba(99, 102, 241, 0.2)
+    border: 1px solid rgba(99, 102, 241, 0.4)
+    color: #a5b4fc
+    hover: rgba(99, 102, 241, 0.35)
+    NOT: solid #4f46e5 or #6366f1
+  
+  Secondary buttons:
+    background: rgba(148, 163, 184, 0.1)
+    border: 1px solid rgba(148, 163, 184, 0.2)
+    color: #94a3b8
+    hover: rgba(148, 163, 184, 0.2)
+  
+  Toggle ON state:
+    accent: #10b981 (green) — not blue
+  
+  Success indicators:
+    colour: #6ee7b7 — light green
+  
+  Info indicators:
+    colour: #93c5fd — light blue (not dark)
+
+CHAT BEHAVIOUR:
+
+1. NON-DATA QUESTIONS — LLM general chat:
+   When user sends a non-data message
+   (greetings, general questions, opinions):
+   
+   Detection — if message matches:
+     - Single word greetings:
+       hi, hello, hey, thanks, bye, ok
+     - General questions not about data:
+       "what can you do", "who are you",
+       "how does this work", "help"
+     - Casual conversation patterns:
+       no column names, no metric terms,
+       no data-related keywords detected
+   
+   Behaviour:
+     Do NOT call run_query()
+     Do NOT call DuckDB
+     Build a simple conversational prompt:
+     
+     prompt = f"""You are a helpful AI 
+     data assistant embedded in an analytics 
+     platform. The user is chatting with you.
+     Respond naturally and helpfully.
+     If they ask what you can do, explain
+     you can answer questions about their
+     uploaded data using natural language.
+     Keep responses concise (2-3 sentences).
+     
+     User: {question}
+     Assistant:"""
+     
+     Call call_llm(prompt) directly
+     Show response as assistant message
+     No data table, no badge, no evidence
+     Just conversational text response
+   
+   Example responses:
+     User: "hi"
+     Assistant: "Hi! I'm your AI data 
+     assistant. Ask me anything about 
+     your uploaded data — like 'show 
+     revenue by colour' or 'top 10 
+     salespeople'. What would you 
+     like to explore?"
+     
+     User: "thanks"
+     Assistant: "You're welcome! 
+     Let me know if you have more 
+     questions about your data."
+
+2. DATA QUESTIONS — existing pipeline:
+   When data-related question detected:
+   Use run_query() as normal
+   Show result with narration if enabled
+   Show badge and evidence
+
+3. DATA QUESTION DETECTION:
+   A message is data-related if it contains:
+   - Any known metric synonym from glossary
+   - Any column name from loaded df
+   - Question words with data context:
+     show, display, list, find, what is,
+     how many, which, top, bottom, total,
+     average, compare, trend, by, group
+   - What-if patterns
+
+4. CONVERSATION MEMORY:
+   Chat must remember conversation history
+   across the session (not just show history,
+   actually USE it for context):
+   
+   Build chat_history_context from last
+   5 exchanges:
+   
+   history_context = ""
+   for msg in chat_messages[-10:]:
+     role = "User" if msg.role=="user" 
+            else "Assistant"
+     if msg.message_type == "query":
+       history_context += f"{role}: {msg.content}\n"
+       if msg.data.get("result_summary"):
+         history_context += (
+           f"[Result: {msg.data['result_summary']}]\n"
+         )
+     else:
+       history_context += (
+         f"{role}: {msg.content}\n"
+       )
+   
+   Inject history_context into BOTH:
+   - The semantic context prompt (for data Q)
+   - The conversational prompt (for general Q)
+   
+   This lets user say:
+   "tell me more about that"
+   "why is the top one so high"
+   "now filter that by 2023"
+   And system understands the reference.
+
+5. RESULT DISPLAY IN CHAT:
+   Keep simple and clean:
+   
+   IF narration OFF:
+     Show: data table only
+            no text explanation
+   
+   IF narration ON:
+     Show: narration text first
+            then data table below
+            (no toggle between them)
+   
+   ALWAYS narrate for:
+     - Why questions
+     - What-if results
+     - Explanation requests
+     - Error explanations
+   
+   Keep data tables compact in chat:
+     max 10 rows shown
+     "Show all X rows" expander
+     for larger results
+
+════════════════════════════════════════════════════════════════
+SECTION 7 — WHAT-IF ENGINE (INTERACTIVE)
+════════════════════════════════════════════════════════════════
+
+FILE: features/whatif_engine.py
+ACTION: Create with interactive slider support
+
+WhatIfEngine class must implement:
+
+METHOD detect_whatif_query(question) → bool:
+  Triggers on patterns:
+    "what if", "if X changes",
+    "suppose", "assume", "simulate",
+    "what would happen if",
+    "if we increased/decreased",
+    "project", "scenario",
+    "what happens when",
+    numeric % change patterns
+
+METHOD parse_scenario(question, df) → dict:
+  Returns:
+  {
+    metric: str,
+    metric_column: str,
+    change_type: "percent" | "absolute",
+    change_value: float,
+    direction: "increase" | "decrease",
+    filter_dimension: str | None,
+    filter_value: str | None,
+    confidence: "high" | "medium" | "low"
+  }
+
+METHOD run_scenario(
+  df, scenario, override_value=None
+) → dict:
+  override_value: if slider moved,
+  use this instead of parsed value
+  
+  Returns:
+  {
+    baseline_total: float,
+    scenario_total: float,
+    delta_absolute: float,
+    delta_percent: float,
+    direction: "up" | "down",
+    dimension_impact: pd.DataFrame,
+    narrative: str,
+    assumptions: list[str],
+    change_applied: float
+  }
+  
+  dimension_impact shows how each category
+  within the top dimension is affected:
+  make, colour, or car_type breakdown
+  sorted by impact magnitude
+
+METHOD generate_interactive_result(
+  scenario_result, question
+) → None:
+  
+  Renders the full interactive what-if UI:
+  
+  STEP 1 — Narrative (always):
+  Show narrative text in narration card style
+  
+  STEP 2 — Metric cards row:
+  3 columns:
+    col1: Baseline value
+    col2: Arrow + delta %
+    col3: Scenario value
+  
+  STEP 3 — Interactive slider:
+  current = scenario_result.change_applied
+  
+  new_value = st.slider(
+    "Adjust scenario percentage",
+    min_value=-100,
+    max_value=200,
+    ════════════════════════════════════════════════════════════
+SECTION 7 — WHAT-IF ENGINE CONTINUED
+════════════════════════════════════════════════════════════════
+
+  new_value = st.slider(
+    "Adjust scenario percentage",
+    min_value=-100,
+    max_value=200,
+    value=int(current),
+    step=5,
+    format="%d%%",
+    key="whatif_slider"
+  )
+  
+  If new_value != current:
+    re-run scenario with override_value=new_value
+    update all cards live
+    update narrative live
+    use st.session_state to track
+  
+  STEP 4 — Dimension impact table:
+  Show which dimensions are most affected:
+  
+  st.markdown("**Impact by dimension:**")
+  st.dataframe(
+    scenario_result.dimension_impact,
+    use_container_width=True,
+    height=200
+  )
+  
+  STEP 5 — Assumptions list:
+  st.markdown("**Assumptions:**")
+  for assumption in assumptions:
+    st.caption(f"• {assumption}")
+
+════════════════════════════════════════════════════════════════
+SECTION 8 — NARRATION ENGINE
+════════════════════════════════════════════════════════════════
+
+FILE: features/narration_engine.py
+ACTION: Create lightweight narration engine
+        No LLM call for narration
+        Pure Python data-driven text generation
+
+NarrationEngine class:
+
+METHOD generate_narration(
+  result_df, question, intent=None
+) → dict:
+
+  Returns:
+  {
+    headline: str,
+    narrative_text: str,
+    key_findings: list[str],
+    recommendation: str | None,
+    result_summary: str
+  }
+
+  result_summary is short 1-line summary
+  stored in chat history for context:
+  "Revenue by colour: Black leads £420K,
+   8 colours, range £89K-£420K"
+
+  Detection logic:
+  
+  A) Count result columns and rows
+  B) Identify numeric columns (measures)
+  C) Identify text columns (dimensions)
+  D) Detect result type:
+     - 1 row, 1 col → scalar
+     - 1 dimension, 1 measure → ranked list
+     - 2+ dimensions → grouped
+     - time column present → trend
+     - 2 measures → comparison
+  
+  E) Generate appropriate text:
+  
+  SCALAR:
+  headline = f"Total {metric_label}"
+  narrative = f"The total {metric_label} 
+    across all records is {value_formatted}."
+  
+  RANKED LIST (most common):
+  top = df.iloc[0]
+  bottom = df.iloc[-1]
+  total = df[value_col].sum()
+  top_pct = top[value_col] / total * 100
+  
+  headline = f"{metric_label} by {dim_label}"
+  narrative = (
+    f"Across {len(df)} {dim_label} values, "
+    f"{top[dim_col]} leads with "
+    f"{format_value(top[value_col])} "
+    f"({top_pct:.0f}% of total). "
+    f"{bottom[dim_col]} is lowest at "
+    f"{format_value(bottom[value_col])}. "
+    f"Total {metric_label}: "
+    f"{format_value(total)}."
+  )
+  
+  key_findings = [
+    f"{top[dim_col]} holds the top position 
+      with {top_pct:.0f}% share",
+    f"Top 3 account for 
+      {top3_pct:.0f}% of total",
+    f"Range spans from 
+      {format_value(bottom[value_col])} 
+      to {format_value(top[value_col])}"
+  ]
+  
+  TREND:
+  latest = df.iloc[-1]
+  prior = df.iloc[-2] if len(df)>1 else None
+  
+  if prior:
+    change = (latest[val]-prior[val])/prior[val]*100
+    direction = "up" if change > 0 else "down"
+    
+  narrative = (
+    f"The {metric_label} trend shows "
+    f"{len(df)} periods. "
+    f"The most recent period "
+    f"({latest[time_col]}) reached "
+    f"{format_value(latest[val_col])}"
+    f"{f', {direction} {abs(change):.1f}% "
+       f"from prior period' if prior else ''}. "
+    f"Average across all periods: "
+    f"{format_value(df[val_col].mean())}."
+  )
+  
+  GROUPED (2 dimensions):
+  narrative = (
+    f"Breaking down {metric_label} across "
+    f"{len(df)} combinations of "
+    f"{dim1_label} and {dim2_label}. "
+    f"{top[dim1_col]} / {top[dim2_col]} "
+    f"leads at "
+    f"{format_value(top[val_col])}."
+  )
+
+METHOD format_value(value, format_type) → str:
+  currency: £1,234,567 or £1.2M for large
+  integer: 1,234
+  percent: 12.3%
+  decimal: 1,234.56
+  
+  For currency over 1M:
+    use £1.2M format
+  For currency over 1K:
+    use £42.3K format
+  For currency under 1K:
+    use £423 format
+
+METHOD should_auto_narrate(question) → bool:
+  Returns True for:
+  why, explain, describe, tell me about,
+  what does this mean, analyse, analysis,
+  insights, summary, overview, understand,
+  what if (always narrate what-if)
+
+════════════════════════════════════════════════════════════════
+SECTION 9 — PROACTIVE ENGINE (SIMPLIFIED)
+════════════════════════════════════════════════════════════════
+
+FILE: features/proactive_engine.py
+ACTION: Create — no suggestions, no chips
+        Only used for welcome screen insights
+        and post-result context in ask mode
+
+ProactiveEngine class:
+
+METHOD generate_proactive_insights(
+  df, limit=4
+) → list[dict]:
+  
+  Cache using df shape+columns hash
+  Only run 4 detection checks:
+  
+  A) TOP PERFORMER:
+     Find numeric column with highest
+     variance — find top category
+     
+  B) RECENT TREND:
+     Only if date column exists
+     Compare last period to prior
+     
+  C) CONCENTRATION:
+     Find if any single category
+     holds over 40% of any metric
+     
+  D) LOWEST PERFORMER:
+     Find dimension with lowest metric
+     Flag as potential opportunity
+  
+  Each insight:
+  {
+    type: str,
+    title: str,
+    summary: str,
+    direction: "up"|"down"|"neutral",
+    suggested_question: str,
+    priority: int
+  }
+  
+  NO render methods here
+  NO HTML generation here
+  Just return clean data dicts
+  Rendering done in tab_query.py
+
+════════════════════════════════════════════════════════════════
+SECTION 10 — CONVERSATION STATE UPDATE
+════════════════════════════════════════════════════════════════
+
+FILE: core/conversation_state.py
+ACTION: Update to support chat memory
+
+ADD to ConversationState:
+
+  chat_history: list of last 5 exchanges
+  Each exchange:
+  {
+    user_question: str,
+    result_summary: str | None,
+    metric_used: str | None,
+    dimensions_used: list[str],
+    was_data_query: bool
+  }
+
+FUNCTION build_chat_context_string(
+  n_turns=5
+) → str:
+
+  Builds context string for LLM injection:
+  
+  "CONVERSATION HISTORY (last {n} turns):
+   User: show revenue by colour
+   Result: Revenue by colour — 
+           Black leads £420K, 8 colours
+   User: what about by make
+   Result: Revenue by make — 
+           Ford leads £580K, 5 makes
+   User: [current question]"
+  
+  This is injected into both:
+  - Data query LLM prompts
+  - Conversational LLM prompts
+
+FUNCTION is_data_question(
+  question: str,
+  df: pd.DataFrame
+) → bool:
+
+  Returns True if question is data-related.
+  
+  Check order:
+  1. Contains any column name from df
+  2. Contains any metric synonym from
+     business_glossary.yaml
+  3. Contains data trigger words:
+     show, display, list, find, top,
+     bottom, total, average, compare,
+     trend, by, group, which, how many,
+     what is, revenue, sales, units,
+     orders, colour, make, model,
+     salesperson, year, month, quarter
+  4. Is a what-if pattern
+  
+  If none match → return False
+  (treat as conversational)
+
+════════════════════════════════════════════════════════════════
+SECTION 11 — STYLES UPDATE
+════════════════════════════════════════════════════════════════
+
+FILE: config/styles.py
+ACTION: Update colour palette throughout
+
+GLOBAL COLOUR REPLACEMENTS:
+Replace ALL instances of:
+  #4f46e5  → rgba(99, 102, 241, 0.2)
+  #6366f1  → #818cf8 (lighter indigo)
+  solid dark blue fills → frosted glass style
+
+NEW PALETTE:
+
+Primary accent (indigo):
+  light:  #818cf8
+  medium: rgba(99, 102, 241, 0.3)
+  bg:     rgba(99, 102, 241, 0.08)
+  border: rgba(99, 102, 241, 0.2)
+
+Success (green):
+  light:  #6ee7b7
+  medium: #34d399
+  bg:     rgba(16, 185, 129, 0.08)
+  border: rgba(16, 185, 129, 0.2)
+
+Warning (amber):
+  light:  #fcd34d
+  bg:     rgba(245, 158, 11, 0.08)
+  border: rgba(245, 158, 11, 0.2)
+
+Error (red):
+  light:  #fca5a5
+  bg:     rgba(239, 68, 68, 0.08)
+  border: rgba(239, 68, 68, 0.15)
+
+Neutral:
+  text primary:    #e2e8f0
+  text secondary:  #94a3b8
+  text muted:      #64748b
+  surface:         rgba(15, 23, 42, 0.6)
+  surface light:   rgba(30, 41, 59, 0.5)
+  border:          rgba(148, 163, 184, 0.12)
+
+BUTTON STYLES:
+Primary button:
+  background: rgba(99, 102, 241, 0.15)
+  border: 1px solid rgba(99, 102, 241, 0.35)
+  color: #a5b4fc
+  hover bg: rgba(99, 102, 241, 0.28)
+  hover border: rgba(99, 102, 241, 0.5)
+  border-radius: 8px
+  font-weight: 600
+  NOT solid dark blue
+
+Secondary button:
+  background: rgba(148, 163, 184, 0.08)
+  border: 1px solid rgba(148, 163, 184, 0.18)
+  color: #94a3b8
+  hover bg: rgba(148, 163, 184, 0.15)
+
+Danger button (clear/delete):
+  background: rgba(239, 68, 68, 0.08)
+  border: 1px solid rgba(239, 68, 68, 0.2)
+  color: #fca5a5
+
+CHAT INPUT AREA:
+  background: rgba(30, 41, 59, 0.6)
+  border: 1px solid rgba(148, 163, 184, 0.25)
+  border-radius: 12px
+  color: #e2e8f0
+  placeholder color: #64748b
+  focus border: rgba(129, 140, 248, 0.5)
+  focus shadow: 0 0 0 3px rgba(99,102,241,0.1)
+  Make clearly visible — not dark on dark
+
+USER BUBBLE IN CHAT:
+  background: rgba(99, 102, 241, 0.12)
+  border: 1px solid rgba(99, 102, 241, 0.25)
+  border-radius: 18px 18px 4px 18px
+  color: #e2e8f0
+  NOT solid purple/blue
+
+ASSISTANT BUBBLE IN CHAT:
+  background: rgba(15, 23, 42, 0.5)
+  border: 1px solid rgba(148, 163, 184, 0.1)
+  border-radius: 4px 18px 18px 18px
+  color: #cbd5e1
+
+AVATAR CIRCLES:
+  User avatar:
+    background: rgba(99, 102, 241, 0.15)
+    border: 1px solid rgba(99, 102, 241, 0.3)
+    color: #818cf8
+    NOT solid dark fill
+
+  Assistant avatar:
+    background: rgba(16, 185, 129, 0.12)
+    border: 1px solid rgba(16, 185, 129, 0.25)
+    color: #34d399
+
+NARRATION CARD:
+  background: rgba(16, 185, 129, 0.05)
+  border-left: 3px solid #34d399
+  border: 1px solid rgba(16, 185, 129, 0.15)
+  border-radius: 0 8px 8px 0
+  padding: 14px 18px
+
+BADGE STYLES:
+  Deterministic (green):
+    background: rgba(16, 185, 129, 0.12)
+    border: 1px solid rgba(16, 185, 129, 0.3)
+    color: #6ee7b7
+    
+  Fallback (amber):
+    background: rgba(245, 158, 11, 0.12)
+    border: 1px solid rgba(245, 158, 11, 0.3)
+    color: #fcd34d
+    
+  Cached (blue):
+    background: rgba(99, 102, 241, 0.12)
+    border: 1px solid rgba(129, 140, 248, 0.3)
+    color: #a5b4fc
+    
+  Custom SQL (purple):
+    background: rgba(168, 85, 247, 0.12)
+    border: 1px solid rgba(168, 85, 247, 0.3)
+    color: #d8b4fe
+
+════════════════════════════════════════════════════════════════
+SECTION 12 — COMPLETE FILE CHANGE SUMMARY
+════════════════════════════════════════════════════════════════
+
+NEW FILES TO CREATE:
+  semantic/metric_registry.yaml
+    → From Section 2 enhanced glossary
+    → Standalone metric definitions
+    
+  features/whatif_engine.py
+    → From Section 7
+    → Interactive slider support
+    → Dimension impact breakdown
+    
+  features/narration_engine.py
+    → From Section 8
+    → Pure Python — no LLM calls
+    → Data-driven text generation
+    
+  features/proactive_engine.py
+    → From Section 9
+    → Simplified — data only
+    → No render methods
+
+FILES TO CHANGE:
+  semantic/business_glossary.yaml
+    → Full enhancement Section 2
+    → sql_expressions per term
+    → sql_patterns section
+    → domain_rules section
+    → example_questions per term
+    → calculation_rules per term
+    → disambiguation rules per term
+
+  semantic/semantic_context_builder.py
+    → Section 3 changes
+    → build_glossary_sql_hints()
+    → build_domain_rules_block()
+    → build_full_context() update
+
+  semantic/semantic_loader.py
+    → Load enhanced glossary fields
+    → Expose sql_expressions map
+    → Expose domain_rules
+    → Expose sql_patterns
+    → Expose calculation_rules
+
+  core/nlq_engine.py
+    → Section 4 changes
+    → Inject semantic context first
+    → Inject glossary SQL hints
+    → Inject domain rules
+    → Keep all fallback logic intact
+
+  core/conversation_state.py
+    → Section 10 changes
+    → chat_history tracking
+    → build_chat_context_string()
+    → is_data_question()
+
+  ui/tab_query.py
+    → Section 5 changes (ask mode)
+    → Section 6 changes (chat mode)
+    → Remove: mode selector
+    → Remove: suggested question chips
+    → Remove: anomaly features
+    → Add: editable SQL panel
+    → Add: interactive what-if slider
+    → Add: is_data_question routing
+    → Add: conversational LLM for non-data
+    → Add: chat history injection
+    → Redesign: chat bubble colours
+    → Redesign: input visibility
+
+  config/styles.py
+    → Section 11 full colour update
+    → Replace all dark blue
+    → Frosted glass aesthetic
+    → Light contrast input area
+
+FILES NOT TO CHANGE:
+  core/intent_cache.py
+  core/llm_client.py
+  core/sql_guardrails.py
+  core/utils.py
+  core/intent_resolver.py    ← keep but not primary
+  core/sql_compiler.py       ← keep but not primary
+  ui/tab_preview.py
+  ui/tab_join.py
+  features/rag_query_memory
+  features/materialized_views
+  features/vector_schema_retrieval
+
+════════════════════════════════════════════════════════════════
+SECTION 13 — TESTING CHECKLIST
+════════════════════════════════════════════════════════════════
+
+SEMANTIC LAYER TESTS:
+  □ "show revenue by colour"
+    → glossary resolves revenue=SUM(total_sales)
+    → SQL hints injected into prompt
+    → Correct SQL generated
+
+  □ "top 10 salespeople by turnover"
+    → synonym 'turnover' → Revenue
+    → first_name||' '||last_name used
+    → ORDER BY DESC LIMIT 10
+
+  □ "monthly trend for 2023"
+    → time grain = month
+    → strftime('%Y-%m') used not DATE_TRUNC
+    → ORDER BY month ASC
+
+  □ "revenue by quarter"
+    → quarter formula uses /3 not /4
+    → July = Q3 confirmed
+    → October/November = Q4 confirmed
+
+  □ "sales by make"
+    → 'sales' resolved to Revenue
+    → make column used correctly
+
+EDITABLE SQL TESTS:
+  □ Query runs → SQL shown in text area
+  □ Edit SQL → click Run → new result shown
+  □ Custom SQL badge shown
+  □ Invalid SQL → error shown below button
+  □ Custom run does NOT update cache
+
+CHAT TESTS:
+  □ "hi" → conversational response
+    → no data table shown
+    → no badge shown
+    → friendly greeting returned
+
+  □ "what can you do" → explanation response
+    → describes data capabilities
+
+  □ "show revenue by colour" → data query
+    → run_query called
+    → result shown in chat
+
+  □ "tell me more about that" → uses history
+    → references prior result context
+
+  □ "same but for 2023" → follow-up works
+    → prior metric inherited
+
+  □ Narration ON → narrative shown above table
+  □ Narration OFF → table only shown
+  □ "why is X low" → narration auto-on
+  □ Clear chat → history wiped
+  □ Chat input clearly visible at bottom
+  □ No dark blue bubbles visible
+
+WHAT-IF TESTS:
+  □ "what if revenue increased 20%"
+    → scenario card shown
+    → baseline vs scenario cards
+    → slider rendered
+    □ Move slider → values update live
+    □ Dimension impact table shown
+    □ Narrative always shown
+
+  □ "what if Ford sales dropped 15%"
+    → filter-scoped scenario
+    → only Ford rows affected
+
+COLOUR TESTS:
+  □ No solid dark blue buttons visible
+  □ User bubbles are light frosted glass
+  □ Chat input clearly visible
+  □ Avatars are light ring style
+  □ Badges use correct colours
+  □ Narration card uses green accent
+
+PROACTIVE ENGINE TESTS:
+  □ Upload CSV → insights generated
+  □ Second call → uses cached insights
+  □ No suggested question chips shown
+  □ Insights in welcome screen only
+
+════════════════════════════════════════════════════════════════
+IMPORTANT IMPLEMENTATION NOTES
+════════════════════════════════════════════════════════════════
+
+NOTE 1 — SEMANTIC LAYER IS PRIMARY:
+The enhanced business_glossary.yaml and
+semantic_context_builder are now the most
+important components. Invest quality here.
+The LLM prompt must receive:
+  1. Semantic context first
+  2. Glossary SQL hints second
+  3. Domain rules third
+  4. Schema fourth
+  5. RAG examples fifth
+
+NOTE 2 — NO DETERMINISTIC SQL:
+Do not route through sql_compiler.py
+as primary path. Keep the file but it
+is not called for standard queries.
+All SQL comes from LLM enriched by
+the semantic + glossary context.
+
+NOTE 3 — CONVERSATIONAL LLM:
+The is_data_question() check is critical.
+When False, use simple conversational prompt.
+When True, use full semantic pipeline.
+This makes chat feel natural and smart.
+
+NOTE 4 — CHAT HISTORY IS CONTEXT:
+The last 5 exchanges must be injected
+into every prompt. This is what makes
+"tell me more" and "same but for X"
+work correctly without complex follow-up
+detection logic.
+
+NOTE 5 — WHAT-IF SLIDER PERFORMANCE:
+The slider re-runs scenario on every move.
+Use st.session_state to store last result.
+Only re-run when value actually changes.
+The scenario runs on DataFrame in memory
+so should be fast enough for live updates.
+
+NOTE 6 — NARRATION IS PURE PYTHON:
+NarrationEngine must NOT call the LLM.
+All narration is generated from data patterns.
+This keeps it fast, free, and consistent.
+LLM is only used for:
+  1. SQL generation (semantic enriched)
+  2. Conversational responses
+
+NOTE 7 — GLOSSARY IS SOURCE OF TRUTH:
+Any SQL expression in the codebase that
+conflicts with business_glossary.yaml
+should be updated to match the glossary.
+The glossary defines correct calculations.
+Quarter formula in glossary overrides
+any other version in the codebase.
+
+END OF MASTER PROMPT
