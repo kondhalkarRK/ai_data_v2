@@ -38,12 +38,9 @@ class SemanticContextBuilder:
 
     def build_base_context(self) -> str:
         """
-        Builds the static semantic context block.
-        Used as the core business model description for GPT.
+        Builds the static semantic context block including enhanced glossary.
         """
         loader = self._loader
-
-        # ── Business Model Header ────────────────────────────────
         lines = [
             "═══════════════════════════════════════════════",
             "BUSINESS MODEL — SEMANTIC LAYER",
@@ -51,90 +48,260 @@ class SemanticContextBuilder:
             "",
         ]
 
-        # ── Fact Table ───────────────────────────────────────────
-        tables = loader.get_tables()
-        fact_tables = [
-            (k, v) for k, v in tables.items()
-            if v.get("type") == "fact"
-        ]
-        if fact_tables:
-            lines.append("FACT TABLE:")
-            for tname, tval in fact_tables:
+        # Glossary measures / terms with SQL
+        glossary = loader.get_glossary()
+        if glossary:
+            lines.append("BUSINESS GLOSSARY (canonical terms):")
+            for term, val in glossary.items():
+                display = val.get("display_label") or term
+                expr = val.get("sql_expression") or val.get("display_expression") or ""
+                if isinstance(expr, str):
+                    expr = " ".join(expr.split())
+                fmt = val.get("format", "")
+                syns = val.get("synonyms", [])[:6]
+                syn_str = ", ".join(syns) if syns else ""
                 lines.append(
-                    f"  {tname} — {tval.get('display_name', tname)}"
+                    f"  {display}"
+                    + (f": {expr}" if expr else "")
+                    + (f"  [{fmt}]" if fmt else "")
+                    + (f"  [also: {syn_str}]" if syn_str else "")
                 )
-                lines.append(
-                    f"  Grain: {tval.get('grain', 'N/A')}"
-                )
+                for rule in (val.get("calculation_rules") or [])[:3]:
+                    lines.append(f"    rule: {rule}")
+                for ex in (val.get("example_questions") or [])[:2]:
+                    lines.append(f"    e.g. {ex}")
             lines.append("")
 
-        # ── Dimension Tables ─────────────────────────────────────
-        dim_tables = [
-            (k, v) for k, v in tables.items()
-            if v.get("type") == "dimension"
-        ]
-        if dim_tables:
-            lines.append("DIMENSION TABLES:")
-            for tname, tval in dim_tables:
-                lines.append(
-                    f"  {tname} — {tval.get('display_name', tname)}"
-                )
+        # SQL patterns
+        patterns = loader.get_sql_patterns()
+        if patterns:
+            lines.append("SQL PATTERNS:")
+            for pname, pval in patterns.items():
+                desc = pval.get("description", pname)
+                triggers = pval.get("trigger_words", [])
+                if isinstance(triggers, list):
+                    trig = ", ".join(str(t) for t in triggers[:8])
+                else:
+                    trig = str(triggers)
+                lines.append(f"  {pname}: {desc}")
+                if trig:
+                    lines.append(f"    triggers: {trig}")
+                if pval.get("pattern"):
+                    pat = " ".join(str(pval["pattern"]).split())
+                    lines.append(f"    pattern: {pat}")
             lines.append("")
 
-        # ── Semantic Dimensions ──────────────────────────────────
+        # Domain rules
+        rules = loader.get_domain_rules()
+        if rules:
+            lines.append("DOMAIN RULES:")
+            for section in ("always_rules", "never_rules", "default_behaviours"):
+                for r in rules.get(section, []) or []:
+                    lines.append(f"  - [{section}] {r}")
+            lines.append("")
+
+        # Semantic model measures (fallback/extra)
+        measures = loader.get_measures()
+        if measures:
+            lines.append("SEMANTIC MODEL MEASURES:")
+            for mname, mval in measures.items():
+                display = mval.get("display_name", mname)
+                expr = mval.get("expression", "")
+                lines.append(f"  {display}: {expr}")
+            lines.append("")
+
         dimensions = loader.get_dimensions()
         if dimensions:
             lines.append("BUSINESS DIMENSIONS:")
             for dname, dval in dimensions.items():
-                display  = dval.get("display_name", dname)
-                src_tbl  = dval.get("source_table", "")
-                attrs    = dval.get("attributes", [])
-                syns     = dval.get("synonyms", [])[:4]
-                syn_str  = ", ".join(syns) if syns else ""
-                lines.append(
-                    f"  {display}"
-                    f"  (source: {src_tbl})"
-                    + (f"  [also: {syn_str}]" if syn_str else "")
-                )
-                if attrs:
-                    lines.append(f"    Attributes: {', '.join(attrs)}")
-            lines.append("")
-
-        # ── Semantic Measures ────────────────────────────────────
-        measures = loader.get_measures()
-        if measures:
-            lines.append("BUSINESS MEASURES:")
-            for mname, mval in measures.items():
-                display = mval.get("display_name", mname)
-                expr    = mval.get("expression", "")
-                fmt     = mval.get("format", "")
-                syns    = mval.get("synonyms", [])[:4]
+                display = dval.get("display_name", dname)
+                syns = dval.get("synonyms", [])[:4]
                 syn_str = ", ".join(syns) if syns else ""
                 lines.append(
-                    f"  {display}: {expr}"
-                    + (f"  [format: {fmt}]" if fmt else "")
+                    f"  {display}"
                     + (f"  [also: {syn_str}]" if syn_str else "")
                 )
-            lines.append("")
-
-        # ── Relationships ────────────────────────────────────────
-        rel_strings = loader.get_relationship_strings()
-        if rel_strings:
-            lines.append("RELATIONSHIPS:")
-            for rel in rel_strings:
-                lines.append(f"  {rel}")
-            lines.append("")
-
-        # ── Available Attributes ─────────────────────────────────
-        attrs = loader.get_available_attributes()
-        if attrs:
-            lines.append("AVAILABLE ATTRIBUTES:")
-            lines.append(f"  {', '.join(attrs)}")
             lines.append("")
 
         lines.append("═══════════════════════════════════════════════")
-
         return "\n".join(lines)
+
+    def build_glossary_sql_hints(self, question: str) -> str:
+        """Scan question for glossary terms and return SQL hints."""
+        if not question:
+            return ""
+        q = question.lower()
+        loader = self._loader
+        glossary = loader.get_glossary()
+        hints: list[str] = []
+        seen = set()
+
+        # Longest synonym first for better matching
+        candidates: list[tuple[str, str, dict]] = []
+        for term, val in glossary.items():
+            candidates.append((term.lower(), term, val))
+            for syn in val.get("synonyms", []) or []:
+                candidates.append((str(syn).lower(), term, val))
+        candidates.sort(key=lambda x: len(x[0]), reverse=True)
+
+        for phrase, term, val in candidates:
+            if not phrase or term in seen:
+                continue
+            # word-boundary-ish match
+            if phrase in q:
+                seen.add(term)
+                expr = val.get("sql_expression") or val.get("display_expression")
+                if isinstance(expr, str) and expr.strip():
+                    expr = " ".join(expr.split())
+                    hints.append(f"  - '{phrase}' detected → use {expr}")
+                # time grains
+                grains = val.get("time_grains") or {}
+                for gname, gexpr in grains.items():
+                    if gname in q or f"by {gname}" in q:
+                        gexpr_c = " ".join(str(gexpr).split())
+                        hints.append(f"  - 'by {gname}' detected → use {gexpr_c}")
+
+        # Pattern triggers
+        for pname, pval in (loader.get_sql_patterns() or {}).items():
+            triggers = pval.get("trigger_words") or []
+            trig_list = triggers if isinstance(triggers, list) else str(triggers).split(",")
+            for t in trig_list:
+                t = str(t).strip().lower()
+                if t and t in q:
+                    pat = " ".join(str(pval.get("pattern", "")).split())
+                    if pat:
+                        hints.append(f"  - pattern '{pname}' triggered → {pat}")
+                    break
+
+        if not hints:
+            return ""
+        return "SQL HINTS FROM BUSINESS GLOSSARY:\n" + "\n".join(hints[:12])
+
+    def build_domain_rules_block(self) -> str:
+        """Formatted domain rules instruction block for LLM."""
+        rules = self._loader.get_domain_rules() or {}
+        lines = ["DOMAIN RULES (always follow):"]
+        for r in (rules.get("always_rules") or [])[:6]:
+            lines.append(f"  - {r}")
+        for r in (rules.get("never_rules") or [])[:4]:
+            lines.append(f"  - NEVER: {r}")
+        for r in (rules.get("default_behaviours") or [])[:4]:
+            lines.append(f"  - DEFAULT: {r}")
+        if len(lines) == 1:
+            lines.extend([
+                "  - Concatenate first+last name for people",
+                "  - Quarter uses /3 formula not /4",
+                "  - Default LIMIT 500 if not specified",
+                "  - strftime for month grouping always",
+            ])
+        return "\n".join(lines)
+
+    def build_resolved_glossary_block(self, question: str, resolutions: dict) -> str:
+        """Pull full glossary definitions for terms relevant to this question."""
+        loader = self._loader
+        glossary = loader.get_glossary()
+        relevant: list[str] = []
+
+        # From vector resolutions
+        for m in resolutions.get("resolved_measures", []) or []:
+            relevant.append(str(m))
+        for d in resolutions.get("resolved_dimensions", []) or []:
+            relevant.append(str(d))
+        for orig, canon in (resolutions.get("resolution_map") or {}).items():
+            relevant.append(str(canon))
+
+        # From synonym scan
+        q = (question or "").lower()
+        for term, val in glossary.items():
+            if term.lower() in q:
+                relevant.append(term)
+            for syn in val.get("synonyms", []) or []:
+                if str(syn).lower() in q:
+                    relevant.append(term)
+
+        # de-dupe
+        seen = set()
+        terms = []
+        for t in relevant:
+            key = t.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            # resolve to glossary key
+            hit = None
+            for gterm in glossary:
+                if gterm.lower() == key or gterm.lower() == t.lower():
+                    hit = gterm
+                    break
+            if hit is None:
+                for gterm, gval in glossary.items():
+                    if any(str(s).lower() == key for s in (gval.get("synonyms") or [])):
+                        hit = gterm
+                        break
+                    if (gval.get("display_label") or "").lower() == key:
+                        hit = gterm
+                        break
+            if hit and hit not in terms:
+                terms.append(hit)
+
+        if not terms:
+            return ""
+
+        lines = [
+            "───────────────────────────────────────────────",
+            "RESOLVED TERMS (from business glossary):",
+            "───────────────────────────────────────────────",
+        ]
+        for term in terms[:8]:
+            val = glossary.get(term, {})
+            lines.append(f"TERM: {term}")
+            if val.get("definition"):
+                defn = " ".join(str(val["definition"]).split())
+                lines.append(f"  definition: {defn[:220]}")
+            expr = val.get("sql_expression") or val.get("display_expression")
+            if expr:
+                lines.append(f"  sql: {' '.join(str(expr).split())}")
+            for rule in (val.get("calculation_rules") or [])[:3]:
+                lines.append(f"  rule: {rule}")
+            for d in (val.get("disambiguation") or [])[:2]:
+                lines.append(f"  disambiguation: {d}")
+            lines.append("")
+        return "\n".join(lines)
+
+    def build_full_context(
+        self,
+        question: str,
+        df:       pd.DataFrame,
+        conv_state: dict | None = None,
+        chat_history: str | None = None,
+    ) -> str:
+        """
+        Complete semantic context for LLM SQL generation.
+        Order: semantic → glossary hints → domain rules → resolved → columns → history
+        """
+        resolutions = self._search.resolve_query_terms(question)
+        base_ctx = self.build_base_context()
+        resolved_glossary = self.build_resolved_glossary_block(question, resolutions)
+        resolved_ctx = self.build_resolved_context(question, resolutions)
+        column_ctx = self.build_physical_column_map(df)
+        hints = self.build_glossary_sql_hints(question)
+        domain = self.build_domain_rules_block()
+        conv_ctx = self.build_conversation_context(conv_state)
+
+        blocks = [base_ctx]
+        if hints:
+            blocks.append(hints)
+        if domain:
+            blocks.append(domain)
+        if resolved_glossary:
+            blocks.append(resolved_glossary)
+        if conv_ctx:
+            blocks.append(conv_ctx)
+        if chat_history:
+            blocks.append(chat_history)
+        blocks.append(resolved_ctx)
+        blocks.append(column_ctx)
+        return "\n\n".join(blocks)
 
     def build_resolved_context(
         self,
@@ -303,57 +470,6 @@ class SemanticContextBuilder:
             "SCOPE: Answer questions about automotive sales data only.\n"
             "Cannot: write code, modify data, make future predictions."
         )
-
-    def build_full_context(
-        self,
-        question: str,
-        df:       pd.DataFrame,
-        conv_state: dict | None = None,
-    ) -> str:
-        """
-        Builds the complete semantic context for a user question.
-
-        This is the main entry point called from nlq_to_sql().
-
-        Combines:
-        1. Base semantic model context
-        2. Vector search entity resolutions
-        3. Physical column mapping
-        4. Metric / conversation / scope blocks (ISANA)
-
-        Args:
-            question: User's natural language question
-            df:       Working DataFrame
-            conv_state: Optional conversation state dict
-
-        Returns:
-            Complete context string for GPT prompt
-        """
-        # ── Step 1: Resolve semantic entities ───────────────────
-        resolutions = self._search.resolve_query_terms(question)
-
-        # ── Step 2: Build context blocks ─────────────────────────
-        base_ctx     = self.build_base_context()
-        resolved_ctx = self.build_resolved_context(question, resolutions)
-        column_ctx   = self.build_physical_column_map(df)
-        metric_ctx   = self.build_metric_context()
-        scope_ctx    = self.build_scope_context()
-        conv_ctx     = self.build_conversation_context(conv_state)
-
-        # ── Step 3: Combine ──────────────────────────────────────
-        blocks = [
-            base_ctx,
-            metric_ctx,
-            scope_ctx,
-            resolved_ctx,
-            column_ctx,
-        ]
-        if conv_ctx:
-            blocks.insert(3, conv_ctx)
-
-        full_context = "\n\n".join(blocks)
-
-        return full_context
 
     def get_resolutions(self, question: str) -> dict:
         """

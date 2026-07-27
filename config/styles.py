@@ -57,16 +57,17 @@ html,body,#root,div[role="main"],.stApp,.block-container{
    to a softer navy #1e3a5f with brighter border
    ============================================= */
 .stButton > button {
-    border-radius: 12px;
-    border: 1px solid #60a5fa;
-    background: #1e3a5f;
-    color: white;
+    border-radius: 8px;
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    background: rgba(99, 102, 241, 0.15);
+    color: #a5b4fc;
+    font-weight: 600;
 }
 
 .stButton > button:hover {
-    border-color: #d8b4fe;
-    box-shadow: 0 0 14px #d8b4fe;
-    background: #274d7a;
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+    background: rgba(99, 102, 241, 0.28);
 }
 
 /* Text */
@@ -88,16 +89,17 @@ section[data-testid="stSidebar"] {
     height: 34px;
     font-size: 12px;
     border-radius: 8px;
-    border: 1px solid #4a7ab5;
-    background: #1e3a5f;
-    color: white;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(148, 163, 184, 0.08);
+    color: #94a3b8;
     margin-top: 6px;
     margin-bottom: 4px;
 }
 
 [data-testid="stSidebar"] .stButton > button:hover {
-    border-color: #93c5fd;
-    background: #274d7a;
+    border-color: rgba(99, 102, 241, 0.35);
+    background: rgba(99, 102, 241, 0.15);
+    color: #a5b4fc;
 }
 
 /* =============================================
@@ -913,8 +915,9 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
 
 /* Execution path badges */
 .badge-deterministic {
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: white;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #6ee7b7;
     padding: 2px 10px;
     border-radius: 12px;
     font-size: 11px;
@@ -924,8 +927,9 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
 }
 
 .badge-fallback {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: white;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #fcd34d;
     padding: 2px 10px;
     border-radius: 12px;
     font-size: 11px;
@@ -934,8 +938,9 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
 }
 
 .badge-cached {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    color: white;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #93c5fd;
     padding: 2px 10px;
     border-radius: 12px;
     font-size: 11px;
@@ -944,8 +949,9 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
 }
 
 .badge-oob {
-    background: linear-gradient(135deg, #ef4444, #dc2626);
-    color: white;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
     padding: 2px 10px;
     border-radius: 12px;
     font-size: 11px;
@@ -1034,11 +1040,12 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
     gap: 8px; margin: 10px 0 4px 60px;
 }
 .user-bubble-text {
-    background: linear-gradient(135deg, #6366f1, #4f46e5);
-    color: white; padding: 10px 16px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    color: #e2e8f0;
+    padding: 10px 16px;
     border-radius: 18px 18px 4px 18px;
     font-size: 14px; line-height: 1.5;
-    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.35);
     max-width: 100%;
 }
 .user-avatar, .assistant-avatar {
@@ -1046,9 +1053,15 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; flex-shrink: 0;
 }
-.user-avatar { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+.user-avatar {
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #818cf8;
+}
 .assistant-avatar {
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: #34d399;
     margin-top: 4px;
 }
 .assistant-bubble {
@@ -1056,18 +1069,17 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
     margin: 10px 60px 4px 0;
 }
 .assistant-card {
-    background: rgba(15, 23, 42, 0.85);
-    border: 1px solid rgba(99, 102, 241, 0.12);
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(148, 163, 184, 0.1);
     border-radius: 4px 18px 18px 18px;
     padding: 14px 18px; width: 100%;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 .narration-card {
-    background: linear-gradient(135deg, rgba(16,185,129,0.06), rgba(99,102,241,0.06));
-    border: 1px solid rgba(16,185,129,0.18);
-    border-left: 3px solid #10b981;
-    border-radius: 8px; padding: 14px 18px; margin-bottom: 12px;
-    animation: fadeInUp 0.3s ease;
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid rgba(16, 185, 129, 0.15);
+    border-left: 3px solid #34d399;
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin-bottom: 12px;
 }
 .narration-headline {
     font-size: 13px; font-weight: 700; color: #6ee7b7;
@@ -1075,6 +1087,17 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
 }
 .narration-body {
     font-size: 13px; color: #cbd5e1; line-height: 1.65; margin-bottom: 10px;
+}
+.chat-input-area {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 12px;
+    padding: 8px 10px;
+    margin-top: 8px;
+}
+[data-testid="stChatInput"] textarea,
+[data-testid="stChatInput"] {
+    border-color: rgba(148, 163, 184, 0.25) !important;
 }
 .narration-findings {
     border-top: 1px solid rgba(16,185,129,0.1);

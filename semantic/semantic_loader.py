@@ -96,6 +96,48 @@ class SemanticLoader:
         self._ensure_loaded()
         return self._glossary.get("terms", {})
 
+    def get_glossary_sql_expressions(self) -> dict[str, str]:
+        """canonical term → sql_expression from enhanced glossary."""
+        self._ensure_loaded()
+        out: dict[str, str] = {}
+        for term, val in self.get_glossary().items():
+            expr = val.get("sql_expression") or val.get("display_expression")
+            if isinstance(expr, str) and expr.strip():
+                out[term] = " ".join(expr.split())
+        return out
+
+    def get_domain_rules(self) -> dict:
+        self._ensure_loaded()
+        return self._glossary.get("domain_rules", {}) or {}
+
+    def get_sql_patterns(self) -> dict:
+        self._ensure_loaded()
+        return self._glossary.get("sql_patterns", {}) or {}
+
+    def get_calculation_rules_map(self) -> dict[str, list]:
+        self._ensure_loaded()
+        out: dict[str, list] = {}
+        for term, val in self.get_glossary().items():
+            rules = val.get("calculation_rules") or []
+            if rules:
+                out[term] = list(rules)
+        return out
+
+    def get_glossary_term(self, name: str) -> dict | None:
+        """Lookup glossary term by canonical name or synonym."""
+        self._ensure_loaded()
+        terms = self.get_glossary()
+        if name in terms:
+            return terms[name]
+        lowered = name.strip().lower()
+        for term, val in terms.items():
+            if term.lower() == lowered:
+                return val
+            for syn in val.get("synonyms", []) or []:
+                if str(syn).lower() == lowered:
+                    return val
+        return None
+
     # ── Flattened synonym map ────────────────────────────────────
 
     def get_synonym_map(self) -> dict[str, str]:
