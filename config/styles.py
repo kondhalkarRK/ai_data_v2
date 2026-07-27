@@ -910,6 +910,269 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
 @supports not selector(:has(a)){
     .ai-loader-overlay{display:none !important;}
 }
+
+/* Execution path badges */
+.badge-deterministic {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    display: inline-block;
+}
+
+.badge-fallback {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+}
+
+.badge-cached {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+}
+
+.badge-oob {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+}
+
+/* Conversation context banner */
+.conv-context-banner {
+    background: rgba(99, 102, 241, 0.1);
+    border-left: 3px solid #6366f1;
+    padding: 6px 12px;
+    border-radius: 0 8px 8px 0;
+    font-size: 12px;
+    color: #a5b4fc;
+    margin-bottom: 8px;
+}
+
+/* OOB deflection card */
+.oob-card {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 12px 0;
+}
+
+/* Evidence detail panel */
+.evidence-panel {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+/* Metric resolution info */
+.metric-info-pill {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #6ee7b7;
+    display: inline-block;
+    margin: 4px 0;
+}
+
+/* Conversation state panel in sidebar */
+.conv-state-panel {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 10px;
+    padding: 12px;
+    margin: 8px 0;
+}
+
+/* Query stats row */
+.query-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(99,102,241,0.08);
+    font-size: 11px;
+}
+
+/* ═══════════════════════════════════
+   CHAT MODE STYLES (Prompt 2)
+═══════════════════════════════════ */
+.chat-outer-wrap { display:flex; flex-direction:column; height:100%; }
+.chat-controls-bar {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+.user-bubble {
+    display: flex; justify-content: flex-end; align-items: flex-end;
+    gap: 8px; margin: 10px 0 4px 60px;
+}
+.user-bubble-text {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white; padding: 10px 16px;
+    border-radius: 18px 18px 4px 18px;
+    font-size: 14px; line-height: 1.5;
+    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.35);
+    max-width: 100%;
+}
+.user-avatar, .assistant-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0;
+}
+.user-avatar { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+.assistant-avatar {
+    background: linear-gradient(135deg, #10b981, #059669);
+    margin-top: 4px;
+}
+.assistant-bubble {
+    display: flex; align-items: flex-start; gap: 8px;
+    margin: 10px 60px 4px 0;
+}
+.assistant-card {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(99, 102, 241, 0.12);
+    border-radius: 4px 18px 18px 18px;
+    padding: 14px 18px; width: 100%;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+.narration-card {
+    background: linear-gradient(135deg, rgba(16,185,129,0.06), rgba(99,102,241,0.06));
+    border: 1px solid rgba(16,185,129,0.18);
+    border-left: 3px solid #10b981;
+    border-radius: 8px; padding: 14px 18px; margin-bottom: 12px;
+    animation: fadeInUp 0.3s ease;
+}
+.narration-headline {
+    font-size: 13px; font-weight: 700; color: #6ee7b7;
+    margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.narration-body {
+    font-size: 13px; color: #cbd5e1; line-height: 1.65; margin-bottom: 10px;
+}
+.narration-findings {
+    border-top: 1px solid rgba(16,185,129,0.1);
+    padding-top: 8px; margin-top: 8px;
+}
+.narration-finding-item {
+    font-size: 12px; color: #94a3b8; margin: 3px 0; line-height: 1.4;
+}
+.narration-recommendation {
+    background: rgba(245,158,11,0.07);
+    border-left: 3px solid #f59e0b;
+    padding: 8px 12px; border-radius: 0 6px 6px 0;
+    font-size: 12px; color: #fcd34d; margin-top: 8px;
+}
+.whatif-baseline-box {
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 10px; padding: 16px; text-align: center;
+}
+.whatif-scenario-box-up {
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 10px; padding: 16px; text-align: center;
+}
+.whatif-scenario-box-down {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 10px; padding: 16px; text-align: center;
+}
+.whatif-value-label {
+    font-size: 10px; color: #94a3b8; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 6px;
+}
+.whatif-value-number { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+.proactive-insight-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(99, 102, 241, 0.1);
+    border-radius: 10px; padding: 12px 16px; margin: 5px 0;
+    display: flex; align-items: center; gap: 12px;
+    transition: all 0.2s ease;
+}
+.proactive-insight-card:hover {
+    border-color: rgba(99, 102, 241, 0.3);
+    background: rgba(99, 102, 241, 0.08);
+    transform: translateX(2px);
+}
+.proactive-insight-icon { font-size: 20px; flex-shrink: 0; }
+.proactive-insight-title { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 2px; }
+.proactive-insight-summary { font-size: 11px; color: #94a3b8; line-height: 1.4; }
+.proactive-ask-arrow { margin-left: auto; font-size: 11px; color: #6366f1; font-weight: 600; }
+.chat-welcome-card {
+    background: linear-gradient(135deg, rgba(99,102,241,0.07), rgba(16,185,129,0.04));
+    border: 1px solid rgba(99, 102, 241, 0.12);
+    border-radius: 14px; padding: 20px 24px; margin-bottom: 16px;
+}
+.chat-welcome-title { font-size: 15px; font-weight: 700; color: #e2e8f0; margin-bottom: 4px; }
+.chat-welcome-subtitle { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+.msg-timestamp { font-size: 10px; color: #475569; margin: 2px 0 8px; padding-left: 40px; }
+.msg-timestamp-right { font-size: 10px; color: #475569; margin: 2px 0 8px; text-align: right; padding-right: 40px; }
+.result-header-bar {
+    display: flex; align-items: center; gap: 10px; padding: 6px 0 10px;
+    border-bottom: 1px solid rgba(99,102,241,0.08); margin-bottom: 10px; flex-wrap: wrap;
+}
+.result-stat-pill {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(99, 102, 241, 0.1);
+    border-radius: 10px; padding: 2px 10px; font-size: 11px; color: #94a3b8;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up { animation: fadeInUp 0.25s ease forwards; }
+.chat-error-card {
+    background: rgba(239, 68, 68, 0.06);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    border-left: 3px solid #ef4444;
+    border-radius: 8px; padding: 12px 16px; margin: 4px 0;
+}
+.chat-oob-card {
+    background: rgba(245, 158, 11, 0.06);
+    border: 1px solid rgba(245, 158, 11, 0.15);
+    border-left: 3px solid #f59e0b;
+    border-radius: 8px; padding: 12px 16px;
+}
+.suggestion-chip {
+    display: inline-block;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.15);
+    border-radius: 16px; padding: 4px 12px;
+    font-size: 11px; color: #a5b4fc; margin: 3px;
+}
+.suggestion-chip:hover {
+    background: rgba(99,102,241,0.18);
+    border-color: rgba(99,102,241,0.35);
+    color: #c7d2fe;
+}
 </style>
 
 <div class="ai-loader-overlay">

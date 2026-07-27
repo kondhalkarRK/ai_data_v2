@@ -1,455 +1,1055 @@
 """
 ui/tab_query.py
+Ask mode + Chat with Data (Prompt 2 UI).
 """
+from __future__ import annotations
+
 import html
+import time
+from datetime import datetime
+
 import pandas as pd
 import streamlit as st
 
-from core.nlq_engine      import run_query, run_sql
-from core.sql_guardrails  import sql_is_safe
-from core.chart_engine    import auto_chart_type, build_chart
-from core.analysis_engine import generate_analysis
+from core.nlq_engine import run_query
+from core.chart_engine import auto_chart_type, build_chart
 
+try:
+    from core.conversation_state import get_state, clear_state, detect_followup
+except Exception:
+    def get_state():
+        return st.session_state.get("conversation_state") or {}
+
+    def clear_state():
+        st.session_state.conversation_state = {}
+
+    def detect_followup(q):
+        return False
+
+try:
+    from core.question_normaliser import detect_oob
+except Exception:
+    def detect_oob(q):
+        return False
+
+try:
+    from core.evidence_builder import get_execution_badge
+except Exception:
+    def get_execution_badge(evidence):
+        return {"icon": "⚠️", "label": "AI Generated", "colour": "orange", "tooltip": ""}
+
+try:
+    from config.constants import (
+        BADGE_CACHED,
+        BADGE_DETERMINISTIC,
+        BADGE_FALLBACK,
+        BADGE_OOB,
+    )
+except Exception:
+    BADGE_CACHED = {"icon": "🔒", "label": "Cached", "colour": "blue"}
+    BADGE_DETERMINISTIC = {"icon": "✅", "label": "Deterministic", "colour": "green"}
+    BADGE_FALLBACK = {"icon": "⚠️", "label": "AI Generated", "colour": "orange"}
+    BADGE_OOB = {"icon": "🚫", "label": "Out of Scope", "colour": "red"}
+
+# Feature engines — graceful fallback
+try:
+    from features.proactive_engine import ProactiveEngine
+    proactive_engine = ProactiveEngine()
+except Exception:
+    proactive_engine = None
+
+try:
+    from features.whatif_engine import WhatIfEngine
+    whatif_engine = WhatIfEngine()
+except Exception:
+    whatif_engine = None
+
+try:
+    from features.anomaly_engine import AnomalyEngine
+    anomaly_engine = AnomalyEngine()
+except Exception:
+    anomaly_engine = None
+
+try:
+    from features.narration_engine import NarrationEngine
+    narration_engine = NarrationEngine()
+except Exception:
+    narration_engine = None
+
+
+def _safe_proactive_insights(df):
+    if proactive_engine is None:
+        return []
+    try:
+        return proactive_engine.generate_proactive_insights(df)
+    except Exception:
+        return []
+
+
+def _safe_suggested_questions(df, limit=4):
+    if proactive_engine is None:
+        return [
+            "Show revenue by colour",
+            "Top 10 salespeople by revenue",
+            "Show revenue trend by month",
+            "Find anomalies in my data",
+        ][:limit]
+    try:
+        return proactive_engine.get_suggested_questions(df, limit=limit)
+    except Exception:
+        return []
+
+
+def _safe_narration(result_df, question, intent, evidence):
+    if narration_engine is None:
+        return None
+    try:
+        return narration_engine.generate_narration(
+            result_df, question, intent, evidence, mode="standard"
+        )
+    except Exception:
+        return None
+
+
+def _safe_whatif_detect(question):
+    if whatif_engine is None:
+        return False
+    try:
+        return whatif_engine.detect_whatif_query(question)
+    except Exception:
+        return False
+
+
+def _safe_anomaly_detect(df):
+    if anomaly_engine is None:
+        return []
+    try:
+        return anomaly_engine.detect_anomalies(df)
+    except Exception:
+        return []
+
+
+def _similar_question_suggestions(question: str) -> list[str]:
+    return _safe_suggested_questions(
+        st.session_state.get("_last_working_df"),
+        limit=3,
+    ) or [
+        "Show revenue by colour",
+        "Top 10 by revenue",
+        "Show monthly trend",
+    ]
+
+
+def _badge_css_class(badge: dict | None, evidence: dict | None = None) -> str:
+    path = (evidence or {}).get("execution_path")
+    if path == "deterministic":
+        return "badge-deterministic"
+    if path == "cache":
+        return "badge-cached"
+    colour = (badge or {}).get("colour", "orange")
+    return {
+        "green": "badge-deterministic",
+        "orange": "badge-fallback",
+        "blue": "badge-cached",
+        "red": "badge-oob",
+    }.get(colour, "badge-fallback")
+
+
+def _fmt_num(v) -> str:
+    try:
+        return f"{float(v):,.1f}"
+    except Exception:
+        return str(v)
+
+
+# ─────────────────────────────────────────────────────────────
+# Shared render helpers
+# ─────────────────────────────────────────────────────────────
+
+def render_narration_card(narration: dict | None):
+    if not narration:
+        return
+    headline = html.escape(str(narration.get("headline") or "Insight"))
+    body = html.escape(str(narration.get("narrative_text") or narration.get("summary") or ""))
+    st.markdown(
+        f"""
+        <div class="narration-card fade-in-up">
+          <div class="narration-headline">📊 {headline}</div>
+          <div class="narration-body">{body}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    findings = narration.get("key_findings") or []
+    if findings:
+        items = "".join(
+            f'<div class="narration-finding-item">• {html.escape(str(f))}</div>'
+            for f in findings
+        )
+        st.markdown(
+            f'<div class="narration-findings"><b>Key Findings:</b>{items}</div>',
+            unsafe_allow_html=True,
+        )
+    if narration.get("recommendation"):
+        st.markdown(
+            f"""
+            <div class="narration-recommendation">
+              💡 {html.escape(str(narration['recommendation']))}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def render_whatif_card(whatif_result: dict | None):
+    if not whatif_result:
+        st.info("No what-if result.")
+        return
+
+    narrative = whatif_result.get("narrative") or ""
+    render_narration_card({
+        "headline": "What-If Analysis",
+        "narrative_text": narrative,
+        "key_findings": [],
+        "recommendation": None,
+    })
+
+    base = whatif_result.get("baseline") or {}
+    scen = whatif_result.get("scenario") or {}
+    delta = whatif_result.get("delta") or {}
+    direction = delta.get("direction", "up")
+    colour = "#10b981" if direction == "up" else "#ef4444"
+    icon = "⬆️" if direction == "up" else "⬇️"
+    scen_cls = "whatif-scenario-box-up" if direction == "up" else "whatif-scenario-box-down"
+
+    col1, col2, col3 = st.columns([2, 1, 2])
+    with col1:
+        st.markdown(
+            f"""
+            <div class="whatif-baseline-box">
+              <div class="whatif-value-label">BASELINE</div>
+              <div class="whatif-value-number" style="color:#a5b4fc;">
+                {_fmt_num(base.get('value', 0))}
+              </div>
+              <div style="font-size:11px;color:#64748b;">
+                {html.escape(str(base.get('label', '')))}
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with col2:
+        pct = float(delta.get("percent") or 0)
+        st.markdown(
+            f"""
+            <div style="display:flex;flex-direction:column;align-items:center;
+                        justify-content:center;padding:16px 0;">
+              <div style="font-size:28px;">{icon}</div>
+              <div style="font-size:16px;font-weight:700;color:{colour};">
+                {pct:+.1f}%
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with col3:
+        st.markdown(
+            f"""
+            <div class="{scen_cls}">
+              <div class="whatif-value-label">SCENARIO</div>
+              <div class="whatif-value-number" style="color:{colour};">
+                {_fmt_num(scen.get('value', 0))}
+              </div>
+              <div style="font-size:11px;color:#64748b;">
+                {html.escape(str(scen.get('label', '')))}
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    chart = whatif_result.get("chart_data")
+    if isinstance(chart, pd.DataFrame) and not chart.empty:
+        try:
+            build_chart(chart, "Bar", "scenario", "value")
+        except Exception:
+            pass
+
+    assumptions = whatif_result.get("assumptions") or []
+    if assumptions:
+        st.markdown("**Assumptions:**")
+        for a in assumptions:
+            st.markdown(f"• {a}")
+
+
+def render_anomaly_cards(anomalies: list[dict], working_df=None):
+    if not anomalies:
+        st.info("No anomalies detected.")
+        return
+
+    engine = anomaly_engine
+    for i, anomaly in enumerate(anomalies[:5]):
+        badge = (
+            engine.get_anomaly_badge(anomaly)
+            if engine is not None
+            else {"icon": "🔵", "colour": "blue", "label": "Info"}
+        )
+        sev = anomaly.get("severity", "info")
+        colours = {
+            "critical": ("#ef4444", "#ef4444", "rgba(239,68,68,0.1)", "#fca5a5"),
+            "warning": ("#f59e0b", "#f59e0b", "rgba(245,158,11,0.1)", "#fcd34d"),
+            "info": ("#3b82f6", "#3b82f6", "rgba(59,130,246,0.1)", "#93c5fd"),
+        }
+        border, left, bg, fg = colours.get(sev, colours["info"])
+        col_name = html.escape(str(anomaly.get("column", "")).replace("_", " ").title())
+        desc = html.escape(str(anomaly.get("description", "")))
+        st.markdown(
+            f"""
+            <div style="background:rgba(15,23,42,0.7);border:1px solid {border};
+                        border-left:3px solid {left};border-radius:8px;
+                        padding:12px 16px;margin:6px 0;display:flex;
+                        align-items:flex-start;gap:12px;">
+              <div style="font-size:18px;flex-shrink:0;">{badge.get('icon','')}</div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                  <span style="font-size:12px;font-weight:700;color:#e2e8f0;">{col_name}</span>
+                  <span style="background:{bg};color:{fg};font-size:10px;font-weight:600;
+                               padding:1px 7px;border-radius:8px;text-transform:uppercase;">
+                    {html.escape(sev)}
+                  </span>
+                </div>
+                <div style="font-size:12px;color:#94a3b8;line-height:1.5;">{desc}</div>
+                <div style="font-size:11px;color:#64748b;margin-top:6px;display:flex;gap:16px;">
+                  <span>Expected: <strong style="color:#a5b4fc;">{_fmt_num(anomaly.get('expected',0))}</strong></span>
+                  <span>Actual: <strong style="color:#f87171;">{_fmt_num(anomaly.get('value',0))}</strong></span>
+                  <span>Deviation: <strong style="color:#fbbf24;">{float(anomaly.get('deviation_pct') or 0):+.1f}%</strong></span>
+                </div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        sq = anomaly.get("suggested_question")
+        if sq and working_df is not None:
+            if st.button(f"🔍 {sq}", key=f"anomaly_drill_{i}"):
+                process_chat_message(sq, working_df)
+
+
+def render_user_bubble(message: dict):
+    content = html.escape(str(message.get("content", "")))
+    ts = html.escape(str(message.get("timestamp", "")))
+    st.markdown(
+        f"""
+        <div class="user-bubble">
+          <div class="user-bubble-text">{content}</div>
+          <div class="user-avatar">👤</div>
+        </div>
+        <div class="msg-timestamp-right">{ts}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_assistant_bubble(message, narration_on, view_mode, working_df=None):
+    ts = html.escape(str(message.get("timestamp", "")))
+    mtype = message.get("message_type", "query")
+    data = message.get("data") or {}
+
+    st.markdown(
+        """
+        <div class="assistant-bubble">
+          <div class="assistant-avatar">🤖</div>
+          <div class="assistant-card">
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if mtype == "error":
+        err = html.escape(str(message.get("content") or data.get("error") or "Error"))
+        is_oob = data.get("error_type") == "out_of_scope" or "out of scope" in err.lower()
+        cls = "chat-oob-card" if is_oob else "chat-error-card"
+        st.markdown(
+            f'<div class="{cls}"><strong>{err}</strong></div>',
+            unsafe_allow_html=True,
+        )
+        for i, s in enumerate((data.get("suggestions") or [])[:3]):
+            if st.button(s, key=f"chat_err_sug_{ts}_{i}"):
+                process_chat_message(s, working_df)
+
+    elif mtype == "anomaly":
+        narr = data.get("narration") or {}
+        render_narration_card(narr)
+        render_anomaly_cards(data.get("anomalies") or [], working_df=working_df)
+
+    elif mtype == "whatif":
+        render_whatif_card(data.get("whatif_result"))
+
+    elif mtype == "query":
+        evidence = data.get("evidence")
+        badge = get_execution_badge(evidence) if evidence else BADGE_FALLBACK
+        css = _badge_css_class(badge, evidence)
+        rows = 0
+        rdf = data.get("result_df")
+        if isinstance(rdf, pd.DataFrame):
+            rows = len(rdf)
+        st.markdown(
+            f"""
+            <div class="result-header-bar">
+              <span class="{css}">{badge.get('icon','')} {html.escape(badge.get('label',''))}</span>
+              <span class="result-stat-pill">📋 {rows:,} rows</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        force = False
+        if narration_engine is not None:
+            try:
+                force = narration_engine.should_auto_narrate(
+                    str(data.get("source_question") or "")
+                )
+            except Exception:
+                force = False
+
+        show_narration = bool(narration_on) or force
+        vm = str(view_mode or "Both")
+
+        if show_narration and vm in ("Narrative", "Both"):
+            render_narration_card(data.get("narration"))
+        elif force:
+            render_narration_card(data.get("narration"))
+
+        show_table = vm in ("Table", "Both") or not show_narration
+        if show_table and isinstance(rdf, pd.DataFrame):
+            st.dataframe(rdf, use_container_width=True, height=min(320, 40 + len(rdf) * 35))
+
+    st.markdown("</div></div>", unsafe_allow_html=True)
+    st.markdown(f'<div class="msg-timestamp">{ts}</div>', unsafe_allow_html=True)
+
+
+def process_chat_message(question: str, working_df: pd.DataFrame):
+    if working_df is None or not question or not str(question).strip():
+        return
+
+    q = question.strip()
+    now = datetime.now().strftime("%H:%M")
+    narration_on = st.session_state.get("chat_narration_on", True)
+    view_mode = st.session_state.get("chat_view_mode", "Both")
+
+    st.session_state.setdefault("chat_messages", [])
+    st.session_state.chat_messages.append({
+        "role": "user",
+        "content": q,
+        "timestamp": now,
+        "message_type": "query",
+        "data": {},
+        "display_mode": view_mode,
+        "narration_active": narration_on,
+    })
+
+    is_oob = detect_oob(q)
+    is_whatif = _safe_whatif_detect(q)
+    anomaly_tokens = [
+        "anomaly", "anomalies", "unusual", "outlier",
+        "what's wrong", "flag", "anything strange", "stands out",
+        "anything odd", "what stands out",
+    ]
+    is_anomaly = any(tok in q.lower() for tok in anomaly_tokens)
+
+    if is_oob:
+        assistant = {
+            "role": "assistant",
+            "content": "That question is outside what I can answer from this dataset.",
+            "message_type": "error",
+            "data": {
+                "error_type": "out_of_scope",
+                "suggestions": _safe_suggested_questions(working_df),
+            },
+        }
+    elif is_whatif and whatif_engine is not None:
+        with st.spinner("🔍 Running scenario..."):
+            scenario = whatif_engine.parse_scenario(q)
+            whatif_result = whatif_engine.run_scenario(working_df, scenario)
+            narrative = (
+                narration_engine.generate_whatif_narration(whatif_result)
+                if narration_engine is not None
+                else whatif_result.get("narrative", "")
+            )
+        assistant = {
+            "role": "assistant",
+            "content": narrative,
+            "message_type": "whatif",
+            "data": {
+                "whatif_result": whatif_result,
+                "narration": {
+                    "narrative_text": narrative,
+                    "headline": "What-If Analysis",
+                    "key_findings": [],
+                },
+            },
+        }
+    elif is_anomaly:
+        with st.spinner("⚠️ Scanning for anomalies..."):
+            anomalies = _safe_anomaly_detect(working_df)
+            summary = (
+                anomaly_engine.summarise_anomalies(anomalies)
+                if anomaly_engine is not None
+                else f"Found {len(anomalies)} anomalies."
+            )
+        assistant = {
+            "role": "assistant",
+            "content": summary,
+            "message_type": "anomaly",
+            "data": {
+                "anomalies": anomalies,
+                "narration": {
+                    "narrative_text": summary,
+                    "headline": "Anomaly Report",
+                    "key_findings": [],
+                },
+            },
+        }
+    else:
+        with st.spinner("⚡ Thinking..."):
+            out = run_query(working_df, q)
+            if isinstance(out, tuple) and len(out) == 4:
+                df_result, sql, err, evidence = out
+            else:
+                df_result, sql, err = out[0], out[1], out[2]
+                evidence = None
+
+        if err:
+            assistant = {
+                "role": "assistant",
+                "content": str(err),
+                "message_type": "error",
+                "data": {
+                    "error": err,
+                    "error_type": "out_of_scope" if "out_of_scope" in str(err).lower() else "query",
+                    "suggestions": _safe_suggested_questions(working_df),
+                    "sql": sql,
+                },
+            }
+        else:
+            narration = _safe_narration(df_result, q, None, evidence)
+            # Force auto-narrate decision based on user question
+            if narration_engine is not None and narration_engine.should_auto_narrate(q):
+                if narration is None:
+                    narration = {"headline": "Analysis", "narrative_text": "", "key_findings": []}
+            assistant = {
+                "role": "assistant",
+                "content": (narration or {}).get("summary", "Here are the results."),
+                "message_type": "query",
+                "data": {
+                    "result_df": df_result,
+                    "sql": sql,
+                    "evidence": evidence,
+                    "narration": narration,
+                    "source_question": q,
+                },
+            }
+
+    assistant["timestamp"] = datetime.now().strftime("%H:%M")
+    assistant["narration_active"] = narration_on
+    assistant["display_mode"] = view_mode
+    st.session_state.chat_messages.append(assistant)
+    st.rerun()
+
+
+# ─────────────────────────────────────────────────────────────
+# Mode: Ask a Question
+# ─────────────────────────────────────────────────────────────
+
+def render_ask_mode(working_df, tables, dfs):
+    st.session_state["_last_working_df"] = working_df
+
+    # Proactive insights
+    insights = _safe_proactive_insights(working_df)
+    if insights:
+        with st.expander(f"💡 {len(insights)} Proactive Insights Found", expanded=False):
+            for i, insight in enumerate(insights[:3]):
+                c1, c2 = st.columns([5, 1])
+                with c1:
+                    st.markdown(f"**{insight['title']}** — {insight['summary']}")
+                with c2:
+                    if st.button("Ask", key=f"ask_insight_{i}"):
+                        st.session_state["prefill_question"] = insight["suggested_question"]
+                        st.rerun()
+
+    # Conversation banner
+    conv = get_state()
+    prior = conv.get("continued_from") or (
+        conv.get("last_question") if conv.get("is_followup") else None
+    )
+    if conv.get("is_followup") and prior:
+        st.markdown(
+            f"<div class='conv-context-banner'>↩ Continuing from: "
+            f"<em>{html.escape(str(prior))}</em></div>",
+            unsafe_allow_html=True,
+        )
+
+    prefill = st.session_state.pop("prefill_question", "")
+    col_input, col_btn = st.columns([9, 1])
+    with col_input:
+        # Use session key carefully with prefill
+        if prefill:
+            st.session_state["ask_question_input"] = prefill
+        question = st.text_input(
+            "Ask a question",
+            placeholder="e.g. Show revenue by colour for 2023 | What if sales increased by 20%?",
+            label_visibility="collapsed",
+            key="ask_question_input",
+        )
+    with col_btn:
+        run_btn = st.button("▶", type="primary", use_container_width=True, key="ask_run_btn")
+
+    suggestions = _safe_suggested_questions(working_df, limit=4)
+    if suggestions:
+        cols = st.columns(len(suggestions))
+        for i, (col, sug) in enumerate(zip(cols, suggestions)):
+            with col:
+                label = sug[:35] + "..." if len(sug) > 35 else sug
+                if st.button(label, key=f"sug_chip_{i}", use_container_width=True):
+                    st.session_state["prefill_question"] = sug
+                    st.rerun()
+
+    if not ((run_btn or False) and question and question.strip()):
+        # Keep prior ask result visible if stored
+        if st.session_state.get("ask_last_bundle"):
+            _render_ask_result_bundle(st.session_state["ask_last_bundle"], working_df)
+        return
+
+    start_time = time.time()
+    q = question.strip()
+
+    with st.status("⚡ Processing...", expanded=True) as status:
+        if detect_oob(q):
+            status.update(label="🚫 Out of scope", state="error")
+            st.markdown(
+                """
+                <div class='oob-card'>
+                  <strong style='color:#fca5a5;'>🚫 Out of Scope</strong>
+                  <p style='color:#cbd5e1;font-size:13px;margin:6px 0 0;'>
+                    That question is outside what I can answer from this dataset.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            return
+
+        if _safe_whatif_detect(q) and whatif_engine is not None:
+            status.update(label="🔍 What-If scenario detected...")
+            scenario = whatif_engine.parse_scenario(q)
+            status.update(label="⚙️ Running scenario simulation...")
+            whatif_result = whatif_engine.run_scenario(working_df, scenario)
+            status.update(label="✅ Scenario complete", state="complete", expanded=False)
+            elapsed = round(time.time() - start_time, 2)
+            st.markdown(
+                f"""
+                <div class='result-header-bar'>
+                  <span class='badge-deterministic'>🔍 What-If Analysis</span>
+                  <span class='result-stat-pill'>⏱ {elapsed}s</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            render_whatif_card(whatif_result)
+            return
+
+        is_anomaly_q = any(
+            tok in q.lower()
+            for tok in [
+                "anomaly", "anomalies", "unusual", "outlier",
+                "what's wrong", "flag", "anything strange",
+                "stands out", "what stands out", "anything odd",
+            ]
+        )
+        if is_anomaly_q:
+            status.update(label="⚠️ Scanning for anomalies...")
+            anomalies = _safe_anomaly_detect(working_df)
+            summary = (
+                anomaly_engine.summarise_anomalies(anomalies)
+                if anomaly_engine is not None
+                else f"Found {len(anomalies)} anomalies."
+            )
+            status.update(
+                label=f"✅ Found {len(anomalies)} anomalies",
+                state="complete",
+                expanded=False,
+            )
+            elapsed = round(time.time() - start_time, 2)
+            st.markdown(
+                f"""
+                <div class='result-header-bar'>
+                  <span class='badge-fallback'>⚠️ Anomaly Report</span>
+                  <span class='result-stat-pill'>{len(anomalies)} found</span>
+                  <span class='result-stat-pill'>⏱ {elapsed}s</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"""
+                <div class='narration-card'>
+                  <div class='narration-headline'>⚠️ Anomaly Summary</div>
+                  <div class='narration-body'>{html.escape(summary)}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            render_anomaly_cards(anomalies, working_df=None)
+            return
+
+        status.update(label="💾 Checking cache...")
+        out = run_query(working_df, q, status=status)
+        if isinstance(out, tuple) and len(out) == 4:
+            result_df, sql, err, evidence = out
+        else:
+            result_df, sql, err = out[0], out[1], out[2]
+            evidence = None
+        elapsed = round(time.time() - start_time, 2)
+
+        if err:
+            status.update(label="❌ Query failed", state="error", expanded=False)
+            st.markdown(
+                f"""
+                <div class='chat-error-card'>
+                  <strong style='color:#fca5a5;'>❌ Could not answer that</strong>
+                  <p style='color:#cbd5e1;font-size:13px;margin:6px 0 0;'>
+                    {html.escape(str(err))}
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            suggestions = _similar_question_suggestions(q)
+            if suggestions:
+                st.markdown("**Try one of these instead:**")
+                for i, s in enumerate(suggestions):
+                    if st.button(s, key=f"err_sug_{i}"):
+                        st.session_state["prefill_question"] = s
+                        st.rerun()
+            return
+
+        status.update(label="✅ Done", state="complete", expanded=False)
+
+    bundle = {
+        "result_df": result_df,
+        "sql": sql,
+        "err": err,
+        "evidence": evidence,
+        "elapsed": elapsed,
+        "question": q,
+    }
+    st.session_state["ask_last_bundle"] = bundle
+    _render_ask_result_bundle(bundle, working_df)
+
+
+def _render_ask_result_bundle(bundle: dict, working_df):
+    result_df = bundle.get("result_df")
+    sql = bundle.get("sql")
+    evidence = bundle.get("evidence")
+    elapsed = bundle.get("elapsed", 0)
+    question = bundle.get("question", "")
+
+    if result_df is None or (isinstance(result_df, pd.DataFrame) and result_df.empty):
+        st.warning("⚠️ Query returned no rows.")
+        if sql:
+            with st.expander("🔍 Generated SQL"):
+                st.code(sql, language="sql")
+        return
+
+    badge = get_execution_badge(evidence) if evidence else BADGE_FALLBACK
+    css = _badge_css_class(badge, evidence)
+    row_count = len(result_df)
+    metric_info = ""
+    if evidence and evidence.get("resolution_source") in ("registry", "synonym"):
+        metric_info = "<span class='metric-info-pill'>📐 Registry resolved</span>"
+
+    st.markdown(
+        f"""
+        <div class='result-header-bar'>
+          <span class='{css}'>{badge.get('icon','')} {html.escape(badge.get('label',''))}</span>
+          <span class='result-stat-pill'>📋 {row_count:,} rows</span>
+          <span class='result-stat-pill'>⏱ {elapsed}s</span>
+          {metric_info}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    tab_table, tab_chart, tab_insights = st.tabs(["📊 Table", "📈 Chart", "💡 Insights"])
+
+    with tab_table:
+        st.dataframe(
+            result_df,
+            use_container_width=True,
+            height=min(400, 40 + max(len(result_df), 1) * 35),
+        )
+        st.download_button(
+            "⬇️ Download CSV",
+            data=result_df.to_csv(index=False).encode(),
+            file_name="query_result.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key="ask_dl_csv",
+        )
+
+    with tab_chart:
+        try:
+            all_cols = list(result_df.columns)
+            num_cols = result_df.select_dtypes(include="number").columns.tolist()
+            str_cols = result_df.select_dtypes(exclude="number").columns.tolist()
+            auto_ct = auto_chart_type(result_df, question)
+            chart_type = st.selectbox(
+                "Chart Type",
+                ["Bar", "Line", "Pie", "Scatter", "Area"],
+                index=["Bar", "Line", "Pie", "Scatter", "Area"].index(auto_ct),
+                key="ask_ct_sel",
+            )
+            default_x = str_cols[0] if str_cols else all_cols[0]
+            default_y = num_cols[0] if num_cols else (all_cols[1] if len(all_cols) > 1 else all_cols[0])
+            x_axis = st.selectbox("X Axis", all_cols, index=all_cols.index(default_x), key="ask_xa")
+            y_axis = st.selectbox("Y Axis", all_cols, index=all_cols.index(default_y), key="ask_ya")
+            build_chart(result_df, chart_type, x_axis, y_axis)
+        except Exception:
+            st.info("Chart not available for this result")
+
+    with tab_insights:
+        try:
+            narration = _safe_narration(result_df, question, None, evidence)
+            render_narration_card(narration)
+            insights = _safe_proactive_insights(working_df)
+            if insights:
+                st.markdown("---")
+                st.markdown("**💡 You might also want to know:**")
+                for i, insight in enumerate(insights[:2]):
+                    st.markdown(f"• **{insight['title']}** — {insight['summary']}")
+                    if st.button(
+                        f"→ {insight['suggested_question']}",
+                        key=f"insight_followup_{i}",
+                    ):
+                        st.session_state["prefill_question"] = insight["suggested_question"]
+                        st.rerun()
+        except Exception:
+            st.info("Insights not available for this result")
+
+    with st.expander("🔍 Query Details"):
+        if evidence:
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown(f"**Execution Path:** `{evidence.get('execution_path', '')}`")
+                st.markdown(f"**Query Hash:** `{evidence.get('query_hash', '')}`")
+                st.markdown(f"**Row Count:** `{evidence.get('result_row_count', 0)}`")
+            with c2:
+                st.markdown(f"**Timestamp:** `{evidence.get('timestamp', '')}`")
+                st.markdown(f"**Status:** `{evidence.get('execution_status', '')}`")
+                st.markdown(f"**Resolution:** `{evidence.get('resolution_source', '')}`")
+        st.markdown("**SQL Used:**")
+        st.code(sql or "", language="sql")
+
+
+# ─────────────────────────────────────────────────────────────
+# Mode: Chat with Data
+# ─────────────────────────────────────────────────────────────
+
+def render_chat_mode(working_df, tables, dfs):
+    st.session_state["_last_working_df"] = working_df
+    if "chat_messages" not in st.session_state:
+        st.session_state.chat_messages = []
+    if "chat_narration_on" not in st.session_state:
+        st.session_state.chat_narration_on = True
+    if "chat_view_mode" not in st.session_state:
+        st.session_state.chat_view_mode = "Both"
+
+    ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([3, 4, 2])
+    with ctrl_col1:
+        narration_on = st.toggle(
+            "📖 Narration",
+            value=st.session_state.chat_narration_on,
+            key="chat_narration_toggle",
+            help="ON: explain results in plain English. OFF: data table only.",
+        )
+        if narration_on != st.session_state.chat_narration_on:
+            st.session_state.chat_narration_on = narration_on
+            if narration_on:
+                st.toast("✨ Narration enabled — I'll explain results in plain English", icon="📖")
+            else:
+                st.toast("📊 Narration off — showing data only", icon="📊")
+
+    with ctrl_col2:
+        if narration_on:
+            view_mode = st.radio(
+                "View",
+                ["Table", "Narrative", "Both"],
+                horizontal=True,
+                index=["Table", "Narrative", "Both"].index(
+                    st.session_state.chat_view_mode
+                    if st.session_state.chat_view_mode in ("Table", "Narrative", "Both")
+                    else "Both"
+                ),
+                key="chat_view_radio",
+                label_visibility="collapsed",
+            )
+            st.session_state.chat_view_mode = view_mode
+        else:
+            st.session_state.chat_view_mode = "Table"
+
+    with ctrl_col3:
+        if st.button("🗑 Clear Chat", use_container_width=True, key="clear_chat_btn"):
+            st.session_state.chat_messages = []
+            clear_state()
+            st.toast("Chat cleared", icon="🗑")
+            st.rerun()
+
+    chat_container = st.container(height=520)
+    with chat_container:
+        if not st.session_state.chat_messages:
+            insights = _safe_proactive_insights(working_df)
+            st.markdown(
+                """
+                <div class='chat-welcome-card'>
+                  <div class='chat-welcome-title'>👋 Hi! I've analysed your data.</div>
+                  <div class='chat-welcome-subtitle'>
+                    Here's what I found — click any insight to explore
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            icon_map = {
+                "top_performer": "🏆",
+                "trend": "📈",
+                "drop": "📉",
+                "concentration": "🎯",
+                "growth": "🚀",
+                "outlier": "⚠️",
+            }
+            for i, insight in enumerate(insights[:5]):
+                icon = icon_map.get(insight.get("type", ""), "💡")
+                direction_colour = (
+                    "#6ee7b7" if insight.get("direction") == "up"
+                    else "#fca5a5" if insight.get("direction") == "down"
+                    else "#94a3b8"
+                )
+                col_ins, col_btn = st.columns([5, 1])
+                with col_ins:
+                    st.markdown(
+                        f"""
+                        <div class='proactive-insight-card'>
+                          <div class='proactive-insight-icon'>{icon}</div>
+                          <div style='flex:1;'>
+                            <div class='proactive-insight-title'>
+                              {html.escape(str(insight.get('title','')))}
+                            </div>
+                            <div class='proactive-insight-summary' style='color:{direction_colour};'>
+                              {html.escape(str(insight.get('summary','')))}
+                            </div>
+                          </div>
+                          <div class='proactive-ask-arrow'>Ask →</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                with col_btn:
+                    if st.button("→", key=f"welcome_insight_{i}", use_container_width=True):
+                        process_chat_message(insight["suggested_question"], working_df)
+
+            suggestions = _safe_suggested_questions(working_df, limit=4)
+            if suggestions:
+                st.markdown(
+                    "<div style='margin-top:12px;font-size:11px;color:#64748b;margin-bottom:6px;'>"
+                    "Or try one of these:</div>",
+                    unsafe_allow_html=True,
+                )
+                sug_cols = st.columns(min(len(suggestions), 2))
+                for i, sug in enumerate(suggestions):
+                    with sug_cols[i % 2]:
+                        if st.button(f"💬 {sug}", key=f"welcome_sug_{i}", use_container_width=True):
+                            process_chat_message(sug, working_df)
+        else:
+            for msg in st.session_state.chat_messages:
+                if msg["role"] == "user":
+                    render_user_bubble(msg)
+                else:
+                    render_assistant_bubble(
+                        msg,
+                        narration_on=st.session_state.chat_narration_on,
+                        view_mode=st.session_state.chat_view_mode,
+                        working_df=working_df,
+                    )
+
+    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+    qa1, qa2, qa3 = st.columns([1, 1, 1])
+    with qa1:
+        if st.button("💡 Suggestions", use_container_width=True, key="chat_suggest_btn"):
+            st.session_state["show_chat_suggestions"] = True
+    with qa2:
+        if st.button("🔍 What-If", use_container_width=True, key="chat_whatif_btn"):
+            st.session_state["chat_input_prefill"] = "What if revenue increased by 20%?"
+            st.toast("Prefill ready — paste or type your what-if below", icon="🔍")
+    with qa3:
+        if st.button("⚠️ Anomalies", use_container_width=True, key="chat_anomaly_btn"):
+            process_chat_message("Find anomalies in my data", working_df)
+
+    if st.session_state.get("show_chat_suggestions"):
+        suggestions = _safe_suggested_questions(working_df, limit=6)
+        with st.expander("💡 Suggested Questions", expanded=True):
+            for i, sug in enumerate(suggestions):
+                if st.button(sug, key=f"chat_sug_{i}", use_container_width=True):
+                    st.session_state["show_chat_suggestions"] = False
+                    process_chat_message(sug, working_df)
+
+    prefill = st.session_state.pop("chat_input_prefill", None)
+    if prefill:
+        st.caption(f"Suggested: `{prefill}`")
+        if st.button("Send suggested what-if", key="send_prefill_whatif"):
+            process_chat_message(prefill, working_df)
+
+    question = st.chat_input(
+        "💬 Ask anything about your data... (try: 'why', 'what if', 'show me', 'explain')",
+        key="chat_main_input",
+    )
+    if question and question.strip():
+        process_chat_message(question, working_df)
+
+
+# ─────────────────────────────────────────────────────────────
+# Entry
+# ─────────────────────────────────────────────────────────────
 
 def render(working_df, tables, dfs):
     if working_df is None or working_df.empty:
         st.warning("⚠️ No data available.")
         st.stop()
 
-    # ── [SEMANTIC #1] Read singletons from session_state ─────────
-    semantic_builder  = st.session_state.get("semantic_builder", None)
-    semantic_search   = st.session_state.get("semantic_search",  None)
-    semantic_base_ctx = st.session_state.get("semantic_base_context", "")
-    semantic_col_map  = st.session_state.get("semantic_column_map",   "")
+    st.markdown(
+        """
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#6366f1;letter-spacing:1.5px;
+                        text-transform:uppercase;margin-bottom:2px;">⚡ AI QUERY ENGINE</div>
+            <div style="font-size:13px;color:#64748b;">Ask questions or chat with your data</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    # ── [SEMANTIC #2] Status badge ────────────────────────────────
-    if semantic_builder is not None:
-        st.markdown(
-            "<div style='font-size:11px;color:#6b7280;margin-bottom:4px;'>"
-            "🧠 <b>Semantic layer active</b> — "
-            "business glossary &amp; column mappings loaded"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-    # ── Quick Filters ─────────────────────────────────────────────
-    with st.expander("🎛️ Quick Filters", expanded=False):
-        qf    = {}
-        qcols = st.columns(4)
-        idx   = 0
-        cat_candidates = [
-            c for c in working_df.columns
-            if working_df[c].dtype == object
-            and working_df[c].nunique() <= 40
-        ]
-        for col in cat_candidates[:3]:
-            vals    = ["All"] + sorted(working_df[col].dropna().unique().tolist())
-            sel_val = qcols[idx % 4].selectbox(col, vals, key=f"qf_{col}")
-            if sel_val != "All":
-                qf[col] = sel_val
-            idx += 1
-
-        date_cols = [
-            c for c in working_df.columns
-            if pd.api.types.is_datetime64_any_dtype(working_df[c])
-        ]
-        if date_cols:
-            dc = date_cols[0]
-            mn = int(working_df[dc].dt.year.min())
-            mx = int(working_df[dc].dt.year.max())
-            if mn < mx:
-                yr = st.slider("Year Range", mn, mx, (mn, mx), key="qf_yr")
-                qf["__year__"] = (dc, yr)
-
-        if qf:
-            for col, val in qf.items():
-                if col == "__year__":
-                    dc2, (y1, y2) = val
-                    working_df = working_df[working_df[dc2].dt.year.between(y1, y2)]
-                else:
-                    working_df = working_df[
-                        working_df[col].astype(str).str.strip().str.lower()
-                        == str(val).strip().lower()
-                    ]
-            st.success(f"✅ Filters applied — {working_df.shape[0]:,} rows")
-
-    _wdf = working_df
-    st.markdown("---")
-
-    # ── Query history ─────────────────────────────────────────────
-    if st.session_state.query_history:
-        st.markdown("**Recent Queries**")
-        hcols = st.columns(min(len(st.session_state.query_history), 4))
-        for i, hq in enumerate(st.session_state.query_history[:4]):
-            if hcols[i].button(
-                f"↩ {hq[:28]}{'…' if len(hq) > 28 else ''}",
-                key=f"h{i}",
-            ):
-                st.session_state.query_input = hq
-                st.rerun()
-
-    st.session_state.setdefault("query_processing", False)
-
-    # ── Input row ─────────────────────────────────────────────────
-    qcol, runcol, clrcol = st.columns([8, 1, 1])
-    q = qcol.text_input(
-        "Ask anything",
-        key="query_input",
-        placeholder="e.g. top 10 salespersons by revenue",
+    mode = st.radio(
+        "",
+        options=["🔍 Ask a Question", "💬 Chat with Data"],
+        horizontal=True,
+        key="query_mode_selector",
         label_visibility="collapsed",
-        disabled=st.session_state.query_processing,
     )
-    run_clicked = runcol.button(
-        "⏳ Running..." if st.session_state.query_processing else "▶️ Run",
-        use_container_width=True,
-        disabled=st.session_state.query_processing,
-    )
-    clr_clicked = clrcol.button(
-        "🗑️ Clear",
-        use_container_width=True,
-        disabled=st.session_state.query_processing,
+    st.markdown(
+        "<hr style='border:none;border-top:1px solid rgba(99,102,241,0.1);margin:8px 0 16px;'>",
+        unsafe_allow_html=True,
     )
 
-    if clr_clicked:
-        st.session_state.last_result        = None
-        st.session_state.last_analysis      = None
-        st.session_state.pending_suggestion = None
-        st.rerun()
-
-    # ── [SEMANTIC #3] Per-question enrichment helper ──────────────
-    def _build_enriched_question(raw_q: str) -> tuple[str, str]:
-        if semantic_builder is None or semantic_search is None:
-            return raw_q, ""
-        try:
-            resolutions  = semantic_search.resolve_query_terms(raw_q)
-            resolved_ctx = semantic_builder.build_resolved_context(
-                raw_q, resolutions,
-            )
-            r_measures   = resolutions.get("resolved_measures",   [])
-            r_dimensions = resolutions.get("resolved_dimensions", [])
-
-            hint_parts = []
-            if r_measures:
-                hint_parts.append(f"measures: {', '.join(r_measures)}")
-            if r_dimensions:
-                hint_parts.append(f"dimensions: {', '.join(r_dimensions)}")
-
-            enriched_q = (
-                f"[Semantic hints — {'; '.join(hint_parts)}] {raw_q}"
-                if hint_parts else raw_q
-            )
-            return enriched_q, resolved_ctx
-        except Exception:
-            return raw_q, ""
-
-    # ── Trigger ───────────────────────────────────────────────────
-    if run_clicked and q.strip() and not st.session_state.query_processing:
-        st.session_state.query_processing     = True
-        st.session_state.pending_run_question = q.strip()
-        st.rerun()
-
-    if st.session_state.pending_suggestion and not st.session_state.query_processing:
-        st.session_state.query_processing     = True
-        st.session_state.pending_run_question = st.session_state.pending_suggestion
-        st.session_state.pending_suggestion   = None
-        st.rerun()
-
-    # ── Execute ───────────────────────────────────────────────────
-    if st.session_state.query_processing and st.session_state.get("pending_run_question"):
-        asked_raw = st.session_state.pending_run_question
-
-        enriched_q, resolved_ctx = _build_enriched_question(asked_raw)
-        st.session_state.last_resolved_ctx = resolved_ctx
-
-        try:
-            with st.status("🧠 Loading metadata & schema...", expanded=False) as status_box:
-                result, sql, err = run_query(_wdf, enriched_q, status=status_box)
-                if err:
-                    status_box.update(label="⚠️ Finished with an issue", state="error")
-                else:
-                    status_box.update(label="✅ Query complete", state="complete")
-        except Exception as e:
-            result, sql, err = None, "", f"Unexpected error while running your question: {e}"
-
-        st.session_state.last_result          = (result, sql, err, asked_raw)
-        st.session_state.last_analysis        = None
-        st.session_state.pending_suggestion   = None
-        st.session_state.view_toggle          = "📋 Table"
-        st.session_state.query_processing     = False
-        st.session_state.pending_run_question = None
-        st.rerun()
-
-    st.markdown("---")
-
-    if st.session_state.last_result is not None:
-        result, sql, err, asked_q = st.session_state.last_result
-
-        if err and result is None:
-            st.error(f"❌ {err}")
-            if sql:
-                with st.expander("🔍 SQL Attempted"):
-                    st.code(sql, language="sql")
-
-        elif result is not None and not result.empty:
-            sql_safe_preview = html.escape((sql or "").strip().replace("\n", " "))
-            first80 = sql_safe_preview[:120] + (
-                "…" if len(sql_safe_preview) > 120 else ""
-            )
-            st.markdown(
-                f'<div class="sql-strip">'
-                f'<span class="badge">SQL</span>'
-                f'<span class="sql-text">{first80}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-            # ── [SEMANTIC #5] Resolved term badges ───────────────
-            if semantic_search is not None and asked_q:
-                try:
-                    hits       = semantic_search.resolve_query_terms(asked_q)
-                    all_res    = hits.get("all_resolutions", [])
-                    confident  = [r for r in all_res if r.get("score", 0) >= 0.35]
-
-                    if confident:
-                        type_colours = {
-                            "measure":   ("rgba(124,58,237,0.18)", "#c4b5fd"),
-                            "dimension": ("rgba(79,124,255,0.18)", "#93c5fd"),
-                            "attribute": ("rgba(0,209,122,0.16)", "#6ee7b7"),
-                            "glossary":  ("rgba(251,191,36,0.16)", "#fde68a"),
-                        }
-                        badges = ""
-                        for r in confident[:5]:
-                            bg, fg = type_colours.get(
-                                r["type"], ("rgba(255,255,255,0.08)", "#e2e8f0")
-                            )
-                            label = r["canonical"]
-                            rtype = r["type"].capitalize()
-                            badges += (
-                                f"<span style='background:{bg};color:{fg};"
-                                f"border-radius:4px;padding:2px 8px;"
-                                f"font-size:11px;margin-right:4px;"
-                                f"font-weight:600;'>"
-                                f"{html.escape(label)}"
-                                f"<span style='opacity:0.6;font-weight:400;"
-                                f"margin-left:3px;'>({rtype})</span>"
-                                f"</span>"
-                            )
-                        st.markdown(
-                            f"<div style='margin-bottom:8px;'>"
-                            f"🏷️ <b style='font-size:11px;color:#9db4e0;'>"
-                            f"Resolved:</b> {badges}"
-                            f"</div>",
-                            unsafe_allow_html=True,
-                        )
-                except Exception:
-                    pass
-
-            # ── Edit & Re-run SQL ─────────────────────────────────
-            with st.expander("✏️ View / Edit & Re-run SQL", expanded=False):
-                edited_sql = st.text_area(
-                    "Edit then Re-run",
-                    value=(sql or "").strip(),
-                    height=140,
-                    key="edited_sql_area",
-                )
-                rcol, _ = st.columns([2, 8])
-                if rcol.button("▶️ Re-run SQL", key="rerun_sql_btn"):
-                    safe, reason = sql_is_safe(edited_sql.strip())
-                    if not safe:
-                        st.error(f"🔒 Blocked: {reason}")
-                    else:
-                        try:
-                            with st.spinner("⚙️ Executing edited query..."):
-                                new_result, new_err = run_sql(
-                                    edited_sql.strip(), _wdf
-                                )
-                        except Exception as e:
-                            new_result, new_err = None, f"Unexpected error: {e}"
-                        if new_err:
-                            st.error(f"SQL error: {new_err}")
-                        elif new_result is not None:
-                            st.session_state.last_result  = (
-                                new_result, edited_sql.strip(), None, asked_q
-                            )
-                            st.session_state.last_analysis = None
-                            st.session_state.view_toggle   = "📋 Table"
-                            st.rerun()
-
-            # ── Stat cards ────────────────────────────────────────
-            num_c   = result.select_dtypes(include="number").columns.tolist()
-            total_v = f"{result[num_c[0]].sum():,.1f}" if num_c else "—"
-            total_l = num_c[0] if num_c else "Total"
-            st.markdown(
-                f"""<div class="stat-row">
-                  <div class="stat-card">
-                    <div class="sv">{result.shape[0]:,}</div>
-                    <div class="sl">Rows</div>
-                  </div>
-                  <div class="stat-card">
-                    <div class="sv">{result.shape[1]}</div>
-                    <div class="sl">Columns</div>
-                  </div>
-                  <div class="stat-card">
-                    <div class="sv">{total_v}</div>
-                    <div class="sl">{total_l}</div>
-                  </div>
-                </div>""",
-                unsafe_allow_html=True,
-            )
-
-            # ── Chart / Table toggle ──────────────────────────────
-            view = st.radio(
-                "View", ["📊 Chart", "📋 Table"],
-                horizontal=True,
-                key="view_toggle",
-            )
-
-            if view == "📊 Chart":
-                all_cols = list(result.columns)
-                num_cols = result.select_dtypes(include="number").columns.tolist()
-                str_cols = result.select_dtypes(exclude="number").columns.tolist()
-                ctrl_col, chart_col = st.columns([2, 8])
-                auto_ct    = auto_chart_type(result, asked_q)
-                chart_type = ctrl_col.selectbox(
-                    "Chart Type",
-                    ["Bar", "Line", "Pie", "Scatter", "Area"],
-                    index=["Bar","Line","Pie","Scatter","Area"].index(auto_ct),
-                    key="ct_sel",
-                )
-                default_x = str_cols[0] if str_cols else all_cols[0]
-                default_y = num_cols[0] if num_cols else (
-                    all_cols[1] if len(all_cols) > 1 else all_cols[0]
-                )
-                if default_x not in all_cols: default_x = all_cols[0]
-                if default_y not in all_cols: default_y = all_cols[-1]
-                x_axis = ctrl_col.selectbox(
-                    "X Axis", all_cols,
-                    index=all_cols.index(default_x), key="xa"
-                )
-                y_default_idx = all_cols.index(default_y)
-                if default_y == x_axis and len(all_cols) > 1:
-                    y_default_idx = (all_cols.index(x_axis) + 1) % len(all_cols)
-                y_axis = ctrl_col.selectbox(
-                    "Y Axis", all_cols,
-                    index=y_default_idx, key="ya"
-                )
-                with chart_col:
-                    if isinstance(x_axis, str) and isinstance(y_axis, str):
-                        try:
-                            with st.spinner("🎨 Rendering chart..."):
-                                build_chart(result, chart_type, x_axis, y_axis)
-                        except Exception as e:
-                            st.error(f"⚠️ Chart could not be rendered: {e}")
-                    else:
-                        st.warning("⚠️ Please select valid X and Y columns.")
-            else:
-                st.dataframe(result, use_container_width=True)
-                st.download_button(
-                    "⬇️ Download CSV",
-                    data=result.to_csv(index=False).encode(),
-                    file_name="result.csv",
-                    mime="text/csv",
-                )
-
-            # ── AI Analysis ───────────────────────────────────────
-            st.markdown("---")
-            st.markdown("##### 🧠 Insights ?*")
-
-            if st.button("✨ Generate Analysis", use_container_width=True):
-                try:
-                    with st.spinner("🧠 AI is analysing your results..."):
-
-                        resolved_ctx = st.session_state.get(
-                            "last_resolved_ctx", ""
-                        )
-
-                        # CHANGED: cap each context block independently
-                        # before combining to keep total prompt small
-                        # and avoid LLM timeout
-                        _MAX_CTX_CHARS = 800   # per context block cap
-
-                        def _cap(text: str, limit: int = _MAX_CTX_CHARS) -> str:
-                            """Trim a context block to limit characters."""
-                            if not text:
-                                return ""
-                            return text[:limit] + (
-                                "\n...[trimmed]" if len(text) > limit else ""
-                            )
-
-                        # CHANGED: cap each block then join — total context
-                        # sent to LLM stays well under ~2400 chars
-                        full_extra = "\n\n".join(filter(bool, [
-                            _cap(semantic_base_ctx),  # static model context
-                            _cap(resolved_ctx),       # per-question resolutions
-                            _cap(semantic_col_map),   # physical column map
-                        ]))
-
-                        # CHANGED: also cap the result dataframe rows sent
-                        # to analysis — only send top 50 rows max to LLM
-                        result_for_analysis = (
-                            result.head(50)
-                            if len(result) > 50
-                            else result
-                        )
-
-                        st.session_state.last_analysis = generate_analysis(
-                            result_for_analysis,
-                            asked_q,
-                            extra_context=full_extra,
-                        )
-
-                except Exception as e:
-                    err_str = str(e).lower()
-                    # CHANGED: specific timeout message vs generic error
-                    if "timed out" in err_str or "timeout" in err_str:
-                        st.error(
-                            "⏱️ Analysis timed out. "
-                            "Try running with fewer rows or a simpler question."
-                        )
-                    else:
-                        st.error(f"⚠️ Analysis could not be generated: {e}")
-
-            if st.session_state.get("last_analysis"):
-                ana = st.session_state.last_analysis
-                sum_col, ins_col = st.columns([1, 1])
-
-                with sum_col:
-                    st.markdown("##### 📋 Summary — *What happened?*")
-                    if ana.get("summary"):
-                        st.markdown(
-                            f"<div class='exec-box'>"
-                            f"{html.escape(ana['summary'])}"
-                            f"</div>",
-                            unsafe_allow_html=True,
-                        )
-
-                with ins_col:
-                    st.markdown("##### 💡 Key Facts")
-                    if ana.get("facts"):
-                        facts_html = "".join(
-                            f"<div style='padding:6px 0;"
-                            f"border-bottom:1px solid rgba(255,255,255,0.08);"
-                            f"font-size:13px;'>"
-                            f"<span style='color:#7c3aed;"
-                            f"font-weight:700;'>•</span> "
-                            f"{html.escape(f)}</div>"
-                            for f in ana["facts"]
-                        )
-                        st.markdown(
-                            f"<div class='exec-box' "
-                            f"style='border-left-color:#7c3aed;"
-                            f"padding:10px 16px;'>{facts_html}</div>",
-                            unsafe_allow_html=True,
-                        )
-
-        elif result is not None and result.empty:
-            st.warning("⚠️ Query returned no rows.")
-            with st.expander("🔍 Generated SQL"):
-                st.code(sql, language="sql")
-
-    elif not run_clicked:
-        st.markdown(
-            "<div style='text-align:center;padding:56px;color:#8b949e;"
-            "font-size:15px;'>💬 Type a question above and press <b>Run</b></div>",
-            unsafe_allow_html=True,
-        )
+    if mode == "🔍 Ask a Question":
+        render_ask_mode(working_df, tables, dfs)
+    else:
+        render_chat_mode(working_df, tables, dfs)

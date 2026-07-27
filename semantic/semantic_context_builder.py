@@ -248,10 +248,67 @@ class SemanticContextBuilder:
 
         return "\n".join(lines)
 
+    def build_metric_context(self) -> str:
+        """Show LLM all known business metrics from metric registry."""
+        lines = [
+            "KNOWN BUSINESS METRICS:",
+        ]
+        try:
+            exprs = self._loader.get_metric_expressions()
+            labels = self._loader.get_metric_display_labels()
+            reg = self._loader.get_metric_registry() or {}
+            formats: dict[str, str] = {}
+            for bucket in ("measures", "derived_measures", "metrics"):
+                for key, val in (reg.get(bucket) or {}).items():
+                    formats[key] = val.get("format", "")
+            if not exprs:
+                # Fallback to semantic model measures
+                for name, expr in self._loader.get_measure_expressions().items():
+                    lines.append(f"  {name}: {expr}")
+            else:
+                for key, expr in exprs.items():
+                    label = labels.get(key, key)
+                    fmt = formats.get(key, "")
+                    fmt_bit = f" [{fmt}]" if fmt else ""
+                    lines.append(f"  {label}: {expr}{fmt_bit}")
+        except Exception:
+            lines.append("  Revenue: SUM(total_sales) [currency]")
+            lines.append("  Units Sold: SUM(order_qty) [integer]")
+        return "\n".join(lines)
+
+    def build_conversation_context(self, conv_state: dict | None) -> str:
+        """Inject prior turn info for follow-up awareness."""
+        if not conv_state:
+            return ""
+        lines = ["CONVERSATION CONTEXT:"]
+        metric = conv_state.get("prior_metric")
+        dims = conv_state.get("prior_dimensions") or []
+        filters = conv_state.get("prior_filters") or {}
+        if metric:
+            lines.append(f"  Prior metric: {metric}")
+        if dims:
+            lines.append(f"  Prior dimensions: {', '.join(map(str, dims))}")
+        if filters:
+            filt = ", ".join(f"{k}={v}" for k, v in filters.items())
+            lines.append(f"  Prior filters: {filt}")
+        if conv_state.get("is_followup"):
+            lines.append("  This appears to be a follow-up query.")
+        if len(lines) == 1:
+            return ""
+        return "\n".join(lines)
+
+    def build_scope_context(self) -> str:
+        """Tell LLM what is in/out of scope."""
+        return (
+            "SCOPE: Answer questions about automotive sales data only.\n"
+            "Cannot: write code, modify data, make future predictions."
+        )
+
     def build_full_context(
         self,
         question: str,
         df:       pd.DataFrame,
+        conv_state: dict | None = None,
     ) -> str:
         """
         Builds the complete semantic context for a user question.
@@ -262,10 +319,12 @@ class SemanticContextBuilder:
         1. Base semantic model context
         2. Vector search entity resolutions
         3. Physical column mapping
+        4. Metric / conversation / scope blocks (ISANA)
 
         Args:
             question: User's natural language question
             df:       Working DataFrame
+            conv_state: Optional conversation state dict
 
         Returns:
             Complete context string for GPT prompt
@@ -277,13 +336,22 @@ class SemanticContextBuilder:
         base_ctx     = self.build_base_context()
         resolved_ctx = self.build_resolved_context(question, resolutions)
         column_ctx   = self.build_physical_column_map(df)
+        metric_ctx   = self.build_metric_context()
+        scope_ctx    = self.build_scope_context()
+        conv_ctx     = self.build_conversation_context(conv_state)
 
         # ── Step 3: Combine ──────────────────────────────────────
-        full_context = "\n\n".join([
+        blocks = [
             base_ctx,
+            metric_ctx,
+            scope_ctx,
             resolved_ctx,
             column_ctx,
-        ])
+        ]
+        if conv_ctx:
+            blocks.insert(3, conv_ctx)
+
+        full_context = "\n\n".join(blocks)
 
         return full_context
 

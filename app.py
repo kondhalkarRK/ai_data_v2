@@ -79,6 +79,28 @@ st.session_state.semantic_builder = _init_semantic_component(
     "Semantic context builder not ready",
 )
 
+# Initialise metric registry singleton
+from core.metric_registry import get_metric_registry
+_init_semantic_component(
+    "metric_registry",
+    get_metric_registry,
+    "Metric registry not loaded",
+)
+
+# Store in session for tab access
+if st.session_state.get("metric_registry"):
+    st.session_state.metric_registry = (
+        st.session_state.metric_registry
+    )
+
+# Initialise conversation state
+try:
+    from core.conversation_state import get_state as _get_conv_state
+    if "conversation_state" not in st.session_state:
+        _get_conv_state()  # initialises with empty state
+except Exception:
+    pass
+
 # NOTE: We do NOT pre-build semantic_context here anymore.
 # build_full_context(question, df) is per-question, not per-session.
 # It is called inside tab_query.py at query-run time.

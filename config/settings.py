@@ -85,3 +85,30 @@ def init_session_state() -> None:
     for k, v in DEFAULTS.items():
         if k not in st.session_state:
             st.session_state[k] = v
+
+    # Conversation state
+    if "conversation_state" not in st.session_state:
+        st.session_state.conversation_state = {
+            "active_intent": None,
+            "last_resolved": {},
+            "prior_metric": None,
+            "prior_dimensions": [],
+            "prior_filters": {},
+            "prior_time_grain": None,
+            "turn_count": 0,
+            "last_question": None,
+            "is_followup": False,
+            "inherited_context": {},
+        }
+
+    # Evidence tracking
+    if "execution_evidence" not in st.session_state:
+        st.session_state.execution_evidence = []
+
+    # Query path stats
+    if "query_stats" not in st.session_state:
+        st.session_state.query_stats = {
+            "deterministic": 0,
+            "fallback": 0,
+            "cache": 0,
+        }

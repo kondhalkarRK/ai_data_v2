@@ -273,6 +273,159 @@ def render():
         section_spacer()
 
         # =========================
+        # CONVERSATION STATE (Prompt 2)
+        # =========================
+        with st.container(border=True):
+
+            section_title("💬 CONVERSATION")
+            section_spacer()
+
+            try:
+                from core.conversation_state import get_state, clear_state
+                conv = get_state()
+            except Exception:
+                conv = st.session_state.get("conversation_state") or {}
+
+                def clear_state():
+                    st.session_state.conversation_state = {
+                        "active_intent": None,
+                        "last_resolved": {},
+                        "prior_metric": None,
+                        "prior_dimensions": [],
+                        "prior_filters": {},
+                        "prior_time_grain": None,
+                        "turn_count": 0,
+                        "last_question": None,
+                        "is_followup": False,
+                        "inherited_context": {},
+                    }
+
+            with st.expander("💬 Conversation", expanded=False):
+                if conv.get("turn_count", 0) > 0:
+                    st.markdown(
+                        f"""
+                        <div class='conv-state-panel'>
+                          <div class='query-stat-row'>
+                            <span style='color:#94a3b8;'>Active Metric</span>
+                            <span style='color:#a5b4fc;font-weight:600;'>
+                              {conv.get('prior_metric') or '—'}
+                            </span>
+                          </div>
+                          <div class='query-stat-row'>
+                            <span style='color:#94a3b8;'>Turn Count</span>
+                            <span style='color:#6ee7b7;font-weight:600;'>
+                              {conv.get('turn_count', 0)}
+                            </span>
+                          </div>
+                          <div class='query-stat-row'>
+                            <span style='color:#94a3b8;'>Last Intent</span>
+                            <span style='color:#fcd34d;font-weight:600;'>
+                              {conv.get('active_intent') or '—'}
+                            </span>
+                          </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    if st.button(
+                        "🔄 Clear Conversation",
+                        use_container_width=True,
+                        key="sidebar_clear_conv",
+                    ):
+                        clear_state()
+                        st.session_state.chat_messages = []
+                        st.toast("Conversation cleared", icon="🔄")
+                        st.rerun()
+                else:
+                    st.caption("No active conversation. Ask a question to start.")
+
+        section_spacer()
+
+        # =========================
+        # QUERY PATH STATS (Prompt 2)
+        # =========================
+        with st.container(border=True):
+
+            section_title("📊 SESSION STATS")
+            section_spacer()
+
+            with st.expander("📊 Session Stats", expanded=False):
+                stats = st.session_state.get(
+                    "query_stats",
+                    {"deterministic": 0, "fallback": 0, "cache": 0},
+                )
+                evidence_list = st.session_state.get("execution_evidence") or []
+                if evidence_list:
+                    counts = {"deterministic": 0, "fallback": 0, "cache": 0}
+                    for ev in evidence_list:
+                        p = (ev or {}).get("execution_path")
+                        if p in counts:
+                            counts[p] += 1
+                    stats = counts
+
+                total = sum(int(stats.get(k, 0) or 0) for k in ("deterministic", "fallback", "cache"))
+                if total > 0:
+                    st.markdown(
+                        f"""
+                        <div class='conv-state-panel'>
+                          <div class='query-stat-row'>
+                            <span>✅ Deterministic</span>
+                            <span style='color:#6ee7b7;font-weight:700;'>{stats.get('deterministic',0)}</span>
+                          </div>
+                          <div class='query-stat-row'>
+                            <span>⚠️ AI Generated</span>
+                            <span style='color:#fcd34d;font-weight:700;'>{stats.get('fallback',0)}</span>
+                          </div>
+                          <div class='query-stat-row'>
+                            <span>🔒 Cached</span>
+                            <span style='color:#93c5fd;font-weight:700;'>{stats.get('cache',0)}</span>
+                          </div>
+                          <div class='query-stat-row' style='border:none;padding-top:6px;'>
+                            <span style='color:#64748b;'>Total queries</span>
+                            <span style='font-weight:700;'>{total}</span>
+                          </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    det_pct = round(stats.get("deterministic", 0) / total * 100) if total else 0
+                    st.markdown(f"**Determinism Rate: {det_pct}%**")
+                    st.progress(det_pct / 100)
+                else:
+                    st.caption("No queries yet this session.")
+
+        section_spacer()
+
+        # =========================
+        # DOMAIN SCOPE HINT (Prompt 2)
+        # =========================
+        with st.container(border=True):
+
+            section_title("🎯 DOMAIN SCOPE")
+            section_spacer()
+
+            with st.expander("💡 What can I ask?", expanded=False):
+                try:
+                    from core.metric_registry import get_metric_registry
+                    registry = get_metric_registry()
+                    metrics = registry.list_measures() or registry.list_metrics()
+                    st.markdown("**Available Metrics:**")
+                    for m in metrics[:8]:
+                        st.markdown(f"• {m.replace('_', ' ').title()}")
+                    st.markdown("---")
+                    st.markdown("**Example Questions:**")
+                    st.markdown("• *Show revenue by colour for 2023*")
+                    st.markdown("• *Top 10 salespeople by units sold*")
+                    st.markdown("• *What if revenue increased by 20%?*")
+                    st.markdown("• *Find anomalies in my data*")
+                    st.markdown("• *Why is silver performing low?*")
+                except Exception:
+                    st.caption("Ask questions about your uploaded data.")
+
+        # CHANGED: spacer between sections
+        section_spacer()
+
+        # =========================
         # INDUSTRY PACK (NEW)
         # =========================
         if _PACKS_AVAILABLE:

@@ -1,0 +1,90 @@
+version: "1.0"
+domain: "Automotive Sales"
+
+measures:
+  revenue:
+    column: total_sales
+    aggregation: SUM
+    display_label: "Revenue"
+    format: currency
+    synonyms:
+      - sales
+      - turnover
+      - income
+      - total revenue
+      - gross sales
+      - earnings
+      - money made
+
+  units_sold:
+    column: order_qty
+    aggregation: SUM
+    display_label: "Units Sold"
+    format: integer
+    synonyms:
+      - volume
+      - quantity
+      - units
+      - cars sold
+      - vehicles sold
+
+  order_count:
+    column: order_id
+    aggregation: COUNT
+    display_label: "Orders"
+    format: integer
+    synonyms:
+      - orders
+      - transactions
+      - deals
+      - bookings
+      - purchases
+
+  avg_price:
+    column: price_per_unit
+    aggregation: AVG
+    display_label: "Average Price"
+    format: currency
+    synonyms:
+      - average price
+      - price
+      - ASP
+      - avg selling price
+
+derived_measures:
+  average_selling_price:
+    formula: "SUM(total_sales) / NULLIF(SUM(order_qty), 0)"
+    display_label: "Average Selling Price"
+    format: currency
+    dependencies:
+      - total_sales
+      - order_qty
+    synonyms:
+      - asp
+      - average unit price
+      - price per car
+
+  revenue_per_order:
+    formula: "SUM(total_sales) / NULLIF(COUNT(order_id), 0)"
+    display_label: "Revenue Per Order"
+    format: currency
+    dependencies:
+      - total_sales
+      - order_id
+    synonyms:
+      - average order value
+      - aov
+      - basket size
+
+metrics:
+  revenue_growth:
+    type: derived
+    formula: "yoy_growth"
+    display_label: "Revenue Growth"
+    description: "Year over year revenue growth percentage"
+
+  market_share:
+    type: derived
+    formula: "SUM(order_qty) / NULLIF(SUM(SUM(order_qty)) OVER(), 0) * 100"
+    display_label: "Market Share %"
+    description: "Share of total units sold"

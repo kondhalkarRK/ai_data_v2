@@ -10,6 +10,7 @@ from typing import Any
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _MODEL_PATH    = os.path.join(_DIR, "semantic_model.yaml")
 _GLOSSARY_PATH = os.path.join(_DIR, "business_glossary.yaml")
+_METRIC_REGISTRY_PATH = os.path.join(_DIR, "metric_registry.yaml")
 
 
 def _load_yaml(path: str) -> dict:
@@ -28,10 +29,11 @@ class SemanticLoader:
     def __init__(self):
         self._model: dict    = {}
         self._glossary: dict = {}
+        self._metric_registry: dict = {}
         self._loaded: bool   = False
 
     def load(self) -> None:
-        """Load both YAML files into memory."""
+        """Load YAML files into memory (metric registry is non-fatal)."""
         try:
             self._model    = _load_yaml(_MODEL_PATH)
             self._glossary = _load_yaml(_GLOSSARY_PATH)
@@ -44,6 +46,15 @@ class SemanticLoader:
             )
         except yaml.YAMLError as e:
             raise RuntimeError(f"YAML parse error: {e}")
+
+        # Metric registry — optional / non-fatal
+        try:
+            if os.path.exists(_METRIC_REGISTRY_PATH):
+                self._metric_registry = _load_yaml(_METRIC_REGISTRY_PATH) or {}
+            else:
+                self._metric_registry = {}
+        except (OSError, yaml.YAMLError):
+            self._metric_registry = {}
 
     def _ensure_loaded(self) -> None:
         if not self._loaded:
@@ -156,6 +167,53 @@ class SemanticLoader:
             )
         return result
 
+    # ── Metric registry accessors ────────────────────────────────
+
+    def get_metric_registry(self) -> dict:
+        self._ensure_loaded()
+        return self._metric_registry or {}
+
+    def get_metric_expressions(self) -> dict[str, str]:
+        """metric_name → SQL expression/formula."""
+        self._ensure_loaded()
+        out: dict[str, str] = {}
+        reg = self._metric_registry or {}
+        for key, val in (reg.get("measures") or {}).items():
+            col = val.get("column", "")
+            agg = str(val.get("aggregation", "SUM")).upper()
+            out[key] = f"{agg}({col})" if col else ""
+        for key, val in (reg.get("derived_measures") or {}).items():
+            out[key] = val.get("formula", "") or ""
+        for key, val in (reg.get("metrics") or {}).items():
+            out[key] = val.get("formula", "") or ""
+        return out
+
+    def get_all_metric_synonyms(self) -> dict[str, str]:
+        """synonym (lowercase) → canonical metric name."""
+        self._ensure_loaded()
+        mapping: dict[str, str] = {}
+        reg = self._metric_registry or {}
+        for bucket in ("measures", "derived_measures", "metrics"):
+            for key, val in (reg.get(bucket) or {}).items():
+                mapping[key.lower()] = key
+                label = val.get("display_label") or val.get("display_name")
+                if isinstance(label, str) and label.strip():
+                    mapping[label.lower()] = key
+                for syn in val.get("synonyms", []) or []:
+                    if isinstance(syn, str) and syn.strip():
+                        mapping[syn.lower()] = key
+        return mapping
+
+    def get_metric_display_labels(self) -> dict[str, str]:
+        """metric_name → display label."""
+        self._ensure_loaded()
+        out: dict[str, str] = {}
+        reg = self._metric_registry or {}
+        for bucket in ("measures", "derived_measures", "metrics"):
+            for key, val in (reg.get(bucket) or {}).items():
+                out[key] = val.get("display_label") or val.get("display_name") or key
+        return out
+
     # ── All semantic terms (for vector indexing) ─────────────────
 
     def get_all_semantic_terms(self) -> list[dict]:
@@ -203,6 +261,26 @@ class SemanticLoader:
                     "type":      "glossary",
                     "key":       term,
                 })
+
+        # Metric registry terms (for vector search)
+        reg = self._metric_registry or {}
+        for bucket, type_name in (
+            ("measures", "measure"),
+            ("derived_measures", "measure"),
+            ("metrics", "measure"),
+        ):
+            for key, val in (reg.get(bucket) or {}).items():
+                canonical = val.get("display_label") or key
+                all_terms = [canonical, key] + list(val.get("synonyms", []) or [])
+                for t in all_terms:
+                    if not t:
+                        continue
+                    terms.append({
+                        "text":      t,
+                        "canonical": canonical,
+                        "type":      type_name,
+                        "key":       key,
+                    })
 
         # Table attributes
         for table_key, table_val in self.get_tables().items():
