@@ -1,0 +1,68 @@
+%% AI Data Platform — User Query to Response Flow
+%% Open in https://mermaid.live or use query_flow_diagram.html
+
+flowchart TD
+    A[User enters question] --> B{UI mode?}
+
+    B -->|Ask a Question| C[tab_query.render_ask_mode]
+    B -->|Chat with Data| D[tab_query.render_chat_mode]
+
+    C --> E{Route by question type}
+    D --> E
+
+    E -->|OOB: write code / delete / password| F[Out of Scope card]
+    E -->|What-if / simulate / percent change| G[whatif_engine]
+    E -->|anomalies / outliers / unusual| H[anomaly_engine]
+    E -->|Normal analytics question| I[nlq_engine.run_query]
+
+    G --> G1[parse_scenario then run on DataFrame copy]
+    G1 --> G2[Baseline vs Scenario plus narrative]
+    G2 --> Z[Render response]
+
+    H --> H1[detect_anomalies plus summarise]
+    H1 --> H2[Anomaly cards plus summary]
+    H2 --> Z
+
+    I --> I0[conversation_state: follow-up detect / inherit]
+    I0 --> I1{OOB?}
+    I1 -->|yes| F
+    I1 -->|no| I2{Materialized view or session cache?}
+
+    I2 -->|hit| I3[Cached result plus evidence]
+    I2 -->|miss| I4[fingerprint to intent_cache]
+
+    I4 --> I5{Intent on disk or session?}
+    I5 -->|hit| I6[Reuse cached intent]
+    I5 -->|miss| I7[intent_resolver LLM JSON intent]
+    I7 --> I8[Store intent in cache]
+    I6 --> I9[semantic_resolver]
+    I8 --> I9
+
+    I9 --> I10[metric_registry / synonyms to execution contract]
+    I10 --> I11{bypass?}
+    I11 -->|yes| I12[LLM SQL fallback nlq_to_sql]
+    I11 -->|no| I13[sql_compiler.compile_from_contract]
+    I13 -->|compile fails| I12
+
+    I13 --> I14[run_sql via DuckDB on df]
+    I12 --> I14
+    I14 -->|SQL error| I15[LLM auto-fix plus retry]
+    I15 --> I14
+
+    I14 --> I16[build_evidence plus update conversation_state]
+    I16 --> I17[Cache result plus optional materialize]
+    I3 --> Z
+    I16 --> Z
+
+    Z --> Z1{Ask mode}
+    Z --> Z2{Chat mode}
+
+    Z1 --> Z1a[Badge plus rows plus time]
+    Z1a --> Z1b[Table / Chart / Insights tabs]
+    Z1b --> Z1c[narration_engine on Insights]
+
+    Z2 --> Z2a[Append user plus assistant messages]
+    Z2a --> Z2b{Narration ON or auto why-explain?}
+    Z2b -->|yes| Z2c[Narration card]
+    Z2b -->|table or both| Z2d[Data table]
+    Z2c --> Z2d
