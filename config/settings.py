@@ -24,7 +24,7 @@ except ImportError:
 # Load sensitive/configurable values from environment (.env) instead of hardcoding
 LLM_BASE_URL = os.getenv("CAPGEMINI_LLM_BASE_URL", "https://openai.generative.engine.capgemini.com/v1")
 LLM_API_KEY = os.getenv("CAPGEMINI_LLM_API_KEY")
-LLM_MODEL = os.getenv("CAPGEMINI_LLM_MODEL", "openai.gpt-5")
+LLM_MODEL = os.getenv("CAPGEMINI_LLM_MODEL", "openai.gpt-5.1")
 
 
 @st.cache_resource(show_spinner=False)
