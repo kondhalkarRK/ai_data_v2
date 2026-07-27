@@ -1,0 +1,1187 @@
+"""Pure execution dispatcher: orchestrates plan steps deterministically.
+
+PHASE 1 CLEANUP: 
+- Executes plan steps ONLY (no fallback paths)
+- Delegates evaluation to goal_evaluator module
+- Delegates adaptive suggestions to adaptive_engine module
+- Returns structured output: {analysis: [], evaluation: null|dict, adaptive: null|dict}
+
+PHASE 7.5: Evidence contract emission for narration grounding enforcement.
+- ALL SQL/simulation/scenario execution emits deterministic evidence contracts
+- Evidence contracts include: evidence_id, evidence_source, evidence_type, execution_id, replay_reference, admissibility_status
+"""
+
+from __future__ import annotations
+
+import hashlib
+import sqlite3
+import uuid
+from datetime import datetime, timezone
+from typing import Any
+
+from agent_layer.grounded_narration_guard import validate_execution_dispatcher_grounding
+from utils.runtime_trace import (
+    build_execution_evidence_emission_event,
+)
+
+from kpi_engine.sql_generator import SQLGenerator
+from simulation_service import SimulationService
+from utils.execution_governance import ensure_lineage_fields, enforce_runtime_mode
+
+
+_SIMULATION_CONFIG_PATH = "config/domain/simulation_config.yaml"
+_SIMULATION_MODEL_VERSION = "v1"
+_SCENARIO_INDICATOR_KEYS = {
+    "demand_increase_pct",
+    "lead_time_increase_days",
+    "inventory_adjustment_pct",
+    "supplier_fill_rate_change",
+    "supplier_otif_change",
+}
+# Multiplier applied to derive the second scenario from a single-parameter-set comparison.
+# No scalar value is hardcoded; this factor is applied to whatever values the parameters carry.
+_SCENARIO_B_SCALE_FACTOR = 2.0
+
+
+class ExecutionDispatcher:
+    """Execute plan steps sequentially. No fallback paths."""
+
+    def __init__(self, db_path: str = "data/processed/enterprise_risk.db") -> None:
+        self.db_path = db_path
+
+    @staticmethod
+    def _build_sql_evidence_contract(
+        query: str,
+        result_count: int,
+        execution_status: str,
+        execution_id: str,
+        replay_reference: str,
+    ) -> dict[str, Any]:
+        """Build SQL execution evidence contract. PHASE 7.5: Evidence grounding."""
+        query_hash = hashlib.sha256(query.encode()).hexdigest()
+        return {
+            "evidence_id": f"{execution_id}:sql",
+            "evidence_source": "sql_generator",
+            "evidence_type": "sql_execution",
+            "query_hash": query_hash,
+            "execution_id": execution_id,
+            "result_count": result_count,
+            "execution_status": execution_status,
+            "execution_timestamp": datetime.now(timezone.utc).isoformat(),
+            "replay_reference": replay_reference,
+            "lineage_status": "execution_bound" if execution_status == "success" else "execution_failed",
+            "evidence_admissibility_status": "evidence_admissible" if execution_status == "success" else "evidence_blocked",
+            "admissibility_status": "evidence_admissible" if execution_status == "success" else "evidence_blocked",
+            "advisory_only": True,
+        }
+
+    @staticmethod
+    def _build_simulation_evidence_contract(
+        simulation_run_id: str,
+        scenario_type: str,
+        result_count: int,
+        execution_status: str,
+        execution_id: str,
+        replay_reference: str,
+    ) -> dict[str, Any]:
+        """Build simulation execution evidence contract. PHASE 7.5: Evidence grounding."""
+        return {
+            "evidence_id": simulation_run_id,
+            "evidence_source": "simulation_service",
+            "evidence_type": "simulation_result",
+            "simulation_run_id": simulation_run_id,
+            "scenario_type": scenario_type,
+            "result_count": result_count,
+            "execution_status": execution_status,
+            "execution_id": execution_id,
+            "execution_timestamp": datetime.now(timezone.utc).isoformat(),
+            "replay_reference": replay_reference,
+            "lineage_status": "execution_bound" if execution_status == "success" else "execution_failed",
+            "evidence_admissibility_status": "evidence_admissible" if execution_status == "success" else "evidence_blocked",
+            "admissibility_status": "evidence_admissible" if execution_status == "success" else "evidence_blocked",
+            "advisory_only": True,
+        }
+
+    @staticmethod
+    def _build_scenario_evidence_contract(
+        scenario_id: str,
+        scaling_reason: str,
+        normalization_reason: str,
+        source_execution_reference: str,
+        result_count: int,
+        execution_status: str,
+        execution_id: str,
+        replay_reference: str,
+    ) -> dict[str, Any]:
+        """Build scenario comparison evidence contract. PHASE 7.5: Evidence grounding."""
+        return {
+            "evidence_id": scenario_id,
+            "evidence_source": "execution_dispatcher",
+            "evidence_type": "scenario_execution",
+            "scenario_id": scenario_id,
+            "scaling_reason": scaling_reason,
+            "normalization_reason": normalization_reason,
+            "source_execution_reference": source_execution_reference,
+            "result_count": result_count,
+            "execution_status": execution_status,
+            "execution_id": execution_id,
+            "execution_timestamp": datetime.now(timezone.utc).isoformat(),
+            "replay_reference": replay_reference,
+            "lineage_status": "execution_bound" if execution_status == "success" else "execution_failed",
+            "evidence_admissibility_status": "evidence_admissible" if execution_status == "success" else "evidence_blocked",
+            "admissibility_status": "evidence_admissible" if execution_status == "success" else "evidence_blocked",
+            "advisory_only": True,
+        }
+
+    def handle_metric(self, resolved: dict[str, Any]) -> dict[str, Any]:
+        """Execute metric query using SQLGenerator.
+        
+        PHASE 7.5: Emit SQL evidence contract for narration grounding.
+        Delegates ALL SQL construction to SQLGenerator.
+        No inline SQL exists in this function.
+        """
+        # Extract resolved contract fields
+        expression = resolved.get("expression")
+        if not isinstance(expression, str) or not expression.strip():
+            raise ValueError("Resolved expression missing — semantic resolver contract violated")
+        dimensions = resolved.get("mapped_dimensions") or []
+        filters = resolved.get("filters") or {}
+        context = resolved.get("context") or {}
+        
+        # Build contract for SQLGenerator
+        sql_contract = {
+            "expression": expression,
+            "group_by": dimensions,
+            "filters": filters,
+            "context": context,
+            "source_tables": resolved.get("source_tables") or [],
+            "base_table": resolved.get("base_table") or "fact_inventory_risk",
+            "order": resolved.get("order"),
+            "limit": resolved.get("limit"),
+            "normalized_query": resolved.get("normalized_query"),
+        }
+        
+        # Generate SQL (all construction delegated to SQLGenerator)
+        generator = SQLGenerator()
+        sql = generator.generate_from_contract(sql_contract)
+        
+        # Execute (no inline SQL anywhere in dispatcher)
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(sql).fetchall()
+        finally:
+            conn.close()
+        
+        # PHASE 7.5: Evidence emission
+        execution_id = resolved.get("execution_id") or str(uuid.uuid4())
+        replay_reference = resolved.get("execution_replay_reference") or f"{execution_id}:sql"
+        is_emit_allowed, emit_block_reason = validate_execution_dispatcher_grounding("success")
+        if not is_emit_allowed:
+            raise ValueError(f"Execution evidence emission blocked: {emit_block_reason}")
+        
+        sql_evidence = self._build_sql_evidence_contract(
+            query=sql,
+            result_count=len(rows),
+            execution_status="success",
+            execution_id=execution_id,
+            replay_reference=replay_reference,
+        )
+        
+        # PHASE 7.5: Emit telemetry
+        telemetry_event = build_execution_evidence_emission_event(
+            emission_type="sql_execution",
+            evidence_count=1,
+            execution_status="success",
+            lineage_status="execution_bound",
+            replay_reference=replay_reference,
+        )
+        
+        return {
+            "rows": [dict(row) for row in rows],
+            "evidence_contract": sql_evidence,  # PHASE 7.5: Evidence binding
+            "evidence_emission_event": telemetry_event,
+        }
+
+    def handle_simulation(self, resolved: dict[str, Any]) -> dict[str, Any]:
+        """Execute simulation via SimulationService.
+        
+        PHASE 7.5: Emit simulation evidence contract for narration grounding.
+        ONLY execution point for simulations in the system.
+        """
+        result = SimulationService().run(resolved)
+        
+        # PHASE 7.5: Evidence emission
+        execution_id = resolved.get("execution_id") or str(uuid.uuid4())
+        simulation_run_id = resolved.get("simulation_run_id") or str(uuid.uuid4())
+        replay_reference = resolved.get("execution_replay_reference") or f"{execution_id}:simulation"
+        sim_status = "success" if result.get("status") == "success" else "error"
+        is_emit_allowed, emit_block_reason = validate_execution_dispatcher_grounding(sim_status)
+        if not is_emit_allowed:
+            return {
+                **result,
+                "evidence_contract": self._build_simulation_evidence_contract(
+                    simulation_run_id=simulation_run_id,
+                    scenario_type=resolved.get("scenario_type", "SCENARIO"),
+                    result_count=0,
+                    execution_status=sim_status,
+                    execution_id=execution_id,
+                    replay_reference=replay_reference,
+                ),
+                "evidence_emission_block_reason": emit_block_reason,
+            }
+        
+        sim_evidence = self._build_simulation_evidence_contract(
+            simulation_run_id=simulation_run_id,
+            scenario_type=resolved.get("scenario_type", "SCENARIO"),
+            result_count=len(result.get("rows", [])) if isinstance(result.get("rows"), list) else 0,
+            execution_status=sim_status,
+            execution_id=execution_id,
+            replay_reference=replay_reference,
+        )
+        
+        # PHASE 7.5: Emit telemetry
+        telemetry_event = build_execution_evidence_emission_event(
+            emission_type="simulation_execution",
+            evidence_count=1,
+            execution_status=sim_status,
+            lineage_status="execution_bound" if sim_status == "success" else "execution_failed",
+            replay_reference=replay_reference,
+        )
+        
+        result["evidence_contract"] = sim_evidence  # PHASE 7.5: Evidence binding
+        result["evidence_emission_event"] = telemetry_event
+
+        # Compute capital_at_risk = avg_inventory_value × avg_expected_risk for the scope.
+        # This gives the estimated monetary value of inventory under stockout pressure.
+        try:
+            _filters = resolved.get("filters") or {}
+            _joins: list[str] = []
+            _wheres: list[str] = []
+            if _filters.get("category"):
+                _joins.append("JOIN dim_product dp ON s.product_key = dp.id")
+                _wheres.append(f"dp.category = '{_filters['category']}' COLLATE NOCASE")
+            if _filters.get("region"):
+                _joins.append("JOIN dim_store ds ON s.store_key = ds.id")
+                _wheres.append(f"ds.region = '{_filters['region']}' COLLATE NOCASE")
+            _join_sql = " ".join(_joins)
+            _where_sql = "WHERE " + " AND ".join(_wheres) if _wheres else ""
+            _cap_sql = f"SELECT SUM(s.avg_inventory_value) FROM daily_store_product_summary s {_join_sql} {_where_sql}"
+            _cap_conn = sqlite3.connect(self.db_path)
+            try:
+                _total_inv_value = _cap_conn.execute(_cap_sql).fetchone()[0] or 0.0
+            finally:
+                _cap_conn.close()
+            # Inject into simulation_unified_output if present
+            _suo = result.get("simulation_unified_output")
+            if isinstance(_suo, dict):
+                _scenario = _suo.get("scenario") or {}
+                _avg_risk = _scenario.get("avg_expected_risk") or 0.0
+                _capital_at_risk = round(_total_inv_value * float(_avg_risk), 0)
+                _suo.setdefault("scenario", {})
+                _suo["scenario"]["capital_at_risk"] = _capital_at_risk
+                _suo["scenario"]["total_inventory_value"] = round(_total_inv_value, 0)
+        except Exception:
+            pass
+
+        # Per-store replenishment breakdown for the current mode + scope
+        try:
+            _filters = resolved.get("filters") or {}
+            _mode = resolved.get("optimization_mode") or "SERVICE_LEVEL"
+            _sdim = "JOIN dim_store ON fd.store_key = dim_store.id"
+            _swhere = "fd.optimization_mode = ?"
+            _sparams: list = [_mode]
+            if _filters.get("region"):
+                _swhere += " AND dim_store.region = ? COLLATE NOCASE"
+                _sparams.append(_filters["region"])
+            if _filters.get("category"):
+                _sdim += "\nJOIN dim_product ON fd.product_key = dim_product.id"
+                _swhere += " AND dim_product.category = ? COLLATE NOCASE"
+                _sparams.append(_filters["category"])
+            _sim_ps_sql = f"""
+                WITH _latest AS (
+                    SELECT fd.store_key, fd.product_key,
+                           fd.final_decision, fd.revenue_at_risk,
+                           fid.recommended_units,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY fd.store_key, fd.product_key
+                               ORDER BY fd.date_key DESC, fd.simulation_run_id DESC
+                           ) AS rn
+                    FROM fact_inventory_final_decision fd
+                    LEFT JOIN fact_inventory_decision fid
+                        ON fd.date_key = fid.date_key
+                        AND fd.store_key = fid.store_key
+                        AND fd.product_key = fid.product_key
+                        AND fd.simulation_run_id = fid.simulation_run_id
+                        AND fd.optimization_mode = fid.optimization_mode
+                    {_sdim}
+                    WHERE {_swhere}
+                )
+                SELECT dim_store.store_id,
+                       COUNT(CASE WHEN l.final_decision = 'REPLENISH' THEN 1 END) AS replenish_skus,
+                       ROUND(SUM(CASE WHEN l.final_decision = 'REPLENISH'
+                                 THEN COALESCE(l.recommended_units, 0) ELSE 0 END), 0) AS units_to_order,
+                       ROUND(SUM(l.revenue_at_risk), 0) AS revenue_at_risk
+                FROM _latest l
+                JOIN dim_store ON l.store_key = dim_store.id
+                WHERE l.rn = 1
+                GROUP BY dim_store.store_id
+                ORDER BY revenue_at_risk DESC
+            """
+            _sc = sqlite3.connect(self.db_path)
+            _sc.row_factory = sqlite3.Row
+            try:
+                result["per_store_context"] = [dict(r) for r in _sc.execute(_sim_ps_sql, _sparams).fetchall()]
+                result["per_store_mode"] = _mode
+            finally:
+                _sc.close()
+        except Exception:
+            pass
+
+        return result
+
+    def handle_driver_query(self, resolved: dict[str, Any]) -> dict[str, Any]:
+        """Query fact_inventory_insight for root cause drivers with optional filters.
+
+        When driver columns contain data: UNION ALL across driver_1/2/3 for full
+        per-driver-type breakdown. Falls back to risk-band breakdown from
+        fact_inventory_risk when all driver columns are NULL.
+        """
+        filters = resolved.get("filters") or {}
+        limit = resolved.get("limit") or 10
+
+        dim_joins: list[str] = []
+        dim_wheres: list[str] = []
+
+        needs_store = "region" in filters
+        needs_product = "category" in filters
+        needs_date = any(k in filters for k in ("year", "month"))
+        needs_risk = "risk_level" in filters
+
+        if needs_store:
+            dim_joins.append("JOIN dim_store ON fii.store_key = dim_store.id")
+            dim_wheres.append(f"dim_store.region = '{filters['region']}' COLLATE NOCASE")
+        if needs_product:
+            dim_joins.append("JOIN dim_product ON fii.product_key = dim_product.id")
+            dim_wheres.append(f"dim_product.category = '{filters['category']}' COLLATE NOCASE")
+        if needs_date:
+            dim_joins.append("JOIN dim_date ON fii.date_key = dim_date.id")
+            if isinstance(filters.get("year"), int):
+                dim_wheres.append(f"dim_date.year = {filters['year']}")
+            if isinstance(filters.get("month"), int):
+                dim_wheres.append(f"dim_date.month = {filters['month']}")
+        if needs_risk:
+            dim_joins.append(
+                "JOIN fact_inventory_risk fir "
+                "ON fii.date_key = fir.date_key "
+                "AND fii.store_key = fir.store_key "
+                "AND fii.product_key = fir.product_key"
+            )
+            risk_val = str(filters["risk_level"]).upper()
+            dim_wheres.append(f"fir.risk_level = '{risk_val}' COLLATE NOCASE")
+
+        join_sql = " ".join(dim_joins)
+        where_sql = "WHERE " + " AND ".join(dim_wheres) if dim_wheres else ""
+
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            # Check if any driver columns are populated in the scoped result set
+            driver_check_cond = " AND ".join(
+                dim_wheres
+                + ["(fii.driver_1 IS NOT NULL OR fii.driver_2 IS NOT NULL OR fii.driver_3 IS NOT NULL)"]
+            )
+            driver_count = conn.execute(
+                f"SELECT COUNT(*) FROM fact_inventory_insight fii {join_sql} WHERE {driver_check_cond}"
+            ).fetchone()[0]
+
+            if driver_count > 0:
+                # UNION ALL across all three driver slots for per-driver-type breakdown
+                def _driver_subquery(col: str, pct_col: str) -> str:
+                    conds = " AND ".join(dim_wheres + [f"fii.{col} IS NOT NULL"])
+                    return (
+                        f"SELECT fii.{col} AS driver_name, COALESCE(fii.{pct_col}, 0.0) AS impact_pct, "
+                        f"fii.revenue_at_risk, fii.expected_risk "
+                        f"FROM fact_inventory_insight fii {join_sql} WHERE {conds}"
+                    )
+
+                sql = f"""
+                    WITH all_drivers AS (
+                        {_driver_subquery('driver_1', 'driver_1_pct')}
+                        UNION ALL
+                        {_driver_subquery('driver_2', 'driver_2_pct')}
+                        UNION ALL
+                        {_driver_subquery('driver_3', 'driver_3_pct')}
+                    )
+                    SELECT
+                        driver_name,
+                        COUNT(*) AS occurrence_count,
+                        ROUND(AVG(impact_pct), 3) AS avg_impact_pct,
+                        ROUND(SUM(revenue_at_risk), 0) AS total_revenue_at_risk,
+                        ROUND(AVG(expected_risk), 3) AS avg_expected_risk
+                    FROM all_drivers
+                    GROUP BY driver_name
+                    ORDER BY total_revenue_at_risk DESC
+                    LIMIT {limit}
+                """
+            else:
+                # Fallback: risk-band breakdown when driver decomposition is unavailable
+                risk_bridge = "" if needs_risk else (
+                    "JOIN fact_inventory_risk fir "
+                    "ON fii.date_key = fir.date_key "
+                    "AND fii.store_key = fir.store_key "
+                    "AND fii.product_key = fir.product_key"
+                )
+                fallback_join = (join_sql + " " + risk_bridge).strip()
+                sql = f"""
+                    SELECT
+                        COALESCE(fir.risk_level, 'UNKNOWN') AS driver_name,
+                        COUNT(*) AS occurrence_count,
+                        ROUND(AVG(fir.stockout_probability), 3) AS avg_impact_pct,
+                        ROUND(SUM(fii.revenue_at_risk), 0) AS total_revenue_at_risk,
+                        ROUND(AVG(fii.expected_risk), 3) AS avg_expected_risk
+                    FROM fact_inventory_insight fii
+                    {fallback_join}
+                    {where_sql}
+                    GROUP BY fir.risk_level
+                    ORDER BY total_revenue_at_risk DESC
+                    LIMIT {limit}
+                """
+
+            rows = conn.execute(sql).fetchall()
+
+            # ── Parallel metric context queries ──────────────────────────────
+            # Run category and region breakdowns alongside the driver query so
+            # narration can say "Electronics carries 42% of total risk exposure"
+            # without a second round-trip from the UI.
+            ctx_by_category: list[dict] = []
+            ctx_by_region: list[dict] = []
+
+            _cat_join = "JOIN dim_product dp ON fii.product_key = dp.id"
+            _reg_join = "JOIN dim_store ds ON fii.store_key = ds.id"
+            _date_join = "JOIN dim_date dd ON fii.date_key = dd.id"
+
+            _ctx_where_parts = list(dim_wheres)
+            _ctx_join_parts = list(dim_joins)
+
+            # Category breakdown — always useful, skip if category is already filtered
+            if "category" not in filters:
+                _cj = " ".join(_ctx_join_parts + ([_cat_join] if _cat_join not in " ".join(_ctx_join_parts) else []))
+                _cw = " AND ".join(_ctx_where_parts) if _ctx_where_parts else "1=1"
+                cat_sql = f"""
+                    SELECT dp.category,
+                           COUNT(*) AS sku_count,
+                           ROUND(AVG(fii.expected_risk), 3) AS avg_expected_risk,
+                           ROUND(SUM(fii.revenue_at_risk), 0) AS total_revenue_at_risk
+                    FROM fact_inventory_insight fii
+                    {_cj}
+                    WHERE {_cw}
+                    GROUP BY dp.category
+                    ORDER BY total_revenue_at_risk DESC
+                """
+                try:
+                    ctx_by_category = [dict(r) for r in conn.execute(cat_sql).fetchall()]
+                except Exception:
+                    ctx_by_category = []
+
+            # Region breakdown — always useful, skip if region is already filtered
+            if "region" not in filters:
+                _rj = " ".join(_ctx_join_parts + ([_reg_join] if _reg_join not in " ".join(_ctx_join_parts) else []))
+                _rw = " AND ".join(_ctx_where_parts) if _ctx_where_parts else "1=1"
+                reg_sql = f"""
+                    SELECT ds.region,
+                           COUNT(*) AS sku_count,
+                           ROUND(AVG(fii.expected_risk), 3) AS avg_expected_risk,
+                           ROUND(SUM(fii.revenue_at_risk), 0) AS total_revenue_at_risk
+                    FROM fact_inventory_insight fii
+                    {_rj}
+                    WHERE {_rw}
+                    GROUP BY ds.region
+                    ORDER BY total_revenue_at_risk DESC
+                """
+                try:
+                    ctx_by_region = [dict(r) for r in conn.execute(reg_sql).fetchall()]
+                except Exception:
+                    ctx_by_region = []
+
+        finally:
+            conn.close()
+
+        execution_id = resolved.get("execution_id") or str(uuid.uuid4())
+        replay_reference = resolved.get("execution_replay_reference") or f"{execution_id}:driver"
+        sql_evidence = self._build_sql_evidence_contract(
+            query=sql,
+            result_count=len(rows),
+            execution_status="success",
+            execution_id=execution_id,
+            replay_reference=replay_reference,
+        )
+        return {
+            "rows": [dict(row) for row in rows],
+            "metric_context_by_category": ctx_by_category,
+            "metric_context_by_region": ctx_by_region,
+            "evidence_contract": sql_evidence,
+        }
+
+    def handle_mode_comparison(self, resolved: dict[str, Any]) -> dict[str, Any]:
+        """Compare all optimization modes via fact_inventory_final_decision breakdown.
+
+        Applies region/category scope filters when present in resolved["filters"] so
+        queries like "compare strategies for Furniture in East" are correctly scoped.
+        """
+        _filters = resolved.get("filters") or {}
+        _sc_region = _filters.get("region")
+        _sc_category = _filters.get("category")
+
+        # Build optional JOINs and WHERE clauses for scope filters
+        _dim_joins = ""
+        _where_clauses: list[str] = []
+        _params: list = []
+
+        if _sc_region or _sc_category:
+            _dim_joins += "\n            JOIN dim_store ON fd.store_key = dim_store.id"
+            if _sc_region:
+                _where_clauses.append("dim_store.region = ? COLLATE NOCASE")
+                _params.append(_sc_region)
+            if _sc_category:
+                _dim_joins += "\n            JOIN dim_product ON fd.product_key = dim_product.id"
+                _where_clauses.append("dim_product.category = ? COLLATE NOCASE")
+                _params.append(_sc_category)
+
+        # Use ROW_NUMBER to get the latest decision per (mode, store, product)
+        # so we don't sum across all 731 dates in the time-series table.
+        _where_str = f"WHERE {' AND '.join(_where_clauses)}" if _where_clauses else ""
+        sql = f"""
+            WITH _latest AS (
+                SELECT
+                    fd.optimization_mode,
+                    fd.store_key,
+                    fd.product_key,
+                    fd.final_decision,
+                    fd.expected_risk,
+                    fd.revenue_at_risk,
+                    fd.economic_score,
+                    fid.recommended_units,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY fd.optimization_mode, fd.store_key, fd.product_key
+                        ORDER BY fd.date_key DESC, fd.simulation_run_id DESC
+                    ) AS rn
+                FROM fact_inventory_final_decision fd
+                LEFT JOIN fact_inventory_decision fid
+                    ON fd.date_key = fid.date_key
+                    AND fd.store_key = fid.store_key
+                    AND fd.product_key = fid.product_key
+                    AND fd.simulation_run_id = fid.simulation_run_id{_dim_joins}
+                {_where_str}
+            )
+            SELECT
+                optimization_mode,
+                final_decision,
+                COUNT(*) AS decision_count,
+                ROUND(AVG(expected_risk), 3) AS avg_expected_risk,
+                ROUND(SUM(revenue_at_risk), 0) AS total_revenue_at_risk,
+                ROUND(AVG(economic_score), 3) AS avg_economic_score,
+                ROUND(SUM(recommended_units), 0) AS total_recommended_units
+            FROM _latest
+            WHERE rn = 1
+            GROUP BY optimization_mode, final_decision
+            ORDER BY optimization_mode, decision_count DESC
+        """
+
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(sql, _params).fetchall()
+        finally:
+            conn.close()
+
+        row_dicts = [dict(row) for row in rows]
+        execution_id = resolved.get("execution_id") or str(uuid.uuid4())
+        replay_reference = resolved.get("execution_replay_reference") or f"{execution_id}:mode_comparison"
+        sql_evidence = self._build_sql_evidence_contract(
+            query=sql,
+            result_count=len(rows),
+            execution_status="success",
+            execution_id=execution_id,
+            replay_reference=replay_reference,
+        )
+        return {
+            "execution": {
+                "data": row_dicts,
+                "row_count": len(row_dicts),
+                "columns": list(row_dicts[0].keys()) if row_dicts else [],
+            },
+            "analysis": [{"rows": row_dicts, "evidence_contract": sql_evidence}],
+            "evaluation": None,
+            "adaptive": None,
+        }
+
+    def handle_compare_scenarios(self, resolved: dict[str, Any]) -> dict[str, Any]:
+        parameters = resolved.get("parameters") if isinstance(resolved.get("parameters"), dict) else {}
+
+        scenario_a_input = dict(resolved)
+        scenario_a_input["scenario_parameters"] = parameters.get("scenario_A")
+
+        scenario_b_input = dict(resolved)
+        scenario_b_input["scenario_parameters"] = parameters.get("scenario_B")
+
+        return {
+            "scenario_A": SimulationService().run(scenario_a_input),
+            "scenario_B": SimulationService().run(scenario_b_input),
+        }
+
+    def _build_simulation_context(
+        self,
+        resolved: dict[str, Any],
+        scenario_parameters: dict[str, Any],
+        optimization_mode: str | None,
+    ) -> dict[str, Any]:
+        """Build a complete SimulationService context from dispatcher-available fields.
+
+        Uses self.db_path and the config path constant — no scalar parameter values
+        are hardcoded here.
+        """
+        context = resolved.get("context") if isinstance(resolved.get("context"), dict) else {}
+        filters = resolved.get("filters") if isinstance(resolved.get("filters"), dict) else {}
+        runtime_origin, execution_mode = enforce_runtime_mode(
+            resolved.get("runtime_origin") or "app.py",
+            resolved.get("execution_mode") or "INTERACTIVE",
+        )
+        replay_reference = (
+            resolved.get("execution_replay_reference")
+            or (
+                resolved.get("execution_governance", {}).get("replay_reference")
+                if isinstance(resolved.get("execution_governance"), dict)
+                else None
+            )
+            or "dispatcher:execution"
+        )
+        # BUG-08: scenario_parameters may carry "optimization_mode" when the caller
+        # embeds per-scenario modes (two-mode comparison). Extract it first so it
+        # reaches simulation context but doesn't pollute the numeric param set.
+        sp = dict(scenario_parameters) if isinstance(scenario_parameters, dict) else {}
+        embedded_mode = sp.pop("optimization_mode", None)
+        return {
+            "db_path": self.db_path,
+            "simulation_config_path": _SIMULATION_CONFIG_PATH,
+            "scenario_type": "SCENARIO",
+            "simulation_run_id": str(uuid.uuid4()),
+            "model_version": _SIMULATION_MODEL_VERSION,
+            "optimization_mode": embedded_mode or optimization_mode or context.get("optimization_mode") or "SERVICE_LEVEL",
+            "service_level_target": context.get("service_level_target"),
+            "scenario_parameters": sp,
+            "runtime_origin": runtime_origin,
+            "execution_mode": execution_mode,
+            "simulation_execution_mode": execution_mode,
+            "execution_transition_status": "origin_locked",
+            "dispatcher_validation_status": "validated",
+            "governance_lock_status": "locked",
+            "execution_replay_reference": str(replay_reference),
+            "advisory_only": True,
+            "request_source": "AGENT",
+            "filters": dict(filters),
+            "strict_execution_mode": True,
+        }
+
+    def handle_scenario_comparison(self, resolved: dict[str, Any]) -> dict[str, Any]:
+        """Execute a scenario vs scenario comparison using SimulationService.
+
+        Derives two scenario parameter sets:
+        - If explicit scenario_A / scenario_B present in parameters, use them directly.
+        - If only a single indicator set exists, use it as scenario_A and scale each
+          numeric value by _SCENARIO_B_SCALE_FACTOR for scenario_B.
+
+        PHASE 7.5: Emit scenario evidence contracts with scaling justification.
+        No scalar parameter values are hardcoded; all values come from the resolved
+        payload or are mathematically derived from it.
+
+        Returns dispatcher-standard execution block plus comparison_results.
+        """
+        parameters = resolved.get("parameters") if isinstance(resolved.get("parameters"), dict) else {}
+        context = resolved.get("context") if isinstance(resolved.get("context"), dict) else {}
+        optimization_mode = context.get("optimization_mode") or resolved.get("optimization_mode")
+
+        # Determine scenario_A and scenario_B parameter sets.
+        synthetic_comparison = False
+        if "scenario_A" in parameters and "scenario_B" in parameters:
+            # Explicit scenario pair — use as-is.
+            scenario_a_params = parameters.get("scenario_A") or {}
+            scenario_b_params = parameters.get("scenario_B") or {}
+        else:
+            # Single indicator set — scenario_A uses it directly;
+            # scenario_B scales each numeric value by _SCENARIO_B_SCALE_FACTOR.
+            synthetic_comparison = True
+            scenario_a_params = {
+                k: v for k, v in parameters.items()
+                if k in _SCENARIO_INDICATOR_KEYS and isinstance(v, (int, float))
+            }
+            scenario_b_params = {
+                k: round(v * _SCENARIO_B_SCALE_FACTOR, 6) if isinstance(v, (int, float)) else v
+                for k, v in scenario_a_params.items()
+            }
+
+        context_a = self._build_simulation_context(resolved, scenario_a_params, optimization_mode)
+        context_b = self._build_simulation_context(resolved, scenario_b_params, optimization_mode)
+
+        result_a = SimulationService().run(context_a)
+        result_b = SimulationService().run(context_b)
+
+        unified_a = result_a.get("simulation_unified_output") if isinstance(result_a.get("simulation_unified_output"), dict) else result_a
+        unified_b = result_b.get("simulation_unified_output") if isinstance(result_b.get("simulation_unified_output"), dict) else result_b
+
+        # PHASE 7.5: Evidence emission
+        execution_id = resolved.get("execution_id") or str(uuid.uuid4())
+        replay_reference = resolved.get("execution_replay_reference") or f"{execution_id}:scenario"
+        
+        scaling_reason = (
+            "explicit_pair" if not synthetic_comparison
+            else f"synthetic_comparison_2x_factor"
+        )
+        normalization_reason = "scenario_parameter_scaling"
+        
+        # Build scenario evidence
+        scenario_a_evidence = self._build_scenario_evidence_contract(
+            scenario_id=f"{execution_id}:scenario_a",
+            scaling_reason=scaling_reason,
+            normalization_reason=normalization_reason,
+            source_execution_reference=execution_id,
+            result_count=len(unified_a.get("rows", [])) if isinstance(unified_a.get("rows"), list) else 0,
+            execution_status="success" if isinstance(result_a.get("status"), str) and result_a["status"] == "success" else "error",
+            execution_id=execution_id,
+            replay_reference=f"{replay_reference}:a",
+        )
+        
+        scenario_b_evidence = self._build_scenario_evidence_contract(
+            scenario_id=f"{execution_id}:scenario_b",
+            scaling_reason=scaling_reason,
+            normalization_reason=normalization_reason,
+            source_execution_reference=execution_id,
+            result_count=len(unified_b.get("rows", [])) if isinstance(unified_b.get("rows"), list) else 0,
+            execution_status="success" if isinstance(result_b.get("status"), str) and result_b["status"] == "success" else "error",
+            execution_id=execution_id,
+            replay_reference=f"{replay_reference}:b",
+        )
+        
+        # PHASE 7.5: Emit telemetry
+        scenario_execution_status = "success" if (result_a.get("status") == "success" and result_b.get("status") == "success") else "error"
+        telemetry_event = build_execution_evidence_emission_event(
+            emission_type="scenario_execution",
+            evidence_count=2,
+            execution_status=scenario_execution_status,
+            lineage_status="execution_bound" if scenario_execution_status == "success" else "execution_failed",
+            replay_reference=replay_reference,
+        )
+
+        # Fetch per-mode decision context from fact_inventory_final_decision so the
+        # narration can surface real REPLENISH/HOLD differences across modes even when
+        # simulation expected_risk values are identical (simulation is mode-agnostic).
+        # Scoped to region/category from resolved["filters"] so Q10-style comparisons
+        # show Furniture/East numbers rather than the global 73k-decision total.
+        mode_decision_context: dict[str, Any] = {}
+        mode_per_store_context: dict[str, Any] = {}
+        service_level_per_store: dict[str, int] = {}
+        mode_a_label = context_a.get("optimization_mode")
+        mode_b_label = context_b.get("optimization_mode")
+        if mode_a_label and mode_b_label and mode_a_label != mode_b_label:
+            _scope_filters = resolved.get("filters") if isinstance(resolved.get("filters"), dict) else {}
+            _sc_region = _scope_filters.get("region")
+            _sc_category = _scope_filters.get("category")
+
+            # Build scoped WHERE conditions and dimension joins
+            _dim_joins = ""
+            _where_extra = ""
+            _scope_params: list = [mode_a_label, mode_b_label]
+            if _sc_region or _sc_category:
+                _dim_joins += "\n                JOIN dim_store ON fd.store_key = dim_store.id"
+                if _sc_region:
+                    _where_extra += "\n                AND dim_store.region = ? COLLATE NOCASE"
+                    _scope_params.append(_sc_region)
+                if _sc_category:
+                    _dim_joins += "\n                JOIN dim_product ON fd.product_key = dim_product.id"
+                    _where_extra += "\n                AND dim_product.category = ? COLLATE NOCASE"
+                    _scope_params.append(_sc_category)
+
+            # Use ROW_NUMBER to get the latest decision per (mode, store, product).
+            # fact_inventory_final_decision is a time-series table (one row per date-run
+            # combination). Summing across all dates inflates units and revenue — we want
+            # the most recent snapshot per SKU as the current replenishment position.
+            _mode_sql = f"""
+                WITH _latest AS (
+                    SELECT fd.optimization_mode, fd.store_key, fd.product_key,
+                           fd.final_decision, fd.revenue_at_risk, fd.expected_risk,
+                           fid.recommended_units,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY fd.optimization_mode, fd.store_key, fd.product_key
+                               ORDER BY fd.date_key DESC, fd.simulation_run_id DESC
+                           ) AS rn
+                    FROM fact_inventory_final_decision fd
+                    LEFT JOIN fact_inventory_decision fid
+                        ON fd.date_key = fid.date_key
+                        AND fd.store_key = fid.store_key
+                        AND fd.product_key = fid.product_key
+                        AND fd.simulation_run_id = fid.simulation_run_id{_dim_joins}
+                    WHERE fd.optimization_mode IN (?, ?){_where_extra}
+                )
+                SELECT optimization_mode, final_decision,
+                       COUNT(*) AS decision_count,
+                       ROUND(SUM(recommended_units), 0) AS total_recommended_units,
+                       ROUND(SUM(revenue_at_risk), 0) AS total_revenue_at_risk,
+                       ROUND(AVG(expected_risk), 3) AS avg_expected_risk
+                FROM _latest
+                WHERE rn = 1
+                GROUP BY optimization_mode, final_decision
+                ORDER BY optimization_mode, decision_count DESC
+            """
+
+            # Per-store breakdown: always join dim_store; add dim_product when category scoped
+            _ps_dim_joins = "\n                    JOIN dim_store ON fd.store_key = dim_store.id"
+            _ps_where_extra = ""
+            _ps_params: list = [mode_a_label, mode_b_label]
+            if _sc_region:
+                _ps_where_extra += "\n                    AND dim_store.region = ? COLLATE NOCASE"
+                _ps_params.append(_sc_region)
+            if _sc_category:
+                _ps_dim_joins += "\n                    JOIN dim_product ON fd.product_key = dim_product.id"
+                _ps_where_extra += "\n                    AND dim_product.category = ? COLLATE NOCASE"
+                _ps_params.append(_sc_category)
+
+            _ps_sql = f"""
+                WITH _latest AS (
+                    SELECT fd.optimization_mode, fd.store_key, fd.product_key,
+                           fd.final_decision, fd.revenue_at_risk, fid.recommended_units,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY fd.optimization_mode, fd.store_key, fd.product_key
+                               ORDER BY fd.date_key DESC, fd.simulation_run_id DESC
+                           ) AS rn
+                    FROM fact_inventory_final_decision fd
+                    LEFT JOIN fact_inventory_decision fid
+                        ON fd.date_key = fid.date_key
+                        AND fd.store_key = fid.store_key
+                        AND fd.product_key = fid.product_key
+                        AND fd.simulation_run_id = fid.simulation_run_id{_ps_dim_joins}
+                    WHERE fd.optimization_mode IN (?, ?){_ps_where_extra}
+                ),
+                _prices AS (
+                    SELECT store_key, product_key, AVG(avg_price) AS avg_unit_price
+                    FROM daily_store_product_summary
+                    GROUP BY store_key, product_key
+                )
+                SELECT l.optimization_mode, dim_store.store_id,
+                       COUNT(CASE WHEN l.final_decision = 'REPLENISH' THEN 1 END) AS replenish_skus,
+                       ROUND(SUM(CASE WHEN l.final_decision = 'REPLENISH'
+                                 THEN l.recommended_units ELSE 0 END), 0) AS units_to_order,
+                       ROUND(SUM(l.revenue_at_risk), 0) AS total_rev_at_risk,
+                       ROUND(SUM(CASE WHEN l.final_decision != 'REPLENISH'
+                                 THEN l.revenue_at_risk ELSE 0 END), 0) AS residual_rev_at_risk,
+                       ROUND(AVG(COALESCE(pr.avg_unit_price, 0)), 2) AS avg_unit_price
+                FROM _latest l
+                LEFT JOIN _prices pr ON l.store_key = pr.store_key AND l.product_key = pr.product_key
+                JOIN dim_store ON l.store_key = dim_store.id
+                WHERE l.rn = 1
+                GROUP BY l.optimization_mode, dim_store.store_id
+                ORDER BY l.optimization_mode, total_rev_at_risk DESC
+            """
+
+            try:
+                _conn = sqlite3.connect(self.db_path)
+                _conn.row_factory = sqlite3.Row
+                try:
+                    _mode_rows = _conn.execute(_mode_sql, _scope_params).fetchall()
+                    for r in _mode_rows:
+                        d = dict(r)
+                        mode = d.get("optimization_mode", "")
+                        if mode not in mode_decision_context:
+                            mode_decision_context[mode] = []
+                        mode_decision_context[mode].append(d)
+                    _ps_rows = _conn.execute(_ps_sql, _ps_params).fetchall()
+                    for r in _ps_rows:
+                        d = dict(r)
+                        mode = d.get("optimization_mode", "")
+                        if mode not in mode_per_store_context:
+                            mode_per_store_context[mode] = []
+                        mode_per_store_context[mode].append(d)
+
+                    # SERVICE_LEVEL per-store as reference baseline.
+                    # Build fresh joins with aliases to avoid any dim_store name collision
+                    # with the outer _ps_sql. No optimization_mode on fid — that column
+                    # does not exist in fact_inventory_decision.
+                    _sl_scope_params: list = []
+                    _sl_cte_joins = ""
+                    _sl_cte_where_parts = ["fd.optimization_mode = 'SERVICE_LEVEL'"]
+                    if _sc_region:
+                        _sl_cte_joins += "\n                            JOIN dim_store sl_ds ON fd.store_key = sl_ds.id"
+                        _sl_cte_where_parts.append("sl_ds.region = ? COLLATE NOCASE")
+                        _sl_scope_params.append(_sc_region)
+                    if _sc_category:
+                        _sl_cte_joins += "\n                            JOIN dim_product sl_dp ON fd.product_key = sl_dp.id"
+                        _sl_cte_where_parts.append("sl_dp.category = ? COLLATE NOCASE")
+                        _sl_scope_params.append(_sc_category)
+                    _sl_cte_where = " AND ".join(_sl_cte_where_parts)
+                    _sl_sql = f"""
+                        WITH _sl_latest AS (
+                            SELECT fd.store_key, fd.product_key,
+                                   COALESCE(fid.recommended_units, 0) AS recommended_units,
+                                   ROW_NUMBER() OVER (
+                                       PARTITION BY fd.store_key, fd.product_key
+                                       ORDER BY fd.date_key DESC, fd.simulation_run_id DESC
+                                   ) AS rn
+                            FROM fact_inventory_final_decision fd
+                            LEFT JOIN fact_inventory_decision fid
+                                ON fd.date_key = fid.date_key
+                                AND fd.store_key = fid.store_key
+                                AND fd.product_key = fid.product_key
+                                AND fd.simulation_run_id = fid.simulation_run_id
+                            {_sl_cte_joins}
+                            WHERE {_sl_cte_where}
+                        )
+                        SELECT sl_outer.store_id,
+                               ROUND(SUM(CASE WHEN l.rn = 1 THEN l.recommended_units ELSE 0 END), 0)
+                                   AS sl_units
+                        FROM _sl_latest l
+                        JOIN dim_store sl_outer ON l.store_key = sl_outer.id
+                        GROUP BY sl_outer.store_id
+                    """
+                    try:
+                        _sl_rows = _conn.execute(_sl_sql, _sl_scope_params).fetchall()
+                        service_level_per_store = {
+                            dict(r)["store_id"]: int(dict(r).get("sl_units") or 0)
+                            for r in _sl_rows
+                        }
+                    except Exception:
+                        service_level_per_store = {}
+
+                finally:
+                    _conn.close()
+            except Exception:
+                mode_decision_context = {}
+                mode_per_store_context = {}
+                service_level_per_store = {}
+
+        _demand_pct_shared = (
+            scenario_a_params.get("demand_increase_pct")
+            or scenario_b_params.get("demand_increase_pct")
+        )
+        comparison_results = {
+            "synthetic_comparison": synthetic_comparison,
+            "mode_decision_context": mode_decision_context,
+            "mode_per_store_context": mode_per_store_context,
+            "service_level_per_store": service_level_per_store,
+            "demand_pct": _demand_pct_shared,
+            "scenario_A": {
+                "baseline": unified_a.get("baseline"),
+                "scenario": unified_a.get("scenario"),
+                "delta": unified_a.get("delta"),
+                "context": unified_a.get("context"),
+                "scenario_parameters": scenario_a_params,
+                "optimization_mode": mode_a_label,
+            },
+            "scenario_B": {
+                "baseline": unified_b.get("baseline"),
+                "scenario": unified_b.get("scenario"),
+                "delta": unified_b.get("delta"),
+                "context": unified_b.get("context"),
+                "scenario_parameters": scenario_b_params,
+                "optimization_mode": mode_b_label,
+            },
+        }
+
+        return {
+            "execution": {
+                "data": [],
+                "row_count": 2,
+                "type": "scenario_comparison",
+            },
+            "analysis": [],
+            "evaluation": None,
+            "adaptive": None,
+            "comparison_results": comparison_results,
+            "evidence_contracts": {  # PHASE 7.5: Evidence binding
+                "scenario_a": scenario_a_evidence,
+                "scenario_b": scenario_b_evidence,
+            },
+            "evidence_emission_event": telemetry_event,
+        }
+
+    def run_metric(self, resolved: dict[str, Any]) -> dict[str, Any]:
+        """Execute a metric step from plan."""
+        return self.handle_metric(resolved)
+
+    def run_simulation(self, resolved: dict[str, Any], scenario: Any | None = None) -> dict[str, Any]:
+        """Execute a simulation step from plan."""
+        if scenario is not None:
+            simulation_input = dict(resolved)
+            simulation_input["scenario_parameters"] = scenario
+            return SimulationService().run(simulation_input)
+        return SimulationService().run(resolved)
+
+    def execute(self, resolved: dict[str, Any]) -> dict[str, Any]:
+        """Execute plan steps sequentially with contract enforcement.
+        
+        PHASE 1 CLEANUP: Plan is mandatory. No fallback paths.
+        PHASE 1.5 CONTRACT HARDENING: Enforce execution contracts at dispatch.
+        PHASE 2 ARCHITECTURE ENFORCEMENT: Dispatcher is pure execution only.
+        
+        Responsibility: Execute metric/simulate steps ONLY.
+        NOT responsible for: evaluation, decision, business logic.
+        
+        Contracts enforced:
+        - Plan must exist with steps
+        - Maximum one simulation per execution
+        - Execution mode always explicit (controller provides)
+        - No evaluation or decision steps inside dispatcher
+        
+        Returns: {execution: dict, analysis: [], evaluation: None, adaptive: None}
+        Raises: ValueError on contract violation
+        """
+        plan = resolved.get("plan")
+        print("TRACE_EXECUTION_PLAN:", plan)
+
+        runtime_origin, execution_mode = enforce_runtime_mode(
+            resolved.get("runtime_origin"),
+            resolved.get("execution_mode"),
+        )
+        resolved["runtime_origin"] = runtime_origin
+        resolved["execution_mode"] = execution_mode
+        resolved["simulation_execution_mode"] = execution_mode
+        resolved["execution_transition_status"] = "origin_locked"
+        resolved["dispatcher_validation_status"] = "validated"
+        resolved["governance_lock_status"] = "locked"
+
+        execution_governance = (
+            resolved.get("execution_governance")
+            if isinstance(resolved.get("execution_governance"), dict)
+            else None
+        )
+        if execution_governance is not None:
+            normalized_lineage = ensure_lineage_fields(execution_governance)
+            if normalized_lineage.get("runtime_origin") != runtime_origin:
+                raise ValueError("Dispatcher runtime_origin mismatch against execution lineage")
+            if normalized_lineage.get("execution_mode") != execution_mode:
+                raise ValueError("Dispatcher execution_mode mismatch against execution lineage")
+
+        execution_output: dict[str, Any] = {
+            "analysis": [],
+            "evaluation": None,
+            "adaptive": None,
+        }
+
+        # TASK 1: ASSERT EXECUTION PLAN EXISTENCE
+        if not plan or not isinstance(plan, dict) or "steps" not in plan:
+            print("TRACE_EXECUTION_CONTRACT_VIOLATION: Missing execution plan")
+            raise ValueError("Execution plan missing — planner contract violated")
+
+        # SCENARIO COMPARISON EARLY EXIT:
+        # If comparison_type == "scenario", bypass plan-step loop entirely and
+        # run two simulations via handle_scenario_comparison(). This prevents the
+        # multiple-simulate-step contract guard from triggering for valid comparisons.
+        # PHASE 7A: Read comparison_type from workflow_context (interpreter authority)
+        # with fallback to resolved.comparison_type for backward compatibility.
+        _wc = resolved.get("workflow_context") if isinstance(resolved.get("workflow_context"), dict) else {}
+        _comparison_type = _wc.get("comparison_type") or resolved.get("comparison_type")
+        if _comparison_type == "scenario":
+            print("TRACE_EXECUTION_STEP: type=scenario_comparison")
+            return self.handle_scenario_comparison(resolved)
+        if _comparison_type == "mode":
+            print("TRACE_EXECUTION_STEP: type=mode_comparison")
+            return self.handle_mode_comparison(resolved)
+
+        # PHASE 2 TASK 5: Dispatcher should NOT contain evaluate_goal or fetch_decision
+        # (Controller filters these out before dispatch)
+        plan_steps = plan.get("steps", [])
+        for step in plan_steps:
+            step_type = step.get("type") if isinstance(step, dict) else None
+            if step_type in ("evaluate_goal", "fetch_decision"):
+                print(f"TRACE_EXECUTION_CONTRACT_VIOLATION: {step_type} must not be in dispatcher plan")
+                raise ValueError(f"{step_type} must be executed in controller, not dispatcher")
+        
+        # TASK 3A: ASSERT SINGLE SIMULATION STEP
+        simulate_step_count = sum(1 for step in plan_steps if isinstance(step, dict) and step.get("type") == "simulate")
+        if simulate_step_count > 1:
+            print("TRACE_SIMULATION_CONTRACT_VIOLATION: Multiple simulation steps")
+            raise ValueError("Only one simulation step allowed per execution")
+        
+        # Execute plan steps sequentially (metric/simulate ONLY)
+        for step in plan_steps:
+            step_type = step.get("type")
+            print(f"TRACE_EXECUTION_STEP: type={step_type}")
+
+            if step_type == "metric":
+                result = self.run_metric(resolved)
+                execution_output["analysis"].append(result)
+
+            elif step_type == "driver":
+                result = self.handle_driver_query(resolved)
+                execution_output["analysis"].append(result)
+
+            elif step_type == "simulate":
+                # FINAL HARDENING: Plan is authority on simulation permission
+                # Dispatcher validates structure, does NOT validate intent
+                # Planner already determined that simulation is appropriate
+                
+                # TASK 1: STRUCTURE VALIDATION (not intent validation)
+                if not isinstance(step, dict):
+                    print(f"TRACE_EXECUTION_CONTRACT_VIOLATION: Invalid simulate step structure")
+                    raise ValueError("Invalid simulation step structure")
+                
+                # Validate that step has either scenario or parameters
+                has_scenario = "scenario" in step
+                has_parameters = "parameters" in step
+                if not (has_scenario or has_parameters):
+                    print(f"TRACE_EXECUTION_CONTRACT_VIOLATION: Simulate step missing scenario or parameters")
+                    raise ValueError("Invalid simulation step structure: missing scenario or parameters")
+                
+                # TASK 2 & 3: STRICT EXECUTION MODE AND REQUEST SOURCE VALIDATION
+                # Do NOT silently fix missing context — controller must provide
+                if "execution_mode" not in resolved:
+                    print("TRACE_EXECUTION_CONTRACT_VIOLATION: execution_mode missing for simulation")
+                    raise ValueError("Execution mode missing for simulation — controller must provide")
+                
+                if resolved.get("execution_mode") != "INTERACTIVE":
+                    print(f"TRACE_EXECUTION_CONTRACT_VIOLATION: invalid execution_mode={resolved.get('execution_mode')}")
+                    raise ValueError("Simulation must run in INTERACTIVE mode")
+                
+                if "request_source" not in resolved:
+                    print("TRACE_EXECUTION_CONTRACT_VIOLATION: request_source missing for simulation")
+                    raise ValueError("Request source missing for simulation — controller must provide")
+                
+                # Execute simulation with validated context
+                scenario = step.get("scenario")
+                result = self.run_simulation(resolved, scenario)
+                execution_output["analysis"].append(result)
+
+            else:
+                # PHASE 2: Only metric and simulate allowed in dispatcher
+                # Evaluation and decision moved to controller layer
+                print(f"TRACE_EXECUTION_STEP: unknown step_type={step_type}")
+                raise ValueError(f"Unknown execution step type: {step_type}")
+
+        print(
+            "TRACE_EXECUTION_RESULT:",
+            {
+                "analysis_count": len(execution_output["analysis"]),
+                "has_evaluation": execution_output["evaluation"] is not None,
+                "has_adaptive": execution_output["adaptive"] is not None,
+            },
+        )
+
+        rows: list[dict[str, Any]] = []
+        analysis = execution_output.get("analysis")
+        if isinstance(analysis, list) and analysis:
+            first_analysis = analysis[0]
+            if isinstance(first_analysis, dict):
+                extracted_rows = first_analysis.get("rows")
+                if isinstance(extracted_rows, list):
+                    rows = [row for row in extracted_rows if isinstance(row, dict)]
+
+        execution_block = {
+            "data": rows,
+            "row_count": len(rows),
+            "columns": list(rows[0].keys()) if rows else [],
+        }
+
+        return {
+            "execution": execution_block,
+            "analysis": execution_output.get("analysis", []),
+            "evaluation": execution_output.get("evaluation"),
+            "adaptive": execution_output.get("adaptive"),
+        }

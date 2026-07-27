@@ -1,0 +1,489 @@
+"""LLM-based intent extractor for ISANA.
+
+Replaces regex-based intent classification with a single structured-output LLM call.
+Falls back to returning UNKNOWN/in_scope=True if the LLM is unavailable.
+
+Output contract:
+{
+    "intent": str,           # one of VALID_INTENTS
+    "in_scope": bool,        # False = graceful deflection, skip execution
+    "deflection_reason": str | None,
+    "parameters": {
+        "demand_increase_pct": int | None,
+        "lead_time_increase_days": int | None,
+        "inventory_adjustment_pct": int | None,  # negative for reduction
+        "supplier_fill_rate_change": int | None,  # % change to supplier fill rate, negative = worse
+        "supplier_otif_change": int | None,        # % change to OTIF rate, negative = worse
+        "limit": int | None,
+        "order": "ASC" | "DESC" | None,
+        "group_by": list[str],
+        "metric": str | None
+    },
+    "filters": {
+        "category": str | None,
+        "region": str | None,
+        "year": int | None,
+        "optimization_mode": str | None,   # SERVICE_LEVEL | MARGIN | SELL_THROUGH
+        "final_decision": str | None        # REPLENISH | MONITOR | HOLD
+    }
+}
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from typing import Any
+
+VALID_INTENTS = {
+    "SCENARIO_ANALYSIS",
+    "COMPARE_SCENARIOS",
+    "RISK_QUERY",
+    "ANALYTICAL_QUERY",
+    "OBJECTIVE_OVERRIDE",
+    "DRIVER_ANALYSIS",
+    "UNKNOWN",
+}
+
+# All valid metric keys from kpi_registry.yaml — unknown LLM output is coerced to null.
+_KNOWN_METRICS: frozenset[str] = frozenset({
+    # Inventory & stock
+    "inventory_on_hand", "avg_inventory_level", "demand_forecasted", "reorder_point",
+    "policy_gap_pct", "avg_replenishment_shortfall",
+    # Replenishment decisions
+    "replenishment_quantity", "replenishment_item_count",
+    # Risk & simulation
+    "stockout_probability", "risk", "risk_level_breakdown",
+    "sim_revenue_at_risk", "sim_p50_risk", "sim_p90_risk", "sim_p95_risk",
+    "system_risk", "inventory_risk", "stockout_risk", "high_risk_count",
+    # Revenue & sales
+    "revenue", "sum_units_sold", "sum_revenue", "revenue_at_risk",
+    # Supplier & supply chain
+    "avg_supplier_fill_rate", "supplier_otif_rate", "supplier_lead_time",
+    "supplier_reliability_index", "avg_supplier_otif",
+    # Efficiency
+    "inventory_turnover", "inventory_efficiency", "stock_pressure", "forecast_accuracy",
+    "inventory_value", "forecast_error", "absolute_forecast_error",
+    "demand_gap", "policy_gap",
+    # Raw measures (less common but valid)
+    "sum_units_ordered", "sum_demand_forecast", "avg_price",
+    "avg_competitor_price", "sum_discount",
+})
+
+_SYSTEM_PROMPT = """You are the intent classification engine for ISANA, an enterprise inventory risk intelligence platform.
+
+OUTPUT REQUIREMENT (CRITICAL): Your ENTIRE response must be a single valid JSON object. No prose, no markdown fences, no explanation before or after. Just the JSON. If you add anything outside the JSON braces, the system will break.
+
+ISANA manages inventory risk across retail stores. It can answer questions about:
+- Inventory replenishment decisions (REPLENISH, MONITOR, HOLD)
+- Stockout risk probability and revenue at risk
+- Optimization strategies: SERVICE_LEVEL (minimize stockouts), MARGIN (maximize profit), SELL_THROUGH (clear inventory fast)
+- Scenario simulations: what happens if demand/lead time/inventory changes
+- Comparing strategies and analyzing risk drivers
+- Policy compliance gaps, conflict analysis
+- Drilldowns by region (North, South, East, West) and category (Electronics, Clothing, Toys, Furniture, Groceries)
+
+OUT OF SCOPE (in_scope=false): purchase orders, competitor pricing, weather forecasts, predicting future demand (ML forecasting), HR/employee data, raw SQL queries, anything outside inventory risk analysis.
+
+INTENT CLASSIFICATION RULES:
+- SCENARIO_ANALYSIS: Any forward-looking statement or question about a numeric % change or day change to a supply-chain parameter. This covers BOTH interrogative ("what if demand rises 20%?") AND declarative ("demand for Toys is projected to rise 22% due to holidays") forms. Examples:
+  "what happens if demand rises 20%", "simulate a 15% demand spike", "what if lead time increases 5 days", "inventory drops by 20%", "stress test", "worst-case scenario", "demand for X is projected to rise Y%", "demand expected to increase Y% due to [event]", "Y% demand surge anticipated", "suppliers taking X more days", "lead time extended by X days", "sales forecast shows Y% uplift", "holiday demand expected to be Y% higher", "demand spike of Y%", "anticipate Y% seasonal surge".
+  KEY RULE: ANY query containing a numeric % or day offset applied to demand / lead time / inventory in a forward-looking context is ALWAYS SCENARIO_ANALYSIS — even when phrased as a statement, not a question. Extract ALL numeric parameters (demand AND lead time AND inventory can all be non-null for combined stress tests).
+- COMPARE_SCENARIOS: "compare strategies", "SERVICE_LEVEL vs MARGIN", "which strategy", "optimization mode comparison", "tradeoff between strategies"
+- RISK_QUERY: replenishment decisions, REPLENISH/MONITOR counts, "what actions are recommended", "how many SKUs need" — only for CURRENT STATE queries with NO % change/simulation. CRITICAL: "which products/stores/suppliers are at HIGH/MEDIUM/LOW risk" is ANALYTICAL_QUERY, NOT RISK_QUERY — it asks for a ranked breakdown, not a count.
+- ANALYTICAL_QUERY: risk scores, averages, breakdowns by dimension, revenue metrics, general analytics, "which stores have the most/least X", "which products have the highest/lowest X", "which suppliers have the lowest/highest X", supplier fill rate, OTIF, lead time, demand variability queries. INCLUDES: "which products are at HIGH risk" → ANALYTICAL_QUERY + group_by=["product"] + risk_level=HIGH.
+- OBJECTIVE_OVERRIDE: "switch to X strategy", "now use MARGIN", "change to SELL_THROUGH", "optimize for"
+- DRIVER_ANALYSIS: "why is X at risk", "what is driving [the risk / the stockout / this exposure]", "root cause", "explain the risk for", "what caused", "what is responsible for". CRITICAL EXCEPTIONS — these are NOT DRIVER_ANALYSIS:
+  1. "explain these products in which region" / "show breakdown by region" / "can you further explain by region and year" → ANALYTICAL_QUERY with group_by=["region"] or group_by=["region","year"].
+  2. "what drives revenue" / "what is driving revenue" / "what's driving our sales" / "what drives our sales" / "top revenue drivers" / "what drives profit" → ANALYTICAL_QUERY, metric=revenue, group_by=["category"]. DRIVER_ANALYSIS is for RISK drivers only, NOT revenue drivers.
+  3. "what contributes to revenue" / "what categories drive revenue" / "which products drive the most revenue" → ANALYTICAL_QUERY, metric=revenue, group_by=["category"] or group_by=["product"].
+
+PARAMETER EXTRACTION RULES:
+- demand_increase_pct: Signed integer representing demand change magnitude. Positive for increase, negative for decrease.
+  "10% demand increase" → 10, "demand up 20%" → 20, "demand decrease by 20%" → -20, "20% demand drop" → -20, "demand reduction 15%" → -15.
+  DECLARATIVE FORMS (also extract the number): "demand for Toys projected to rise 22%" → 22, "anticipated 22% holiday surge" → 22, "demand expected to increase 15% due to heatwave" → 15, "30% demand uplift forecast" → 30, "sales expected to be 10% higher" → 10.
+- lead_time_increase_days: positive integer for delay (e.g. "5-day lead time increase" → 5)
+- inventory_adjustment_pct: NEGATIVE for reduction, positive for increase (e.g. "20% inventory drop" → -20, "15% inventory reduction" → -15)
+- supplier_fill_rate_change: Signed integer for % change to supplier fill rate. Negative = fill rate worsens.
+  "supplier fill rate drops by 15%" → -15, "fill rate improves 10%" → 10, "supplier delivers 20% fewer units" → -20.
+- supplier_otif_change: Signed integer for % change to supplier OTIF (On-Time-In-Full) rate. Negative = OTIF worsens.
+  "OTIF drops by 25%" → -25, "supplier delays worsen by 20%" → -20, "supplier reliability falls 10%" → -10, "OTIF improves 5%" → 5.
+- IMPORTANT: For combined stress tests ALL params can be non-null simultaneously (e.g. demand spike + lead time delay + fill rate drop)
+- limit: for "top N" or "which single X is worst/best" (which + worst/lowest → limit=1, order=ASC)
+- order: "best selling" / "top selling" / "highest" / "most" → order=DESC; "least selling" / "worst selling" / "lowest" / "bottom" / "slowest" → order=ASC
+- group_by: MANDATORY dimension grouping list. Rules:
+  ["region"] for "by region", "across regions", "per region";
+  ["category"] for "by category", "per category";
+  ["supplier"] for "by supplier", "per supplier";
+  ["store"] for "by store", "per store", "which store", "which stores";
+  ["product"] for "by product", "which product", "which products", "which products are at HIGH/MEDIUM/LOW risk",
+              "best selling product", "top selling product", "top product", "most popular product",
+              "highest selling product", "most sold product", "best product", "top products",
+              "least selling product", "worst selling product", "lowest selling product", "bottom product",
+              "least popular product", "slowest selling product", "lowest revenue product";
+  ["year"] for "by year", "per year", "for each year", "year over year", "yearly", "annual breakdown";
+  ["month"] for "by month", "monthly breakdown", "month over month";
+  ["risk_level"] for "distribution", "risk distribution", "breakdown by risk", "risk tier", "risk band", "risk segments".
+  CRITICAL — FILTERS vs GROUP_BY: When the user gives a SPECIFIC VALUE for a dimension, that is a FILTER, NOT a group_by.
+  - "for electronics in east region" → category=Electronics (filter), region=East (filter), group_by=[] — NEVER add category/region to group_by here
+  - "demand decrease for electronics in east" → category=Electronics (filter), region=East (filter), group_by=[]
+  - "by category in east region" → group_by=["category"], region=East (filter)
+  - "which products are at HIGH risk of stockout" → group_by=["product"], risk_level=HIGH (filter)
+  - "what is the risk distribution for North" → group_by=["risk_level"], region=North (filter)
+  - "best selling product for north in 2023" → group_by=["product"], region=North (filter), year=2023 (filter), metric=revenue, order=DESC
+  - "least selling product in west" → group_by=["product"], region=West (filter), metric=revenue, order=ASC
+  - "top selling product in west" → group_by=["product"], region=West (filter), metric=revenue, order=DESC
+  Use [] ONLY when no breakdown dimension is mentioned at all.
+- metric: Select the BEST matching metric key from the catalog below.
+  Return null ONLY for SCENARIO_ANALYSIS / COMPARE_SCENARIOS / OBJECTIVE_OVERRIDE / DRIVER_ANALYSIS.
+  For RISK_QUERY, ALWAYS return a metric — never null.
+  RISK_QUERY metric rule: "how many SKUs need REPLENISH" / "REPLENISH action count" / "replenishment actions needed" / "how many items flagged" → "replenishment_item_count".
+
+METRIC CATALOG — use ONLY these exact keys:
+  Inventory:     inventory_on_hand, avg_inventory_level, demand_forecasted, reorder_point, policy_gap_pct, avg_replenishment_shortfall
+  Replenishment: replenishment_quantity, replenishment_item_count
+  Risk:          stockout_probability, risk, risk_level_breakdown, sim_revenue_at_risk, sim_p50_risk, sim_p90_risk, sim_p95_risk
+  Revenue/Sales: revenue, sum_units_sold
+  Supplier:      avg_supplier_fill_rate, supplier_otif_rate, supplier_lead_time, supplier_reliability_index
+  Efficiency:    inventory_turnover, stock_pressure, forecast_accuracy
+
+METRIC SELECTION — examples (query text → metric key):
+  "inventory level" / "current stock" / "on hand" / "units on hand"               → "inventory_on_hand"
+  "average inventory" / "mean inventory level"                                     → "avg_inventory_level"
+  "demand forecast" / "expected demand" / "average demand for X" / "demand for X" / "how much demand" / "forecasted demand" → "demand_forecasted"
+  "safety stock" / "reorder point" / "buffer stock" / "minimum stock" / "% SKUs below reorder" / "below safety stock" / "items below reorder" → "reorder_point"
+  "fill rate" / "supplier fill rate" / "how well suppliers fill orders"            → "avg_supplier_fill_rate"
+  "OTIF" / "on-time in-full" / "supplier delivery performance" / "on-time delivery" → "supplier_otif_rate"
+  "lead time" / "supplier lead time" / "days to deliver" / "delivery time"        → "supplier_lead_time"
+  "supplier reliability" / "vendor reliability" / "supplier performance" / "reliability score" → "supplier_reliability_index"
+  "stockout probability" / "stockout rate" / "out-of-stock probability" / "average stockout risk" / "stockout risk by region/category/store" / "how likely is a stockout" → "stockout_probability"
+  "risk" / "at risk" / "risk score" / "inventory risk" / "overall risk"           → "risk"
+  "risk distribution" / "risk breakdown by level" / "how many HIGH/MEDIUM/LOW" / "count of HIGH risk items" / "risk tier breakdown" → "risk_level_breakdown"
+  CRITICAL: "average stockout risk" or "stockout risk by X" → "stockout_probability" (NOT risk_level_breakdown).
+  Use "risk_level_breakdown" ONLY when the user explicitly asks for a count or distribution of HIGH/MEDIUM/LOW bands.
+  "revenue at risk" / "simulated revenue at risk"                                  → "sim_revenue_at_risk"
+  "p50" / "median scenario" / "base case"                                          → "sim_p50_risk"
+  "p90" / "90th percentile" / "tail risk" / "adverse scenario"                    → "sim_p90_risk"
+  "p95" / "95th percentile" / "worst case scenario"                               → "sim_p95_risk"
+  "revenue" / "sales" / "contribution" / "top contributing" / "profitability" / "margin" / "what drives revenue" / "revenue drivers" / "what's driving sales" → "revenue"
+  "best selling product" / "top selling product" / "top product" / "most popular product" / "highest selling" → "revenue" (with order=DESC)
+  "least selling product" / "worst selling product" / "lowest selling" / "bottom product" / "slowest selling" → "revenue" (with order=ASC)
+  "units sold" / "sales volume"                                                    → "sum_units_sold"
+  "replenishment quantity" / "how much to reorder" / "what to restock" / "reorder quantity" → "replenishment_quantity"
+  "how many SKUs need replenishment" / "items flagged REPLENISH" / "replenishment count" / "how many items" / "SKUs flagged" → "replenishment_item_count"
+  "inventory shortfall" / "replenishment shortfall" / "units short"               → "avg_replenishment_shortfall"
+  "policy gap" / "policy compliance" / "policy shortfall"                         → "policy_gap_pct"
+  "inventory turnover" / "stock rotation" / "inventory velocity"                  → "inventory_turnover"
+  "stock pressure" / "inventory health" / "inventory posture" / "supply pressure" → "stock_pressure"
+  "forecast accuracy" / "how accurate is the forecast"                             → "forecast_accuracy"
+
+FILTER EXTRACTION RULES:
+- category: one of Electronics, Clothing, Toys, Furniture, Groceries (case-insensitive match)
+- region: one of North, South, East, West (case-insensitive)
+- year: 4-digit year if exactly ONE year is mentioned (e.g. "in 2024" → 2024). Set to null when year_list is used.
+- year_list: Use ONLY when TWO specific years are compared with "vs", "versus", "compared to", "against", "and" in a comparison context (e.g. "2022 vs 2023", "compare 2022 and 2023", "2022 versus 2023"). Set to [year_a, year_b]. Leave null for single year queries.
+- months_back: rolling month window — 1 for "latest month", "most recent month", "current month", "this month"; N for "last N months", "past N months", "previous N months". Use 1 when user says "latest available" with no explicit count.
+- optimization_mode: SERVICE_LEVEL (keywords: service level, availability, stockout, "for SERVICE_LEVEL", "under SERVICE_LEVEL", "show for SERVICE_LEVEL"), MARGIN (keywords: margin, profit, cost efficiency), SELL_THROUGH (keywords: sell-through, sell through, SELL_THROUGH). NOTE: "show data for X strategy" or "baseline for X mode" → set optimization_mode=X, intent=ANALYTICAL_QUERY, NOT OBJECTIVE_OVERRIDE. OBJECTIVE_OVERRIDE only fires for "switch to X", "now use X", "change to X", "optimize for X".
+- final_decision: REPLENISH (inventory shortfall exists), MONITOR (no shortfall, low risk), POLICY_REVIEW (no shortfall but elevated risk requiring policy attention). Use null when no specific decision type is mentioned.
+- risk_level: HIGH, MEDIUM, or LOW if query filters to a specific risk band (e.g. "show HIGH risk items", "filter to LOW risk")
+- product: specific product identifier or name if the user references a single product entity (e.g. "for product P001", "SKU ABC-123", "show me the Laptop Pro"). Use null when the user asks about products in general (group_by=["product"]) rather than a specific one.
+- store: specific store identifier if the user references a single store (e.g. "for store S05", "store ID 12"). Use null when asking about stores in general (group_by=["store"]).
+
+SCENARIO CONTINUATION (applies when prior context contains last_intent=SCENARIO_ANALYSIS and prior_scenario_params):
+When the query is a follow-up with no new simulation numbers and prior_scenario_params is in context:
+- Set intent=SCENARIO_ANALYSIS
+- COPY prior_scenario_params into demand_increase_pct / lead_time_increase_days / inventory_adjustment_pct
+- COPY prior_category → category filter; prior_region → region filter
+- Set optimization_mode to whatever the new query specifies ("in service level" → SERVICE_LEVEL, "for margin" → MARGIN, "sell-through" → SELL_THROUGH)
+- If the query doesn't specify a new optimization_mode, copy prior_optimization_mode if present
+- NEVER return null scenario params when prior values exist and no new change is stated
+Example: context has prior_scenario_params={'demand_increase_pct': -20}, prior_category=Electronics, prior_region=East
+  "how does this scenario change in service level?" →
+    demand_increase_pct=-20, category=Electronics, region=East, optimization_mode=SERVICE_LEVEL
+  "same scenario but for margin optimization" →
+    demand_increase_pct=-20, category=Electronics, region=East, optimization_mode=MARGIN
+
+STRATEGY COMPARISON AFTER SCENARIO (applies when prior context is SCENARIO_ANALYSIS and user asks to compare strategies):
+"compare it between sell through vs margin", "compare this across strategies", "how does this look under different modes" →
+intent=COMPARE_SCENARIOS, COPY prior_scenario_params, COPY prior_category, COPY prior_region.
+The system will run the scenario under each requested mode and compare outcomes.
+Example: prior_scenario_params={'demand_increase_pct': 22}, prior_category=Toys
+  "compare it between sell through vs margin" →
+    intent=COMPARE_SCENARIOS, demand_increase_pct=22, category=Toys
+
+AFFIRMATIVE FOLLOW-UP (when query is "yes", "yes please", "yes, drill", "go ahead", "show me", "proceed", "do it", "break it down", "yes show breakdown"):
+- If last_intent=ANALYTICAL_QUERY and prior_metric=revenue: Route as ANALYTICAL_QUERY, metric=revenue, inherit prior_category/prior_region. If no group_by suggested, add group_by=["region"] as default drill. NEVER route to DRIVER_ANALYSIS when prior was ANALYTICAL_QUERY.
+- If last_intent=ANALYTICAL_QUERY and prior_metric is a risk metric: Route as ANALYTICAL_QUERY, inherit prior_metric and prior filters. Add group_by=["product"] as default.
+- If last_intent=SCENARIO_ANALYSIS: Route as SCENARIO_ANALYSIS, copy all prior_scenario_params, prior_category, prior_region.
+CRITICAL: "yes, drill" or "yes, drill main drivers" after a revenue query is ALWAYS ANALYTICAL_QUERY with group_by=["region"] — NOT DRIVER_ANALYSIS.
+
+FINAL REMINDER: Return raw JSON only. No ```json``` fences. No leading text. No trailing explanation. The first character of your response must be { and the last must be }.
+"""
+
+_USER_PROMPT_TEMPLATE = """Classify this query. Prior session context: {context}
+
+Query: {query}
+
+Respond with JSON only:
+{{
+  "intent": "<INTENT>",
+  "in_scope": true/false,
+  "deflection_reason": null or "reason string",
+  "parameters": {{
+    "demand_increase_pct": null or integer,
+    "lead_time_increase_days": null or integer,
+    "inventory_adjustment_pct": null or integer,
+    "supplier_fill_rate_change": null or integer,
+    "supplier_otif_change": null or integer,
+    "limit": null or integer,
+    "order": null or "ASC" or "DESC",
+    "group_by": [],
+    "metric": null or string
+  }},
+  "filters": {{
+    "category": null or string,
+    "region": null or string,
+    "year": null or integer,
+    "year_list": null or [integer, integer],
+    "months_back": null or integer,
+    "optimization_mode": null or "SERVICE_LEVEL" or "MARGIN" or "SELL_THROUGH",
+    "final_decision": null or "REPLENISH" or "MONITOR" or "POLICY_REVIEW",
+    "risk_level": null or "HIGH" or "MEDIUM" or "LOW",
+    "product": null or string,
+    "store": null or string
+  }}
+}}"""
+
+_FALLBACK_RESULT: dict[str, Any] = {
+    "intent": "UNKNOWN",
+    "in_scope": True,
+    "deflection_reason": None,
+    "parameters": {
+        "demand_increase_pct": None,
+        "lead_time_increase_days": None,
+        "inventory_adjustment_pct": None,
+        "limit": None,
+        "order": None,
+        "group_by": [],
+        "metric": None,
+    },
+    "filters": {
+        "category": None,
+        "region": None,
+        "year": None,
+        "year_list": None,
+        "months_back": None,
+        "optimization_mode": None,
+        "final_decision": None,
+        "risk_level": None,
+        "product": None,
+        "store": None,
+    },
+}
+
+# Out-of-scope keyword guard — hard-coded safety net independent of LLM
+_OOB_PATTERNS = (
+    r"\bplace\s+(a\s+)?purchase\s+order\b",
+    r"\bpurchase\s+order\b",
+    r"\bcompetitor(s)?\s+(price|pricing)\b",
+    r"\bweather\s+forecast\b",
+    r"\bpredict\s+supplier\b",
+    r"\bforecast\s+(next|future|quarterly)\b",
+    r"\bhr\b|\bhire\b|\bfire\b|\bpayroll\b",
+    r"^\s*SELECT\s+\*",
+    # Capability gaps: real-time feeds, customer-facing demand prediction, raw ML forecasting
+    r"\breal[\s-]?time\s+inventory\b",
+    r"\bcustomer\s+demand\s+forecast(ing)?\b",
+    r"\bpredict\s+(future|next)\s+(demand|inventory|sales)\b",
+    r"\bml\s+forecast\b|\bforecast\s+model\b",
+    r"\bsupplier\s+reliability\s+predict\b",
+)
+
+
+def _is_oob(query: str) -> bool:
+    text = query.lower()
+    return any(re.search(p, text, re.IGNORECASE) for p in _OOB_PATTERNS)
+
+
+def _safe_int(val: Any) -> int | None:
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _clean_result(raw: dict[str, Any]) -> dict[str, Any]:
+    """Normalize and validate the LLM JSON output."""
+    intent = str(raw.get("intent") or "UNKNOWN").upper().strip()
+    if intent not in VALID_INTENTS:
+        intent = "UNKNOWN"
+
+    in_scope = bool(raw.get("in_scope", True))
+    deflection_reason = raw.get("deflection_reason") if not in_scope else None
+
+    raw_params = raw.get("parameters") or {}
+    if not isinstance(raw_params, dict):
+        raw_params = {}
+
+    group_by_raw = raw_params.get("group_by") or []
+    group_by: list[str] = []
+    if isinstance(group_by_raw, list):
+        group_by = [str(g).lower() for g in group_by_raw if isinstance(g, str)]
+
+    order_raw = str(raw_params.get("order") or "").upper().strip()
+    order = order_raw if order_raw in ("ASC", "DESC") else None
+
+    raw_filters = raw.get("filters") or {}
+    if not isinstance(raw_filters, dict):
+        raw_filters = {}
+
+    opt_mode = str(raw_filters.get("optimization_mode") or "").upper().strip()
+    if opt_mode not in ("SERVICE_LEVEL", "MARGIN", "SELL_THROUGH"):
+        opt_mode = None  # type: ignore[assignment]
+
+    decision = str(raw_filters.get("final_decision") or "").upper().strip()
+    if decision not in ("REPLENISH", "MONITOR", "POLICY_REVIEW"):
+        decision = None  # type: ignore[assignment]
+
+    risk_level = str(raw_filters.get("risk_level") or "").upper().strip()
+    if risk_level not in ("HIGH", "MEDIUM", "LOW"):
+        risk_level = None  # type: ignore[assignment]
+
+    months_back = _safe_int(raw_filters.get("months_back"))
+    if months_back is not None and months_back <= 0:
+        months_back = None
+
+    # year_list: exactly two distinct valid 4-digit years for "X vs Y" comparisons
+    year_list_raw = raw_filters.get("year_list")
+    year_list: list[int] | None = None
+    if isinstance(year_list_raw, list) and len(year_list_raw) == 2:
+        parsed_years = [_safe_int(y) for y in year_list_raw]
+        if all(isinstance(y, int) and 2000 <= y <= 2100 for y in parsed_years) and parsed_years[0] != parsed_years[1]:
+            year_list = parsed_years
+
+    _VALID_REGIONS = {"North", "South", "East", "West"}
+    _VALID_CATEGORIES = {"Electronics", "Clothing", "Toys", "Furniture", "Groceries"}
+
+    region_raw = raw_filters.get("region")
+    region = str(region_raw).capitalize() if region_raw else None
+    if region not in _VALID_REGIONS:
+        region = None  # type: ignore[assignment]
+
+    category_raw = raw_filters.get("category")
+    category = str(category_raw).capitalize() if category_raw else None
+    if category not in _VALID_CATEGORIES:
+        category = None  # type: ignore[assignment]
+
+    product_raw = raw_filters.get("product")
+    product = str(product_raw).strip() if product_raw else None
+
+    store_raw = raw_filters.get("store")
+    store = str(store_raw).strip() if store_raw else None
+
+    return {
+        "intent": intent,
+        "in_scope": in_scope,
+        "deflection_reason": deflection_reason,
+        "parameters": {
+            "demand_increase_pct": _safe_int(raw_params.get("demand_increase_pct")),
+            "lead_time_increase_days": _safe_int(raw_params.get("lead_time_increase_days")),
+            "inventory_adjustment_pct": _safe_int(raw_params.get("inventory_adjustment_pct")),
+            "limit": _safe_int(raw_params.get("limit")),
+            "order": order,
+            "group_by": group_by,
+            "metric": (
+                str(raw_params.get("metric")).lower().strip()
+                if raw_params.get("metric")
+                and str(raw_params.get("metric")).lower().strip() in _KNOWN_METRICS
+                else None
+            ),
+        },
+        "filters": {
+            "category": category,
+            "region": region,
+            "year": _safe_int(raw_filters.get("year")),
+            "year_list": year_list,
+            "months_back": months_back,
+            "optimization_mode": opt_mode,
+            "final_decision": decision,
+            "risk_level": risk_level,
+            "product": product,
+            "store": store,
+        },
+    }
+
+
+def extract_intent_llm(query: str, conv_state: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Call LLM to classify intent and extract parameters. Falls back to UNKNOWN on any error."""
+    if not isinstance(query, str) or not query.strip():
+        return dict(_FALLBACK_RESULT)
+
+    # Hard-coded OOB guard (applies even if LLM is unavailable)
+    if _is_oob(query):
+        return {
+            **_FALLBACK_RESULT,
+            "intent": "OUT_OF_SCOPE",
+            "in_scope": False,
+            "deflection_reason": "Query is outside ISANA's inventory risk domain",
+        }
+
+    # Build session context for the LLM.
+    # General filters are excluded to prevent prior-turn regions/categories bleeding into
+    # unrelated follow-on queries. Exception: when last_intent=SCENARIO_ANALYSIS, inject
+    # prior scenario params + filters so continuation queries like "same scenario in
+    # SERVICE_LEVEL" can inherit them without the user re-stating values.
+    ctx_summary = "none"
+    if isinstance(conv_state, dict):
+        last_intent = conv_state.get("active_intent") or conv_state.get("last_intent")
+        if last_intent:
+            ctx_summary = f"last_intent={last_intent}"
+            _last_upper = str(last_intent).upper()
+            if _last_upper == "SCENARIO_ANALYSIS":
+                last_resolved = conv_state.get("last_resolved") or {}
+                last_params = last_resolved.get("parameters") or {}
+                last_filters = last_resolved.get("filters") or {}
+                prior_scenario: dict[str, Any] = {
+                    k: last_params[k]
+                    for k in ("demand_increase_pct", "lead_time_increase_days", "inventory_adjustment_pct")
+                    if last_params.get(k) is not None
+                }
+                if prior_scenario:
+                    ctx_summary += f"; prior_scenario_params={prior_scenario}"
+                for key in ("category", "region", "optimization_mode"):
+                    if last_filters.get(key):
+                        ctx_summary += f"; prior_{key}={last_filters[key]}"
+            elif _last_upper in ("ANALYTICAL_QUERY", "RISK_QUERY"):
+                last_resolved = conv_state.get("last_resolved") or {}
+                last_params = last_resolved.get("parameters") or {}
+                prior_metric = last_params.get("metric")
+                prior_group_by = last_params.get("group_by") or []
+                if prior_metric:
+                    ctx_summary += f"; prior_metric={prior_metric}"
+                if prior_group_by:
+                    ctx_summary += f"; prior_group_by={prior_group_by}"
+                # NOTE: spatial filters (region, category) are intentionally NOT injected here.
+                # Carrying prior_region/prior_category causes session bleed — fresh analytical
+                # queries should not inherit spatial scope from a previous turn. Continuation
+                # is signalled explicitly by the user with tokens like "now", "same", "also".
+
+    prompt = _USER_PROMPT_TEMPLATE.format(query=query.strip(), context=ctx_summary)
+
+    try:
+        from agent_layer.llm_gateway import _execute_chat
+        raw_text = _execute_chat(prompt, system_prompt=_SYSTEM_PROMPT)
+
+        # Strip markdown fences if present
+        raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text.strip(), flags=re.IGNORECASE)
+        raw_text = re.sub(r"\s*```$", "", raw_text.strip())
+
+        raw_json = json.loads(raw_text)
+        result = _clean_result(raw_json)
+
+        # Secondary OOB guard: if LLM returned in_scope=False, trust it
+        return result
+
+    except Exception:
+        # LLM unavailable or parse error — return fallback, let regex interpreter handle it
+        return dict(_FALLBACK_RESULT)

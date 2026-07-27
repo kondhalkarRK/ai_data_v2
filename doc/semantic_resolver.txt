@@ -1,0 +1,694 @@
+"""Semantic resolver for deterministic execution contracts."""
+
+from __future__ import annotations
+
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from kpi_engine.metric_registry import MetricRegistry
+from kpi_engine.dependency_graph import DependencyGraph
+from kpi_registry.metric_resolver import MetricResolver
+
+
+def _normalize_month(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, int) and 1 <= value <= 12:
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        month_map = {
+            "january": 1,
+            "february": 2,
+            "march": 3,
+            "april": 4,
+            "may": 5,
+            "june": 6,
+            "july": 7,
+            "august": 8,
+            "september": 9,
+            "october": 10,
+            "november": 11,
+            "december": 12,
+            "jan": 1,
+            "feb": 2,
+            "mar": 3,
+            "apr": 4,
+            "jun": 6,
+            "jul": 7,
+            "aug": 8,
+            "sep": 9,
+            "sept": 9,
+            "oct": 10,
+            "nov": 11,
+            "dec": 12,
+        }
+        if text.isdigit():
+            number = int(text)
+            if 1 <= number <= 12:
+                return number
+        return month_map.get(text)
+    return None
+
+
+def _extract_month_year(value: Any) -> tuple[int | None, int | None]:
+    """Extract month and optional year from a single value.
+
+    Supports forms like "december", "12", "december 2024", "12/2024".
+    """
+    month = _normalize_month(value)
+    year = None
+
+    if isinstance(value, str):
+        text = value.strip().lower()
+        match = re.search(r"\b(19\d{2}|20\d{2}|21\d{2})\b", text)
+        if match:
+            year = int(match.group(1))
+            # Try month extraction from text without year token.
+            text_wo_year = re.sub(r"\b(19\d{2}|20\d{2}|21\d{2})\b", "", text).strip(" /,-")
+            if month is None:
+                month = _normalize_month(text_wo_year)
+
+    return month, year
+
+
+def _detect_analysis_type(validated: dict[str, Any]) -> str:
+    """Detect analysis_type from query intent.
+    
+    Maps query keywords to analysis types:
+    - "plan", "strategy", "optimize plan" → "decision_planning"
+    - "why", "reason", "cause" → "root_cause_analysis"
+    - "compare", "difference", "vs", "between" → "scenario_comparison"
+    - else → "execution_summary" (default)
+    
+    Returns one of:
+    - "execution_summary"
+    - "root_cause_analysis"
+    - "scenario_comparison"
+    - "decision_planning"
+    """
+    intent = validated.get("intent", "").lower()
+    query = validated.get("query", "").lower()
+    
+    # Combine intent and query for analysis
+    combined = f"{intent} {query}"
+
+    # Decision planning keywords
+    if any(keyword in combined for keyword in ["plan", "strategy", "decision planning", "optimization plan"]):
+        return "decision_planning"
+    
+    # Root cause analysis keywords
+    if any(keyword in combined for keyword in ["why", "reason", "cause", "what caused", "what happened"]):
+        return "root_cause_analysis"
+    
+    # Scenario comparison keywords
+    if any(keyword in combined for keyword in ["compare", "difference", "vs", "versus", "between runs", "scenario comparison"]):
+        return "scenario_comparison"
+    
+    # Default: execution summary
+    return "execution_summary"
+
+
+def _load_metric_phrase_mapping(config_path: str = "config/domain/semantic_functions.yaml") -> dict[str, Any]:
+    path = Path(config_path)
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as fh:
+        config = yaml.safe_load(fh) or {}
+    mapping = config.get("metric_phrase_mapping")
+    return mapping if isinstance(mapping, dict) else {}
+
+
+def _phrase_in_text(phrase: str, text: str) -> bool:
+    normalized = phrase.strip().lower()
+    if not normalized:
+        return False
+    pattern = r"\b" + re.escape(normalized) + r"\b"
+    return re.search(pattern, text) is not None
+
+
+def _resolve_metric_from_semantic_mapping(validated: dict[str, Any], registry: MetricRegistry) -> str | None:
+    mapping = _load_metric_phrase_mapping()
+    if not mapping:
+        return None
+
+    query = str(validated.get("query") or "").strip().lower()
+    intent = str(validated.get("intent") or "").strip().lower()
+    parameters = validated.get("parameters") if isinstance(validated.get("parameters"), dict) else {}
+    context = validated.get("context") if isinstance(validated.get("context"), dict) else {}
+    semantic_tokens = " ".join(
+        [
+            query,
+            intent,
+            " ".join(str(k) for k in parameters.keys()),
+            " ".join(str(v) for v in parameters.values() if isinstance(v, (str, int, float))),
+            " ".join(str(k) for k in context.keys()),
+            " ".join(str(v) for v in context.values() if isinstance(v, str)),
+        ]
+    ).strip().lower()
+
+    registry_metrics = set(registry.list_metrics())
+    registry_measures = set(registry.list_measures())
+    registry_derived_measures = set(registry.derived_measures.keys())
+
+    best_metric: str | None = None
+    best_score = -1
+    first_valid_metric: str | None = None
+
+    for item in mapping.values():
+        if not isinstance(item, dict):
+            continue
+
+        candidate_metric = item.get("metric")
+        if not isinstance(candidate_metric, str) or not candidate_metric.strip():
+            continue
+
+        candidate_metric = candidate_metric.strip()
+        if (
+            candidate_metric not in registry_metrics
+            and candidate_metric not in registry_measures
+            and candidate_metric not in registry_derived_measures
+        ):
+            continue
+
+        if first_valid_metric is None:
+            first_valid_metric = candidate_metric
+
+        phrases = item.get("phrases")
+        if not isinstance(phrases, list):
+            continue
+
+        for phrase in phrases:
+            if not isinstance(phrase, str):
+                continue
+            if semantic_tokens and _phrase_in_text(phrase, semantic_tokens):
+                score = len(phrase.strip())
+                if score > best_score:
+                    best_score = score
+                    best_metric = candidate_metric
+
+    if best_metric:
+        return best_metric
+
+    scenario_param_keys = {
+        "demand_increase_pct",
+        "lead_time_increase_days",
+        "inventory_adjustment_pct",
+        "supplier_fill_rate_change",
+        "supplier_otif_change",
+        "scenario_A",
+        "scenario_B",
+    }
+    has_scenario_params = any(key in parameters for key in scenario_param_keys)
+
+    # If query text was not propagated to validator payload, use mapping-driven default
+    # only for analytical, non-scenario requests.
+    if intent == "analytical_query" and not has_scenario_params:
+        return first_valid_metric
+
+    return None
+
+
+def resolve_semantics(validated: dict[str, Any]) -> dict[str, Any]:
+    """Resolve validated payload to backend-ready metric, dimensions, filters, and analysis_type."""
+    parameters = validated.get("parameters") if isinstance(validated.get("parameters"), dict) else {}
+    validated_filters = validated.get("filters") if isinstance(validated.get("filters"), dict) else {}
+    context = validated.get("context") if isinstance(validated.get("context"), dict) else {}
+
+    # Detect analysis type from query intent
+    analysis_type = _detect_analysis_type(validated)
+
+    comparison_type = validated.get("comparison_type") if isinstance(validated.get("comparison_type"), str) else None
+
+    # PHASE 7A: Read comparison_type from canonical workflow_context first.
+    # Autonomous re-inference of comparison_type from mode counts / context is removed.
+    # The interpreter is the sole authority; resolver only resolves metrics and filters.
+    workflow_context = validated.get("workflow_context") if isinstance(validated.get("workflow_context"), dict) else {}
+    if workflow_context.get("workflow_authority") == "interpreter":
+        wc_comparison = workflow_context.get("comparison_type")
+        if isinstance(wc_comparison, str):
+            comparison_type = wc_comparison
+
+    if comparison_type is None:
+        param_comparison_type = parameters.get("comparison_type")
+        if isinstance(param_comparison_type, str):
+            comparison_type = param_comparison_type
+
+    # Legacy re-inference block removed in Phase 7A.
+    # comparison_type must come from workflow_context (interpreter authority).
+    if comparison_type is None:
+        comparison_type = "none"
+
+    metric = parameters.get("metric")
+    metric_name: str | None = metric.strip() if isinstance(metric, str) and metric.strip() else None
+    mode_only_comparison = (not metric_name) and comparison_type == "mode"
+
+    # Detect scenario-comparison queries that carry scenario indicator params but no explicit
+    # scenario_A/scenario_B block (e.g. "compare demand increase 10% vs 20%").
+    # These must skip metric resolution entirely — the execution layer handles scenario dispatch.
+    _SCENARIO_INDICATOR_KEYS = {
+        "demand_increase_pct",
+        "lead_time_increase_days",
+        "inventory_adjustment_pct",
+        "supplier_fill_rate_change",
+        "supplier_otif_change",
+    }
+    has_scenario_pairs = "scenario_A" in parameters and "scenario_B" in parameters
+    is_scenario_comparison = (
+        validated.get("intent") == "COMPARE_SCENARIOS"
+        and (
+            has_scenario_pairs
+            or any(key in parameters for key in _SCENARIO_INDICATOR_KEYS)
+        )
+        and not has_scenario_pairs
+        and not mode_only_comparison
+    )
+
+    if validated.get("intent") == "COMPARE_SCENARIOS" and has_scenario_pairs and not mode_only_comparison:
+        is_scenario_comparison = True
+
+    # PHASE 7B: A comparison_continuation follow-up inherits comparison_type=scenario
+    # from prior workflow_context but may have no new scenario params (those lived in Q1).
+    # Treat it as scenario comparison so metric resolution is bypassed correctly.
+    if not is_scenario_comparison and validated.get("intent") == "COMPARE_SCENARIOS":
+        wc_ct = workflow_context.get("comparison_type")
+        promo_type = workflow_context.get("followup_promotion", {}).get("promotion_type") if isinstance(workflow_context.get("followup_promotion"), dict) else None
+        if wc_ct == "scenario" and promo_type in ("comparison_continuation", "scope_refinement"):
+            is_scenario_comparison = True
+
+    # PHASE 7B: A scenario_mutation follow-up (SCENARIO_ANALYSIS) may have no new scenario
+    # params in Q2 — scenario params live in prior conv state. Bypass metric resolution.
+    promo_dict = workflow_context.get("followup_promotion") if isinstance(workflow_context.get("followup_promotion"), dict) else {}
+    if (
+        not is_scenario_comparison
+        and validated.get("intent") == "SCENARIO_ANALYSIS"
+        and promo_dict.get("promotion_type") == "scenario_mutation"
+        and not any(k in parameters for k in _SCENARIO_INDICATOR_KEYS)
+    ):
+        is_scenario_comparison = True  # treated as pass-through scenario dispatch
+
+
+
+    _COMMON_FILTER_KEYS = frozenset({
+        "region", "category", "supplier", "month", "year", "months_back",
+        "product", "store", "optimization_mode", "final_decision", "risk_level", "action_type",
+    })
+
+    if is_scenario_comparison:
+        # Return execution-ready contract without metric resolution.
+        return {
+            "mapped_metric": None,
+            "expression": "1",
+            "mapped_dimensions": [],
+            "filters": {
+                k: v
+                for k, v in validated_filters.items()
+                if k in _COMMON_FILTER_KEYS
+            },
+            "limit": None,
+            "order": None,
+            "analysis_type": analysis_type,
+            "metric_name": None,
+            "source_tables": [],
+            "base_table": "fact_inventory_risk",
+            "kpi_source": "scenario_comparison_bypass",
+            "metric": None,
+            "group_by": [],
+            "comparison_type": "scenario",
+            # PHASE 7A: Propagate workflow_context through early-exit path too.
+            "workflow_context": workflow_context,
+            "intent": validated.get("intent"),
+        }
+
+    # DRIVER_ANALYSIS bypass: preserve filters so handle_driver_query can apply them.
+    if validated.get("intent") == "DRIVER_ANALYSIS":
+        return {
+            "mapped_metric": None,
+            "expression": "1",
+            "mapped_dimensions": [],
+            "filters": {
+                k: v
+                for k, v in validated_filters.items()
+                if k in _COMMON_FILTER_KEYS
+            },
+            "limit": parameters.get("limit"),
+            "order": parameters.get("order") or "DESC",
+            "analysis_type": "root_cause_analysis",
+            "metric_name": None,
+            "source_tables": ["fact_inventory_insight"],
+            "base_table": "fact_inventory_insight",
+            "kpi_source": "driver_analysis_bypass",
+            "metric": None,
+            "group_by": [],
+            "comparison_type": comparison_type,
+            "workflow_context": workflow_context,
+            "intent": "DRIVER_ANALYSIS",
+        }
+
+    # PHASE 7A: OBJECTIVE_OVERRIDE and FOLLOWUP_REFINEMENT intents do not require
+    # metric resolution — they are orchestration-layer redirects that the planner
+    # and controller handle deterministically. Return a pass-through contract.
+    # Also bypass for COMPARE_SCENARIOS with comparison_type=filter (e.g. "compare
+    # summer vs festival season") — execution layer handles filter-level comparisons.
+    # PHASE 7C: SCENARIO_ANALYSIS is added — single-scenario queries now route
+    # through the unified dispatcher path (no controller-side execution shortcut).
+    _NON_METRIC_INTENTS = {"OBJECTIVE_OVERRIDE", "FOLLOWUP_REFINEMENT", "SCENARIO_ANALYSIS"}
+    is_filter_comparison = validated.get("intent") == "COMPARE_SCENARIOS" and comparison_type == "filter"
+    if validated.get("intent") in _NON_METRIC_INTENTS or is_filter_comparison:
+        return {
+            "mapped_metric": None,
+            "expression": "1",
+            "mapped_dimensions": [],
+            "filters": {
+                k: v
+                for k, v in validated_filters.items()
+                if k in _COMMON_FILTER_KEYS
+            },
+            "limit": None,
+            "order": None,
+            "analysis_type": analysis_type,
+            "metric_name": None,
+            "source_tables": [],
+            "base_table": "fact_inventory_risk",
+            "kpi_source": "non_metric_intent_bypass",
+            "metric": None,
+            "group_by": [],
+            "comparison_type": comparison_type,
+            "workflow_context": workflow_context,
+            "intent": validated.get("intent"),
+        }
+
+    registry = MetricRegistry()
+    resolved_expression: str | None = None
+    resolved_source_tables: list[str] = []
+    resolved_base_table: str | None = None
+
+    if mode_only_comparison:
+        passthrough_expression = validated.get("expression")
+        if not isinstance(passthrough_expression, str) or not passthrough_expression.strip():
+            passthrough_expression = parameters.get("expression")
+        if isinstance(passthrough_expression, str) and passthrough_expression.strip():
+            resolved_expression = passthrough_expression.strip()
+        else:
+            resolved_expression = "1"
+    else:
+        if not metric_name:
+            metric_name = _resolve_metric_from_semantic_mapping(validated, registry)
+
+        if not metric_name:
+            raise ValueError("Metric missing for semantic resolution")
+
+        dependency_graph = DependencyGraph(registry)
+        metric_resolver = MetricResolver(registry, dependency_graph)
+
+        try:
+            resolved_metric = metric_resolver.resolve(metric_name)
+        except (ValueError, KeyError):
+            # metric_name was a free-form LLM phrase (e.g. "fill rate", "average inventory level")
+            # rather than a registry key. Fall through to phrase-based resolution.
+            metric_name = _resolve_metric_from_semantic_mapping(validated, registry)
+            if not metric_name:
+                raise ValueError("Metric resolution failed — no registry match and no phrase match")
+            resolved_metric = metric_resolver.resolve(metric_name)
+
+        resolved_expression = resolved_metric.get("formula")
+        resolved_source_tables = resolved_metric.get("source_tables")
+        resolved_base_table = resolved_source_tables[0] if isinstance(resolved_source_tables, list) and resolved_source_tables else None
+
+        if not isinstance(resolved_expression, str) or not resolved_expression.strip():
+            raise ValueError("Metric resolution failed")
+        if not isinstance(resolved_source_tables, list):
+            raise ValueError("Metric resolution failed")
+
+    group_by = parameters.get("group_by")
+    if isinstance(group_by, list) and group_by:
+        dimensions = [str(item).lower() for item in group_by]
+    elif isinstance(group_by, str) and group_by:
+        dimensions = [group_by.lower()]
+    else:
+        dimensions = []
+
+    # Normalize plural dimension aliases.
+    normalized_dimensions: list[str] = []
+    dimension_aliases = {
+        "dim_region": "region",
+        "dim_category": "category",
+        "dim_store": "store",
+        "dim_product": "product",
+        "regions": "region",
+        "categories": "category",
+        "stores": "store",
+        "store_id": "store",
+        "products": "product",
+        "product_id": "product",
+    }
+    for dim in dimensions:
+        mapped = dimension_aliases.get(dim, dim)
+        if mapped not in normalized_dimensions:
+            normalized_dimensions.append(mapped)
+
+    # Replenishment quantity: auto-include product when store is in group_by.
+    # A store-level replenishment view without product breakdown is too coarse —
+    # operators need to know which SKUs to order, not just how many units total.
+    if (
+        metric_name == "replenishment_quantity"
+        and "store" in normalized_dimensions
+        and "product" not in normalized_dimensions
+    ):
+        normalized_dimensions.append("product")
+
+    resolved_filters: dict[str, Any] = {}
+
+    # Seed resolved_filters with any measure-level defaults declared in kpi_registry.yaml.
+    # User-supplied filters applied below will overwrite these when explicitly provided.
+    if isinstance(resolved_metric, dict):
+        _measure_defaults = resolved_metric.get("default_filters") or {}
+        resolved_filters.update(_measure_defaults)
+
+    before_filters = dict(validated.get("filters", {}) if isinstance(validated.get("filters"), dict) else {})
+
+    # PHASE 6: Resolve semantic business filters to canonical dimensions
+    context = validated.get("context") if isinstance(validated.get("context"), dict) else {}
+    semantic_filters = context.get("semantic_filters") if isinstance(context.get("semantic_filters"), dict) else {}
+    exclusion_filters = context.get("exclusion_filters") if isinstance(context.get("exclusion_filters"), dict) else {}
+    
+    if semantic_filters or exclusion_filters:
+        try:
+            from agent_layer.semantic_filter_resolver import (
+                resolve_semantic_filters,
+                normalize_filters_to_sql,
+            )
+            
+            # Resolve semantic aliases to dimension filters
+            resolved_semantic = resolve_semantic_filters(semantic_filters, exclusion_filters)
+            
+            # Merge semantic dimension filters into resolved_filters
+            for dim, filter_spec in resolved_semantic.get("dimension_filters", {}).items():
+                if isinstance(filter_spec, dict):
+                    # For single-value filters, just use the first value
+                    values = filter_spec.get("values", [])
+                    if values:
+                        # Map to existing filter keys for backward compatibility
+                        if dim == "region" and len(values) == 1:
+                            resolved_filters[dim] = values[0].lower()
+                        elif dim == "category" and len(values) == 1:
+                            resolved_filters[dim] = values[0].lower()
+                        elif dim == "supplier" and len(values) == 1:
+                            resolved_filters[dim] = values[0]
+                        elif dim == "store_tier" and len(values) == 1:
+                            resolved_filters["store_tier"] = values[0]
+                        elif dim == "fiscal_period" and len(values) == 1:
+                            resolved_filters["fiscal_period"] = values[0]
+                        elif dim == "promotion_flag" and len(values) == 1:
+                            resolved_filters["promotion_flag"] = values[0]
+                        elif dim == "margin_flag" and len(values) == 1:
+                            resolved_filters["margin_flag"] = values[0]
+                        # Store full dimension_filters for advanced SQL generation if needed
+                        resolved_filters[f"_dimension_{dim}"] = filter_spec
+            
+            # Store exclusions for SQL layer
+            if resolved_semantic.get("excluded_filters"):
+                resolved_filters["_excluded_filters"] = resolved_semantic["excluded_filters"]
+                
+        except Exception:
+            # If semantic resolution fails, continue with existing filters
+            pass
+
+    month_value = validated_filters.get("month", parameters.get("month"))
+    month, extracted_year = _extract_month_year(month_value)
+    if month is not None:
+        resolved_filters["month"] = month
+
+    year = validated_filters.get("year", parameters.get("year"))
+    year_list = validated_filters.get("year_list")
+    if isinstance(year_list, list) and len(year_list) == 2:
+        # year_list takes precedence — filters to exactly those two years; clear single-year filter
+        resolved_filters["year_list"] = [int(y) for y in year_list]
+
+    month_list = validated_filters.get("month_list")
+    if isinstance(month_list, list) and len(month_list) >= 2:
+        resolved_filters["month_list"] = [int(m) for m in month_list[:12]]
+    elif isinstance(year, int):
+        resolved_filters["year"] = year
+    elif isinstance(year, str) and year.isdigit():
+        resolved_filters["year"] = int(year)
+    elif extracted_year is not None:
+        resolved_filters["year"] = extracted_year
+
+    region = validated_filters.get("region")
+    if isinstance(region, str) and region:
+        resolved_filters["region"] = region.lower()
+
+    category = validated_filters.get("category")
+    if isinstance(category, str) and category:
+        resolved_filters["category"] = category.lower()
+
+    supplier = validated_filters.get("supplier")
+    if isinstance(supplier, str) and supplier:
+        resolved_filters["supplier"] = supplier
+
+    product = validated_filters.get("product")
+    if isinstance(product, str) and product.strip():
+        resolved_filters["product"] = product.strip()
+
+    store = validated_filters.get("store")
+    if isinstance(store, str) and store.strip():
+        resolved_filters["store"] = store.strip()
+
+    # months_back may appear in: filters directly, parameters directly, or parameters.filters
+    # (the last case occurs when query_interpreter_v2 puts it in parameters.setdefault("filters"))
+    months_back = (
+        validated_filters.get("months_back")
+        or parameters.get("months_back")
+        or (parameters.get("filters") or {}).get("months_back")
+    )
+    if isinstance(months_back, str) and months_back.isdigit():
+        months_back = int(months_back)
+    if isinstance(months_back, int) and months_back > 0:
+        resolved_filters["months_back"] = months_back
+        # Anchor to latest available data year so the rolling-window subquery has a
+        # stable upper bound.  Do NOT inject a wall-clock month — the SQL rolling-window
+        # expression already pins to the real latest (year, month) pair in the data.
+        resolved_filters.setdefault("year", "latest")
+
+    # Default 6-month rolling window for operational tables when no time filter is set.
+    # These tables accumulate across all years (2022-2024) — without a window, per-store
+    # and per-product aggregates are 2-3x the real single-period value.
+    # User-specified year/month/months_back always takes priority.
+    # Exception: replenishment_quantity uses the 2-week cycle formula (see below)
+    # which divides by COUNT(DISTINCT weeks) over all history — it needs NO time filter.
+    _OPERATIONAL_TABLES = {
+        "fact_inventory_decision",
+        "fact_inventory_risk",
+        "fact_inventory_policy",
+    }
+    _no_time_filter = not any(
+        k in resolved_filters for k in ("year", "month", "months_back", "year_list")
+    )
+    _is_replenishment_2w = (metric_name == "replenishment_quantity") and _no_time_filter
+
+    if _no_time_filter and resolved_base_table in _OPERATIONAL_TABLES and not _is_replenishment_2w:
+        resolved_filters["months_back"] = 6
+        # Do NOT inject year="latest" — the months_back rolling-window subquery
+        # self-anchors to MAX(year*12+month) in the base table. Adding a year filter
+        # on top would restrict to the latest year only (2024 partial data), which
+        # kills the 2023 months that fall within the 6-month window.
+
+    if _is_replenishment_2w:
+        # 2-week replenishment cycle formula derived from full historical data.
+        # Formula: avg weekly order × 2 = one 2-week cycle order quantity.
+        # Denominator = COUNT(DISTINCT weeks) over all history → stable baseline.
+        # action_type='REPLENISH' filter is embedded in CASE (not WHERE) so the
+        # denominator counts ALL weeks, not just replenishment-flagged weeks.
+        resolved_filters.pop("action_type", None)
+        resolved_expression = (
+            "ROUND("
+            "SUM(CASE WHEN fa.action_type = 'REPLENISH' THEN fa.recommended_units ELSE 0 END)"
+            " * 2.0 / NULLIF(COUNT(DISTINCT dim_date.year * 52 + dim_date.week), 0)"
+            ", 0)"
+        )
+        if "dim_date" not in (resolved_source_tables or []):
+            resolved_source_tables = list(resolved_source_tables or []) + ["dim_date"]
+
+    # STABILITY FIX: Preserve explicitly requested dimensions even when constrained by filters.
+    # Only exclude filter-constrained dimensions if no explicit group_by was provided.
+    # This ensures inherited dimensions from structured continuity reach the execution layer.
+    
+    explicit_group_by_requested = isinstance(group_by, (list, str)) and bool(group_by)
+    
+    if explicit_group_by_requested:
+        # Explicit group_by provided (either from query or inherited): preserve all requested dimensions
+        # even if they're also constrained by filters. This enables queries like:
+        # Q1: "show revenue by region"  →  state: active_dimensions=['region']
+        # Q2: "only north"  →  inherits group_by=['region'], adds filter region='north'
+        # Expected: dimensions=['region'] (not dropped due to filter)
+        dimensions = normalized_dimensions
+    else:
+        # No explicit group_by: apply filter-exclusion logic to avoid redundant grouping
+        filtered_dimension_keys = {key for key in ["region", "category", "supplier"] if key in resolved_filters}
+        dimensions = [d for d in normalized_dimensions if d not in filtered_dimension_keys]
+
+    if not dimensions and not normalized_dimensions:
+        dimensions = []
+
+    limit = parameters.get("limit")
+    if isinstance(limit, str) and limit.isdigit():
+        limit = int(limit)
+    if not isinstance(limit, int) or limit <= 0:
+        limit = None
+
+    order = parameters.get("order")
+    if isinstance(order, str):
+        order = order.strip().upper()
+    if order not in {"ASC", "DESC"}:
+        order = None
+
+    # Time-semantic guardrail:
+    # Month-only filters should target latest year to avoid cross-year mixing.
+    if "month" in resolved_filters and "year" not in resolved_filters and "year_list" not in resolved_filters:
+        resolved_filters["year"] = "latest"
+
+    # PHASE 5: Resolve temporal semantics to normalized filters
+    time_context = context.get("time_context") if isinstance(context.get("time_context"), dict) else None
+    if time_context:
+        try:
+            from agent_layer.temporal_resolution import resolve_time_context_to_filters
+            
+            temporal_filters = resolve_time_context_to_filters(time_context)
+            # Merge temporal filters with existing filters (temporal takes precedence)
+            if temporal_filters:
+                resolved_filters.update(temporal_filters)
+        except Exception:
+            # If temporal resolution fails, continue with existing filters
+            pass
+
+    resolved = {
+        "mapped_metric": resolved_expression,
+        "expression": resolved_expression,
+        "mapped_dimensions": dimensions,
+        "filters": resolved_filters,
+        "limit": limit,
+        "order": order,
+        "analysis_type": analysis_type,
+        "metric_name": metric_name,
+        "source_tables": resolved_source_tables,
+        "base_table": resolved_base_table,
+        "kpi_source": "mode_only_comparison" if mode_only_comparison else "registry_applied",
+        # Contract mirror for downstream components that consume generic keys.
+        "metric": metric_name,
+        "group_by": dimensions,
+        # PHASE 7A: Propagate workflow_context unchanged so planner and dispatcher
+        # can read it without re-inference.
+        "workflow_context": workflow_context,
+        "comparison_type": comparison_type,
+        "intent": validated.get("intent"),
+    }
+
+    if not mode_only_comparison and not resolved.get("expression"):
+        raise ValueError("Metric resolution failed")
+
+    return resolved

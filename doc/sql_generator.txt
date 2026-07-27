@@ -1,0 +1,445 @@
+from __future__ import annotations
+
+"""SQL Generator — Builds SQL from fully resolved contracts.
+
+This module is responsible ONLY for SQL construction.
+Metric resolution and formula expansion moved to semantic_resolver.
+"""
+
+import re
+import sqlite3
+from typing import Any
+
+# Tables where each row is a snapshot for one (date, store, product) combination.
+# SUM/COUNT across all rows inflates by the number of dates in the table (~730×).
+# These tables need deduplication to latest date before aggregating SUM/COUNT.
+_POINT_IN_TIME_TABLES: frozenset[str] = frozenset({
+    "fact_inventory_risk",
+    "fact_inventory_decision",
+    "fact_inventory_daily",
+    "fact_inventory_policy",
+    "fact_inventory_simulation",
+})
+
+# Extra partition columns beyond (store_key, product_key) per table.
+_DEDUP_EXTRA_PARTITION: dict[str, str] = {
+    "fact_inventory_policy":     ", optimization_mode",
+    "fact_inventory_simulation": ", simulation_run_id",
+}
+
+
+class SQLGenerator:
+    """Builds SQL from resolved contract (expression, dimensions, filters).
+    
+    Responsibilities:
+    - SELECT clause building
+    - JOIN logic
+    - WHERE clause building
+    - GROUP BY clause building
+    
+    NOT responsible for:
+    - Metric resolution
+    - Formula expansion
+    - Table determination
+    """
+
+    TABLE_ALIAS = {
+        "fact_inventory_risk": "r",
+        "fact_inventory_policy": "fip",
+        "fact_inventory_simulation": "sim",
+        "fact_inventory_daily": "fid",
+        "fact_inventory_insight": "fii",
+        "fact_inventory_final_decision": "fd",
+        "v_simulation_baseline": "base_sim",
+        "daily_store_product_summary": "s",
+        "daily_store_summary": "ds"
+    }
+
+    # fact_inventory_risk has a TEXT risk_level column (HIGH/MEDIUM/LOW).
+    # fact_inventory_final_decision only has expected_risk (REAL) — translate to range.
+    _RISK_LEVEL_TO_EXPR = {
+        "HIGH":   "{a}.expected_risk >= 0.7",
+        "MEDIUM": "{a}.expected_risk >= 0.4 AND {a}.expected_risk < 0.7",
+        "LOW":    "{a}.expected_risk < 0.4",
+    }
+
+    FIELD_MAPPING = {
+        "date": ("dim_date", "date"),
+        "week": ("dim_date", "week"),
+        "year": ("dim_date", "year"),
+        "month": ("dim_date", "month"),
+        "region": ("dim_store", "region"),
+        "store": ("dim_store", "store_id"),
+        "product": ("dim_product", "product_id"),
+        "category": ("dim_product", "category"),
+        "supplier": ("dim_supplier", "supplier_id"),
+    }
+
+    def __init__(self):
+        """Initialize SQLGenerator."""
+        pass
+
+    def fetch_latest_batch_run_id(self, policy_mode: str | None = None) -> str | None:
+        """Fetch latest successful baseline run id for deterministic fallback."""
+        conn = sqlite3.connect("data/processed/enterprise_risk.db")
+        try:
+            where = "WHERE status = 'SUCCESS' AND scenario_type = 'BASELINE'"
+            params: tuple[Any, ...] = ()
+            if isinstance(policy_mode, str) and policy_mode.strip():
+                where += " AND policy_mode = ?"
+                params = (policy_mode.strip().upper(),)
+            row = conn.execute(
+                f"""
+                SELECT simulation_run_id
+                FROM simulation_run_registry
+                {where}
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                params,
+            ).fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
+
+    def generate_from_contract(self, resolved_contract: dict[str, Any]) -> str:
+        """Build SQL from fully resolved contract.
+
+        Input contract must contain:
+        {
+            "expression": "SUM(f.revenue_at_risk)",
+            "source_tables": ["fact_inventory_simulation"],
+            "base_table": "v_simulation_baseline",
+            "group_by": ["region", "category"],
+            "filters": {"month": 12}
+        }
+
+        Returns: SQL string
+        """
+        print(f"SQL_GEN_CONTRACT_INPUT: {resolved_contract}")
+
+        expr = resolved_contract.get("expression", "")
+        source_tables = set(resolved_contract.get("source_tables", []))
+        base_table = resolved_contract.get("base_table", "fact_inventory_risk")
+        filters = resolved_contract.get("filters", {})
+        context = resolved_contract.get("context", {})
+        query_type = context.get("query_type")
+        baseline_run_id = context.get("baseline_run_id")
+        simulation_run_id = context.get("simulation_run_id")
+        optimization_mode = context.get("optimization_mode")
+
+        if query_type == "DETERMINISTIC":
+            run_id = simulation_run_id or baseline_run_id
+        elif query_type == "SCENARIO":
+            run_id = simulation_run_id
+        else:
+            run_id = None
+
+        if query_type == "DETERMINISTIC" and not run_id:
+            run_id = self.fetch_latest_batch_run_id(policy_mode=optimization_mode)
+
+        if query_type == "DETERMINISTIC" and not run_id:
+            raise ValueError("DETERMINISTIC query requires simulation_run_id")
+
+        print(f"SQL_GEN_RUN_ID: {run_id}, query_type: {query_type}")
+
+        group_by_fields = resolved_contract.get("group_by", [])
+        if not isinstance(group_by_fields, list):
+            group_by_fields = [group_by_fields] if group_by_fields else []
+        
+        order_value = resolved_contract.get("order")
+        if isinstance(order_value, str):
+            order_value = order_value.strip().upper()
+        if order_value not in {"ASC", "DESC"}:
+            order_value = "DESC"
+        
+        limit_value = resolved_contract.get("limit")
+        if isinstance(limit_value, str) and limit_value.isdigit():
+            limit_value = int(limit_value)
+        if not isinstance(limit_value, int) or limit_value <= 0:
+            limit_value = None
+        
+        normalized_query = str(resolved_contract.get("normalized_query") or "").lower()
+        if limit_value is None and re.search(r"\b(top|highest|most)\b", normalized_query):
+            limit_value = 1
+            order_value = "DESC"
+
+        # Dimension uniqueness expansion:
+        # store_id repeats across 4 regions; product_id repeats across 5 categories.
+        # Auto-prepend the parent dimension so every key is unambiguous.
+        # Hierarchy: region → store, category → product.
+        _expanded: list[str] = []
+        for _f in group_by_fields:
+            if _f == "store" and "region" not in group_by_fields:
+                _expanded.append("region")
+            if _f == "product" and "category" not in group_by_fields:
+                _expanded.append("category")
+            _expanded.append(_f)
+        group_by_fields = _expanded
+
+        # Time grouping correction:
+        # If month is grouped without year, inject year immediately before month.
+        if "month" in group_by_fields and "year" not in group_by_fields:
+            month_index = group_by_fields.index("month")
+            group_by_fields.insert(month_index, "year")
+
+        base_alias = self.TABLE_ALIAS.get(base_table, base_table[:2])
+
+        # Add dim_date if time filters or time grouping requested
+        time_group_fields = {"year", "month", "week", "date"}
+        if any(k in group_by_fields or k in filters for k in time_group_fields) or "months_back" in filters or "year_list" in filters:
+            source_tables.add("dim_date")
+
+        required_tables = set(source_tables)
+        required_tables.add(base_table)
+        # Ensure dimension-filter references have corresponding joins.
+        for key in filters.keys():
+            if isinstance(key, str) and key.startswith("_"):
+                continue
+            if key in self.FIELD_MAPPING:
+                table, _ = self.FIELD_MAPPING[key]
+                required_tables.add(table)
+
+        # Detect if expression already contains aggregation
+        has_aggregation = bool(re.search(r"\b(SUM|AVG|COUNT)\s*\(", expr))
+
+        # Qualify bare column refs in aggregate functions when dimension joins may be added.
+        # Prevents "ambiguous column name" when joined dim tables share column names (e.g., lead_time).
+        if group_by_fields and has_aggregation:
+            expr = re.sub(
+                r'\b(SUM|AVG|COUNT|MIN|MAX)\s*\(\s*(?!DISTINCT\s|\*)([a-zA-Z_][a-zA-Z0-9_]*)\s*\)',
+                lambda m: f"{m.group(1)}({base_alias}.{m.group(2)})",
+                expr,
+                flags=re.IGNORECASE,
+            )
+
+        # Build SELECT clause
+        if group_by_fields:
+            dim_select_parts = []
+            for field in group_by_fields:
+                if field in self.FIELD_MAPPING:
+                    table, column = self.FIELD_MAPPING[field]
+                    dim_select_parts.append(f"{table}.{column} AS dim_{field}")
+                    required_tables.add(table)
+                else:
+                    dim_select_parts.append(f"{base_alias}.{field} AS dim_{field}")
+
+            if has_aggregation:
+                select_clause = ", ".join(dim_select_parts + [f"{expr} AS value"])
+            else:
+                select_clause = ", ".join(dim_select_parts + [f"SUM({expr}) AS value"])
+        else:
+            if has_aggregation:
+                select_clause = f"{expr} AS value"
+            else:
+                select_clause = f"SUM({expr}) AS value"
+
+        # Build JOIN clause
+        joins = []
+        added_join_tables = set()
+        for table in required_tables:
+            if table == base_table:
+                continue
+            join_condition = self._get_join_path(table, base_alias)
+            if join_condition and table not in added_join_tables:
+                joins.append(f"JOIN {table} ON {join_condition}")
+                added_join_tables.add(table)
+
+        join_clause = " ".join(joins) if joins else ""
+
+        # Build WHERE clause
+        where_clauses = []
+
+        # System-level run_id filter must be first WHERE condition when present.
+        if run_id:
+            where_clauses.append(f"{base_alias}.simulation_run_id = '{run_id}'")
+
+        # Time semantics:
+        # 1) year='latest' -> constrain to max year
+        # 2) year=<int> -> exact year filter
+        # 3) month=<int> -> exact month filter
+        # 4) months_back=N -> rolling N-month window (cross-year support)
+        year_value = filters.get("year")
+        year_list_value = filters.get("year_list")
+        month_value = filters.get("month")
+        months_back_value = filters.get("months_back")
+
+        # Handle months_back (last N months) — uses month ordinal arithmetic
+        # Convert (year, month) to total month count, subtract N, then filter
+        if isinstance(months_back_value, int) and months_back_value > 0:
+            # Month ordinal: year * 12 + month (allows proper arithmetic across years)
+            # Example: 2026-05 = 2026*12 + 5 = 24317
+            #          2025-05 = 2025*12 + 5 = 24305
+            # Difference: 24317 - 24305 = 12 ✓
+            where_clauses.append(
+                f"(dim_date.year * 12 + dim_date.month) >= "
+                f"((SELECT MAX(d_m.year * 12 + d_m.month) FROM dim_date d_m "
+                f" JOIN {base_table} {base_alias}_months ON {base_alias}_months.date_key = d_m.id) "
+                f" - {months_back_value - 1})"
+            )
+
+        # year_list: filter to exactly the named years (e.g. 2022 vs 2023 comparison)
+        if isinstance(year_list_value, list) and len(year_list_value) == 2:
+            y0, y1 = int(year_list_value[0]), int(year_list_value[1])
+            where_clauses.append(f"dim_date.year IN ({y0}, {y1})")
+        elif year_value == "latest":
+            latest_year_subquery = [
+                "SELECT MAX(d.year)",
+                "FROM dim_date d",
+                f"JOIN {base_table} {base_alias}2 ON {base_alias}2.date_key = d.id",
+            ]
+            if isinstance(month_value, int) or (isinstance(month_value, str) and month_value.isdigit()):
+                month_int = int(month_value)
+                latest_year_subquery.append(f"WHERE d.month = {month_int}")
+
+            where_clauses.append(
+                "dim_date.year = (\n"
+                + "\n".join(latest_year_subquery)
+                + "\n)"
+            )
+        elif isinstance(year_value, int) or (isinstance(year_value, str) and year_value.isdigit()):
+            year_int = int(year_value)
+            where_clauses.append(f"dim_date.year = {year_int}")
+
+        month_list_value = filters.get("month_list")
+        if isinstance(month_list_value, list) and len(month_list_value) >= 2:
+            _ms = ", ".join(str(int(m)) for m in month_list_value[:12])
+            where_clauses.append(f"dim_date.month IN ({_ms})")
+        elif isinstance(month_value, int) or (isinstance(month_value, str) and month_value.isdigit()):
+            month_int = int(month_value)
+            where_clauses.append(f"dim_date.month = {month_int}")
+
+        for key, value in filters.items():
+            if key in {"year", "year_list", "month", "month_list", "months_back"}:
+                continue
+            if isinstance(key, str) and key.startswith("_"):
+                continue
+            if value is None:
+                continue
+            if isinstance(value, (dict, list, tuple, set)):
+                continue
+            if key == "risk_level":
+                # fact_inventory_risk has a TEXT risk_level column; other tables (e.g.
+                # fact_inventory_final_decision) use expected_risk REAL — translate to range.
+                rl = str(value).upper().strip()
+                if base_table == "fact_inventory_risk":
+                    where_clauses.append(f"{base_alias}.risk_level = '{rl}' COLLATE NOCASE")
+                else:
+                    expr_tmpl = self._RISK_LEVEL_TO_EXPR.get(rl)
+                    if expr_tmpl:
+                        where_clauses.append(expr_tmpl.format(a=base_alias))
+            elif key in self.FIELD_MAPPING:
+                table, column = self.FIELD_MAPPING[key]
+                if isinstance(value, str):
+                    where_clauses.append(f"{table}.{column} = '{value}' COLLATE NOCASE")
+                else:
+                    where_clauses.append(f"{table}.{column} = {value}")
+            else:
+                if isinstance(value, str):
+                    where_clauses.append(f"{base_alias}.{key} = '{value}' COLLATE NOCASE")
+                else:
+                    where_clauses.append(f"{base_alias}.{key} = {value}")
+
+        # For fact_inventory_policy queries, add optimization_mode filter so that
+        # only one mode's rows are returned when the table stores per-mode data.
+        # If optimization_mode is already in filters (explicit user request), skip.
+        if base_table == "fact_inventory_policy" and "optimization_mode" not in filters:
+            _active_mode = str(
+                filters.get("optimization_mode")
+                or optimization_mode
+                or "SERVICE_LEVEL"
+            ).upper().strip()
+            where_clauses.append(f"{base_alias}.optimization_mode = '{_active_mode}'")
+
+        # Dedup guard: point-in-time tables store one row per (date, store, product).
+        # SUM/COUNT across all rows inflates results by the number of dates (~730×).
+        # When the expression uses SUM or COUNT, wrap the base table in a subquery that
+        # numbers rows by date (latest = 1) so only the most recent snapshot per SKU
+        # is aggregated.  AVG is safe without dedup — averaging 730 equal values ≈ 1 value.
+        _is_pit = base_table in _POINT_IN_TIME_TABLES
+        _has_sum_count = bool(re.search(r"\b(SUM|COUNT)\s*\(", expr, re.IGNORECASE))
+        _needs_dedup = _is_pit and has_aggregation and _has_sum_count
+
+        if _needs_dedup:
+            _extra = _DEDUP_EXTRA_PARTITION.get(base_table, "")
+            _dedup_from = (
+                f"(SELECT *, ROW_NUMBER() OVER "
+                f"(PARTITION BY store_key, product_key{_extra} "
+                f"ORDER BY date_key DESC) AS _rn "
+                f"FROM {base_table}) {base_alias}"
+            )
+            where_clauses.append(f"{base_alias}._rn = 1")
+
+        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        print(f"SQL_GEN_FINAL_WHERE: {where_clause}")
+
+        # Build GROUP BY clause
+        group_by_clause = ""
+        if group_by_fields:
+            group_cols = []
+            for field in group_by_fields:
+                if field in self.FIELD_MAPPING:
+                    table, column = self.FIELD_MAPPING[field]
+                    group_cols.append(f"{table}.{column}")
+                else:
+                    group_cols.append(f"{base_alias}.{field}")
+            if group_cols:
+                group_by_clause = "GROUP BY " + ", ".join(group_cols)
+        print(f"SQL_GEN_FINAL_GROUP_BY: {group_by_clause}")
+
+        # Assemble final SQL
+        _from_expr = _dedup_from if _needs_dedup else f"{base_table} {base_alias}"
+        sql_parts = [f"SELECT {select_clause}", f"FROM {_from_expr}"]
+        if join_clause:
+            sql_parts.append(join_clause)
+        if where_clause:
+            sql_parts.append(where_clause)
+        if group_by_clause:
+            sql_parts.append(group_by_clause)
+        
+        if group_by_fields:
+            sql_parts.append(f"ORDER BY value {order_value}")
+            if limit_value is not None:
+                sql_parts.append(f"LIMIT {limit_value}")
+
+        sql = " ".join(sql_parts)
+
+        # Top-N per group: when rank_partition_by + rank_limit are in the contract,
+        # wrap the base query in a CTE with RANK() OVER(PARTITION BY ...) so callers
+        # get the top-N items within each partition (e.g. top 5 stores per region).
+        _rank_partition = resolved_contract.get("rank_partition_by")
+        _rank_limit = resolved_contract.get("rank_limit")
+        if (
+            isinstance(_rank_partition, list) and len(_rank_partition) > 0
+            and isinstance(_rank_limit, int) and _rank_limit > 0
+            and group_by_fields
+        ):
+            _inner_cols = ", ".join(f"dim_{f}" for f in group_by_fields) + ", value"
+            _part_cols = ", ".join(
+                f"dim_{f}" for f in _rank_partition if f in group_by_fields
+            )
+            if _part_cols:
+                sql = (
+                    f"WITH _base AS ({sql}), "
+                    f"_ranked AS (SELECT {_inner_cols}, "
+                    f"RANK() OVER (PARTITION BY {_part_cols} ORDER BY value DESC) AS _r "
+                    f"FROM _base) "
+                    f"SELECT {_inner_cols} FROM _ranked WHERE _r <= {int(_rank_limit)}"
+                )
+
+        # TAG_SQL_CONTRACT_FIX — forbid policy_mode predicates unless registry join is present.
+        if "policy_mode" in sql and "simulation_run_registry" not in sql:
+            raise ValueError("Invalid SQL: policy_mode used without registry join")
+
+        print("SQL_GEN_FINAL_SQL:", sql)
+        return sql
+
+    def _get_join_path(self, table: str, base_alias: str) -> str | None:
+        """Get JOIN condition for a dimension table."""
+        join_paths = {
+            "dim_date": f"{base_alias}.date_key = dim_date.id",
+            "dim_store": f"{base_alias}.store_key = dim_store.id",
+            "dim_product": f"{base_alias}.product_key = dim_product.id",
+            "dim_supplier": f"{base_alias}.supplier_key = dim_supplier.id",
+        }
+        return join_paths.get(table)

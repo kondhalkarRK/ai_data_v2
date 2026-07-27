@@ -1,0 +1,56 @@
+class MetricResolver:
+
+    def __init__(self, registry, graph):
+        self.registry = registry
+        self.graph = graph
+
+    def resolve(self, metric_name):
+
+        if metric_name in self.registry.metrics:
+            metric = self.registry.metrics[metric_name]
+            metric_type = metric["type"]
+
+        elif metric_name in self.registry.measures:
+            metric = self.registry.measures[metric_name]
+            metric_type = "base"
+
+        elif metric_name in self.registry.derived_measures:
+            metric = self.registry.derived_measures[metric_name]
+            metric_type = "derived"
+
+        else:
+            raise ValueError(f"Metric '{metric_name}' not found in registry")
+
+        if metric_type == "base":
+            col = metric["column"]
+            agg = str(metric.get("aggregation") or "").upper()
+            # Use explicit formula override if present (supports CASE WHEN expressions)
+            formula = metric.get("formula") or (f"{agg}({col})" if agg else col)
+            return {
+                "metric": metric_name,
+                "type": "base",
+                "base_measures": [col],
+                "source_tables": [metric["table"]] if "table" in metric else [],
+                "formula": formula,
+                "default_filters": metric.get("default_filters") or {},
+            }
+
+        elif metric_type == "derived":
+
+            deps = metric["dependencies"]
+
+            base_measures = set()
+            source_tables = set()
+
+            for dep in deps:
+                resolved = self.resolve(dep)
+                base_measures.update(resolved["base_measures"])
+                source_tables.update(resolved["source_tables"])
+
+            return {
+                "metric": metric_name,
+                "type": "derived",
+                "base_measures": list(base_measures),
+                "source_tables": list(source_tables),
+                "formula": metric["formula"]
+            }

@@ -1,0 +1,385 @@
+version: 1
+
+measures:
+
+  sum_units_sold:
+    column: sum_units_sold
+    aggregation: sum
+    table: daily_store_product_summary
+    description: Total units sold
+
+  sum_units_ordered:
+    column: sum_units_ordered
+    aggregation: sum
+    table: daily_store_product_summary
+    description: Total units ordered
+
+  sum_demand_forecast:
+    column: sum_demand_forecast
+    aggregation: sum
+    table: daily_store_product_summary
+    description: Forecasted demand
+
+  avg_inventory_level:
+    column: avg_inventory_level
+    aggregation: avg
+    table: daily_store_product_summary
+    description: Average inventory level
+
+  avg_price:
+    column: avg_price
+    aggregation: avg
+    table: daily_store_product_summary
+    description: Average selling price
+
+  avg_competitor_price:
+    column: avg_competitor_price
+    aggregation: avg
+    table: daily_store_product_summary
+    description: Competitor pricing signal
+
+  sum_discount:
+    column: sum_discount
+    aggregation: sum
+    table: daily_store_product_summary
+    description: Total discount amount
+
+  record_count:
+    column: record_count
+    aggregation: count
+    table: daily_store_product_summary
+    description: Number of records
+  
+  avg_supplier_fill_rate:
+    column: supplier_fill_rate
+    aggregation: avg
+    table: fact_inventory_policy
+    description: Average supplier fill rate
+
+  avg_supplier_otif:
+    column: supplier_otif
+    aggregation: avg
+    table: fact_inventory_policy
+    description: Average supplier on-time-in-full
+
+  reorder_point:
+    column: reorder_point
+    aggregation: avg
+    table: fact_inventory_policy
+    description: Inventory reorder point
+
+  risk_category:
+    column: risk_category
+    table: fact_inventory_risk
+
+  stockout_probability:
+    column: stockout_probability
+    aggregation: avg
+    table: fact_inventory_risk
+
+  sim_revenue_at_risk:
+    column: revenue_at_risk
+    aggregation: sum
+    table: fact_inventory_simulation
+    description: Simulated revenue at risk from Monte Carlo no-action runs
+
+  sim_expected_risk:
+    column: expected_risk
+    aggregation: avg
+    table: fact_inventory_simulation
+    description: Simulated stockout probability from Monte Carlo no-action runs
+
+  replenishment_quantity:
+    column: recommended_units
+    aggregation: sum
+    table: fact_inventory_decision
+    default_filters:
+      action_type: REPLENISH
+    description: Total recommended replenishment units for items requiring restocking
+
+  replenishment_item_count:
+    column: product_key
+    aggregation: count
+    table: fact_inventory_decision
+    default_filters:
+      action_type: REPLENISH
+    description: Count of SKUs (items) flagged for immediate replenishment action
+
+  avg_replenishment_shortfall:
+    column: shortfall
+    aggregation: avg
+    table: fact_inventory_decision
+    default_filters:
+      action_type: REPLENISH
+    description: Average inventory shortfall per item requiring replenishment
+
+  sim_p50_risk:
+    column: p50
+    aggregation: avg
+    table: fact_inventory_simulation
+    description: P50 (median) revenue at risk from Monte Carlo simulation
+
+  sim_p90_risk:
+    column: p90
+    aggregation: avg
+    table: fact_inventory_simulation
+    description: P90 revenue at risk — 90th percentile scenario outcome
+
+  sim_p95_risk:
+    column: p95
+    aggregation: avg
+    table: fact_inventory_simulation
+    description: P95 revenue at risk — 95th percentile worst-case scenario outcome
+
+  inventory_on_hand:
+    column: inventory_level
+    aggregation: sum
+    table: fact_inventory_daily
+    description: Total on-hand inventory units
+
+  demand_forecasted:
+    column: demand_forecast
+    aggregation: sum
+    table: fact_inventory_daily
+    description: Total forecasted demand units
+
+  supplier_lead_time:
+    column: lead_time
+    aggregation: avg
+    table: fact_inventory_policy
+    description: Average supplier lead time in days
+
+  supplier_otif_rate:
+    column: supplier_otif
+    aggregation: avg
+    table: fact_inventory_policy
+    description: Average supplier on-time-in-full rate
+
+  policy_gap_pct:
+    column: policy_gap
+    aggregation: avg
+    table: fact_inventory_risk
+    formula: "SUM(CASE WHEN policy_gap < 0 THEN 1.0 ELSE 0.0 END) / NULLIF(COUNT(*), 0)"
+    description: Fraction of SKUs below reorder point (0-1 scale)
+
+  risk_level_breakdown:
+    column: risk_level
+    aggregation: count
+    table: fact_inventory_risk
+    description: Count of records grouped by risk level
+
+derived_measures:
+
+  sum_revenue:
+    formula: sum_units_sold * avg_price
+    display_label: Revenue
+    dependencies:
+      - sum_units_sold
+      - avg_price
+    description: Total revenue
+
+  avg_inventory_value:
+    formula: avg_inventory_level * avg_price
+    display_label: Inventory Value
+    dependencies:
+      - avg_inventory_level
+      - avg_price
+    description: Value of average inventory
+
+  total_discount_value:
+    formula: sum_units_sold * sum_discount
+    display_label: Total Discount
+    dependencies:
+      - sum_units_sold
+      - sum_discount
+    description: Total discount impact
+
+  forecast_error:
+    formula: sum_units_sold - sum_demand_forecast
+    display_label: Forecast Error
+    dependencies:
+      - sum_units_sold
+      - sum_demand_forecast
+    description: Forecast error
+
+  absolute_forecast_error:
+    formula: abs(sum_units_sold - sum_demand_forecast)
+    display_label: Forecast Error
+    dependencies:
+      - sum_units_sold
+      - sum_demand_forecast
+    description: Absolute forecast error
+
+  demand_gap:
+    formula: sum_units_ordered - sum_units_sold
+    display_label: Demand Gap
+    dependencies:
+      - sum_units_ordered
+      - sum_units_sold
+    description: Overstock or shortage signal
+
+  price_vs_competitor:
+    formula: avg_price - avg_competitor_price
+    display_label: Price vs Competitor
+    dependencies:
+      - avg_price
+      - avg_competitor_price
+    description: Price difference from competitor
+
+  overstock_ratio:
+    formula: policy_gap / avg_inventory_level
+    display_label: Overstock Ratio
+    dependencies:
+      - policy_gap
+      - avg_inventory_level
+
+
+metrics:
+
+  revenue:
+    type: derived
+    formula: sum_units_sold * avg_price
+    display_label: Revenue
+    dependencies:
+      - sum_units_sold
+      - avg_price
+
+  inventory_value:
+    type: derived
+    formula: avg_inventory_level * avg_price
+    display_label: Inventory Value
+    dependencies:
+      - avg_inventory_level
+      - avg_price
+    description: Total value of held inventory
+
+  discount_rate:
+    type: derived
+    formula: total_discount_value / sum_revenue
+    display_label: Discount Rate
+    dependencies:
+      - total_discount_value
+      - sum_revenue
+
+  demand_gap_rate:
+    type: derived
+    formula: demand_gap / sum_units_ordered
+    display_label: Demand Gap Rate
+    dependencies:
+      - demand_gap
+      - sum_units_ordered
+
+  price_index:
+    type: derived
+    formula: avg_price / avg_competitor_price
+    display_label: Price Index
+    dependencies:
+      - avg_price
+      - avg_competitor_price
+
+  inventory_turnover:
+    type: derived
+    formula: sum_units_sold / avg_inventory_level
+    display_label: Inventory Turnover
+    dependencies:
+      - sum_units_sold
+      - avg_inventory_level
+
+  inventory_efficiency:
+    type: derived
+    formula: sum_units_sold / avg_inventory_level
+    display_label: Inventory Efficiency
+    dependencies:
+      - sum_units_sold
+      - avg_inventory_level
+    description: Units sold per unit of average inventory
+
+  forecast_accuracy:
+    type: derived
+    formula: 1 - (absolute_forecast_error / sum_units_sold)
+    display_label: Forecast Accuracy
+    dependencies:
+      - absolute_forecast_error
+      - sum_units_sold
+
+  stock_pressure:
+    type: derived
+    formula: sum_units_ordered / avg_inventory_level
+    display_label: Stock Pressure
+    dependencies:
+      - sum_units_ordered
+      - avg_inventory_level
+
+  revenue_at_risk:
+    type: derived
+    formula: sim_revenue_at_risk
+    display_label: Revenue at Risk
+    dependencies:
+      - sim_revenue_at_risk
+    description: Simulated revenue at risk (decision-truth source)
+
+  capital_at_risk:
+    type: derived
+    formula: avg_inventory_value * overstock_ratio
+    display_label: Capital at Risk
+    dependencies:
+      - avg_inventory_value
+      - overstock_ratio
+
+  # -----------------------------
+  # Risk Metrics
+  # -----------------------------
+
+  stockout_risk:
+    type: base
+    column: stockout_probability
+    display_label: Stockout Risk
+    aggregation: avg
+    table: fact_inventory_risk
+
+  risk:
+    type: derived
+    formula: AVG(stockout_probability)
+    display_label: Stockout Risk
+    dependencies:
+      - stockout_risk
+    description: Alias metric for system risk queries
+
+  system_risk:
+    type: derived
+    formula: AVG(stockout_probability)
+    display_label: Stockout Risk
+    dependencies:
+      - stockout_risk
+    description: System-level risk alias using stockout probability
+
+  inventory_risk:
+    type: derived
+    formula: AVG(stockout_probability)
+    display_label: Stockout Risk
+    dependencies:
+      - stockout_risk
+    description: Inventory risk alias using stockout probability
+
+  policy_gap:
+    type: derived
+    formula: avg_inventory_level - reorder_point
+    display_label: Policy Gap
+    dependencies:
+      - avg_inventory_level
+      - reorder_point
+
+  high_risk_count:
+    type: derived
+    formula: CASE WHEN risk_category = 'HIGH' THEN 1 ELSE 0 END
+    display_label: High Risk Count
+    dependencies:
+      - risk_category
+
+  supplier_reliability_index:
+    type: derived
+    formula: (AVG(supplier_fill_rate) + AVG(supplier_otif)) / 2
+    display_label: Supplier Reliability
+    dependencies:
+      - avg_supplier_fill_rate
+      - avg_supplier_otif

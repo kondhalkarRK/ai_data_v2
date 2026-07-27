@@ -1,0 +1,75 @@
+import re
+from pathlib import Path
+from collections import defaultdict
+import yaml
+
+
+class DependencyGraph:
+
+    def __init__(self, registry):
+
+        self.registry = registry
+        self.graph = defaultdict(list)
+
+        self.functions = self.load_functions()
+
+        self.build_graph()
+
+
+    def load_functions(self):
+
+        path = Path("config/domain/semantic_functions.yaml")
+
+        with open(path, "r") as f:
+            config = yaml.safe_load(f)
+
+        return set(config.get("functions", []))
+
+
+    def extract_dependencies(self, expression):
+
+        tokens = re.findall(r"[a-zA-Z_]+", expression)
+
+        dependencies = []
+
+        for token in tokens:
+
+            if token in self.functions:
+                continue
+
+            dependencies.append(token)
+
+        return dependencies
+
+    def build_graph(self):
+
+        # combine all definitions
+        all_nodes = {}
+
+        all_nodes.update(self.registry.measures)
+        all_nodes.update(self.registry.derived_measures)
+        all_nodes.update(self.registry.metrics)
+
+        print("\nDEBUG: Checking registry nodes...")
+        for k, v in all_nodes.items():
+            if v is None:
+                print("⚠️ NULL CONFIG:", k)
+
+        for name, config in all_nodes.items():
+
+            # skip invalid configs
+            if not config or not isinstance(config, dict):
+                continue
+            
+            if "dependencies" not in config:
+                continue
+
+            deps = config.get("dependencies", [])
+
+            for dep in deps:
+                self.graph[name].append(dep)
+
+
+    def get_dependencies(self, metric):
+
+        return self.graph.get(metric, [])

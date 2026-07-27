@@ -1,0 +1,32 @@
+import yaml
+from pathlib import Path
+
+
+class MetricRegistry:
+
+    def __init__(self, config_path="config/domain/kpi_registry.yaml"):
+        self.config_path = Path(config_path)
+        self.measures = {}
+        self.metrics = {}
+        self.derived_measures = {}
+        self.load_registry()
+
+    def load_registry(self):
+        with open(self.config_path, "r") as f:
+            config = yaml.safe_load(f)
+
+        self.measures = config.get("measures", {})
+        self.derived_measures = config.get("derived_measures", {})
+        self.metrics = config.get("metrics", {})
+
+    def get_metric(self, name):
+        return self.metrics.get(name)
+
+    def get_measure(self, name):
+        return self.measures.get(name)
+
+    def list_metrics(self):
+        return list(self.metrics.keys())
+
+    def list_measures(self):
+        return list(self.measures.keys())
