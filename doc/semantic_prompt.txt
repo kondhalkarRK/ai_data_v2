@@ -1,0 +1,700 @@
+PROMPT: SEMANTIC LAYER ACTIVATION
+====================================
+
+You are upgrading ai_data_v2 to fully activate
+the semantic layer for LLM SQL generation.
+
+The problem: core/nlq_engine.py (NEW version)
+already calls three semantic builder methods
+but they do not exist yet so silently fail.
+
+Goal: implement the missing methods so the
+enhanced business_glossary.yaml and
+semantic_model.yaml fully enrich every
+LLM SQL generation call.
+
+════════════════════════════════════════════════
+CONTEXT — WHAT EXISTS
+════════════════════════════════════════════════
+
+core/nlq_engine.py (NEW version) already calls:
+
+  builder.build_full_context(
+    question, df,
+    conv_state=conv,
+    chat_history=chat_hist
+  )
+  builder.build_glossary_sql_hints(question)
+  builder.build_domain_rules_block()
+
+All three results are injected into LLM prompt:
+
+  prompt = f"""
+  {semantic_context}
+  {glossary_sql_hints}
+  {domain_rules}
+  TABLE NAME: df
+  {schema}
+  ...
+  """
+
+The enhanced business_glossary.yaml now has:
+  Per term: sql_expression, aggregation,
+    calculation_rules, disambiguation,
+    example_questions, related_terms,
+    time_grains (for Date term)
+  Top level: sql_patterns section
+  Top level: domain_rules section
+
+semantic_loader.py currently only reads:
+  get_glossary() → raw terms dict
+  BUT does NOT expose:
+    sql_patterns section
+    domain_rules section
+    sql_expression per term
+    calculation_rules per term
+    time_grains per term
+
+semantic_context_builder.py currently has:
+  build_base_context() ✅ exists
+  build_resolved_context() ✅ exists
+  build_physical_column_map() ✅ exists
+  build_full_context() ✅ exists
+    BUT signature is:
+    build_full_context(question, df)
+    MISSING: conv_state, chat_history params
+  build_glossary_sql_hints() ❌ MISSING
+  build_domain_rules_block() ❌ MISSING
+
+════════════════════════════════════════════════
+TASK 1 — CHANGE: semantic/semantic_loader.py
+════════════════════════════════════════════════
+
+ADD these new accessor methods to
+SemanticLoader class.
+Do NOT change any existing methods.
+
+METHOD 1: get_sql_patterns() → dict
+  Returns the sql_patterns top-level
+  section from business_glossary.yaml
+  Returns {} if section missing
+
+METHOD 2: get_domain_rules() → dict
+  Returns the domain_rules top-level
+  section from business_glossary.yaml
+  Returns {} if section missing
+  Structure returned:
+  {
+    "always_rules": list[str],
+    "never_rules": list[str],
+    "default_behaviours": list[str]
+  }
+
+METHOD 3: get_term_sql_expression(
+  term_name: str
+) → str | None
+  Looks up a specific term by name
+  in glossary terms dict
+  Returns its sql_expression field
+  Returns None if term or field missing
+  Case insensitive term lookup
+
+METHOD 4: get_term_calculation_rules(
+  term_name: str
+) → list[str]
+  Returns calculation_rules list for term
+  Returns [] if missing
+
+METHOD 5: get_term_time_grains(
+  term_name: str
+) → dict
+  Returns time_grains dict for term
+  Only populated for Date/Time term
+  Returns {} if missing
+
+METHOD 6: get_all_sql_expressions() → dict
+  Returns flat dict:
+    term_display_label → sql_expression
+  For ALL terms that have sql_expression
+  Example:
+  {
+    "Revenue": "SUM(total_sales)",
+    "Units Sold": "SUM(order_qty)",
+    "Orders": "COUNT(order_id)",
+    ...
+  }
+  Skip terms with no sql_expression
+
+METHOD 7: get_glossary_hints_for_question(
+  question: str
+) → list[dict]
+  Scans question text for synonym matches
+  against all glossary terms.
+  
+  Logic:
+  1. Build synonym → term_name map from
+     all terms in glossary
+  2. Tokenise question into words and bigrams
+  3. For each token check synonym map
+     case insensitive
+  4. For each match collect:
+     {
+       "matched_token": str,
+       "term_name": str,
+       "sql_expression": str | None,
+       "calculation_rules": list[str],
+       "disambiguation": list[str],
+       "time_grains": dict
+     }
+  5. Deduplicate by term_name
+  6. Return list of match dicts
+  
+  Returns [] if no matches found
+
+════════════════════════════════════════════════
+TASK 2 — CHANGE: semantic/semantic_context_builder.py
+════════════════════════════════════════════════
+
+ADD three new methods.
+UPDATE one existing method signature.
+Do NOT change any other existing methods.
+
+METHOD 1 — ADD: build_glossary_sql_hints(
+  question: str
+) → str
+
+  Purpose: scan question for glossary term
+  matches and return SQL hint block for LLM.
+
+  Implementation:
+  1. Call loader.get_glossary_hints_for_question(
+       question
+     ) → list of matched term dicts
+
+  2. If no matches: return ""
+
+  3. Build formatted string:
+
+  "───────────────────────────────────────────
+  SQL HINTS FROM BUSINESS GLOSSARY:
+  ───────────────────────────────────────────"
+
+  For each matched term:
+
+  If term has sql_expression:
+    "  '{matched_token}' → use: {sql_expression}"
+
+  If term has time_grains:
+    Show each grain:
+    "  'month' → use: strftime('%Y-%m', ...) AS month"
+    "  'quarter' → use: [full quarter formula]"
+    "  'year' → use: strftime('%Y', ...) AS year"
+
+  If term has calculation_rules:
+    "  Rules for {term_name}:"
+    For each rule (max 3):
+      "    • {rule}"
+
+  If term has disambiguation (first item only):
+    "  Note: {disambiguation[0]}"
+
+  End with separator line:
+  "───────────────────────────────────────────"
+
+  Return full string.
+  Wrap entire method in try/except
+  Return "" on any exception.
+
+METHOD 2 — ADD: build_domain_rules_block() → str
+
+  Purpose: return formatted domain rules
+  from glossary for LLM instruction.
+
+  Implementation:
+  1. Call loader.get_domain_rules() → dict
+
+  2. If empty dict: return ""
+
+  3. Build formatted string:
+
+  "───────────────────────────────────────────
+  DOMAIN RULES (always follow these exactly):
+  ───────────────────────────────────────────"
+
+  always_rules section:
+  "ALWAYS:"
+  For each rule:
+    "  ✓ {rule}"
+
+  never_rules section (if present):
+  "NEVER:"
+  For each rule:
+    "  ✗ {rule}"
+
+  default_behaviours section (if present):
+  "DEFAULTS:"
+  For each rule:
+    "  → {rule}"
+
+  End with separator.
+
+  Return full string.
+  Wrap in try/except. Return "" on exception.
+
+METHOD 3 — ADD: build_conversation_context(
+  conv_state: dict | None,
+  chat_history: str | None
+) → str
+
+  Purpose: inject prior conversation context
+  for follow-up query awareness.
+
+  Implementation:
+  If both conv_state and chat_history are None
+  or empty: return ""
+
+  Build string:
+  "───────────────────────────────────────────
+  CONVERSATION CONTEXT:
+  ───────────────────────────────────────────"
+
+  If chat_history (non-empty string):
+    "Recent conversation:\n{chat_history}"
+
+  If conv_state dict has prior_metric:
+    "Prior metric used: {prior_metric}"
+
+  If conv_state has prior_dimensions (non-empty):
+    "Prior dimensions: {joined list}"
+
+  If conv_state has is_followup = True:
+    "Note: This appears to be a follow-up query.
+     Consider inheriting prior context unless
+     user explicitly changes topic."
+
+  End with separator.
+  Return string. Return "" on exception.
+
+METHOD 4 — UPDATE: build_full_context(
+  question: str,
+  df: pd.DataFrame,
+  conv_state: dict | None = None,
+  chat_history: str | None = None
+) → str
+
+  Change ONLY the signature and the
+  combination step.
+  Keep all existing logic intact.
+
+  Current combination:
+  full_context = "\n\n".join([
+    base_ctx,
+    resolved_ctx,
+    column_ctx,
+  ])
+
+  NEW combination:
+  glossary_hints = self.build_glossary_sql_hints(
+    question
+  )
+  domain_rules = self.build_domain_rules_block()
+  conv_ctx = self.build_conversation_context(
+    conv_state, chat_history
+  )
+
+  blocks = [b for b in [
+    base_ctx,
+    resolved_ctx,
+    column_ctx,
+    glossary_hints,
+    domain_rules,
+    conv_ctx,
+  ] if b and b.strip()]
+
+  full_context = "\n\n".join(blocks)
+  return full_context
+
+════════════════════════════════════════════════
+TASK 3 — CHANGE: core/nlq_engine.py
+════════════════════════════════════════════════
+
+TARGET: the NEW version of nlq_engine.py
+that already calls the three builder methods.
+
+CHANGE 1:
+In nlq_to_sql() the semantic call is:
+
+  semantic_context = builder.build_full_context(
+    question, df, conv_state=conv,
+    chat_history=chat_hist or None
+  )
+
+This already has correct signature.
+No change needed here IF Task 2 is done.
+
+CHANGE 2:
+After semantic context is built,
+add sql_patterns injection.
+
+After the three builder calls add:
+
+  sql_patterns_block = ""
+  try:
+    loader = builder._loader
+    patterns = loader.get_sql_patterns()
+    if patterns:
+      lines = ["SQL QUERY PATTERNS:"]
+      for pat_name, pat_val in patterns.items():
+        desc = pat_val.get("description","")
+        triggers = pat_val.get(
+          "trigger_words", []
+        )
+        trigger_str = ", ".join(
+          triggers[:5]
+        ) if triggers else ""
+        lines.append(
+          f"  {desc}"
+          + (f" (triggers: {trigger_str})"
+             if trigger_str else "")
+        )
+      sql_patterns_block = "\n".join(lines)
+  except Exception:
+    sql_patterns_block = ""
+
+CHANGE 3:
+Add sql_patterns_block to prompt:
+
+  prompt = f"""You are an expert DuckDB
+  SQL generator.
+
+  {semantic_context}
+
+  {glossary_sql_hints}
+
+  {domain_rules}
+
+  {sql_patterns_block}
+
+  TABLE NAME: df
+  {schema}
+  ...rest of existing prompt...
+  """
+
+CHANGE 4:
+If using OLD nlq_engine.py (without semantic
+calls), ADD the semantic enrichment block
+immediately before the prompt is built.
+Insert after schema and name_cols are computed:
+
+  semantic_context = ""
+  glossary_sql_hints = ""
+  domain_rules = ""
+  sql_patterns_block = ""
+  try:
+    from semantic.semantic_context_builder \
+      import get_context_builder
+    builder = get_context_builder()
+    semantic_context = builder.build_full_context(
+      question, df
+    )
+    glossary_sql_hints = (
+      builder.build_glossary_sql_hints(question)
+    )
+    domain_rules = (
+      builder.build_domain_rules_block()
+    )
+  except Exception:
+    pass
+
+Then inject all four into prompt
+as shown in CHANGE 3.
+
+════════════════════════════════════════════════
+TASK 4 — CHANGE: ui/tab_query.py
+════════════════════════════════════════════════
+
+UPDATE the resolved term badges section.
+Current code shows term name + type only.
+Enhance to show sql_expression and rules.
+
+FIND this section in tab_query.py:
+
+  if confident:
+    badges = ""
+    for r in confident[:5]:
+      ...badges HTML...
+    st.markdown(badges...)
+
+CHANGE 1 — Update badge to show expression:
+
+For each resolved term r:
+  Also look up sql_expression using:
+    loader = get_semantic_loader()
+    expr = loader.get_term_sql_expression(
+      r["canonical"]
+    )
+
+  If expr found, add to badge tooltip:
+    title="{canonical} = {expr}"
+
+  Update badge HTML to include expression:
+    f"{html.escape(label)}"
+    f"<span style='opacity:0.5;font-size:9px;"
+    f"margin-left:4px;'>= {html.escape(expr)}"
+    f"</span>"
+  Only show expr if it exists and is short
+  (under 40 chars). For longer expressions
+  show in expander not inline.
+
+CHANGE 2 — Add semantic injection summary:
+
+After the badges block add a small
+collapsible expander:
+
+  with st.expander(
+    "🧠 Semantic Context Injected",
+    expanded=False
+  ):
+    st.markdown(
+      "**What the AI received from "
+      "semantic layer:**"
+    )
+    
+    Show which blocks were non-empty:
+    
+    If semantic_context non-empty:
+      st.markdown(
+        "✅ Business model context injected"
+      )
+    
+    If glossary_sql_hints non-empty:
+      st.markdown(
+        "✅ SQL hints from glossary injected"
+      )
+      Show the hints in a code block:
+      st.code(glossary_sql_hints, language="")
+    
+    If domain_rules non-empty:
+      st.markdown(
+        "✅ Domain rules injected"
+      )
+    
+    If all empty:
+      st.markdown(
+        "⚠️ Semantic layer inactive — "
+        "check semantic YAML files"
+      )
+    
+    Show count of terms resolved:
+    st.caption(
+      f"{len(confident)} business terms "
+      f"resolved from your question"
+    )
+
+  Store these in session_state after query:
+  st.session_state.last_semantic_context = (
+    semantic_context
+  )
+  st.session_state.last_glossary_hints = (
+    glossary_sql_hints
+  )
+  st.session_state.last_domain_rules = (
+    domain_rules
+  )
+
+CHANGE 3 — Update "Semantic layer active" badge:
+
+Current badge just says semantic layer active.
+Update to show more detail:
+
+  resolved_count = len(confident) if confident
+    else 0
+  hints_active = bool(
+    st.session_state.get("last_glossary_hints")
+  )
+  rules_active = bool(
+    st.session_state.get("last_domain_rules")
+  )
+
+  detail_parts = []
+  if resolved_count:
+    detail_parts.append(
+      f"{resolved_count} terms resolved"
+    )
+  if hints_active:
+    detail_parts.append("SQL hints active")
+  if rules_active:
+    detail_parts.append("domain rules active")
+
+  detail_str = " · ".join(detail_parts)
+
+  st.markdown(
+    f"<div style='font-size:11px;"
+    f"color:#6b7280;margin-bottom:4px;'>"
+    f"🧠 <b>Semantic layer active</b>"
+    f"{' — ' + detail_str if detail_str else ''}"
+    f"</div>",
+    unsafe_allow_html=True,
+  )
+
+════════════════════════════════════════════════
+TASK 5 — VERIFICATION: what to check
+════════════════════════════════════════════════
+
+After implementation verify:
+
+□ semantic_loader.py loads enhanced glossary
+  fields without error on startup
+
+□ get_sql_patterns() returns 4 patterns
+  (top_n, bottom_n, time_series, comparison)
+
+□ get_domain_rules() returns dict with
+  always_rules, never_rules, default_behaviours
+
+□ get_term_sql_expression("Revenue")
+  returns "SUM(total_sales)"
+
+□ get_glossary_hints_for_question(
+    "show revenue by colour"
+  ) returns at least 2 matches:
+  Revenue and Colour
+
+□ build_glossary_sql_hints(
+    "show revenue by colour"
+  ) returns non-empty string containing
+  "SUM(total_sales)" and "colour_name"
+
+□ build_domain_rules_block()
+  returns non-empty string containing
+  "Quarter formula uses /3 not /4"
+
+□ build_full_context() returns string
+  containing all 6 blocks (non-empty ones)
+
+□ nlq_engine.nlq_to_sql() prompt
+  contains SUM(total_sales) hint when
+  question mentions revenue
+
+□ tab_query.py shows
+  "SQL hints active" in semantic badge
+  after running a query
+
+□ "Semantic Context Injected" expander
+  shows correct hints for the question
+
+□ Revenue question → badge shows
+  "Revenue = SUM(total_sales)"
+
+□ Quarter question → hints show
+  correct /3 formula not /4
+
+════════════════════════════════════════════════
+IMPORTANT RULES
+════════════════════════════════════════════════
+
+RULE 1:
+Do NOT change existing methods in
+semantic_loader.py or semantic_context_builder.py
+Only ADD new methods.
+Keep all existing method signatures intact.
+
+RULE 2:
+All new methods must be wrapped in
+try/except and return empty value
+(empty string, empty dict, empty list)
+on any exception.
+Never let semantic layer crash the app.
+
+RULE 3:
+semantic_loader.py uses _ensure_loaded()
+before every data access.
+All new methods must call
+self._ensure_loaded() first.
+
+RULE 4:
+The enhanced business_glossary.yaml has
+sql_patterns and domain_rules as TOP LEVEL
+keys alongside terms.
+Access them as:
+  self._glossary.get("sql_patterns", {})
+  self._glossary.get("domain_rules", {})
+NOT inside self._glossary.get("terms", {})
+
+RULE 5:
+get_glossary_hints_for_question() tokenises
+using simple word split + bigrams only.
+Do NOT use the vector search here.
+This is a fast exact synonym match.
+Vector search is already handled separately
+by semantic_vector_search.py.
+
+RULE 6:
+In tab_query.py do NOT remove any
+existing functionality.
+The editable SQL panel, chart toggle,
+stat cards, AI analysis button must
+all remain working exactly as before.
+Only ADD the semantic context expander
+and UPDATE the badge text.
+
+RULE 7:
+semantic_context injected into LLM prompt
+must be capped at 3000 characters total
+to avoid token limit issues.
+In nlq_to_sql() after building semantic_context:
+
+  MAX_SEM_CHARS = 3000
+  if len(semantic_context) > MAX_SEM_CHARS:
+    semantic_context = (
+      semantic_context[:MAX_SEM_CHARS]
+      + "\n...[context trimmed]"
+    )
+
+RULE 8:
+glossary_sql_hints must be capped at
+800 characters. domain_rules capped at
+600 characters.
+Apply same trimming pattern.
+
+════════════════════════════════════════════════
+FILES CHANGED SUMMARY
+════════════════════════════════════════════════
+
+CHANGE (add methods only):
+  semantic/semantic_loader.py
+    + get_sql_patterns()
+    + get_domain_rules()
+    + get_term_sql_expression()
+    + get_term_calculation_rules()
+    + get_term_time_grains()
+    + get_all_sql_expressions()
+    + get_glossary_hints_for_question()
+
+CHANGE (add methods + update one):
+  semantic/semantic_context_builder.py
+    + build_glossary_sql_hints()
+    + build_domain_rules_block()
+    + build_conversation_context()
+    ~ build_full_context() (update signature
+      and combination step only)
+
+CHANGE (add semantic injection):
+  core/nlq_engine.py
+    ~ nlq_to_sql() (add semantic blocks
+      if not already present, add cap)
+
+CHANGE (update badge + add expander):
+  ui/tab_query.py
+    ~ resolved term badges (add expression)
+    + semantic context injected expander
+    ~ semantic active badge (add detail)
+
+NO CHANGE:
+  semantic_model.yaml
+  business_glossary.yaml (already enhanced)
+  semantic_vector_search.py
+  Any other file
+
+END OF PROMPT
+══════════════════════════
