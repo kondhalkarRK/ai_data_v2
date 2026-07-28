@@ -3,6 +3,7 @@
 # Capgemini AI Data Platform V10
 
 import os
+import re
 import yaml
 from typing import Any
 
@@ -137,6 +138,140 @@ class SemanticLoader:
                 if str(syn).lower() == lowered:
                     return val
         return None
+
+    def get_term_sql_expression(self, term_name: str) -> str | None:
+        """Look up sql_expression for a glossary term (case-insensitive)."""
+        try:
+            self._ensure_loaded()
+            if not term_name:
+                return None
+            terms = self.get_glossary()
+            lowered = term_name.strip().lower()
+            for term, val in terms.items():
+                if term.lower() == lowered or str(val.get("display_label", "")).lower() == lowered:
+                    expr = val.get("sql_expression") or val.get("display_expression")
+                    if isinstance(expr, str) and expr.strip():
+                        return " ".join(expr.split())
+                    src = val.get("source_column")
+                    if isinstance(src, str) and src.strip():
+                        return src.strip()
+                    return None
+            return None
+        except Exception:
+            return None
+
+    def get_term_calculation_rules(self, term_name: str) -> list[str]:
+        """Return calculation_rules for a glossary term."""
+        try:
+            self._ensure_loaded()
+            if not term_name:
+                return []
+            terms = self.get_glossary()
+            lowered = term_name.strip().lower()
+            for term, val in terms.items():
+                if term.lower() == lowered or str(val.get("display_label", "")).lower() == lowered:
+                    rules = val.get("calculation_rules") or []
+                    return list(rules) if isinstance(rules, list) else []
+            return []
+        except Exception:
+            return []
+
+    def get_term_time_grains(self, term_name: str) -> dict:
+        """Return time_grains dict for a glossary term (Date/Time)."""
+        try:
+            self._ensure_loaded()
+            if not term_name:
+                return {}
+            terms = self.get_glossary()
+            lowered = term_name.strip().lower()
+            for term, val in terms.items():
+                if term.lower() == lowered or str(val.get("display_label", "")).lower() == lowered:
+                    grains = val.get("time_grains") or {}
+                    return dict(grains) if isinstance(grains, dict) else {}
+                # also match partial e.g. "Date"
+                if "date" in lowered and "date" in term.lower():
+                    grains = val.get("time_grains") or {}
+                    if grains:
+                        return dict(grains) if isinstance(grains, dict) else {}
+            return {}
+        except Exception:
+            return {}
+
+    def get_all_sql_expressions(self) -> dict:
+        """Flat dict: term display label → sql_expression for all terms that have one."""
+        try:
+            self._ensure_loaded()
+            out: dict[str, str] = {}
+            for term, val in self.get_glossary().items():
+                expr = val.get("sql_expression") or val.get("display_expression")
+                if isinstance(expr, str) and expr.strip():
+                    label = val.get("display_label") or term
+                    out[label] = " ".join(expr.split())
+            return out
+        except Exception:
+            return {}
+
+    def get_glossary_hints_for_question(self, question: str) -> list[dict]:
+        """
+        Fast exact synonym match (unigrams + bigrams) against glossary.
+        Returns list of match dicts for SQL hint injection.
+        """
+        try:
+            self._ensure_loaded()
+            if not question or not str(question).strip():
+                return []
+
+            terms = self.get_glossary()
+            synonym_map: dict[str, str] = {}
+            for term, val in terms.items():
+                synonym_map[term.lower()] = term
+                label = val.get("display_label")
+                if isinstance(label, str) and label.strip():
+                    synonym_map[label.lower()] = term
+                for syn in val.get("synonyms", []) or []:
+                    if isinstance(syn, str) and syn.strip():
+                        synonym_map[syn.lower()] = term
+
+            q = question.lower().strip()
+            words = re.findall(r"[a-z0-9]+", q)
+            tokens = list(words)
+            for i in range(len(words) - 1):
+                tokens.append(f"{words[i]} {words[i + 1]}")
+            # Prefer longer matches first
+            tokens = sorted(set(tokens), key=len, reverse=True)
+
+            matches: list[dict] = []
+            seen: set[str] = set()
+            for token in tokens:
+                term_name = synonym_map.get(token)
+                if not term_name or term_name in seen:
+                    continue
+                # Require whole-word / phrase presence in question
+                if token not in q:
+                    continue
+                seen.add(term_name)
+                val = terms.get(term_name) or {}
+                expr = val.get("sql_expression") or val.get("display_expression")
+                if isinstance(expr, str) and expr.strip():
+                    expr_out = " ".join(expr.split())
+                else:
+                    src = val.get("source_column")
+                    expr_out = (
+                        f"column {src}" if isinstance(src, str) and src.strip() else None
+                    )
+                grains = val.get("time_grains") or {}
+                matches.append({
+                    "matched_token": token,
+                    "term_name": term_name,
+                    "sql_expression": expr_out,
+                    "calculation_rules": list(val.get("calculation_rules") or []),
+                    "disambiguation": list(val.get("disambiguation") or []),
+                    "time_grains": dict(grains) if isinstance(grains, dict) else {},
+                    "source_column": val.get("source_column"),
+                })
+            return matches
+        except Exception:
+            return []
 
     # ── Flattened synonym map ────────────────────────────────────
 

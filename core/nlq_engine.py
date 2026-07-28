@@ -112,29 +112,95 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
     examples_block = query_memory.format_examples_for_prompt(rag_examples)
     glossary_block = glossary_store.format_glossary_for_prompt(rag_glossary)
 
-    # Semantic + glossary enrichment (PRIMARY)
+    # Semantic + glossary enrichment (PRIMARY) — each block isolated
     semantic_context = ""
     glossary_sql_hints = ""
     domain_rules = ""
+    sql_patterns_block = ""
+    builder = None
     if _SEM_CTX_OK:
         try:
             builder = get_context_builder()
-            conv = get_state() if _CONV_OK else None
-            chat_hist = ""
-            if _CONV_OK:
-                try:
-                    chat_hist = build_chat_context_string(5)
-                except Exception:
-                    chat_hist = ""
+        except Exception:
+            builder = None
+
+    if builder is not None:
+        conv = None
+        chat_hist = ""
+        if _CONV_OK:
+            try:
+                conv = get_state()
+            except Exception:
+                conv = None
+            try:
+                chat_hist = build_chat_context_string(5)
+            except Exception:
+                chat_hist = ""
+
+        try:
             semantic_context = builder.build_full_context(
                 question, df, conv_state=conv, chat_history=chat_hist or None
             )
-            glossary_sql_hints = builder.build_glossary_sql_hints(question)
-            domain_rules = builder.build_domain_rules_block()
         except Exception:
             semantic_context = ""
+
+        try:
+            glossary_sql_hints = builder.build_glossary_sql_hints(question)
+        except Exception:
             glossary_sql_hints = ""
+
+        try:
+            domain_rules = builder.build_domain_rules_block()
+        except Exception:
             domain_rules = ""
+
+        try:
+            loader = builder._loader
+            patterns = loader.get_sql_patterns()
+            if patterns:
+                lines = ["SQL QUERY PATTERNS:"]
+                for pat_name, pat_val in patterns.items():
+                    if not isinstance(pat_val, dict):
+                        continue
+                    desc = pat_val.get("description", pat_name)
+                    triggers = pat_val.get("trigger_words", [])
+                    trigger_str = ", ".join(triggers[:5]) if triggers else ""
+                    lines.append(
+                        f"  {desc}"
+                        + (f" (triggers: {trigger_str})" if trigger_str else "")
+                    )
+                sql_patterns_block = "\n".join(lines)
+        except Exception:
+            sql_patterns_block = ""
+
+    # Caps to protect token budget
+    MAX_SEM_CHARS = 3000
+    if len(semantic_context) > MAX_SEM_CHARS:
+        semantic_context = (
+            semantic_context[:MAX_SEM_CHARS] + "\n...[context trimmed]"
+        )
+    if len(glossary_sql_hints) > 800:
+        glossary_sql_hints = glossary_sql_hints[:800] + "\n...[hints trimmed]"
+    if len(domain_rules) > 600:
+        domain_rules = domain_rules[:600] + "\n...[rules trimmed]"
+
+    # Persist for UI badges / expander
+    try:
+        st.session_state.last_semantic_context = semantic_context
+        st.session_state.last_glossary_hints = glossary_sql_hints
+        st.session_state.last_domain_rules = domain_rules
+        st.session_state.last_sql_patterns = sql_patterns_block
+        if builder is not None:
+            try:
+                st.session_state.last_glossary_matches = (
+                    builder._loader.get_glossary_hints_for_question(question)
+                )
+            except Exception:
+                st.session_state.last_glossary_matches = []
+        else:
+            st.session_state.last_glossary_matches = []
+    except Exception:
+        pass
 
     prompt = f"""You are an expert DuckDB SQL generator.
 
@@ -143,6 +209,8 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
 {glossary_sql_hints}
 
 {domain_rules}
+
+{sql_patterns_block}
 
 TABLE NAME: df
 {schema}
@@ -218,7 +286,7 @@ def run_query(working_df: pd.DataFrame, question: str, status=None):
         return _pack_return(None, "", "No data loaded.", None)
 
     evidence = None
-    execution_path = "fallback"
+    execution_path = "semantic"
 
     try:
         if _CACHE_OK and detect_oob(question):

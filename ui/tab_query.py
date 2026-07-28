@@ -95,7 +95,73 @@ def _badge_class(evidence):
         "deterministic": "badge-deterministic",
         "cache": "badge-cached",
         "fallback": "badge-fallback",
+        "semantic": "badge-semantic",
     }.get(path, "badge-fallback")
+
+
+def _render_semantic_layer_status(question: str = ""):
+    """Show resolved glossary terms + injection summary (semantic_prompt Task 4)."""
+    matches = st.session_state.get("last_glossary_matches") or []
+    hints = st.session_state.get("last_glossary_hints") or ""
+    rules = st.session_state.get("last_domain_rules") or ""
+    sem_ctx = st.session_state.get("last_semantic_context") or ""
+
+    resolved_count = len(matches)
+    hints_active = bool(str(hints).strip())
+    rules_active = bool(str(rules).strip())
+    detail_parts = []
+    if resolved_count:
+        detail_parts.append(f"{resolved_count} terms resolved")
+    if hints_active:
+        detail_parts.append("SQL hints active")
+    if rules_active:
+        detail_parts.append("domain rules active")
+    detail_str = " · ".join(detail_parts)
+
+    st.markdown(
+        f"<div style='font-size:11px;color:#94a3b8;margin-bottom:6px;'>"
+        f"🧠 <b style='color:#a5b4fc;'>Semantic layer active</b>"
+        f"{(' — ' + detail_str) if detail_str else ''}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    if matches:
+        badges = []
+        for m in matches[:5]:
+            label = html.escape(str(m.get("term_name") or m.get("matched_token") or ""))
+            expr = m.get("sql_expression") or m.get("source_column") or ""
+            expr_s = " ".join(str(expr).split())
+            title = html.escape(f"{label} = {expr_s}" if expr_s else label)
+            if expr_s and len(expr_s) <= 40:
+                badges.append(
+                    f"<span class='sem-term-badge' title='{title}'>"
+                    f"{label}"
+                    f"<span style='opacity:0.55;font-size:9px;margin-left:4px;'>"
+                    f"= {html.escape(expr_s)}</span></span>"
+                )
+            else:
+                badges.append(
+                    f"<span class='sem-term-badge' title='{title}'>{label}</span>"
+                )
+        st.markdown(" ".join(badges), unsafe_allow_html=True)
+
+    with st.expander("🧠 Semantic Context Injected", expanded=False):
+        st.markdown("**What the AI received from semantic layer:**")
+        if str(sem_ctx).strip():
+            st.markdown("✅ Business model context injected")
+        if hints_active:
+            st.markdown("✅ SQL hints from glossary injected")
+            st.code(hints, language="")
+        if rules_active:
+            st.markdown("✅ Domain rules injected")
+        if not (sem_ctx or hints or rules):
+            st.markdown(
+                "⚠️ Semantic layer inactive — check semantic YAML files"
+            )
+        st.caption(f"{resolved_count} business terms resolved from your question")
+        if question:
+            st.caption(f"Question: {question}")
 
 
 def render_narration_card(narration: dict | None):
@@ -281,6 +347,7 @@ def _render_ask_bundle(bundle, working_df):
         """,
         unsafe_allow_html=True,
     )
+    _render_semantic_layer_status(question)
 
     tab_table, tab_chart, tab_insights = st.tabs(["📊 Table", "📈 Chart", "💡 Insights"])
     with tab_table:
@@ -324,24 +391,103 @@ def _render_ask_bundle(bundle, working_df):
 
 # ── Chat mode ────────────────────────────────────────────────────
 
-def _conversational_reply(question: str) -> str:
+def _conversational_reply(question: str, working_df: pd.DataFrame | None = None) -> str:
     history = ""
     try:
         history = build_chat_context_string(5)
     except Exception:
         history = ""
+
+    data_summary = ""
+    if working_df is not None and not working_df.empty:
+        cols = ", ".join(str(c) for c in list(working_df.columns)[:18])
+        data_summary = (
+            f"Dataset loaded: {len(working_df):,} rows, "
+            f"{len(working_df.columns)} columns ({cols}"
+            f"{'…' if len(working_df.columns) > 18 else ''})."
+        )
+
+    glossary_bits = ""
+    try:
+        from semantic.semantic_loader import get_semantic_loader
+        loader = get_semantic_loader()
+        matches = loader.get_glossary_hints_for_question(question)
+        if matches:
+            parts = []
+            for m in matches[:4]:
+                expr = m.get("sql_expression") or m.get("source_column") or ""
+                parts.append(f"{m.get('term_name')}: {expr}")
+            glossary_bits = "Relevant business terms: " + "; ".join(parts)
+    except Exception:
+        glossary_bits = ""
+
     prompt = f"""You are a helpful AI data assistant embedded in an analytics platform.
-The user is chatting with you. Respond naturally and helpfully.
-If they ask what you can do, explain you can answer questions about their
-uploaded data using natural language.
-Keep responses concise (2-3 sentences).
+Respond naturally and helpfully. Keep responses concise (2-4 sentences).
+
+Capabilities you can describe:
+- Answer natural-language questions about the uploaded sales dataset
+- Resolve business terms (Revenue, Units Sold, Colour, etc.) via a semantic glossary
+- Run what-if scenarios ("what if revenue increased 20%")
+- Explain results and trends in plain language
+- Follow-ups like "same but for 2023" or "tell me more"
+
+{data_summary}
+{glossary_bits}
 
 {history}
 
 User: {question}
 Assistant:"""
     text = call_llm(prompt)
-    return (text or "Hi! Ask me anything about your uploaded data.").strip()
+    return (text or "Hi! Ask me anything about your uploaded data — revenue, colours, makes, trends.").strip()
+
+
+def _should_force_narration(question: str) -> bool:
+    q = (question or "").lower()
+    return any(
+        p in q
+        for p in (
+            "why", "explain", "how come", "what caused", "tell me more",
+            "insight", "interpret", "meaning",
+        )
+    )
+
+
+def _chat_scroll_to_bottom():
+    """Scroll the chat message panel to the latest message."""
+    try:
+        import streamlit.components.v1 as components
+        components.html(
+            """
+            <script>
+            (function() {
+              const doc = window.parent.document;
+              // Prefer our marked chat scroll area
+              let box = doc.querySelector('[data-testid="stVerticalBlockBorderWrapper"]');
+              const anchors = doc.querySelectorAll('#chat-scroll-anchor');
+              if (anchors.length) {
+                const a = anchors[anchors.length - 1];
+                a.scrollIntoView({behavior: 'smooth', block: 'end'});
+                // Also scroll nearest scrollable parent
+                let p = a.parentElement;
+                for (let i = 0; i < 8 && p; i++) {
+                  if (p.scrollHeight > p.clientHeight + 40) {
+                    p.scrollTop = p.scrollHeight;
+                    break;
+                  }
+                  p = p.parentElement;
+                }
+                return;
+              }
+              if (box) box.scrollTop = box.scrollHeight;
+            })();
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
+    except Exception:
+        pass
 
 
 def process_chat_message(question: str, working_df: pd.DataFrame):
@@ -375,7 +521,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     # Conversational (non-data)
     if not is_data_question(q, working_df):
         with st.spinner("💬 Thinking..."):
-            reply = _conversational_reply(q)
+            reply = _conversational_reply(q, working_df)
         append_chat_exchange(q, result_summary=None, was_data_query=False)
         st.session_state.chat_messages.append({
             "role": "assistant",
@@ -404,7 +550,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         return
 
     # Data query
-    with st.spinner("⚡ Querying your data..."):
+    with st.spinner("⚡ Querying your data with semantic layer..."):
         out = run_query(working_df, q)
         if isinstance(out, tuple) and len(out) == 4:
             df_result, sql, err, evidence = out
@@ -423,10 +569,13 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         st.rerun()
         return
 
+    force = _should_force_narration(q)
     narr = _safe_narration(df_result, q, evidence)
-    summary = (narr or {}).get("result_summary") or f"{len(df_result) if df_result is not None else 0} rows"
+    summary = (narr or {}).get("result_summary") or (
+        f"{len(df_result)} rows returned" if isinstance(df_result, pd.DataFrame) else "Done"
+    )
     append_chat_exchange(q, result_summary=summary, was_data_query=True)
-    force = narration_engine.should_auto_narrate(q) if narration_engine else False
+
     st.session_state.chat_messages.append({
         "role": "assistant",
         "content": (narr or {}).get("summary", "Here are the results."),
@@ -437,8 +586,9 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             "evidence": evidence,
             "narration": narr,
             "result_summary": summary,
-            "force_narration": force,
+            "force_narration": force or narration_on,
             "source_question": q,
+            "glossary_matches": list(st.session_state.get("last_glossary_matches") or []),
         },
         "timestamp": datetime.now().strftime("%H:%M"),
     })
@@ -483,12 +633,25 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
             st.markdown(html.escape(str(msg.get("content", ""))))
     elif mtype == "query":
         evidence = data.get("evidence")
-        badge = get_execution_badge(evidence) if evidence else {"icon": "⚠️", "label": "AI Generated"}
+        badge = get_execution_badge(evidence) if evidence else {"icon": "🧠", "label": "Semantic + AI"}
         st.markdown(
             f'<span class="{_badge_class(evidence)}">{badge.get("icon","")} '
             f'{html.escape(badge.get("label",""))}</span>',
             unsafe_allow_html=True,
         )
+        matches = data.get("glossary_matches") or []
+        if matches:
+            chips = []
+            for m in matches[:4]:
+                label = html.escape(str(m.get("term_name") or ""))
+                expr = m.get("sql_expression") or m.get("source_column") or ""
+                expr_s = html.escape(" ".join(str(expr).split())[:40])
+                chips.append(
+                    f"<span class='sem-term-badge'>{label}"
+                    + (f"<span style='opacity:0.55;font-size:9px;margin-left:4px;'>= {expr_s}</span>" if expr_s else "")
+                    + "</span>"
+                )
+            st.markdown(" ".join(chips), unsafe_allow_html=True)
         force = data.get("force_narration") or False
         show_narr = narration_on or force
         if show_narr:
@@ -500,6 +663,10 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
             if len(rdf) > 10:
                 with st.expander(f"Show all {len(rdf)} rows"):
                     st.dataframe(rdf, use_container_width=True)
+        sql = data.get("sql")
+        if sql and not str(sql).startswith("--"):
+            with st.expander("SQL used"):
+                st.code(sql, language="sql")
 
     st.markdown("</div></div>", unsafe_allow_html=True)
     st.markdown(
@@ -528,7 +695,7 @@ def render_chat_mode(working_df, tables, dfs):
             st.toast("Chat cleared", icon="🗑")
             st.rerun()
 
-    chat_box = st.container(height=480)
+    chat_box = st.container(height=480, border=True)
     with chat_box:
         if not st.session_state.chat_messages:
             insights = _safe_insights(working_df, limit=4)
@@ -536,7 +703,8 @@ def render_chat_mode(working_df, tables, dfs):
                 """
                 <div class="chat-welcome-card">
                   <div class="chat-welcome-title">👋 Hi! I've analysed your data.</div>
-                  <div class="chat-welcome-subtitle">Ask about revenue, colours, makes — or just say hi.</div>
+                  <div class="chat-welcome-subtitle">Ask about revenue, colours, makes — or just say hi.
+                  Follow-ups like "same for 2023" or "tell me more" work too.</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -551,10 +719,13 @@ def render_chat_mode(working_df, tables, dfs):
                     render_assistant_bubble(
                         msg, working_df, st.session_state.chat_narration_on
                     )
+        st.markdown('<div id="chat-scroll-anchor"></div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="chat-input-area">', unsafe_allow_html=True)
+    _chat_scroll_to_bottom()
+
+    st.markdown('<div class="chat-input-area chat-input-area-visible">', unsafe_allow_html=True)
     question = st.chat_input(
-        "Ask about your data, or just say hi...",
+        "Ask about your data, say hi, or ask a follow-up…",
         key="chat_main_input",
     )
     st.markdown("</div>", unsafe_allow_html=True)

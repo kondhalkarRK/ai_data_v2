@@ -1089,15 +1089,52 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
     font-size: 13px; color: #cbd5e1; line-height: 1.65; margin-bottom: 10px;
 }
 .chat-input-area {
-    background: rgba(30, 41, 59, 0.6);
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    border-radius: 12px;
-    padding: 8px 10px;
-    margin-top: 8px;
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 14px;
+    padding: 10px 12px;
+    margin-top: 10px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+.chat-input-area-visible {
+    background: linear-gradient(180deg, rgba(51, 65, 85, 0.55), rgba(30, 41, 59, 0.9));
+    border: 1.5px solid rgba(165, 180, 252, 0.45);
+}
+[data-testid="stChatInput"] {
+    background: rgba(15, 23, 42, 0.75) !important;
+    border: 1px solid rgba(148, 163, 184, 0.4) !important;
+    border-radius: 12px !important;
 }
 [data-testid="stChatInput"] textarea,
 [data-testid="stChatInput"] {
-    border-color: rgba(148, 163, 184, 0.25) !important;
+    border-color: rgba(165, 180, 252, 0.45) !important;
+    color: #e2e8f0 !important;
+    caret-color: #a5b4fc !important;
+}
+[data-testid="stChatInput"] textarea::placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+}
+.sem-term-badge {
+    display: inline-block;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.28);
+    color: #c7d2fe;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin: 2px 4px 6px 0;
+}
+.badge-semantic {
+    background: rgba(99, 102, 241, 0.14);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: #a5b4fc;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
 }
 .narration-findings {
     border-top: 1px solid rgba(16,185,129,0.1);

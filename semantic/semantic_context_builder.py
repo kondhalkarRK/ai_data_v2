@@ -127,74 +127,125 @@ class SemanticContextBuilder:
         return "\n".join(lines)
 
     def build_glossary_sql_hints(self, question: str) -> str:
-        """Scan question for glossary terms and return SQL hints."""
-        if not question:
-            return ""
-        q = question.lower()
-        loader = self._loader
-        glossary = loader.get_glossary()
-        hints: list[str] = []
-        seen = set()
+        """Scan question for glossary term matches and return SQL hint block for LLM."""
+        try:
+            if not question:
+                return ""
+            matches = self._loader.get_glossary_hints_for_question(question)
+            if not matches:
+                return ""
 
-        # Longest synonym first for better matching
-        candidates: list[tuple[str, str, dict]] = []
-        for term, val in glossary.items():
-            candidates.append((term.lower(), term, val))
-            for syn in val.get("synonyms", []) or []:
-                candidates.append((str(syn).lower(), term, val))
-        candidates.sort(key=lambda x: len(x[0]), reverse=True)
+            lines = [
+                "───────────────────────────────────────────",
+                "SQL HINTS FROM BUSINESS GLOSSARY:",
+                "───────────────────────────────────────────",
+            ]
+            for m in matches:
+                token = m.get("matched_token", "")
+                term = m.get("term_name", "")
+                expr = m.get("sql_expression")
+                if expr:
+                    lines.append(f"  '{token}' → use: {expr}")
+                src = m.get("source_column")
+                is_agg = isinstance(expr, str) and (
+                    "SUM(" in expr.upper() or "COUNT(" in expr.upper() or "/" in expr
+                )
+                if src and (not expr or (isinstance(expr, str) and expr.startswith("column "))):
+                    if not is_agg:
+                        lines.append(f"  '{token}' → physical column: {src}")
 
-        for phrase, term, val in candidates:
-            if not phrase or term in seen:
-                continue
-            # word-boundary-ish match
-            if phrase in q:
-                seen.add(term)
-                expr = val.get("sql_expression") or val.get("display_expression")
-                if isinstance(expr, str) and expr.strip():
-                    expr = " ".join(expr.split())
-                    hints.append(f"  - '{phrase}' detected → use {expr}")
-                # time grains
-                grains = val.get("time_grains") or {}
-                for gname, gexpr in grains.items():
-                    if gname in q or f"by {gname}" in q:
+                grains = m.get("time_grains") or {}
+                if grains:
+                    for gname, gexpr in grains.items():
                         gexpr_c = " ".join(str(gexpr).split())
-                        hints.append(f"  - 'by {gname}' detected → use {gexpr_c}")
+                        lines.append(f"  '{gname}' → use: {gexpr_c}")
 
-        # Pattern triggers
-        for pname, pval in (loader.get_sql_patterns() or {}).items():
-            triggers = pval.get("trigger_words") or []
-            trig_list = triggers if isinstance(triggers, list) else str(triggers).split(",")
-            for t in trig_list:
-                t = str(t).strip().lower()
-                if t and t in q:
-                    pat = " ".join(str(pval.get("pattern", "")).split())
-                    if pat:
-                        hints.append(f"  - pattern '{pname}' triggered → {pat}")
-                    break
+                rules = m.get("calculation_rules") or []
+                if rules:
+                    lines.append(f"  Rules for {term}:")
+                    for rule in rules[:3]:
+                        lines.append(f"    • {rule}")
 
-        if not hints:
+                disamb = m.get("disambiguation") or []
+                if disamb:
+                    lines.append(f"  Note: {disamb[0]}")
+
+            lines.append("───────────────────────────────────────────")
+            return "\n".join(lines)
+        except Exception:
             return ""
-        return "SQL HINTS FROM BUSINESS GLOSSARY:\n" + "\n".join(hints[:12])
 
     def build_domain_rules_block(self) -> str:
-        """Formatted domain rules instruction block for LLM."""
-        rules = self._loader.get_domain_rules() or {}
-        lines = ["DOMAIN RULES (always follow):"]
-        for r in (rules.get("always_rules") or [])[:6]:
-            lines.append(f"  - {r}")
-        for r in (rules.get("never_rules") or [])[:4]:
-            lines.append(f"  - NEVER: {r}")
-        for r in (rules.get("default_behaviours") or [])[:4]:
-            lines.append(f"  - DEFAULT: {r}")
-        if len(lines) == 1:
-            lines.extend([
-                "  - Concatenate first+last name for people",
-                "  - Quarter uses /3 formula not /4",
-                "  - Default LIMIT 500 if not specified",
-                "  - strftime for month grouping always",
-            ])
-        return "\n".join(lines)
+        """Return formatted domain rules from glossary for LLM instruction."""
+        try:
+            rules = self._loader.get_domain_rules() or {}
+            if not rules:
+                return ""
+
+            lines = [
+                "───────────────────────────────────────────",
+                "DOMAIN RULES (always follow these exactly):",
+                "───────────────────────────────────────────",
+            ]
+            always = rules.get("always_rules") or []
+            if always:
+                lines.append("ALWAYS:")
+                for r in always:
+                    lines.append(f"  ✓ {r}")
+            never = rules.get("never_rules") or []
+            if never:
+                lines.append("NEVER:")
+                for r in never:
+                    lines.append(f"  ✗ {r}")
+            defaults = rules.get("default_behaviours") or []
+            if defaults:
+                lines.append("DEFAULTS:")
+                for r in defaults:
+                    lines.append(f"  → {r}")
+            lines.append("───────────────────────────────────────────")
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def build_conversation_context(
+        self,
+        conv_state: dict | None = None,
+        chat_history: str | None = None,
+    ) -> str:
+        """Inject prior conversation context for follow-up query awareness."""
+        try:
+            has_hist = bool(chat_history and str(chat_history).strip())
+            has_conv = bool(conv_state) and (
+                conv_state.get("prior_metric")
+                or conv_state.get("prior_dimensions")
+                or conv_state.get("is_followup")
+            )
+            if not has_hist and not has_conv:
+                return ""
+
+            lines = [
+                "───────────────────────────────────────────",
+                "CONVERSATION CONTEXT:",
+                "───────────────────────────────────────────",
+            ]
+            if has_hist:
+                lines.append(f"Recent conversation:\n{chat_history}")
+            if conv_state:
+                if conv_state.get("prior_metric"):
+                    lines.append(f"Prior metric used: {conv_state['prior_metric']}")
+                dims = conv_state.get("prior_dimensions") or []
+                if dims:
+                    lines.append(f"Prior dimensions: {', '.join(map(str, dims))}")
+                if conv_state.get("is_followup"):
+                    lines.append(
+                        "Note: This appears to be a follow-up query.\n"
+                        "     Consider inheriting prior context unless\n"
+                        "     user explicitly changes topic."
+                    )
+            lines.append("───────────────────────────────────────────")
+            return "\n".join(lines)
+        except Exception:
+            return ""
 
     def build_resolved_glossary_block(self, question: str, resolutions: dict) -> str:
         """Pull full glossary definitions for terms relevant to this question."""
@@ -277,30 +328,42 @@ class SemanticContextBuilder:
     ) -> str:
         """
         Complete semantic context for LLM SQL generation.
-        Order: semantic → glossary hints → domain rules → resolved → columns → history
+        Combines base model, resolved entities, columns, glossary hints,
+        domain rules, and conversation context.
         """
-        resolutions = self._search.resolve_query_terms(question)
-        base_ctx = self.build_base_context()
-        resolved_glossary = self.build_resolved_glossary_block(question, resolutions)
-        resolved_ctx = self.build_resolved_context(question, resolutions)
-        column_ctx = self.build_physical_column_map(df)
-        hints = self.build_glossary_sql_hints(question)
-        domain = self.build_domain_rules_block()
-        conv_ctx = self.build_conversation_context(conv_state)
+        try:
+            resolutions = self._search.resolve_query_terms(question)
+        except Exception:
+            resolutions = {
+                "resolved_measures": [],
+                "resolved_dimensions": [],
+                "resolved_attributes": [],
+                "resolution_map": {},
+            }
 
-        blocks = [base_ctx]
-        if hints:
-            blocks.append(hints)
-        if domain:
-            blocks.append(domain)
-        if resolved_glossary:
-            blocks.append(resolved_glossary)
-        if conv_ctx:
-            blocks.append(conv_ctx)
-        if chat_history:
-            blocks.append(chat_history)
-        blocks.append(resolved_ctx)
-        blocks.append(column_ctx)
+        base_ctx = self.build_base_context()
+        try:
+            resolved_ctx = self.build_resolved_context(question, resolutions)
+        except Exception:
+            resolved_ctx = ""
+        try:
+            column_ctx = self.build_physical_column_map(df)
+        except Exception:
+            column_ctx = ""
+
+        glossary_hints = self.build_glossary_sql_hints(question)
+        domain_rules = self.build_domain_rules_block()
+        conv_ctx = self.build_conversation_context(conv_state, chat_history)
+
+        blocks = [b for b in [
+            base_ctx,
+            resolved_ctx,
+            column_ctx,
+            glossary_hints,
+            domain_rules,
+            conv_ctx,
+        ] if b and str(b).strip()]
+
         return "\n\n".join(blocks)
 
     def build_resolved_context(
@@ -331,14 +394,22 @@ class SemanticContextBuilder:
         resolution_map      = resolutions.get("resolution_map", {})
 
         if resolved_measures:
-            # Attach SQL expressions
-            loader    = self._loader
-            measures  = loader.get_measures()
-            expr_map  = loader.get_measure_expressions()
+            # Prefer glossary SQL expressions, then semantic model measures
+            loader = self._loader
+            expr_map = dict(loader.get_measure_expressions() or {})
+            try:
+                expr_map.update(loader.get_all_sql_expressions() or {})
+            except Exception:
+                pass
 
             lines.append("MEASURES TO USE:")
             for m in resolved_measures:
                 expr = expr_map.get(m, "")
+                if not expr:
+                    try:
+                        expr = loader.get_term_sql_expression(m) or ""
+                    except Exception:
+                        expr = ""
                 lines.append(
                     f"  {m}: {expr}" if expr else f"  {m}"
                 )
@@ -441,27 +512,6 @@ class SemanticContextBuilder:
         except Exception:
             lines.append("  Revenue: SUM(total_sales) [currency]")
             lines.append("  Units Sold: SUM(order_qty) [integer]")
-        return "\n".join(lines)
-
-    def build_conversation_context(self, conv_state: dict | None) -> str:
-        """Inject prior turn info for follow-up awareness."""
-        if not conv_state:
-            return ""
-        lines = ["CONVERSATION CONTEXT:"]
-        metric = conv_state.get("prior_metric")
-        dims = conv_state.get("prior_dimensions") or []
-        filters = conv_state.get("prior_filters") or {}
-        if metric:
-            lines.append(f"  Prior metric: {metric}")
-        if dims:
-            lines.append(f"  Prior dimensions: {', '.join(map(str, dims))}")
-        if filters:
-            filt = ", ".join(f"{k}={v}" for k, v in filters.items())
-            lines.append(f"  Prior filters: {filt}")
-        if conv_state.get("is_followup"):
-            lines.append("  This appears to be a follow-up query.")
-        if len(lines) == 1:
-            return ""
         return "\n".join(lines)
 
     def build_scope_context(self) -> str:

@@ -310,6 +310,15 @@ def is_data_question(question: str, df=None) -> bool:
     ):
         return False
 
+    # Follow-ups / clarifications about prior results → treat as data
+    followup_phrases = [
+        "same but", "same for", "and for", "now for", "tell me more",
+        "why is", "why are", "what about", "break that down", "drill",
+        "previous", "that again", "those results", "the result",
+    ]
+    if any(p in q for p in followup_phrases):
+        return True
+
     # What-if always data
     if any(p in q for p in ("what if", "suppose", "simulate", "scenario")):
         return True
