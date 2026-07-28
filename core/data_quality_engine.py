@@ -221,50 +221,130 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
     st.caption("Automated data health checks — zero AI involvement. Pure statistical analysis.")
 
     score = dq["health_score"]
-    if score >= 80:
-        score_color = "#22c55e"; score_label = "Excellent";      badge_cls = "dq-badge-green"
-    elif score >= 60:
-        score_color = "#f59e0b"; score_label = "Needs Attention"; badge_cls = "dq-badge-amber"
+    if score >= 90:
+        score_color = "#10b981"; score_label = "Excellent"; badge_cls = "dq-badge-green"
+    elif score >= 70:
+        score_color = "#f59e0b"; score_label = "Good"; badge_cls = "dq-badge-amber"
+    elif score >= 50:
+        score_color = "#f97316"; score_label = "Needs Attention"; badge_cls = "dq-badge-amber"
     else:
-        score_color = "#ef4444"; score_label = "Poor Quality";    badge_cls = "dq-badge-red"
+        score_color = "#ef4444"; score_label = "Poor Quality"; badge_cls = "dq-badge-red"
 
-    g_col1, g_col2, g_col3 = st.columns([1, 2, 3])
+    null_pct = dq["total_null_pct"]
+    null_color = "#6ee7b7" if null_pct == 0 else ("#fcd34d" if null_pct < 5 else "#fca5a5")
+    dup_color = "#6ee7b7" if dq["duplicate_count"] == 0 else "#fca5a5"
+    out_color = "#6ee7b7" if len(dq["outliers"]) == 0 else "#fcd34d"
+
+    n_num = int(df.select_dtypes(include="number").shape[1])
+    n_txt = int(df.select_dtypes(include=["object", "string", "category"]).shape[1])
+    n_date = int(df.select_dtypes(include=["datetime", "datetimetz"]).shape[1])
+    # also count parsed-looking date cols
+    for c in df.columns:
+        if n_date == 0 and any(x in str(c).lower() for x in ("date", "time", "year", "month")):
+            n_date += 1
+            break
+    n_bool = int(df.select_dtypes(include="bool").shape[1])
+    completeness = round(100.0 - float(null_pct), 1)
+
+    glow = (
+        "drop-shadow(0 0 12px rgba(16,185,129,0.4))" if score >= 90
+        else ("drop-shadow(0 0 10px rgba(245,158,11,0.3))" if score >= 70
+              else "drop-shadow(0 0 10px rgba(239,68,68,0.3))")
+    )
+
+    # 25% / 45% / 30% layout
+    g_col1, g_col2, g_col3 = st.columns([25, 45, 30])
     with g_col1:
         st.markdown(
-            f"<div style='text-align:center;padding:16px 0;'>"
-            f"<div style='font-size:56px;font-weight:800;color:{score_color};line-height:1;'>{score}%</div>"
-            f"<div style='font-size:12px;color:#8b949e;margin-top:6px;'>Data Health Score</div>"
-            f"<div class='{badge_cls}' style='margin-top:8px;display:inline-block;'>{score_label}</div>"
+            f"<div style='text-align:center;padding:8px 0;filter:{glow};'>"
+            f"<div style='font-size:52px;font-weight:900;color:{score_color};line-height:1;'>{score}%</div>"
+            f"<div class='dq-health-label'>Data Health Score</div>"
+            f"<div class='dq-status-pill'>{score_label}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
-    with g_col2:
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number", value=score,
             gauge={
-                "axis":  {"range": [0, 100], "tickwidth": 1},
-                "bar":   {"color": score_color},
-                "steps": [{"range": [0,60], "color": "#1c0505"}, {"range": [60,80], "color": "#1c1204"}, {"range": [80,100], "color": "#052e16"}],
-                "threshold": {"line": {"color": score_color, "width": 3}, "thickness": 0.8, "value": score},
+                "axis": {"range": [0, 100], "tickwidth": 1},
+                "bar": {"color": score_color},
+                "steps": [
+                    {"range": [0, 50], "color": "#1c0505"},
+                    {"range": [50, 70], "color": "#1c1204"},
+                    {"range": [70, 100], "color": "#052e16"},
+                ],
+                "threshold": {
+                    "line": {"color": score_color, "width": 3},
+                    "thickness": 0.8, "value": score,
+                },
             },
-            number={"suffix": "%", "font": {"size": 28, "color": score_color}},
+            number={"suffix": "%", "font": {"size": 22, "color": score_color}},
         ))
-        fig_gauge.update_layout(height=180, margin=dict(l=10,r=10,t=20,b=10), paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"))
+        fig_gauge.update_layout(
+            height=150, margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"),
+        )
         st.plotly_chart(fig_gauge, use_container_width=True)
+
+    with g_col2:
+        r1 = st.columns(3)
+        stats_primary = [
+            (f"{dq['total_rows']:,}", "Total Rows", "#818cf8"),
+            (str(dq["total_cols"]), "Columns", "#818cf8"),
+            (f"{null_pct}%", "Null Rate", null_color),
+        ]
+        for col, (val, lab, color) in zip(r1, stats_primary):
+            with col:
+                st.markdown(
+                    f'<div class="dq-stat-box"><div class="sv" style="color:{color}">{val}</div>'
+                    f'<div class="sl">{lab}</div></div>',
+                    unsafe_allow_html=True,
+                )
+        r2 = st.columns(2)
+        stats_r2 = [
+            (f"{dq['duplicate_count']:,}", "Duplicates", dup_color),
+            (str(len(dq["outliers"])), "Outlier Cols", out_color),
+        ]
+        for col, (val, lab, color) in zip(r2, stats_r2):
+            with col:
+                st.markdown(
+                    f'<div class="dq-stat-box" style="margin-top:8px;"><div class="sv" style="color:{color}">{val}</div>'
+                    f'<div class="sl">{lab}</div></div>',
+                    unsafe_allow_html=True,
+                )
+
     with g_col3:
-        st.markdown(f"""
-        <div class="stat-row" style="margin-top:12px;">
-          <div class="stat-card"><div class="sv">{dq['total_rows']:,}</div><div class="sl">Total Rows</div></div>
-          <div class="stat-card"><div class="sv">{dq['total_cols']}</div><div class="sl">Columns</div></div>
-          <div class="stat-card"><div class="sv" style="color:{'#ef4444' if dq['total_null_pct']>10 else '#4fc3f7'};">{dq['total_null_pct']}%</div><div class="sl">Null Rate</div></div>
-          <div class="stat-card"><div class="sv" style="color:{'#ef4444' if dq['duplicate_count']>0 else '#22c55e'};">{dq['duplicate_count']:,}</div><div class="sl">Duplicates</div></div>
-          <div class="stat-card"><div class="sv" style="color:{'#f59e0b' if len(dq['outliers'])>0 else '#22c55e'};">{len(dq['outliers'])}</div><div class="sl">Outlier Cols</div></div>
-        
-        </div>""", unsafe_allow_html=True)
+        secondary = [
+            (f"{completeness}%", "Completeness", "#6ee7b7"),
+            (str(n_num), "Numeric Cols", "#93c5fd"),
+            (str(n_txt), "Text Cols", "#6ee7b7"),
+            (str(n_date), "Date Cols", "#fcd34d"),
+        ]
+        for val, lab, color in secondary:
+            st.markdown(
+                f'<div class="dq-stat-box" style="margin-bottom:6px;"><div class="sv" style="color:{color}">{val}</div>'
+                f'<div class="sl">{lab}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+    # Schema composition pills
+    st.markdown(
+        f'<div style="margin:10px 0 4px;font-size:11px;color:#64748b;font-weight:700;'
+        f'letter-spacing:1px;text-transform:uppercase;">🔬 Schema Composition</div>'
+        f'<span class="schema-pill num">Numeric: {n_num}</span>'
+        f'<span class="schema-pill txt">Text: {n_txt}</span>'
+        f'<span class="schema-pill date">Date: {n_date}</span>'
+        f'<span class="schema-pill bool">Boolean: {n_bool}</span>',
+        unsafe_allow_html=True,
+    )
 
     st.markdown("---")
 
     if dq["null_summary"]:
+        st.markdown(
+            '<div class="dq-banner-warn">⚠️ Null values detected in some columns — review the analysis below.</div>',
+            unsafe_allow_html=True,
+        )
         st.markdown("#### 🕳️ Null Value Analysis")
         null_df = pd.DataFrame([
             {"Column": col, "Null Count": v["count"], "Null %": v["pct"],
@@ -273,28 +353,121 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
         ]).sort_values("Null %", ascending=False)
         nc1, nc2 = st.columns([3, 2])
         with nc1:
-            fig_null = px.bar(null_df, x="Null %", y="Column", orientation="h",
-                              color="Null %", color_continuous_scale=["#22c55e","#f59e0b","#ef4444"],
-                              range_color=[0,100], text="Null %", title="Missing Data % by Column")
-            fig_null.update_layout(height=max(250, len(null_df)*32), margin=dict(l=0,r=0,t=30,b=0),
-                                   paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", coloraxis_showscale=False)
+            fig_null = px.bar(
+                null_df, x="Null %", y="Column", orientation="h",
+                color="Null %", color_continuous_scale=["#22c55e", "#f59e0b", "#ef4444"],
+                range_color=[0, 100], text="Null %", title="Missing Data % by Column",
+            )
+            fig_null.update_layout(
+                height=max(250, len(null_df) * 32), margin=dict(l=0, r=0, t=30, b=0),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                coloraxis_showscale=False,
+            )
             fig_null.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
             st.plotly_chart(fig_null, use_container_width=True)
         with nc2:
             st.dataframe(null_df, use_container_width=True, hide_index=True)
         st.markdown("---")
     else:
-        st.success("✅ No null values detected — data is complete!")
-        st.markdown("---")
+        st.markdown(
+            '<div class="dq-banner-ok">✅ No null values detected — data is complete!</div>',
+            unsafe_allow_html=True,
+        )
+
+    # Column Health Report
+    with st.expander("📋 Column Health Report", expanded=False):
+        rows = []
+        for col in list(df.columns)[:15]:
+            s = df[col]
+            total = max(len(s), 1)
+            comp = round(100.0 * float(s.notna().sum()) / total, 1)
+            if pd.api.types.is_numeric_dtype(s):
+                icon = "🔢"
+            elif pd.api.types.is_datetime64_any_dtype(s):
+                icon = "📅"
+            else:
+                icon = "📝"
+            if comp >= 100:
+                status = "✅ Complete"
+            elif comp >= 95:
+                status = "🟡 Minor gaps"
+            elif comp >= 80:
+                status = "🟠 Gaps"
+            else:
+                status = "🔴 Sparse"
+            rows.append({
+                "Column": col,
+                "Type": f"{icon} {s.dtype}",
+                "Completeness %": comp,
+                "Unique": int(s.nunique()),
+                "Status": status,
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    # Numeric profiles
+    num_cols = df.select_dtypes(include="number").columns.tolist()[:8]
+    if num_cols:
+        with st.expander("📊 Numeric Column Profiles", expanded=False):
+            profiles = []
+            for col in num_cols:
+                s = pd.to_numeric(df[col], errors="coerce").dropna()
+                if s.empty:
+                    continue
+                mean_v = float(s.mean())
+                med_v = float(s.median())
+                skew_flag = "🔴 skewed" if abs(mean_v - med_v) > (abs(med_v) * 0.25 + 1e-9) else "🟢 normal"
+                profiles.append({
+                    "Column": col,
+                    "Min": round(float(s.min()), 2),
+                    "Max": round(float(s.max()), 2),
+                    "Mean": round(mean_v, 2),
+                    "Std Dev": round(float(s.std()), 2) if len(s) > 1 else 0,
+                    "Shape": skew_flag,
+                })
+            if profiles:
+                st.dataframe(pd.DataFrame(profiles), use_container_width=True, hide_index=True)
+
+    # Top values
+    cat_cols = [
+        c for c in df.columns
+        if (df[c].dtype == object or str(df[c].dtype).startswith("string"))
+        and df[c].nunique() <= max(50, int(len(df) * 0.5))
+    ][:5]
+    if cat_cols:
+        with st.expander("🏷️ Top Values by Column", expanded=False):
+            for col in cat_cols:
+                top = df[col].astype(str).value_counts().head(3)
+                bits = " · ".join(f"**{idx}** ({cnt})" for idx, cnt in top.items())
+                st.markdown(f"**{col}:** {bits}")
 
     st.markdown("#### 👥 Duplicate Row Detection")
     if dq["duplicate_count"] > 0:
-        st.warning(f"⚠️ **{dq['duplicate_count']:,} duplicate rows** found ({dq['duplicate_pct']}% of data). These may skew aggregations and KPIs.")
+        st.markdown(
+            f'<div class="dq-banner-warn">⚠️ <b>{dq["duplicate_count"]:,} duplicate rows</b> '
+            f'({dq["duplicate_pct"]}% of data). These may skew aggregations and KPIs.</div>',
+            unsafe_allow_html=True,
+        )
+        # Top repeated values hint
+        try:
+            hints = []
+            for c in df.columns[:12]:
+                vc = df[c].astype(str).value_counts()
+                if len(vc) and vc.iloc[0] > 1:
+                    hints.append((c, int(vc.iloc[0])))
+            hints.sort(key=lambda x: x[1], reverse=True)
+            if hints:
+                top_c, top_n = hints[0]
+                st.caption(f"Top repeated: `{top_c}` ({top_n} times) · {dq['duplicate_pct']}% of rows are duplicates")
+        except Exception:
+            pass
         if "duplicate_sample" in dq:
             with st.expander("👁️ Preview Duplicate Rows"):
                 st.dataframe(pd.DataFrame(dq["duplicate_sample"]), use_container_width=True, hide_index=True)
     else:
-        st.success("✅ No duplicate rows found — data is unique!")
+        st.markdown(
+            '<div class="dq-banner-ok">🎉 Perfect — No duplicate rows</div>',
+            unsafe_allow_html=True,
+        )
     st.markdown("---")
 
     st.markdown("#### 📊 Statistical Outlier Detection")
@@ -314,27 +487,11 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
         with oc2:
             st.dataframe(out_df, use_container_width=True, hide_index=True)
     else:
-        st.success("✅ No significant outliers detected across numeric columns!")
+        st.markdown(
+            '<div class="dq-banner-ok">✅ No significant outliers detected across numeric columns!</div>',
+            unsafe_allow_html=True,
+        )
     st.markdown("---")
-
-    # st.markdown("#### ⚡ Time-Series Spike Detection")
-    # st.caption("Flags months where values deviate > 2.5 standard deviations from rolling average.")
-    # if dq["spikes"]:
-    #     for col, spike_list in dq["spikes"].items():
-    #         with st.expander(f"📌 **{col}** — {len(spike_list)} spike(s) detected", expanded=True):
-    #             spike_df = pd.DataFrame(spike_list)
-    #             spike_df.columns = ["Period","Value","Z-Score","Direction"]
-    #             sc1, sc2 = st.columns([3, 2])
-    #             with sc1:
-    #                 fig_spike = px.bar(spike_df, x="Period", y="Value", color="Z-Score",
-    #                                    color_continuous_scale=["#f59e0b","#ef4444"], text="Direction", title=f"Spikes in {col}")
-    #                 fig_spike.update_layout(margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", coloraxis_showscale=False)
-    #                 st.plotly_chart(fig_spike, use_container_width=True)
-    #             with sc2:
-    #                 st.dataframe(spike_df, use_container_width=True, hide_index=True)
-    # else:
-    #     st.success("✅ No unusual spikes detected in time-series columns!")
-    # st.markdown("---")
 
     st.markdown("#### 🔧 Data Type Issue Detection")
     st.caption("Columns stored in wrong format — affects calculations and joins.")
@@ -348,7 +505,10 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
             st.markdown(f"<div class='dq-issue-row'>{icon} <b>{col_name}</b> — <span class='{badge}'>{issue_txt}</span> &nbsp; <span style='color:#8b949e;font-size:12px;'>{pct_info} &nbsp;|&nbsp; Sample: {issue.get('sample', [])}</span></div>", unsafe_allow_html=True)
         st.markdown("<div style='font-size:12px;color:#8b949e;margin-top:4px;'>💡 <b>Recommendation:</b> Convert these columns to their correct data types before analysis to ensure accurate aggregations and joins.</div>", unsafe_allow_html=True)
     else:
-        st.success("✅ All columns appear to be stored in the correct data type!")
+        st.markdown(
+            '<div class="dq-banner-ok">✅ All columns appear to be stored in the correct data type!</div>',
+            unsafe_allow_html=True,
+        )
     st.markdown("---")
 
     st.markdown("#### 🏷️ Column Cardinality Analysis")
@@ -364,22 +524,31 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
         with cc2:
             st.dataframe(card_df, use_container_width=True, hide_index=True)
     else:
-        st.success("✅ All categorical columns have healthy cardinality!")
+        st.markdown(
+            '<div class="dq-banner-ok">✅ All categorical columns have healthy cardinality!</div>',
+            unsafe_allow_html=True,
+        )
     st.markdown("---")
 
     st.markdown("#### 📅 Time-Series Continuity Check")
     st.caption("Checks for missing months in your date column — gaps can distort trend analysis.")
     if dq.get("date_col"):
         if dq["date_gaps"]:
-            st.warning(f"⚠️ **{len(dq['date_gaps'])} missing month(s)** detected in column `{dq['date_col']}`. This may affect trend analysis and forecasting accuracy.")
+            st.markdown(
+                f'<div class="dq-banner-warn">⚠️ <b>{len(dq["date_gaps"])} missing month(s)</b> detected in column '
+                f'`{dq["date_col"]}`. This may affect trend analysis.</div>',
+                unsafe_allow_html=True,
+            )
             gap_cols = st.columns(min(len(dq["date_gaps"]), 6))
             for i, gap in enumerate(dq["date_gaps"][:6]):
                 gap_cols[i].markdown(f"<div class='dq-badge-red' style='text-align:center;'>📭 {gap}</div>", unsafe_allow_html=True)
             if len(dq["date_gaps"]) > 6:
                 st.caption(f"… and {len(dq['date_gaps']) - 6} more missing periods.")
-            st.markdown("<div style='font-size:12px;color:#8b949e;margin-top:8px;'>💡 <b>Recommendation:</b> Fill missing periods with zero values or interpolated estimates before running time-series analysis.</div>", unsafe_allow_html=True)
         else:
-            st.success(f"✅ No date gaps found in `{dq['date_col']}` — time series is continuous!")
+            st.markdown(
+                f'<div class="dq-banner-ok">✅ No date gaps found in `{dq["date_col"]}` — time series is continuous!</div>',
+                unsafe_allow_html=True,
+            )
     else:
         st.info("ℹ️ No date column detected — skipping time-series continuity check.")
     st.markdown("---")
@@ -393,15 +562,12 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
         all_issues.append({"Column": "— (row level)", "Issue": "Duplicate Rows", "Detail": f"{dq['duplicate_count']:,} rows ({dq['duplicate_pct']}%)", "Severity": "🔴 Critical" if dq["duplicate_pct"] > 10 else "🟡 Warning"})
     for col, info in dq["outliers"].items():
         all_issues.append({"Column": col, "Issue": "Statistical Outliers", "Detail": f"{info['count']} values outside [{info['lower_fence']}, {info['upper_fence']}]", "Severity": "🟡 Warning" if info["pct"] < 5 else "🔴 Critical"})
-    # for col, spike_list in dq["spikes"].items():
-    #     for sp in spike_list:
-    #         all_issues.append({"Column": col, "Issue": "Time-Series Spike", "Detail": f"{sp['period']} — value {sp['value']:,} (Z={sp['z_score']}) {sp['direction']}", "Severity": "🟡 Warning"})
     for issue in dq["type_issues"]:
         all_issues.append({"Column": issue["column"], "Issue": "Data Type Mismatch", "Detail": issue["issue"], "Severity": "🟡 Warning"})
-    for flag in dq["cardinality_flags"]:
-        all_issues.append({"Column": flag["column"], "Issue": "Cardinality Anomaly", "Detail": flag["issue"], "Severity": "🟢 Minor"})
-    for gap in dq["date_gaps"]:
-        all_issues.append({"Column": dq.get("date_col","date"), "Issue": "Date Gap", "Detail": f"Missing period: {gap}", "Severity": "🟡 Warning"})
+    for f in dq["cardinality_flags"]:
+        all_issues.append({"Column": f["column"], "Issue": "Cardinality", "Detail": f["issue"], "Severity": "🟢 Minor"})
+    for gap in dq.get("date_gaps") or []:
+        all_issues.append({"Column": dq.get("date_col", "date"), "Issue": "Date Gap", "Detail": str(gap), "Severity": "🟡 Warning"})
 
     if all_issues:
         issues_df = pd.DataFrame(all_issues)
@@ -409,6 +575,14 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
         issues_df["_sort"] = issues_df["Severity"].map(sev_order)
         issues_df = issues_df.sort_values("_sort").drop(columns=["_sort"])
         st.dataframe(issues_df, use_container_width=True, hide_index=True)
-        st.download_button("⬇️ Download Quality Report (CSV)", data=issues_df.to_csv(index=False).encode(), file_name=f"data_quality_{table_name}.csv", mime="text/csv")
+        st.download_button(
+            "⬇️ Download Quality Report (CSV)",
+            data=issues_df.to_csv(index=False).encode(),
+            file_name=f"data_quality_{table_name}.csv",
+            mime="text/csv",
+        )
     else:
-        st.success("🎉 No issues found — this dataset is in excellent shape!")
+        st.markdown(
+            '<div class="dq-banner-ok">🎉 No issues found — dataset looks healthy!</div>',
+            unsafe_allow_html=True,
+        )

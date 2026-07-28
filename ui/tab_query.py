@@ -133,20 +133,30 @@ def _render_semantic_layer_status(question: str = ""):
             expr = m.get("sql_expression") or m.get("source_column") or ""
             expr_s = " ".join(str(expr).split())
             title = html.escape(f"{label} = {expr_s}" if expr_s else label)
-            if expr_s and len(expr_s) <= 40:
-                badges.append(
-                    f"<span class='sem-term-badge' title='{title}'>"
-                    f"{label}"
-                    f"<span style='opacity:0.55;font-size:9px;margin-left:4px;'>"
-                    f"= {html.escape(expr_s)}</span></span>"
-                )
-            else:
-                badges.append(
-                    f"<span class='sem-term-badge' title='{title}'>{label}</span>"
-                )
+            # Heuristic badge type
+            kind = "glossary"
+            expr_u = (expr_s or "").upper()
+            if "SUM(" in expr_u or "COUNT(" in expr_u or "/" in expr_u:
+                kind = "measure"
+            elif expr_s and not expr_u.startswith("COLUMN") and "(" not in expr_u:
+                kind = "dimension"
+            elif (expr_s or "").lower().startswith("column "):
+                kind = "dimension"
+            expr_html = (
+                f"<span class='sem-expr'>= {html.escape(expr_s[:40])}</span>"
+                if expr_s and len(expr_s) <= 40 else ""
+            )
+            badges.append(
+                f"<span class='sem-term-badge {kind}' title='{title}'>"
+                f"{label}{expr_html}</span>"
+            )
         st.markdown(" ".join(badges), unsafe_allow_html=True)
 
-    with st.expander("🧠 Semantic Context Injected", expanded=False):
+    st.markdown(
+        '<div class="sem-ctx-expander-hint">🧠 Semantic Context Injected</div>',
+        unsafe_allow_html=True,
+    )
+    with st.expander("View injected context", expanded=False):
         st.markdown("**What the AI received from semantic layer:**")
         if str(sem_ctx).strip():
             st.markdown("✅ Business model context injected")
@@ -247,7 +257,9 @@ def render_ask_mode(working_df, tables, dfs):
             key="ask_question_input",
         )
     with col_btn:
+        st.markdown('<div class="ask-run-btn-wrap">', unsafe_allow_html=True)
         run_btn = st.button("▶", type="primary", use_container_width=True, key="ask_run_btn")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # Show custom SQL override if present
     custom = st.session_state.get("ask_custom_result")

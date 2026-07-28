@@ -135,10 +135,8 @@ def render():
         # FILES
         # =========================
         with st.container(border=True):
-
+            st.markdown('<div class="sb-upload-wrap">', unsafe_allow_html=True)
             section_title("📁 UPLOAD FILES HERE")
-
-            # CHANGED: spacer below title inside section
             section_spacer()
 
             file_count = len(st.session_state.get("dfs", {}))
@@ -146,67 +144,64 @@ def render():
             c1, c2 = st.columns([3, 1])
 
             with c1:
-                status_row("Files Loaded", file_count, "#38bdf8")
+                status_row("Files Loaded", file_count, "#fcd34d")
 
             with c2:
                 if st.button(
                     "＋",
                     use_container_width=True,
-                    help="Add Files"
+                    help="Add Files",
+                    key="sidebar_upload_plus",
                 ):
                     upload_dialog()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        # CHANGED: spacer between sections
-        section_spacer()
+        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
 
         # =========================
         # SEMANTIC
         # =========================
         with st.container(border=True):
-
+            st.markdown('<div class="sb-semantic-wrap">', unsafe_allow_html=True)
             section_title("🧬 SEMANTIC LAYER")
-
-            # CHANGED: spacer below title
             section_spacer()
 
             semantic_used = st.session_state.get("semantic_join_used", None)
 
             if semantic_used is True:
                 join_status = "ACTIVE"
-                join_color  = "#22c55e"
+                join_color  = "#6ee7b7"
             elif semantic_used is False:
                 join_status = "FALLBACK"
-                join_color  = "#f59e0b"
+                join_color  = "#fcd34d"
             else:
                 join_status = "PENDING"
-                join_color  = "#ef4444"
+                join_color  = "#fca5a5"
 
             model_status = "UNAVAILABLE"
-            model_color  = "#ef4444"
+            model_color  = "#fca5a5"
 
             if _SEMANTIC_AVAILABLE:
                 try:
                     get_semantic_loader()
                     model_status = "LOADED"
-                    model_color  = "#eab308"
+                    model_color  = "#6ee7b7"
                 except Exception:
                     model_status = "ERROR"
-                    model_color  = "#ef4444"
+                    model_color  = "#fca5a5"
 
             status_row("Join",  join_status,  join_color)
             status_row("Model", model_status, model_color)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        # CHANGED: spacer between sections
-        section_spacer()
+        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
 
         # =========================
         # USAGE
         # =========================
         with st.container(border=True):
-
+            st.markdown('<div class="sb-llm-wrap">', unsafe_allow_html=True)
             section_title("⚡ LLM USAGE STATUS")
-
-            # CHANGED: spacer below title
             section_spacer()
 
             calls  = st.session_state.get("llm_calls", 0)
@@ -216,67 +211,59 @@ def render():
                 st.session_state.get("max_llm_calls", 1), 1
             )
 
-            status_row("Calls",  calls,          "#38bdf8")
-            status_row("Tokens", f"{tokens:,}",  "#38bdf8")
+            status_row("Calls",  calls,          "#a5b4fc")
+            status_row("Tokens", f"{tokens:,}",  "#a5b4fc")
 
-            # CHANGED: small spacer before progress bar so it
-            # doesn't sit directly against the token row
             section_spacer()
-
             st.progress(min(calls / max_calls, 1.0))
-
-            # CHANGED: spacer between progress bar and buttons
             section_spacer()
 
             c1, c2 = st.columns(2)
 
             with c1:
-                if st.button("RESET", use_container_width=True):
+                if st.button("RESET", use_container_width=True, key="sidebar_reset"):
                     st.session_state.llm_calls    = 0
                     st.session_state.total_tokens = 0
                     st.rerun()
 
             with c2:
-                if st.button("CACHE", use_container_width=True):
+                if st.button("CACHE", use_container_width=True, key="sidebar_cache"):
                     st.session_state.memory      = {}
                     st.session_state.last_plan   = None
                     st.session_state.last_query  = ""
                     st.session_state.query_history = []
                     st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        # CHANGED: spacer between sections
-        section_spacer()
+        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
 
         # =========================
         # MATERIALIZED VIEWS
         # =========================
         with st.container(border=True):
-
+            st.markdown('<div class="sb-views-wrap">', unsafe_allow_html=True)
             section_title("🗂️ VIEWS")
-
-            # CHANGED: spacer below title
             section_spacer()
 
             active_views = view_store.count_active_views()
 
-            status_row("Active", active_views, "#38bdf8")
+            status_row("Active", active_views, "#a5b4fc")
 
-            # CHANGED: spacer before button
             section_spacer()
 
-            if st.button("CLEAR", use_container_width=True):
+            if st.button("CLEAR", use_container_width=True, key="sidebar_clear_views"):
                 removed = view_store.clear_all_views()
                 st.success(f"Cleared {removed} view(s)")
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        # CHANGED: spacer between sections
-        section_spacer()
+        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
 
         # =========================
         # CONVERSATION STATE (Prompt 2)
         # =========================
         with st.container(border=True):
-
+            st.markdown('<div class="sb-conv-wrap">', unsafe_allow_html=True)
             section_title("💬 CONVERSATION")
             section_spacer()
 
@@ -339,7 +326,9 @@ def render():
                 else:
                     st.caption("No active conversation. Ask a question to start.")
 
-        section_spacer()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
 
         # =========================
         # QUERY PATH STATS (Prompt 2)
