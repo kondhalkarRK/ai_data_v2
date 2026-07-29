@@ -330,6 +330,7 @@ def render_ask_mode(working_df, tables, dfs):
         "question": q,
     }
     st.session_state["ask_last_bundle"] = bundle
+    st.session_state["editable_sql"] = (sql or "").strip()  
     _render_ask_bundle(bundle, working_df)
 
 
@@ -397,7 +398,7 @@ def _render_ask_bundle(bundle, working_df):
             st.markdown(f"**Hash:** `{evidence.get('query_hash')}`")
             st.markdown(f"**Resolution:** `{evidence.get('resolution_source')}`")
         st.code(sql or "", language="sql")
-
+    st.session_state["editable_sql"] = (sql or "").strip()  
     render_editable_sql(sql or "", working_df)
 
 
