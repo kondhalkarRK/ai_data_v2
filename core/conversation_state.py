@@ -354,6 +354,16 @@ def is_data_question(question: str, df=None) -> bool:
     if q in greetings:
         return False
 
+    # Lifestyle / off-topic → never treat as data (polite redirect via OOB)
+    lifestyle = (
+        "dinner", "lunch", "breakfast", "recipe", "weather", "joke",
+        "movie", "song", "football", "cricket", "restaurant", "cook",
+    )
+    if any(w in q for w in lifestyle) and not any(
+        w in q for w in ("revenue", "sales", "units", "colour", "make", "region", "order")
+    ):
+        return False
+
     general = [
         "what can you do", "who are you", "how does this work", "help",
         "what are you", "introduce yourself",
@@ -376,33 +386,46 @@ def is_data_question(question: str, df=None) -> bool:
     if any(p in q for p in ("what if", "suppose", "simulate", "scenario")):
         return True
 
-    # Column names
+    data_terms = (
+        "revenue", "sales", "units", "orders", "colour", "color", "make",
+        "model", "salesperson", "region", "quarter", "month", "year",
+        "trend", "top", "bottom", "compare", "average", "total",
+        "car type", "vehicle", "ev", "electric",
+    )
+    has_data_term = any(t in q for t in data_terms)
+
+    # Column names (only meaningful if also looks analytical, or exact col mention)
     if df is not None:
         try:
             for c in df.columns:
-                if str(c).lower() in q:
+                cl = str(c).lower()
+                if len(cl) >= 4 and cl in q:
                     return True
         except Exception:
             pass
 
-    # Glossary synonyms
+    # Glossary synonyms — skip ultra-short tokens to avoid false positives
     try:
         from semantic.semantic_loader import get_semantic_loader
         syn_map = get_semantic_loader().get_synonym_map()
         for syn in syn_map:
-            if syn and syn in q:
+            if syn and len(syn) >= 3 and syn in q:
                 return True
     except Exception:
         pass
 
     triggers = [
-        "show", "display", "list", "find", "top", "bottom", "total",
-        "average", "compare", "trend", " by ", "group", "which",
-        "how many", "what is", "revenue", "sales", "units", "orders",
+        "show", "display", "list", "find", "top", "bottom",
+        "average", "compare", "trend", " by ", "group",
+        "how many", "revenue", "sales", "units", "orders",
         "colour", "color", "make", "model", "salesperson", "year",
-        "month", "quarter", "filter", "same but",
+        "month", "quarter", "filter", "same but", "region",
     ]
-    return any(t in q for t in triggers)
+    # "which" / "what is" only count when paired with a data term
+    if any(t in q for t in ("which ", "what is ", "what's ")):
+        return has_data_term or any(t in q for t in triggers)
+
+    return any(t in q for t in triggers) or has_data_term
 
 
 def to_context_string() -> str:

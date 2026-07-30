@@ -285,12 +285,19 @@ terms:
       day: "strftime('%Y-%m-%d', sales_date)"
       month: "strftime('%Y-%m', sales_date) AS month"
       quarter: >
-        strftime('%Y', sales_date) || '-Q' ||
-        CAST(((CAST(strftime('%m', sales_date)
-        AS INTEGER)-1)/3)+1 AS VARCHAR) AS quarter
+        CASE
+          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 1 AND 3
+            THEN 'Q1-' || strftime('%Y', sales_date)
+          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 4 AND 6
+            THEN 'Q2-' || strftime('%Y', sales_date)
+          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 7 AND 9
+            THEN 'Q3-' || strftime('%Y', sales_date)
+          ELSE 'Q4-' || strftime('%Y', sales_date)
+        END AS quarter
       year: "strftime('%Y', sales_date) AS year"
     calculation_rules:
-      - QUARTER formula uses /3 not /4
+      - "Quarter labels must be Q1-YYYY, Q2-YYYY, Q3-YYYY, Q4-YYYY — never decimals"
+      - "Use CASE WHEN month bands for quarter — never floating /3 division"
       - "Month grouping always alias as 'month'"
       - "Year grouping always alias as 'year'"
       - "Quarter grouping always alias as 'quarter'"
@@ -522,14 +529,17 @@ domain_rules:
     - Always concatenate first_name and last_name as salesperson_name
     - Always use meaningful column aliases
     - "For month grouping use strftime('%Y-%m') never DATE_TRUNC which returns timestamps"
-    - Quarter formula uses integer division by 3 not 4
+    - "For quarter labels use CASE WHEN month bands → Q1-YYYY … Q4-YYYY — never float /3"
+    - "Dataset is India PV sales 2019–2026; COVID 2020 dip and rising EV share are expected patterns"
   never_rules:
     - Never use price_per_unit for revenue
     - Never average total_sales directly
     - Never show raw IDs without labels
     - Never use ORDER BY on unaggregated columns when GROUP BY is present
+    - Never produce decimal quarter labels like Q1.333
   default_behaviours:
     - No LIMIT specified: add LIMIT 500
     - Top/bottom without N: use 10
     - Trend without grain: use monthly
     - Date filter without year: use all years
+    - Units sold means SUM(order_qty) not COUNT(*)

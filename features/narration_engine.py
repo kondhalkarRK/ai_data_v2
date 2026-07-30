@@ -22,11 +22,13 @@ class NarrationEngine:
         if format_type == "currency":
             av = abs(v)
             sign = "-" if v < 0 else ""
-            if av >= 1_000_000:
-                return f"{sign}£{av/1_000_000:.1f}M"
+            if av >= 10_000_000:
+                return f"{sign}₹{av/10_000_000:.2f} Cr"
+            if av >= 100_000:
+                return f"{sign}₹{av/100_000:.2f} L"
             if av >= 1_000:
-                return f"{sign}£{av/1_000:.1f}K"
-            return f"{sign}£{av:,.0f}"
+                return f"{sign}₹{av/1_000:.1f}K"
+            return f"{sign}₹{av:,.0f}"
         return f"{v:,.2f}"
 
     def generate_narration(
@@ -145,30 +147,48 @@ class NarrationEngine:
             )
 
         else:
-            headline = f"Breakdown of {metric_label}"
+            # Multi-dimension / generic result — clear leader summary, not "Breakdown"
             if dim and metric in result_df.columns:
                 ordered = result_df.sort_values(metric, ascending=False)
                 top = ordered.iloc[0]
                 dim2 = str_cols[1] if len(str_cols) > 1 else None
                 if dim2:
+                    headline = f"Top result: {top[dim]} × {top[dim2]}"
                     narrative = (
-                        f"Breaking down {metric_label} across {n} combinations of "
-                        f"{dim_label} and {str(dim2).replace('_',' ')}. "
-                        f"{top[dim]} / {top[dim2]} leads at "
+                        f"Among {n} result rows, the leading combination is "
+                        f"{top[dim]} with {top[dim2]} at "
                         f"{self.format_value(top[metric], fmt)}."
                     )
-                else:
-                    narrative = (
-                        f"Breaking down {metric_label} across {n} groups. "
-                        f"{top[dim]} leads at {self.format_value(top[metric], fmt)}."
+                    findings = [
+                        f"Leader: {top[dim]} / {top[dim2]}",
+                        f"{self.format_value(top[metric], fmt)} on {metric_label}",
+                        f"{n} rows in the result",
+                    ]
+                    result_summary = (
+                        f"Top: {top[dim]} / {top[dim2]} = "
+                        f"{self.format_value(top[metric], fmt)} ({n} rows)"
                     )
-                findings = [f"Top: {top[dim]}", f"{n} groups returned", f"Question: {question}"]
-                result_summary = f"{metric_label} breakdown: {top[dim]} leads, {n} groups"
+                else:
+                    headline = f"Top {dim_label}: {top[dim]}"
+                    narrative = (
+                        f"Across {n} {dim_label} values, {top[dim]} leads with "
+                        f"{self.format_value(top[metric], fmt)}."
+                    )
+                    findings = [
+                        f"Leader: {top[dim]}",
+                        f"{n} groups in the result",
+                    ]
+                    result_summary = (
+                        f"{top[dim]} leads with "
+                        f"{self.format_value(top[metric], fmt)}"
+                    )
+                recommendation = "Ask for a chart view, or filter to one region/make."
             else:
+                headline = "Query results"
                 narrative = f"Returned {n} rows and {result_df.shape[1]} columns."
-                findings = [f"{n} rows", f"Columns: {', '.join(map(str, result_df.columns[:5]))}"]
+                findings = [f"{n} rows returned"]
                 result_summary = f"{n} rows returned"
-            recommendation = "Try sorting by the main metric or filtering to one segment."
+                recommendation = "Try a more specific metric or dimension."
 
         return {
             "headline": headline,

@@ -221,7 +221,12 @@ RULES:
 3. Always SELECT meaningful labels. If first_name and last_name exist, concatenate: first_name || ' ' || last_name AS salesperson_name
 4. For "best/top/worst" queries: ORDER BY metric DESC/ASC with LIMIT (default 10)
 5. For trend queries: use strftime('%Y-%m', date_col) AS month — never DATE_TRUNC
-6. For quarter: ((CAST(strftime('%m', sales_date) AS INTEGER)-1)/3)+1 — NEVER /4
+6. For quarter labels use ONLY this CASE expression (format Q1-2023, never decimals, never /3 float):
+   CASE WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 1 AND 3 THEN 'Q1-' || strftime('%Y', sales_date)
+        WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 4 AND 6 THEN 'Q2-' || strftime('%Y', sales_date)
+        WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 7 AND 9 THEN 'Q3-' || strftime('%Y', sales_date)
+        ELSE 'Q4-' || strftime('%Y', sales_date) END AS quarter
+   NEVER use ((month-1)/3)+1 — DuckDB / is floating point and produces Q1.333...
 7. For "by X and Y" queries: GROUP BY both columns
 8. For count of orders: COUNT(order_id); for units: SUM(order_qty)
 9. Revenue always means SUM(total_sales) — never price_per_unit

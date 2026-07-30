@@ -4,7 +4,10 @@
 
 version: "1.0"
 domain: "Automotive Sales"
-description: "Production semantic model for automotive sales analytics"
+description: >
+  India passenger-vehicle sales analytics (2019–2026). Reflects COVID volume dip (2020),
+  recovery and boom (2021–2025), rising EV share, and market leadership of Maruti, Tata,
+  and Mahindra across metro and regional India.
 
 # ══════════════════════════════════════════
 # TABLES
@@ -456,7 +459,14 @@ hierarchies:
       - name: Year
         expression: "strftime('%Y', sales_date)"
       - name: Quarter
-        expression: "strftime('%Y-Q', sales_date)"
+        expression: >
+          CASE WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 1 AND 3
+            THEN 'Q1-' || strftime('%Y', sales_date)
+          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 4 AND 6
+            THEN 'Q2-' || strftime('%Y', sales_date)
+          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 7 AND 9
+            THEN 'Q3-' || strftime('%Y', sales_date)
+          ELSE 'Q4-' || strftime('%Y', sales_date) END
       - name: Month
         expression: "strftime('%Y-%m', sales_date)"
       - name: Day

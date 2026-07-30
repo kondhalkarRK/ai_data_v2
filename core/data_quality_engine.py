@@ -29,7 +29,9 @@ def _is_metric_col(col_name: str, series: pd.Series) -> bool:
         "index", "idx", "_idx",
         "num", "_num", "number",
         "ref", "_ref", "seq",
-        "row", "record", "pk", "fk"
+        "row", "record", "pk", "fk",
+        # Attribute / catalogue fields — not financial metrics for outlier IQR
+        "capacity", "engine", "patent",
     ]
     for pattern in exclude_patterns:
         if col_lower == pattern:                    return False

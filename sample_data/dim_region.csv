@@ -1,13 +1,15 @@
 region_id,region_name,city,state_code,country
 1,North,Delhi NCR,DL,India
 2,North,Chandigarh,CH,India
-3,West,Mumbai,MH,India
-4,West,Pune,MH,India
-5,West,Ahmedabad,GJ,India
-6,South,Bengaluru,KA,India
-7,South,Chennai,TN,India
-8,South,Hyderabad,TS,India
-9,East,Kolkata,WB,India
-10,East,Bhubaneswar,OD,India
-11,Central,Indore,MP,India
-12,Central,Nagpur,MH,India
+3,North,Jaipur,RJ,India
+4,West,Mumbai,MH,India
+5,West,Pune,MH,India
+6,West,Ahmedabad,GJ,India
+7,South,Bengaluru,KA,India
+8,South,Chennai,TN,India
+9,South,Hyderabad,TS,India
+10,South,Kochi,KL,India
+11,East,Kolkata,WB,India
+12,East,Bhubaneswar,OD,India
+13,Central,Indore,MP,India
+14,Central,Nagpur,MH,India

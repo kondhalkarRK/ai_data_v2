@@ -848,10 +848,11 @@ def _oob_redirect(question: str, working_df: pd.DataFrame) -> str:
     except Exception:
         pass
     return (
-        "I'm focused on helping you get insights from your sales data — "
-        "that's where I can add real value! 😊\n\n"
-        f"Could I help you with something like:\n→ '{q1}'\n→ '{q2}'\n\n"
-        "Or just ask me anything about your data and I'll do my best!"
+        "That's a lovely question — I'm set up for your sales and vehicle data, "
+        "so I may not be the best dinner planner. Happy to help with insights "
+        "from this dataset instead.\n\n"
+        f"You could try:\n→ '{q1}'\n→ '{q2}'\n\n"
+        "Ask anything about revenue, units, makes, regions, or trends — I'll dig in."
     )
 
 

@@ -4,18 +4,18 @@ config/constants.py
 # ─────────────────────────────────────────────────────────────────
 # KPI ENGINE — column candidates
 # ─────────────────────────────────────────────────────────────────
-_REV_CANDIDATES    = ["revenue","sales_amount","revenue_value","turnover","sale_price",
-                      "price","amount","total","value"]
-_VOL_CANDIDATES    = ["units_sold","quantity","vehicle_sales","sales_volume","units","count","qty"]
-_DATE_CANDIDATES   = ["date","month","quarter","year","sale_date","order_date","transaction_date"]
-_SEG_CANDIDATES    = ["segment","category","type","car_type","vehicle_type","class"]
-_MODEL_CANDIDATES  = ["model","vehicle_model","product_name","make","brand","car_model"]
-_REGION_CANDIDATES = ["region","territory","state","country","area","zone","city"]
+_REV_CANDIDATES    = ["total_sales","revenue","sales_amount","revenue_value","turnover",
+                      "sale_price","amount","sales_value"]
+_VOL_CANDIDATES    = ["order_qty","units_sold","quantity","vehicle_sales","sales_volume","qty"]
+_DATE_CANDIDATES   = ["sales_date","date","month","quarter","year","sale_date","order_date","transaction_date"]
+_SEG_CANDIDATES    = ["car_type","segment","category","type","vehicle_type","class"]
+_MODEL_CANDIDATES  = ["model","vehicle_model","product_name","car_model","carline_name"]
+_REGION_CANDIDATES = ["region_name","region","territory","state","area","zone","city"]
 _SALES_CANDIDATES  = ["salesperson","sales_person","sales_rep","agent",
                       "seller","employee","staff","rep"]
 _MKTSH_CANDIDATES  = ["market_share","marketshare","share"]
-_FIRST_NAME_CANDIDATES = ["first_name","firstname","fname","first"]
-_LAST_NAME_CANDIDATES  = ["last_name","lastname","lname","last","surname"]
+_FIRST_NAME_CANDIDATES = ["first_name","firstname","fname"]
+_LAST_NAME_CANDIDATES  = ["last_name","lastname","lname","surname"]
 
 # ─────────────────────────────────────────────────────────────────
 # Conversation
@@ -29,7 +29,7 @@ FOLLOWUP_TRIGGER_TOKENS = [
 ]
 MAX_FOLLOWUP_QUESTION_WORDS = 8
 
-# OOB Guard
+# OOB Guard — destructive + lifestyle / off-domain chat
 OOB_PATTERNS = [
     r"\bwrite\s+(me\s+)?code\b",
     r"\bdelete\s+(the\s+)?data\b",
@@ -38,6 +38,12 @@ OOB_PATTERNS = [
     r"\bpredict\s+future\b",
     r"\bml\s+model\b",
     r"\btrain\s+(a\s+)?model\b",
+    # Lifestyle / chit-chat — redirect politely to data questions
+    r"\b(dinner|lunch|breakfast|brunch|recipe|cook|eat|food|restaurant)\b",
+    r"\b(weather|joke|movie|song|music|football|cricket|news)\b",
+    r"\bplan\s+for\s+(dinner|lunch|tonight|weekend)\b",
+    r"\bwhat\s+should\s+i\s+(eat|cook|wear|do)\b",
+    r"\b(tell\s+me\s+a\s+joke|how\s+are\s+you\s+feeling)\b",
 ]
 
 # Evidence

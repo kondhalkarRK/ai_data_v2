@@ -86,12 +86,14 @@ def _build_where(filters: dict | list, date_col: str = "sales_date") -> str:
             except (TypeError, ValueError):
                 continue
         elif key.lower() == "quarter":
-            # CORRECT: ((month - 1) / 3) + 1
-            # NOT: month / 4 + 1 (wrong for Jul/Oct/Nov)
+            # Filter by quarter number 1-4 using month bands (integer-safe)
             try:
                 q = int(value)
+                lo = (q - 1) * 3 + 1
+                hi = q * 3
                 clauses.append(
-                    f"((CAST(strftime('%m', {_quote_ident(date_col)}) AS INTEGER) - 1) / 3) + 1 = {q}"
+                    f"CAST(strftime('%m', {_quote_ident(date_col)}) AS INTEGER) "
+                    f"BETWEEN {lo} AND {hi}"
                 )
             except (TypeError, ValueError):
                 continue
@@ -123,10 +125,16 @@ def _time_grain_expr(grain: str | None, date_col: str = "sales_date") -> tuple[s
     if g == "year":
         return f"strftime('%Y', {col})", "year"
     if g == "quarter":
-        # CORRECT: ((month - 1) / 3) + 1
-        # NOT: month / 4 + 1 (wrong for Jul/Oct/Nov)
+        # Label format: Q1-2023 (CASE avoids DuckDB float /3 → Q1.333...)
         return (
-            f"strftime('%Y', {col}) || '-Q' || CAST(((CAST(strftime('%m', {col}) AS INTEGER) - 1) / 3) + 1 AS VARCHAR)",
+            f"CASE "
+            f"WHEN CAST(strftime('%m', {col}) AS INTEGER) BETWEEN 1 AND 3 "
+            f"THEN 'Q1-' || strftime('%Y', {col}) "
+            f"WHEN CAST(strftime('%m', {col}) AS INTEGER) BETWEEN 4 AND 6 "
+            f"THEN 'Q2-' || strftime('%Y', {col}) "
+            f"WHEN CAST(strftime('%m', {col}) AS INTEGER) BETWEEN 7 AND 9 "
+            f"THEN 'Q3-' || strftime('%Y', {col}) "
+            f"ELSE 'Q4-' || strftime('%Y', {col}) END",
             "quarter",
         )
     if g == "day":
