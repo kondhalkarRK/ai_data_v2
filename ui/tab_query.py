@@ -26,6 +26,8 @@ try:
         is_awaiting_clarification,
         set_pending_clarification,
         resolve_clarification,
+        get_sql_anchor,
+        clear_sql_anchor,
     )
 except Exception:
     def get_state():
@@ -51,6 +53,12 @@ except Exception:
 
     def resolve_clarification(choice):
         return None
+
+    def get_sql_anchor():
+        return None
+
+    def clear_sql_anchor():
+        pass
 
 try:
     from core.question_normaliser import detect_oob
@@ -102,6 +110,8 @@ def _safe_narration(df, question, evidence=None):
 
 
 def _badge_class(evidence):
+    if (evidence or {}).get("modified"):
+        return "badge-modified"
     path = (evidence or {}).get("execution_path", "fallback")
     return {
         "deterministic": "badge-deterministic",
@@ -109,6 +119,37 @@ def _badge_class(evidence):
         "fallback": "badge-fallback",
         "semantic": "badge-semantic",
     }.get(path, "badge-fallback")
+
+
+def _modification_banner(evidence: dict | None) -> str:
+    """HTML banner describing how the prior SQL was modified."""
+    ev = evidence or {}
+    intent = ev.get("followup_intent") or ""
+    subject = ev.get("followup_subject") or ""
+    if not ev.get("modified") and intent in ("", "new_question", None):
+        if intent == "new_question" and ev.get("followup_intent") == "new_question":
+            return (
+                '<div class="mod-context-banner">'
+                "🆕 New query — previous context cleared</div>"
+            )
+        return ""
+    messages = {
+        "additive": f"✅ Added {html.escape(str(subject))} to your previous query",
+        "subtractive": f"✅ Removed {html.escape(str(subject))} from your previous query",
+        "filter_change": (
+            f"✅ Applied filter: {html.escape(str(subject) or 'updated')} "
+            "to your previous query"
+        ),
+        "sort_change": (
+            f"✅ Changed sorting to: {html.escape(str(subject) or 'updated')}"
+        ),
+    }
+    text = messages.get(intent)
+    if not text and ev.get("modified"):
+        text = "✅ Modified your previous query"
+    if not text:
+        return ""
+    return f'<div class="mod-context-banner">{text}</div>'
 
 
 def _render_semantic_layer_status(question: str = ""):
@@ -506,62 +547,60 @@ def _suggested_qs(df: pd.DataFrame, limit: int = 2) -> list[str]:
 
 
 def compute_trust_score(evidence, result_df, working_df) -> tuple[int, dict]:
-    """Five-component Data Trust Score (0–100)."""
+    """Four-component Data Trust Score (0–100). Row coverage removed — intentional
+    small result sets (e.g. top 10) must not lower confidence."""
     matches = st.session_state.get("last_glossary_matches") or []
     hints = st.session_state.get("last_glossary_hints") or ""
 
-    # 1 Semantic match
+    # 1 Semantic match (0–25)
     n = len(matches)
-    semantic = 0 if n == 0 else (10 if n == 1 else 20)
+    semantic = 0 if n == 0 else (12 if n == 1 else 25)
 
-    # 2 Glossary match
-    glossary = 20 if str(hints).strip() else 0
-    if not glossary and matches:
-        glossary = 10
+    # 2 Glossary match (0–25)
+    hints_s = str(hints).strip()
+    if hints_s and any(
+        tok in hints_s.upper()
+        for tok in ("SUM(", "COUNT(", "AVG(", "SQL", "EXPRESSION")
+    ):
+        glossary = 25
+    elif hints_s or matches:
+        glossary = 12
+    else:
+        glossary = 0
 
-    # 3 SQL validation
+    # 3 SQL validation (0–25)
     path = (evidence or {}).get("execution_path", "fallback")
-    if path == "semantic":
-        sql_val = 20
+    used_retry = bool((evidence or {}).get("sql_retry") or (evidence or {}).get("sql2_used"))
+    if used_retry:
+        sql_val = 5
+    elif path == "semantic":
+        sql_val = 25
     elif path == "cache":
-        sql_val = 15
+        sql_val = 20
     elif path == "fallback":
         sql_val = 10
     else:
         sql_val = 5
 
-    # 4 Row coverage
-    try:
-        n_res = len(result_df) if result_df is not None else 0
-        n_all = max(len(working_df) if working_df is not None else 1, 1)
-        ratio = n_res / n_all
-        if ratio > 0.5:
-            row_cov = 20
-        elif ratio >= 0.10:
-            row_cov = 15
-        elif ratio >= 0.01:
-            row_cov = 10
-        elif n_res > 0:
-            row_cov = 5
-        else:
-            row_cov = 0
-    except Exception:
-        row_cov = 5
-
-    # 5 Join quality
-    src = (evidence or {}).get("resolution_source", "")
-    if src == "semantic_llm" or path == "semantic":
+    # 4 Join quality (0–25) — resolution / path quality
+    src = (evidence or {}).get("resolution_source") or ""
+    if src == "semantic_llm":
+        join_q = 25
+    elif src == "cache" or path == "cache":
         join_q = 20
-    elif path == "cache" or src == "cache":
-        join_q = 15
-    else:
+    elif src == "fallback" or path == "fallback":
+        join_q = 8
+    elif path == "semantic":
+        join_q = 25
+    elif not src:
         join_q = 5
+    else:
+        join_q = 8
 
     breakdown = {
         "semantic": semantic,
         "glossary": glossary,
         "sql_validation": sql_val,
-        "row_coverage": row_cov,
         "join_quality": join_q,
     }
     return sum(breakdown.values()), breakdown
@@ -585,45 +624,52 @@ def render_trust_score_card(evidence: dict | None):
     score = int(evidence.get("trust_score") or 0)
     bd = evidence.get("trust_breakdown") or {}
     label, color = _trust_band(score)
-    note = ""
-    if score >= 100:
-        note = '<div class="trust-note">🏆 Perfect data confidence</div>'
-    elif score < 75:
-        note = (
-            '<div class="trust-note warn">⚠️ Lower confidence — review SQL '
-            "for accuracy before decisions</div>"
-        )
 
-    def row(name, key):
-        v = int(bd.get(key, 0))
-        icon = "✅" if v >= 15 else ("🟡" if v >= 10 else "⚠️")
-        return (
-            f'<div class="trust-row"><span>{icon} {name}</span>'
-            f"<span>{v}/20</span></div>"
-        )
-
+    # Compact always-visible summary
     st.markdown(
         f"""
-        <div class="trust-score-card" style="border-color:{color}33;">
-          <div class="trust-title">🎯 Data Trust Score</div>
-          <div class="trust-score-line">
-            <span class="trust-pct" style="color:{color};">{score}%</span>
-            <span class="trust-band" style="color:{color};">{label}</span>
-          </div>
+        <div class="trust-score-summary" style="border-color:{color}33;">
+          <span class="trust-pct" style="color:{color};">🎯 {score}%</span>
+          <span class="trust-band" style="color:{color};">{label}</span>
           <div class="trust-bar">
             <div class="trust-bar-fill" style="width:{score}%;background:{color};"></div>
           </div>
-          <div class="trust-based">Based on:</div>
-          {row("Semantic match", "semantic")}
-          {row("Glossary match", "glossary")}
-          {row("SQL validation", "sql_validation")}
-          {row("Row coverage", "row_coverage")}
-          {row("Join quality", "join_quality")}
-          {note}
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    def row(name, key):
+        v = int(bd.get(key, 0))
+        icon = "✅" if v >= 18 else ("🟡" if v >= 10 else "⚠️")
+        return (
+            f'<div class="trust-row"><span>{icon} {name}</span>'
+            f"<span>{v}/25</span></div>"
+        )
+
+    note = ""
+    if score >= 100:
+        note = '<div class="trust-note">Perfect data confidence</div>'
+    elif score < 75:
+        note = (
+            '<div class="trust-note warn">Lower confidence — review SQL '
+            "for accuracy before decisions</div>"
+        )
+
+    with st.expander(f"🎯 Data Trust Score — {score}%", expanded=False):
+        st.markdown(
+            f"""
+            <div class="trust-score-card" style="border-color:{color}33;">
+              <div class="trust-based">Based on:</div>
+              {row("Semantic match", "semantic")}
+              {row("Glossary match", "glossary")}
+              {row("SQL validation", "sql_validation")}
+              {row("Join quality", "join_quality")}
+              {note}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def _find_rev_col(df: pd.DataFrame) -> str | None:
@@ -1179,9 +1225,24 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             evidence = None
 
     if err:
-        friendly = _friendly_error(q, str(err))
+        err_s = str(err)
+        if err_s.startswith("missing_column:"):
+            try:
+                _, rest = err_s.split(":", 1)
+                missing, avail = rest.split("|", 1)
+            except ValueError:
+                missing, avail = err_s, ""
+            reply = (
+                f"I don't see a '{missing}' column in your data. "
+                f"Available columns include: {avail}. "
+                "Want me to add one of these instead?"
+            )
+            _append_assistant(reply, "chat")
+            st.rerun()
+            return
+        friendly = _friendly_error(q, err_s)
         _append_assistant(
-            friendly, "error_friendly", {"sql": sql, "raw_error": str(err)},
+            friendly, "error_friendly", {"sql": sql, "raw_error": err_s},
         )
         st.rerun()
         return
@@ -1302,7 +1363,12 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
 
     elif mtype == "query":
         evidence = data.get("evidence")
+        banner = _modification_banner(evidence)
+        if banner:
+            st.markdown(banner, unsafe_allow_html=True)
         badge = get_execution_badge(evidence) if evidence else {"icon": "🧠", "label": "Semantic + AI"}
+        if (evidence or {}).get("modified"):
+            badge = {"icon": "✏️", "label": "Modified", "colour": "emerald"}
         st.markdown(
             f'<span class="{_badge_class(evidence)}">{badge.get("icon","")} '
             f'{html.escape(badge.get("label",""))}</span>',
@@ -1321,6 +1387,17 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
                     + "</span>"
                 )
             st.markdown(" ".join(chips), unsafe_allow_html=True)
+
+        # Collapsible anchor context for modified turns
+        if (evidence or {}).get("modified"):
+            anchor = get_sql_anchor() or {}
+            with st.expander("📎 Query context", expanded=False):
+                st.caption(f"Metric: {anchor.get('sql_anchor_metric') or '—'}")
+                filt = anchor.get("sql_anchor_filters") or []
+                st.caption(f"Filters: {'; '.join(filt) if filt else '—'}")
+                cols = anchor.get("sql_anchor_columns") or []
+                st.caption(f"Columns: {', '.join(map(str, cols)) if cols else '—'}")
+                st.caption(f"Turn: {anchor.get('anchor_turn', 0)}")
 
         force = data.get("force_narration") or False
         show_narr = narration_on or force
@@ -1377,6 +1454,7 @@ def render_chat_mode(working_df, tables, dfs):
         if st.button("🗑 Clear Chat", use_container_width=True, key="clear_chat_btn"):
             st.session_state.chat_messages = []
             clear_state()
+            clear_sql_anchor()
             st.toast("Chat cleared", icon="🗑")
             st.rerun()
 

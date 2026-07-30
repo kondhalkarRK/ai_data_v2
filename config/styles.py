@@ -1509,16 +1509,31 @@ div[data-testid="stExpander"] details:hover summary{
   background:rgba(15,23,42,0.6);border:1px solid rgba(148,163,184,0.15);
   border-radius:10px;padding:12px 14px;margin:10px 0;color:#94a3b8;
 }
+.trust-score-summary{
+  background:rgba(15,23,42,0.45);border:1px solid rgba(148,163,184,0.12);
+  border-radius:10px;padding:10px 12px;margin:8px 0 4px;color:#94a3b8;
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+}
 .trust-title{font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:6px;}
 .trust-score-line{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;}
-.trust-pct{font-size:28px;font-weight:800;line-height:1;}
+.trust-pct{font-size:22px;font-weight:800;line-height:1;}
 .trust-band{font-size:13px;font-weight:700;}
-.trust-bar{height:6px;background:rgba(148,163,184,0.15);border-radius:4px;overflow:hidden;margin-bottom:8px;}
+.trust-bar{height:6px;background:rgba(148,163,184,0.15);border-radius:4px;overflow:hidden;margin-bottom:0;flex:1;min-width:120px;}
 .trust-bar-fill{height:100%;border-radius:4px;}
 .trust-based{font-size:11px;margin-bottom:4px;color:#64748b;}
 .trust-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;}
 .trust-note{font-size:11px;margin-top:8px;color:#94a3b8;}
 .trust-note.warn{color:#fcd34d;}
+.badge-modified{
+  display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;
+  background:rgba(16,185,129,0.12);color:#6ee7b7;border:1px solid rgba(16,185,129,0.25);
+  margin:4px 0 8px;
+}
+.mod-context-banner{
+  background:rgba(16,185,129,0.06);border-left:3px solid #10b981;
+  font-size:11px;color:#6ee7b7;padding:6px 12px;border-radius:0 6px 6px 0;
+  margin:6px 0 8px;
+}
 </style>
 
 <div class="ai-loader-overlay">

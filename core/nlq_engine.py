@@ -20,6 +20,10 @@ try:
         get_state,
         update_state,
         build_chat_context_string,
+        get_sql_anchor,
+        set_sql_anchor,
+        clear_sql_anchor,
+        should_use_anchor,
     )
     _CONV_OK = True
 except ImportError:
@@ -28,6 +32,18 @@ except ImportError:
     def build_chat_context_string(n_turns=5):
         return ""
 
+    def get_sql_anchor():
+        return None
+
+    def set_sql_anchor(*a, **k):
+        pass
+
+    def clear_sql_anchor():
+        pass
+
+    def should_use_anchor(q):
+        return False
+
 try:
     from core.evidence_builder import build_evidence
     _EVIDENCE_OK = True
@@ -35,7 +51,12 @@ except ImportError:
     _EVIDENCE_OK = False
 
 try:
-    from core.question_normaliser import detect_oob, fingerprint_question
+    from core.question_normaliser import (
+        detect_oob,
+        fingerprint_question,
+        classify_followup_intent,
+        extract_intent_subject,
+    )
     _CACHE_OK = True
 except ImportError:
     _CACHE_OK = False
@@ -45,6 +66,12 @@ except ImportError:
 
     def fingerprint_question(q):
         return ""
+
+    def classify_followup_intent(q, anchor):
+        return "new_question"
+
+    def extract_intent_subject(q, intent, df=None):
+        return None
 
 try:
     from semantic.semantic_context_builder import get_context_builder
@@ -87,10 +114,290 @@ def format_result_dates(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _filter_instruction(question: str, subject: str | None) -> str:
+    q = (question or "").strip().lower()
+    sub = (subject or "").strip()
+    year_m = re.search(r"\b(20\d{2}|19\d{2})\b", q)
+    if year_m:
+        y = year_m.group(1)
+        return f"Add: strftime('%Y', sales_date) = '{y}'"
+    if "last month" in q:
+        return "Add a last-calendar-month filter on sales_date"
+    if "this year" in q:
+        return "Add: strftime('%Y', sales_date) = strftime('%Y', CURRENT_DATE)"
+    if sub:
+        # Prefer make / colour style text filters
+        return f"Add: relevant dimension ILIKE '%{sub}%' (prefer make/colour_name/model/region_name)"
+    return f"Apply filter from user request: {question}"
+
+
+def _sort_instruction(question: str, subject: str | None) -> str:
+    q = (question or "").strip().lower()
+    m = re.search(r"\b(?:top|show|bottom)\s+(\d+)", q)
+    if m:
+        n = m.group(1)
+        direction = "ASC" if "bottom" in q or "lowest" in q else "DESC"
+        return f"Set LIMIT {n}; keep ORDER BY metric {direction}"
+    if "order by" in q or "sort by" in q:
+        return f"Replace ORDER BY with: {subject or question}"
+    return f"Adjust ORDER BY / LIMIT per: {question}"
+
+
+def build_modification_prompt(
+    question: str,
+    intent_type: str,
+    subject: str | None,
+    anchor: dict,
+    df: pd.DataFrame,
+) -> str:
+    """Surgical SQL-edit prompt — modify anchor, do not rewrite from scratch."""
+    base_sql = anchor.get("sql_anchor") or ""
+    cols = list(df.columns)
+    subject_s = subject or "(infer from question)"
+
+    if intent_type == "additive":
+        return f"""You are modifying an existing SQL query.
+Add ONE thing only. Change nothing else.
+
+EXISTING SQL (this is your base):
+```sql
+{base_sql}
+```
+
+TASK: Add column "{subject_s}" to the query.
+
+STRICT RULES:
+- Add "{subject_s}" to SELECT clause only
+- Add "{subject_s}" to GROUP BY if it exists
+- DO NOT change WHERE clause
+- DO NOT change ORDER BY
+- DO NOT change LIMIT
+- DO NOT change any aggregations
+- DO NOT add any new filters
+- DO NOT remove any existing columns
+- Return ONLY the modified SQL
+
+COLUMN TO ADD: {subject_s}
+TABLE: df
+AVAILABLE COLUMNS: {cols}
+
+Modified SQL:"""
+
+    if intent_type == "subtractive":
+        return f"""You are modifying an existing SQL query.
+Remove ONE thing only. Change nothing else.
+
+EXISTING SQL:
+```sql
+{base_sql}
+```
+
+TASK: Remove column "{subject_s}" from results.
+
+STRICT RULES:
+- Remove "{subject_s}" from SELECT only
+- Remove "{subject_s}" from GROUP BY if present
+- DO NOT change WHERE clause
+- DO NOT change ORDER BY
+- DO NOT change LIMIT
+- DO NOT change any aggregations
+- DO NOT add anything new
+- Return ONLY the modified SQL
+
+Modified SQL:"""
+
+    if intent_type == "filter_change":
+        filt = _filter_instruction(question, subject)
+        return f"""You are modifying an existing SQL query.
+Change only the filter. Keep everything else.
+
+EXISTING SQL:
+```sql
+{base_sql}
+```
+
+TASK: Apply filter "{question}"
+
+WHAT TO CHANGE: {filt}
+
+STRICT RULES:
+- Add or modify WHERE clause only
+- DO NOT change SELECT columns
+- DO NOT change ORDER BY
+- DO NOT change LIMIT
+- DO NOT change GROUP BY
+- DO NOT change aggregations
+- Combine with existing WHERE using AND
+- Return ONLY the modified SQL
+TABLE: df
+AVAILABLE COLUMNS: {cols}
+
+Modified SQL:"""
+
+    # sort_change
+    sort_i = _sort_instruction(question, subject)
+    return f"""You are modifying an existing SQL query.
+Change only the sort or limit.
+
+EXISTING SQL:
+```sql
+{base_sql}
+```
+
+TASK: "{question}"
+
+WHAT TO CHANGE: {sort_i}
+
+STRICT RULES:
+- Change ORDER BY or LIMIT only
+- DO NOT change SELECT
+- DO NOT change WHERE
+- DO NOT change GROUP BY
+- DO NOT change aggregations
+- Return ONLY the modified SQL
+
+Modified SQL:"""
+
+
+def validate_anchor_preserved(
+    new_sql: str,
+    anchor: dict,
+    intent_type: str,
+) -> tuple[bool, str]:
+    """Check that a modification kept clauses it should preserve."""
+    if not new_sql or not anchor:
+        return False, "missing sql or anchor"
+    ns = new_sql.lower()
+    filters = anchor.get("sql_anchor_filters") or []
+    order = anchor.get("sql_anchor_order")
+    limit = anchor.get("sql_anchor_limit")
+    group = anchor.get("sql_anchor_group_by")
+    cols = anchor.get("sql_anchor_columns") or []
+
+    def _has_fragment(frag: str | None) -> bool:
+        if not frag:
+            return True
+        # Compare loosely — strip whitespace
+        key = re.sub(r"\s+", " ", frag.lower()).strip()[:80]
+        return key[:40] in re.sub(r"\s+", " ", ns)
+
+    if intent_type in ("additive", "subtractive"):
+        for f in filters:
+            if f and not _has_fragment(f):
+                return False, f"WHERE clause lost: {f[:60]}"
+        if order and "order by" in (anchor.get("sql_anchor") or "").lower():
+            if "order by" not in ns:
+                return False, "ORDER BY missing"
+        if limit is not None and f"limit {limit}" not in ns and "limit" not in ns:
+            return False, f"LIMIT {limit} missing"
+        return True, ""
+
+    if intent_type == "filter_change":
+        # SELECT / ORDER / LIMIT should remain
+        if order and "order by" in (anchor.get("sql_anchor") or "").lower():
+            if "order by" not in ns:
+                return False, "ORDER BY changed/removed"
+        if limit is not None and "limit" not in ns:
+            return False, "LIMIT removed"
+        if group and "group by" not in ns:
+            return False, "GROUP BY removed"
+        return True, ""
+
+    if intent_type == "sort_change":
+        for f in filters:
+            if f and not _has_fragment(f):
+                return False, f"WHERE clause lost: {f[:60]}"
+        if group and "group by" not in ns:
+            return False, "GROUP BY removed"
+        # At least one prior select column name should still appear
+        if cols:
+            found = sum(1 for c in cols if str(c).lower() in ns)
+            if found == 0:
+                return False, "SELECT columns changed"
+        return True, ""
+
+    return True, ""
+
+
 def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
     """LLM SQL generation enriched by semantic layer + glossary (PRIMARY PATH)."""
     if status is not None:
         status.update(label="🔍 Building semantic context...")
+
+    # ── SQL-anchor routing for multi-turn continuity ─────────────
+    followup_intent = "new_question"
+    followup_subject = None
+    anchor = None
+    if _CONV_OK and _CACHE_OK:
+        try:
+            anchor = get_sql_anchor()
+        except Exception:
+            anchor = None
+        if anchor and should_use_anchor(question):
+            followup_intent = classify_followup_intent(question, anchor)
+            followup_subject = extract_intent_subject(question, followup_intent, df)
+            try:
+                st.session_state["_followup_intent"] = followup_intent
+                st.session_state["_followup_subject"] = followup_subject
+                state = get_state()
+                state["last_followup_intent"] = followup_intent
+                state["last_followup_subject"] = followup_subject
+            except Exception:
+                pass
+
+            if followup_intent == "new_question":
+                try:
+                    clear_sql_anchor()
+                except Exception:
+                    pass
+            else:
+                # Ambiguous / missing column for additive
+                if followup_intent == "additive" and followup_subject:
+                    cols_l = {str(c).lower() for c in df.columns}
+                    if followup_subject.lower() not in cols_l and not any(
+                        followup_subject.lower() in str(c).lower() for c in df.columns
+                    ):
+                        # Signal missing column via sentinel — caller may show chat reply
+                        st.session_state["_anchor_missing_column"] = followup_subject
+                        return None
+
+                if status is not None:
+                    status.update(label=f"✏️ Modifying prior SQL ({followup_intent})...")
+                prompt = build_modification_prompt(
+                    question, followup_intent, followup_subject, anchor, df
+                )
+                sql_result = call_llm(prompt)
+                if sql_result:
+                    sql_clean = sql_result.strip().strip("`").strip()
+                    if sql_clean.lower().startswith("sql"):
+                        sql_clean = sql_clean[3:].strip()
+                    ok, reason = validate_anchor_preserved(
+                        sql_clean, anchor, followup_intent
+                    )
+                    if not ok:
+                        retry = (
+                            prompt
+                            + f"\n\nCRITICAL: Previous attempt failed validation: {reason}. "
+                            f"The WHERE clause must still contain: "
+                            f"{anchor.get('sql_anchor_filters')}. "
+                            "Return ONLY corrected SQL."
+                        )
+                        sql2 = call_llm(retry)
+                        if sql2:
+                            sql_clean = sql2.strip().strip("`").strip()
+                            if sql_clean.lower().startswith("sql"):
+                                sql_clean = sql_clean[3:].strip()
+                            st.session_state["_sql_retry_used"] = True
+                    try:
+                        st.session_state["_modification_used"] = True
+                        state = get_state()
+                        state["modification_depth"] = int(
+                            state.get("modification_depth") or 0
+                        ) + 1
+                    except Exception:
+                        pass
+                    query_memory.store_successful_query(question, sql_clean)
+                    return sql_clean
 
     # Schema (optionally narrowed)
     if len(df.columns) > 25:
@@ -190,6 +497,8 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
         st.session_state.last_glossary_hints = glossary_sql_hints
         st.session_state.last_domain_rules = domain_rules
         st.session_state.last_sql_patterns = sql_patterns_block
+        st.session_state["_modification_used"] = False
+        st.session_state["_followup_intent"] = "new_question"
         if builder is not None:
             try:
                 st.session_state.last_glossary_matches = (
@@ -365,6 +674,10 @@ Fix and return ONLY corrected SQL:"""
                     status.update(label="⚙️ Re-executing corrected query...")
                 result, err = run_sql(sql2, working_df)
                 sql = sql2
+                try:
+                    st.session_state["_sql_retry_used"] = True
+                except Exception:
+                    pass
 
         if result is not None:
             st.session_state.memory[cache_key] = (result, sql, None)
@@ -374,6 +687,10 @@ Fix and return ONLY corrected SQL:"""
             if _EVIDENCE_OK:
                 evidence = build_evidence(sql, result, execution_path, question)
                 evidence["resolution_source"] = "semantic_llm"
+                evidence["sql_retry"] = bool(st.session_state.get("_sql_retry_used"))
+                evidence["modified"] = bool(st.session_state.get("_modification_used"))
+                evidence["followup_intent"] = st.session_state.get("_followup_intent")
+                evidence["followup_subject"] = st.session_state.get("_followup_subject")
 
             if _CONV_OK:
                 try:
@@ -382,6 +699,7 @@ Fix and return ONLY corrected SQL:"""
                         {"sql": sql, "metric_name": None},
                         question,
                     )
+                    set_sql_anchor(sql, question, working_df)
                 except Exception:
                     pass
 
@@ -393,8 +711,22 @@ Fix and return ONLY corrected SQL:"""
                     "execution_path": execution_path,
                 },
             )
+            try:
+                st.session_state["_sql_retry_used"] = False
+            except Exception:
+                pass
         elif _EVIDENCE_OK:
             evidence = build_evidence(sql or "", None, execution_path, question)
+
+        # Missing-column follow-up → friendly chat signal
+        missing = st.session_state.pop("_anchor_missing_column", None)
+        if missing and result is None:
+            avail = ", ".join(str(c) for c in list(working_df.columns)[:10])
+            return _pack_return(
+                None, "",
+                f"missing_column:{missing}|{avail}",
+                evidence,
+            )
 
         return _pack_return(result, sql, err, evidence)
 

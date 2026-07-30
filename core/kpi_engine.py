@@ -109,16 +109,23 @@ def compute_kpis(df: pd.DataFrame) -> dict:
         except Exception:
             pass
 
+    # Top model is a VOLUME KPI — always rank by units (order_qty), never revenue
     if model_col and vol_col:
         try:
-            tmp = df.copy(); tmp[vol_col] = pd.to_numeric(tmp[vol_col], errors="coerce")
-            kpis["top_model"] = str(tmp.groupby(model_col)[vol_col].sum().idxmax())
+            tmp = df.copy()
+            tmp[vol_col] = pd.to_numeric(tmp[vol_col], errors="coerce")
+            by_vol = tmp.groupby(model_col)[vol_col].sum().sort_values(ascending=False)
+            kpis["top_model"] = str(by_vol.index[0])
+            kpis["top_model_units"] = int(by_vol.iloc[0])
+            kpis["top_model_by"] = "volume"
         except Exception:
             pass
     elif model_col and rev_col:
         try:
-            tmp = df.copy(); tmp[rev_col] = pd.to_numeric(tmp[rev_col], errors="coerce")
+            tmp = df.copy()
+            tmp[rev_col] = pd.to_numeric(tmp[rev_col], errors="coerce")
             kpis["top_model"] = str(tmp.groupby(model_col)[rev_col].sum().idxmax())
+            kpis["top_model_by"] = "revenue_fallback"
         except Exception:
             pass
 
@@ -378,10 +385,15 @@ def render_kpi_tab(df: pd.DataFrame):
             None,
         ))
     if "top_model" in kpis:
+        units = kpis.get("top_model_units")
+        if units is not None:
+            sub = f"{units:,} units sold"
+        else:
+            sub = "by units sold"
         cards.append((
-            "🏆 TOP MODEL",
+            "📦 TOP MODEL BY VOLUME",
             kpis["top_model"],
-            "by revenue" if kpis.get("_rev_col") else "by units",
+            sub,
             "model",
             None,
             None,

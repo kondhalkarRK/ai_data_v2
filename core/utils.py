@@ -62,6 +62,32 @@ def load_files(files):
 
         for col in df.columns:
             if "date" in col.lower():
-                df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
+                df[col] = _parse_date_series(df[col])
 
         dfs[clean_name(name)] = df
+
+
+def _parse_date_series(series: pd.Series) -> pd.Series:
+    """
+    Parse date columns safely.
+
+    Never force dayfirst=True on ISO YYYY-MM-DD data — that treats MM as day and
+    turns every day>12 into NaT (~60% nulls on typical calendars).
+    Try ISO first, then default inference, then dayfirst only as last resort.
+    """
+    if series is None or series.empty:
+        return series
+
+    for kwargs in (
+        {"format": "ISO8601"},
+        {},
+        {"dayfirst": True},
+    ):
+        try:
+            parsed = pd.to_datetime(series, errors="coerce", **kwargs)
+        except (ValueError, TypeError):
+            continue
+        if parsed.notna().mean() >= 0.8:
+            return parsed
+
+    return pd.to_datetime(series, errors="coerce")

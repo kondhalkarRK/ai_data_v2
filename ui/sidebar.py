@@ -53,6 +53,11 @@ def upload_dialog():
             with st.spinner("Loading files, please wait..."):
                 try:
                     load_files(uploaded_files)
+                    try:
+                        from core.conversation_state import clear_sql_anchor
+                        clear_sql_anchor()
+                    except Exception:
+                        pass
 
                     st.session_state.sidebar_uploaded_names = [
                         getattr(f, "name", "uploaded_file")
@@ -232,6 +237,11 @@ def render():
                     st.session_state.last_plan   = None
                     st.session_state.last_query  = ""
                     st.session_state.query_history = []
+                    try:
+                        from core.conversation_state import clear_sql_anchor
+                        clear_sql_anchor()
+                    except Exception:
+                        pass
                     st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 

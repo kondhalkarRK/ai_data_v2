@@ -4,6 +4,7 @@ Conversation-aware state for follow-up NLQ turns.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import streamlit as st
@@ -46,6 +47,19 @@ _EMPTY_STATE: dict[str, Any] = {
     "inherited_context": {},
     "chat_history": [],
     "pending_clarification": None,
+    # SQL anchor — last successful query for surgical follow-up edits
+    "sql_anchor": None,
+    "sql_anchor_question": None,
+    "sql_anchor_columns": [],
+    "sql_anchor_filters": [],
+    "sql_anchor_metric": None,
+    "sql_anchor_order": None,
+    "sql_anchor_limit": None,
+    "sql_anchor_group_by": None,
+    "anchor_turn": 0,
+    "modification_depth": 0,
+    "last_followup_intent": None,
+    "last_followup_subject": None,
 }
 
 
@@ -84,6 +98,152 @@ def clear_state() -> None:
     st.session_state[_STATE_KEY]["continued_from"] = None
     st.session_state[_STATE_KEY]["chat_history"] = []
     st.session_state[_STATE_KEY]["pending_clarification"] = None
+    clear_sql_anchor()
+
+
+def _extract_sql_clause(sql: str, keyword: str) -> str | None:
+    """Extract a top-level SQL clause body (rough, keyword → next keyword)."""
+    if not sql:
+        return None
+    pattern = rf"\b{keyword}\b\s+(.*?)(?=\b(?:WHERE|GROUP\s+BY|ORDER\s+BY|LIMIT|HAVING)\b|$)"
+    m = re.search(pattern, sql, flags=re.IGNORECASE | re.DOTALL)
+    if not m:
+        return None
+    return m.group(1).strip().rstrip(";")
+
+
+def set_sql_anchor(sql: str, question: str, df=None) -> None:
+    """Parse successful SQL and store as surgical-edit anchor."""
+    state = _ensure_state()
+    sql = (sql or "").strip()
+    if not sql or sql.startswith("--"):
+        return
+
+    select_m = re.search(
+        r"\bSELECT\b\s+(.*?)\s+\bFROM\b",
+        sql,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    select_body = select_m.group(1).strip() if select_m else ""
+
+    # Column-ish tokens from SELECT (aliases + bare names)
+    cols: list[str] = []
+    for part in re.split(r",(?![^()]*\))", select_body):
+        part = part.strip()
+        if not part:
+            continue
+        as_m = re.search(r"\bAS\s+([A-Za-z_][\w]*)\s*$", part, flags=re.IGNORECASE)
+        if as_m:
+            cols.append(as_m.group(1))
+            continue
+        bare = re.findall(r"[A-Za-z_][\w]*", part)
+        if bare:
+            cols.append(bare[-1])
+
+    where_m = re.search(
+        r"\bWHERE\b\s+(.*?)(?=\b(?:GROUP\s+BY|ORDER\s+BY|LIMIT|HAVING)\b|$)",
+        sql,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    filters = [where_m.group(1).strip().rstrip(";")] if where_m else []
+
+    metric_m = re.search(
+        r"\b((?:SUM|COUNT|AVG|MIN|MAX)\s*\([^)]+\))",
+        select_body,
+        flags=re.IGNORECASE,
+    )
+    order_m = re.search(
+        r"\bORDER\s+BY\b\s+(.*?)(?=\bLIMIT\b|$)",
+        sql,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    limit_m = re.search(r"\bLIMIT\s+(\d+)", sql, flags=re.IGNORECASE)
+    group_m = re.search(
+        r"\bGROUP\s+BY\b\s+(.*?)(?=\b(?:ORDER\s+BY|LIMIT|HAVING)\b|$)",
+        sql,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    state["sql_anchor"] = sql
+    state["sql_anchor_question"] = question
+    state["sql_anchor_columns"] = cols
+    state["sql_anchor_filters"] = filters
+    state["sql_anchor_metric"] = metric_m.group(1) if metric_m else None
+    state["sql_anchor_order"] = order_m.group(1).strip().rstrip(";") if order_m else None
+    state["sql_anchor_limit"] = int(limit_m.group(1)) if limit_m else None
+    state["sql_anchor_group_by"] = (
+        group_m.group(1).strip().rstrip(";") if group_m else None
+    )
+    state["anchor_turn"] = int(state.get("anchor_turn") or 0) + 1
+
+
+def get_sql_anchor() -> dict | None:
+    """Return full SQL anchor dict, or None if unset."""
+    state = _ensure_state()
+    if not state.get("sql_anchor"):
+        return None
+    return {
+        "sql_anchor": state.get("sql_anchor"),
+        "sql_anchor_question": state.get("sql_anchor_question"),
+        "sql_anchor_columns": list(state.get("sql_anchor_columns") or []),
+        "sql_anchor_filters": list(state.get("sql_anchor_filters") or []),
+        "sql_anchor_metric": state.get("sql_anchor_metric"),
+        "sql_anchor_order": state.get("sql_anchor_order"),
+        "sql_anchor_limit": state.get("sql_anchor_limit"),
+        "sql_anchor_group_by": state.get("sql_anchor_group_by"),
+        "anchor_turn": state.get("anchor_turn", 0),
+        "modification_depth": state.get("modification_depth", 0),
+        "last_followup_intent": state.get("last_followup_intent"),
+        "last_followup_subject": state.get("last_followup_subject"),
+    }
+
+
+def clear_sql_anchor() -> None:
+    """Reset all sql_anchor_* fields."""
+    state = _ensure_state()
+    state["sql_anchor"] = None
+    state["sql_anchor_question"] = None
+    state["sql_anchor_columns"] = []
+    state["sql_anchor_filters"] = []
+    state["sql_anchor_metric"] = None
+    state["sql_anchor_order"] = None
+    state["sql_anchor_limit"] = None
+    state["sql_anchor_group_by"] = None
+    state["anchor_turn"] = 0
+    state["modification_depth"] = 0
+    state["last_followup_intent"] = None
+    state["last_followup_subject"] = None
+
+
+def should_use_anchor(question: str) -> bool:
+    """True when follow-up should surgically modify the SQL anchor."""
+    anchor = get_sql_anchor()
+    if not anchor or not question:
+        return False
+    q = question.strip().lower()
+    new_topic = (
+        "new question", "start over", "forget that", "different question",
+        "actually", "instead show me",
+    )
+    if any(sig in q for sig in new_topic):
+        return False
+
+    # Long question with no column overlap → new topic
+    words = q.split()
+    cols = [str(c).lower() for c in (anchor.get("sql_anchor_columns") or [])]
+    if len(words) > 12 and cols:
+        if not any(c in q for c in cols if len(c) >= 3):
+            # still allow short follow-up tokens
+            from core.question_normaliser import detect_followup as _df
+            if not _df(question):
+                return False
+
+    try:
+        from core.question_normaliser import classify_followup_intent
+        intent = classify_followup_intent(question, anchor)
+        return intent != "new_question"
+    except Exception:
+        return detect_followup(question)
 
 
 def is_awaiting_clarification() -> bool:
@@ -272,6 +432,13 @@ def update_state(
         int(state.get("turn_count") or 0) + 1,
         MAX_CONVERSATION_TURNS * 10,
     )
+
+    # Keep SQL anchor in sync after successful data queries
+    if sql and not str(sql).startswith("--"):
+        try:
+            set_sql_anchor(sql, question or "")
+        except Exception:
+            pass
 
     # Chat history (last 5 exchanges)
     hist = list(state.get("chat_history") or [])

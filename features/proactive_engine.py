@@ -48,6 +48,16 @@ class ProactiveEngine:
             if (df[c].dtype == object or str(df[c].dtype) == "category")
             and 1 < df[c].nunique() <= 40
         ]
+        # Volume metric preferred for TOP MODEL / sales volume insights
+        vol_metric = None
+        for pref in ("order_qty", "units_sold", "quantity", "qty"):
+            for c in nums:
+                if pref == c.lower() or pref in c.lower():
+                    vol_metric = c
+                    break
+            if vol_metric:
+                break
+
         metric = None
         for pref in ("total_sales", "revenue", "order_qty"):
             for c in nums:
@@ -65,21 +75,32 @@ class ProactiveEngine:
                 date_c = c
                 break
 
-        # A) Top performer
-        if metric and cats:
-            dim = cats[0]
+        # Prefer model / carline for volume top-performer card
+        model_dims = [
+            c for c in df.columns
+            if str(c).lower() in ("model", "carline_name", "make", "car_type")
+            and 1 < df[c].nunique() <= 80
+        ]
+        top_dim = model_dims[0] if model_dims else (cats[0] if cats else None)
+        top_metric = vol_metric or metric
+
+        # A) Top performer by VOLUME (units sold)
+        if top_metric and top_dim:
             try:
-                g = df.groupby(dim)[metric].sum().sort_values(ascending=False)
+                g = df.groupby(top_dim)[top_metric].sum().sort_values(ascending=False)
                 if len(g) >= 2:
                     top_name, top_val = g.index[0], float(g.iloc[0])
                     avg = float(g.mean())
                     pct = ((top_val / avg) - 1) * 100 if avg else 0
                     insights.append({
                         "type": "top_performer",
-                        "title": f"{top_name} leads {metric}",
-                        "summary": f"{top_name} is {pct:.0f}% above average on {metric}",
+                        "title": f"📦 Top model by volume: {top_name}",
+                        "summary": (
+                            f"{top_name} — {int(top_val):,} units sold "
+                            f"({pct:.0f}% above average)"
+                        ),
                         "direction": "up",
-                        "suggested_question": f"Which {dim} has highest {metric}?",
+                        "suggested_question": f"Which {top_dim} has highest units sold?",
                         "priority": 2,
                     })
             except Exception:
