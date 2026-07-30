@@ -1,0 +1,588 @@
+
+
+════════════════════════════════════════════
+FIX 1 — DATA TRUST SCORE RESTRUCTURE
+════════════════════════════════════════════
+
+PROBLEM:
+  Row Coverage component is logically wrong.
+  When a filtered query returns few rows
+  intentionally (e.g. top 10 cars) the
+  score drops — but that is CORRECT behaviour
+  not low confidence.
+  A query for "top 10" returning 10 rows
+  from 10,000 should NOT be penalised.
+
+REMOVE:
+  Row Coverage component entirely.
+  Remove from score calculation.
+  Remove from display breakdown.
+  Remove from trust_breakdown dict.
+
+REBALANCE remaining 4 components to 25% each:
+  Semantic Match:   0-25 points
+  Glossary Match:   0-25 points
+  SQL Validation:   0-25 points
+  Join Quality:     0-25 points
+  Total max = 100
+
+NEW SCORING PER COMPONENT:
+
+  Semantic Match (0-25):
+    0 glossary matches  = 0
+    1 match             = 12
+    2+ matches          = 25
+
+  Glossary Match (0-25):
+    sql_expression found in hints = 25
+    partial / hints non-empty     = 12
+    not found / hints empty       = 0
+
+  SQL Validation (0-25):
+    execution_path = "semantic"   = 25
+    execution_path = "cache"      = 20
+    execution_path = "fallback"   = 10
+    required retry (sql2 used)    = 5
+
+  Join Quality (0-25):
+    resolution_source = "semantic_llm" = 25
+    resolution_source = "cache"        = 20
+    resolution_source = "fallback"     = 8
+    resolution_source = None           = 5
+
+DISPLAY CHANGE:
+  Remove "Row coverage" row from card.
+  Show 4 rows only:
+    ✅ Semantic match    __/25
+    ✅ Glossary match    __/25
+    ✅ SQL validation    __/25
+    ✅ Join quality      __/25
+
+EXPAND BEHAVIOUR FIX:
+  Current: expanded=True always visible
+  Change: expanded=False always
+  
+  In render_trust_score_card():
+  Wrap entire breakdown detail inside:
+    st.expander(
+      f"🎯 Data Trust Score — {score}%",
+      expanded=False
+    )
+  
+  Outside expander (always visible):
+    Only show the score number + band label
+    + thin progress bar
+    Nothing else visible until clicked
+  
+  So user sees:
+    "🎯 96% Excellent ████████████░"
+    collapsed by default
+    Click → reveals 4 component rows
+
+════════════════════════════════════════════
+FIX 2 — PROACTIVE KPI: SALES VOLUME LOGIC
+════════════════════════════════════════════
+
+PROBLEM:
+  "Top Model" KPI card currently ranks
+  models by SUM(total_sales) — revenue.
+  This is wrong for a VOLUME metric.
+  A cheap car with 500 units sold
+  loses to an expensive car with 50 units
+  even though it outsells it 10x.
+
+FIND in features/proactive_engine.py:
+  The TOP PERFORMER detection block
+  that currently uses total_sales or
+  revenue column to find top model.
+
+CHANGE THE LOGIC:
+
+  For KPI card labelled "TOP MODEL"
+  or "TOP PERFORMER" or "Sales Volume":
+
+  OLD: rank by SUM(total_sales) descending
+  NEW: rank by SUM(order_qty) descending
+
+  The card label must also change:
+  OLD label: "TOP MODEL"
+  NEW label: "TOP MODEL BY VOLUME"
+  OLD sub-label: "by sales"
+  NEW sub-label: "by units sold"
+  OLD icon: 🏆
+  NEW icon: 📦
+
+  This makes the metric honest:
+  "SUV — 4,231 units sold"
+  not
+  "SUV — £388K revenue"
+
+ALSO FIX in tab_kpi.py:
+  Any KPI card showing "Top Model"
+  must use order_qty not total_sales.
+  
+  Find the KPI computation block
+  where carline_name or model is grouped.
+  Change aggregation column from
+  total_sales to order_qty.
+  
+  Update display format from currency
+  to integer with "units" suffix:
+  "4,231 units" not "£388K
+
+
+FIX 3 — Chat Context Continuity (Architect-Level)
+PROMPT: FIX CHAT CONTEXT CONTINUITY — 
+SEMANTIC SQL HALLUCINATION IN MULTI-TURN CHAT
+===============================================
+
+You are an AI engineer fixing a fundamental
+multi-turn conversation problem in ai_data_v2.
+
+════════════════════════════════════════════
+ROOT CAUSE — UNDERSTAND FIRST
+════════════════════════════════════════════
+
+THE REAL PROBLEM IS NOT ONE QUESTION.
+IT IS A SYSTEMIC ARCHITECTURE GAP.
+
+Current system sends to LLM:
+  - Fresh schema every turn
+  - Concatenated question string
+  - No memory of what SQL worked
+  - No memory of what filters applied
+  - No memory of what metric was active
+  - No memory of what columns were shown
+
+Result:
+  Turn 1: User asks complex question
+    → LLM generates correct SQL ✅
+  Turn 2: User asks simple follow-up
+    → LLM hallucinates new SQL entirely
+    → Different columns
+    → Different metric
+    → Different filters
+    → Lost all prior constraints
+  Turn 3: Another follow-up
+    → Even more drift from original intent
+  Turn N: Result bears no resemblance
+    to what user was exploring
+
+THIS IS THE HALLUCINATION SPIRAL.
+Each turn drifts further from user intent.
+
+════════════════════════════════════════════
+THE COMPLETE SOLUTION — 3 LAYERS
+════════════════════════════════════════════
+
+LAYER 1 — SQL ANCHOR
+  The last successful SQL is the anchor.
+  All follow-up queries modify the anchor.
+  Never replace the anchor on follow-ups.
+
+LAYER 2 — INTENT CLASSIFICATION
+  Classify EVERY message before sending
+  to LLM into one of 4 intent types.
+  Different intent = different prompt.
+  Same wrong prompt for all = hallucination.
+
+LAYER 3 — STRUCTURED CONTEXT INJECTION
+  Instead of concatenating question strings,
+  inject a structured context block that
+  tells LLM exactly what state to preserve.
+
+════════════════════════════════════════════
+LAYER 1 — SQL ANCHOR IMPLEMENTATION
+════════════════════════════════════════════
+
+FILE: core/conversation_state.py
+
+ADD to _EMPTY_STATE:
+  "sql_anchor": None
+  "sql_anchor_question": None
+  "sql_anchor_columns": []
+  "sql_anchor_filters": []
+  "sql_anchor_metric": None
+  "sql_anchor_order": None
+  "sql_anchor_limit": None
+  "anchor_turn": 0
+
+ADD function: set_sql_anchor(sql, question, df):
+  Parse the SQL string to extract:
+  
+  anchor_columns:
+    Extract all column names from SELECT
+    using regex on SELECT ... FROM
+  
+  anchor_filters:
+    Extract WHERE clause as raw string
+    preserve exactly as-is
+  
+  anchor_metric:
+    Find the SUM/COUNT/AVG expression
+    in SELECT clause
+  
+  anchor_order:
+    Extract ORDER BY clause
+  
+  anchor_limit:
+    Extract LIMIT value as integer
+  
+  Store all in state under sql_anchor_*
+  Store raw sql in state["sql_anchor"]
+  Increment anchor_turn
+
+ADD function: get_sql_anchor() → dict | None:
+  Returns full anchor dict or None
+  if no anchor set yet
+
+ADD function: clear_sql_anchor():
+  Resets all sql_anchor_* fields to None
+  Called when user starts clearly new topic
+
+ADD function: should_use_anchor(question) → bool:
+  Returns True if:
+    sql_anchor is not None
+    AND question is a follow-up pattern
+    AND question does NOT signal new topic
+
+  New topic signals (clear anchor):
+    "new question", "start over",
+    "forget that", "different question",
+    "actually", "instead show me",
+    question is longer than 12 words
+    AND shares no columns with anchor
+
+WHEN TO SET ANCHOR:
+  In nlq_engine.run_query():
+  After every SUCCESSFUL data query:
+    if result is not None:
+      set_sql_anchor(sql, question, working_df)
+
+════════════════════════════════════════════
+LAYER 2 — INTENT CLASSIFICATION
+════════════════════════════════════════════
+
+FILE: core/question_normaliser.py
+
+ADD function: classify_followup_intent(
+  question: str,
+  anchor: dict | None
+) → str
+
+Returns one of these 5 intent types:
+
+INTENT 1: "additive"
+  User wants to ADD something to result.
+  Patterns:
+    "add {x}", "include {x}",
+    "also show {x}", "with {x}",
+    "show {x} as well", "plus {x}",
+    "can you add {x}", "and {x} column",
+    "show me {x} too"
+  Action: Add column to SELECT + GROUP BY
+          Keep everything else
+
+INTENT 2: "subtractive"
+  User wants to REMOVE something.
+  Patterns:
+    "remove {x}", "hide {x}",
+    "without {x}", "drop {x}",
+    "don't show {x}", "exclude {x}",
+    "only {x} and {y}" (implies remove rest)
+  Action: Remove column from SELECT + GROUP BY
+          Keep everything else
+
+INTENT 3: "filter_change"
+  User wants to change/add a filter.
+  Patterns:
+    "only for {x}", "filter by {x}",
+    "just {x}", "for {year}",
+    "in {month}", "where {x} is {y}",
+    "same but for {x}",
+    "{year} only", "last month",
+    "this year", "for {make}"
+  Action: Add/change WHERE clause
+          Keep SELECT + ORDER + LIMIT
+
+INTENT 4: "sort_change"
+  User wants to change ordering or limit.
+  Patterns:
+    "top {n}", "bottom {n}",
+    "order by {x}", "sort by {x}",
+    "highest {x}", "lowest {x}",
+    "ranked by {x}", "show {n}"
+  Action: Change ORDER BY and/or LIMIT
+          Keep SELECT + WHERE + GROUP BY
+
+INTENT 5: "new_question"
+  User is asking something genuinely new.
+  Signals:
+    Question > 10 words with no anchor overlap
+    "show me", "what is", "how many"
+      without follow-up tokens
+    No shared vocabulary with anchor
+    User explicitly signals new topic
+  Action: Generate fresh SQL
+          Set new anchor on success
+
+ALSO ADD: extract_intent_subject(
+  question: str,
+  intent_type: str
+) → str | None
+
+  Extracts WHAT the user is referring to:
+  "add make column" → subject = "make"
+  "filter by 2023"  → subject = "2023"
+  "top 5 only"      → subject = "5"
+  "remove colour"   → subject = "colour_name"
+
+  For column names: match against df.columns
+  using fuzzy match (lowercase, strip spaces)
+  Return actual df column name not user word
+
+════════════════════════════════════════════
+LAYER 3 — STRUCTURED CONTEXT INJECTION
+════════════════════════════════════════════
+
+FILE: core/nlq_engine.py
+
+REPLACE enrich_query() string concatenation
+with structured context injection.
+
+ADD function: build_modification_prompt(
+  question: str,
+  intent_type: str,
+  subject: str | None,
+  anchor: dict,
+  df: pd.DataFrame
+) → str:
+
+  Builds a precise surgical prompt
+  based on intent type.
+  LLM receives exact instructions
+  not an ambiguous combined question.
+
+PROMPT TEMPLATE PER INTENT:
+
+──────────────────────────────────────────
+ADDITIVE PROMPT:
+
+You are modifying an existing SQL query.
+Add ONE thing only. Change nothing else.
+
+EXISTING SQL (this is your base):
+```sql
+{anchor["sql_anchor"]}
+TASK: Add column "{subject}" to the query.
+
+STRICT RULES:
+
+Add "{subject}" to SELECT clause only
+Add "{subject}" to GROUP BY if it exists
+DO NOT change WHERE clause
+DO NOT change ORDER BY
+DO NOT change LIMIT
+DO NOT change any aggregations
+DO NOT add any new filters
+DO NOT remove any existing columns
+Return ONLY the modified SQL
+COLUMN TO ADD: {resolved_column_name} TABLE: df AVAILABLE COLUMNS: {df.columns.tolist()}
+
+Modified SQL: ──────────────────────────────────────────
+
+SUBTRACTIVE PROMPT:
+
+You are modifying an existing SQL query. Remove ONE thing only. Change nothing else.
+
+EXISTING SQL:
+
+{anchor["sql_anchor"]}
+
+TASK: Remove column "{subject}" from results.
+
+STRICT RULES:
+
+Remove "{subject}" from SELECT only
+Remove "{subject}" from GROUP BY if present
+DO NOT change WHERE clause
+DO NOT change ORDER BY
+DO NOT change LIMIT
+DO NOT change any aggregations
+DO NOT add anything new
+Return ONLY the modified SQL
+Modified SQL: ──────────────────────────────────────────
+
+FILTER CHANGE PROMPT:
+
+You are modifying an existing SQL query. Change only the filter. Keep everything else.
+
+EXISTING SQL:
+
+{anchor["sql_anchor"]}
+
+TASK: Apply filter "{question}"
+
+WHAT TO CHANGE: {filter_instruction}
+
+STRICT RULES:
+
+Add or modify WHERE clause only
+DO NOT change SELECT columns
+DO NOT change ORDER BY
+DO NOT change LIMIT
+DO NOT change GROUP BY
+DO NOT change aggregations
+Combine with existing WHERE using AND
+Return ONLY the modified SQL
+filter_instruction is built as: "Add: strftime('%Y', sales_date) = '2023'" or "Replace last_month filter with: strftime('%Y-%m', sales_date) = '2023-06'" or "Add: make ILIKE '%ford%'"
+
+Modified SQL: ──────────────────────────────────────────
+
+SORT CHANGE PROMPT:
+
+You are modifying an existing SQL query. Change only the sort or limit.
+
+EXISTING SQL:
+
+{anchor["sql_anchor"]}
+
+TASK: "{question}"
+
+WHAT TO CHANGE: {sort_instruction}
+
+STRICT RULES:
+
+Change ORDER BY or LIMIT only
+DO NOT change SELECT
+DO NOT change WHERE
+DO NOT change GROUP BY
+DO NOT change aggregations
+Return ONLY the modified SQL
+Modified SQL: ──────────────────────────────────────────
+
+NEW QUESTION PROMPT: Use existing full semantic prompt (current nlq_to_sql prompt) with full schema + semantic context Clear the anchor after sending Set new anchor on success
+
+════════════════════════════════════════════ ROUTING LOGIC IN nlq_to_sql() ════════════════════════════════════════════
+
+In nlq_to_sql() BEFORE building prompt:
+
+STEP 1: anchor = get_sql_anchor()
+
+STEP 2: If anchor is None: → use full semantic prompt (existing) → this is a fresh question
+
+STEP 3: If anchor is not None: intent = classify_followup_intent( question, anchor ) subject = extract_intent_subject( question, intent )
+
+STEP 4: Route by intent: "additive" → build_modification_prompt with ADDITIVE template "subtractive" → build_modification_prompt with SUBTRACTIVE template "filter_change"→ build_modification_prompt with FILTER CHANGE template "sort_change" → build_modification_prompt with SORT CHANGE template "new_question" → clear_sql_anchor() use full semantic prompt
+
+STEP 5: Call call_llm(prompt)
+
+If result SQL: Validate it contains key elements from anchor (WHERE preserved etc) If validation passes: update anchor with new SQL return SQL If validation fails: retry with stricter prompt adding: "CRITICAL: The WHERE clause must still contain: {anchor_filters}"
+
+════════════════════════════════════════════ SQL ANCHOR VALIDATION ════════════════════════════════════════════
+
+FILE: core/nlq_engine.py
+
+ADD function: validate_anchor_preserved( new_sql: str, anchor: dict, intent_type: str ) → tuple[bool, str]:
+
+Checks that modification preserved what it should have preserved.
+
+For "additive": Check WHERE clause from anchor still exists in new_sql Check ORDER BY still exists Check LIMIT still exists If any missing: return False, reason
+
+For "subtractive": Same checks as additive Also check removed column gone from SELECT
+
+For "filter_change": Check SELECT columns unchanged Check ORDER BY unchanged Check LIMIT unchanged
+
+For "sort_change": Check SELECT unchanged Check WHERE unchanged Check GROUP BY unchanged
+
+Returns True, "" if all pass Returns False, "reason" if fail
+
+On False: build retry prompt that explicitly includes the missing clause and retry ONCE only.
+
+════════════════════════════════════════════ CONTEXT BANNER IN UI ════════════════════════════════════════════
+
+FILE: ui/tab_query.py
+
+After every successful modification query show a context banner above the result:
+
+For additive: "✅ Added {subject} to your previous query"
+
+For subtractive: "✅ Removed {subject} from your previous query"
+
+For filter_change: "✅ Applied filter: {filter_description} to your previous query"
+
+For sort_change: "✅ Changed sorting to: {sort_description}"
+
+For new_question: "🆕 New query — previous context cleared"
+
+Banner style: background: rgba(16,185,129,0.06) border-left: 3px solid #10b981 font-size: 11px color: #6ee7b7 padding: 6px 12px border-radius: 0 6px 6px 0
+
+Also show modification badge: "✏️ Modified" badge in result header alongside existing execution badge
+
+════════════════════════════════════════════ CONVERSATION STATE DISPLAY IN CHAT ════════════════════════════════════════════
+
+In chat bubble for modified queries show what the anchor contains:
+
+Small collapsible section: "📎 Query context" Metric: {anchor_metric} Filters: {anchor_filters summary} Columns: {anchor_columns list} Turn: {anchor_turn}
+
+This shows user the system remembers their full context. Collapsed by default. Only shown for modification intents.
+
+════════════════════════════════════════════ EDGE CASES TO HANDLE ════════════════════════════════════════════
+
+EDGE CASE 1 — Ambiguous column name: User says "add make" df has both "make" and "carline_name"
+
+Resolution: Try exact match first: "make" → make ✅ If no exact match: Try contains match If still ambiguous: Use clarification response: "Did you mean 'make' (brand) or 'carline_name' (model name)?"
+
+EDGE CASE 2 — Column not in df: User says "add region" No region column in df
+
+Resolution: Do NOT hallucinate the column. Respond in chat: "I don't see a 'region' column in your data. Available columns are: {list top 10 relevant columns} Want me to add one of these instead?"
+
+EDGE CASE 3 — Anchor stale after data change: User uploads new CSV Old anchor SQL references old columns
+
+Resolution: On any new data load: clear_sql_anchor() immediately Also clear on sidebar CACHE button click
+
+EDGE CASE 4 — User contradicts anchor: Anchor has "ORDER BY units_sold DESC" User says "order by revenue"
+
+Resolution: This is "sort_change" intent Replace ORDER BY entirely Update anchor with new ORDER BY
+
+EDGE CASE 5 — Long conversation drift: After 8+ turns anchor may be stale Queries become complex to modify
+
+Resolution: Track modification_depth counter in anchor (increments each modification) At depth >= 5: suggest reset: "We've made several modifications. Would you like to start fresh or continue refining this query?"
+
+════════════════════════════════════════════ FILES CHANGED SUMMARY ════════════════════════════════════════════
+
+core/conversation_state.py → Add sql_anchor fields to _EMPTY_STATE → Add set_sql_anchor() → Add get_sql_anchor() → Add clear_sql_anchor() → Add should_use_anchor() → Update update_state() to call set_sql_anchor on success
+
+core/question_normaliser.py → Add classify_followup_intent() → Add extract_intent_subject() → Add ADDITIVE_PATTERNS list → Add SUBTRACTIVE_PATTERNS list → Add FILTER_CHANGE_PATTERNS list → Add SORT_CHANGE_PATTERNS list → Add NEW_TOPIC_SIGNALS list
+
+core/nlq_engine.py → Add build_modification_prompt() → Add validate_anchor_preserved() → Update nlq_to_sql() routing logic → Update run_query() to call set_sql_anchor on success → Track sql2 retry in evidence
+
+ui/tab_query.py → Add modification context banner → Add "✏️ Modified" badge type → Add anchor context panel in chat → Handle new message_type "modified" → Clear anchor on CACHE button
+
+ui/sidebar.py → CACHE button: call clear_sql_anchor()
+
+config/styles.py → badge-modified CSS class → modification context banner CSS
+
+════════════════════════════════════════════ TESTING SEQUENCE ════════════════════════════════════════════
+
+Run this EXACT sequence to verify fix:
+
+Q1: "top 10 cars by units sold last month" → Fresh SQL generated → Anchor set with WHERE + LIMIT + ORDER → Badge: Semantic + AI
+
+Q2: "add make column" → Intent: additive → make added to SELECT + GROUP BY → WHERE last month preserved ✅ → ORDER BY units_sold preserved ✅ → LIMIT 10 preserved ✅ → Badge: ✏️ Modified
+
+Q3: "also show colour" → Intent: additive → colour_name added → All Q1 constraints preserved ✅ → Badge: ✏️ Modified
+
+Q4: "only for Ford" → Intent: filter_change → WHERE make ILIKE '%ford%' added → All other constraints preserved ✅
+
+Q5: "top 5 only" → Intent: sort_change → LIMIT changes to 5 → Everything else preserved ✅
+
+Q6: "remove colour" → Intent: subtractive → colour_name removed from SELECT → All constraints preserved ✅
+
+Q7: "show me revenue by salesperson" → Intent: new_question → Anchor cleared ✅ → Fresh SQL generated ✅ → New anchor set ✅
+
+Q8: "same for 2023" → Intent: filter_change → New anchor from Q7 used → 2023 filter applied ✅
+
+ALL 8 MUST PASS for fix to be complete.
+
+════════════════════════════════════════════ END OF PROMPT

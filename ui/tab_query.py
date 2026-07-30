@@ -860,7 +860,7 @@ def _blocked_reply(question: str) -> str:
     return (
         "🔒 Data Protection — I can only read and analyse your data. "
         "I'm not able to modify, delete or update any records.\n\n"
-        "Your data is safe. If you need to make changes, please use your "
+        "Your data is safe. If you need to make changes, contact your administrator"
         "source system directly."
     )
 
