@@ -154,5 +154,25 @@ class ProactiveEngine:
         return insights
 
     def get_suggested_questions(self, df: pd.DataFrame, limit: int = 5) -> list[str]:
-        """Deprecated for UI chips — kept for internal fallbacks only."""
-        return []
+        """Return a few ready-to-ask NL questions for OOB redirects / concierge."""
+        suggestions = [
+            "Show revenue by colour",
+            "Top 10 salespeople by revenue",
+            "Monthly revenue trend",
+            "Units sold by make",
+            "Revenue by car type",
+        ]
+        if df is not None and not df.empty:
+            cols = {str(c).lower() for c in df.columns}
+            out = []
+            if any("colour" in c or "color" in c for c in cols):
+                out.append("Show revenue by colour")
+            if any("make" in c for c in cols):
+                out.append("Units sold by make")
+            if any("first_name" in c or "sales" in c for c in cols):
+                out.append("Top salespeople by revenue")
+            if any("date" in c for c in cols):
+                out.append("Monthly revenue trend")
+            if out:
+                suggestions = out + [s for s in suggestions if s not in out]
+        return suggestions[: max(1, int(limit))]

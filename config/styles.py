@@ -1209,7 +1209,7 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
     margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
 }
 .narration-body {
-    font-size: 13px; color: #cbd5e1; line-height: 1.65; margin-bottom: 10px;
+    font-size: 13px; color: #cbd5e1; line-height: 1.7; margin-bottom: 10px;
 }
 .chat-input-area {
     background: rgba(30, 41, 59, 0.85);
@@ -1243,8 +1243,8 @@ body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
     background: rgba(99, 102, 241, 0.12);
     border: 1px solid rgba(99, 102, 241, 0.28);
     color: #c7d2fe;
-    padding: 2px 8px;
-    border-radius: 10px;
+    padding: 3px 8px;
+    border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
     margin: 2px 4px 6px 0;
@@ -1456,6 +1456,69 @@ div[data-testid="stExpander"] details:hover summary{
 .ask-run-btn-wrap button{
   font-size:16px !important;
 }
+
+/* ═══ chat_ench.md — message types, trust, surprise ═══ */
+.chat-msg-gap{margin-bottom:16px;}
+.assistant-card{padding:12px 18px;}
+.card-chat{
+  background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.1);
+  border-radius:4px 18px 18px 18px;
+}
+.card-query{
+  background:rgba(15,23,42,0.7);border:1px solid rgba(99,102,241,0.15);
+  border-left:3px solid #6366f1;border-radius:4px 18px 18px 18px;
+}
+.card-whatif{
+  background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.15);
+  border-left:3px solid #f59e0b;border-radius:4px 18px 18px 18px;
+}
+.card-surprise{
+  background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);
+  border-left:3px solid #f59e0b;border-radius:4px 18px 18px 18px;
+}
+.card-blocked{
+  background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);
+  border-left:3px solid #ef4444;border-radius:4px 18px 18px 18px;color:#fca5a5;
+}
+.card-oob{
+  background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.12);
+  border-left:3px solid #f59e0b;border-radius:4px 18px 18px 18px;color:#fde68a;
+}
+.card-clarification{
+  background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);
+  border-left:3px solid #818cf8;border-radius:4px 18px 18px 18px;
+}
+.card-error{
+  background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.12);
+  border-left:3px solid #ef4444;border-radius:4px 18px 18px 18px;
+}
+.chat-reply-text{font-size:13px;line-height:1.7;color:#cbd5e1;}
+.finding-bullet{
+  background:rgba(99,102,241,0.05);border-left:2px solid #6366f1;
+  padding:6px 10px;border-radius:0 4px 4px 0;margin:3px 0;font-size:12px;color:#cbd5e1;
+}
+.chat-results-label{font-size:11px;color:#64748b;margin:8px 0 4px;font-weight:600;}
+.surprise-header{font-size:14px;font-weight:700;color:#fcd34d;margin-bottom:10px;}
+.surprise-highlight{
+  background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);
+  border-radius:10px;padding:12px 14px;font-size:15px;font-weight:700;color:#fde68a;margin-bottom:12px;
+}
+.surprise-rec-title{font-size:12px;color:#94a3b8;margin:8px 0;}
+.surprise-opp{font-size:13px;font-weight:700;color:#fcd34d;margin-top:10px;}
+.trust-score-card{
+  background:rgba(15,23,42,0.6);border:1px solid rgba(148,163,184,0.15);
+  border-radius:10px;padding:12px 14px;margin:10px 0;color:#94a3b8;
+}
+.trust-title{font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:6px;}
+.trust-score-line{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;}
+.trust-pct{font-size:28px;font-weight:800;line-height:1;}
+.trust-band{font-size:13px;font-weight:700;}
+.trust-bar{height:6px;background:rgba(148,163,184,0.15);border-radius:4px;overflow:hidden;margin-bottom:8px;}
+.trust-bar-fill{height:100%;border-radius:4px;}
+.trust-based{font-size:11px;margin-bottom:4px;color:#64748b;}
+.trust-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;}
+.trust-note{font-size:11px;margin-top:8px;color:#94a3b8;}
+.trust-note.warn{color:#fcd34d;}
 </style>
 
 <div class="ai-loader-overlay">

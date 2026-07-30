@@ -422,6 +422,37 @@ terms:
     category: Product
     maps_to_attribute: dim_carline.car_type
 
+  Region:
+    definition: >
+      Geographic sales territory covering region name, city,
+      state and country. Use for location and territory analytics.
+    source_column: "region_name"
+    display_label: "Region"
+    synonyms:
+      - geography
+      - area
+      - territory
+      - zone
+      - location
+      - market
+      - region name
+      - city
+      - state
+    calculation_rules:
+      - Use region_name for grouping by territory
+      - Use city for city-level breakdown
+      - Join via region_id to dim_region
+    related_terms:
+      - Revenue
+      - Units Sold
+    example_questions:
+      - "Revenue by region"
+      - "Top cities by sales"
+      - "Units sold in South region"
+      - "Which region has highest revenue"
+    category: Geography
+    maps_to_dimension: Region
+
 sql_patterns:
   top_n_query:
     description: "When user asks for top/best/highest N"

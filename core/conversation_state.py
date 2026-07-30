@@ -45,6 +45,7 @@ _EMPTY_STATE: dict[str, Any] = {
     "is_followup": False,
     "inherited_context": {},
     "chat_history": [],
+    "pending_clarification": None,
 }
 
 
@@ -82,6 +83,58 @@ def clear_state() -> None:
     st.session_state[_STATE_KEY]["inherited_context"] = {}
     st.session_state[_STATE_KEY]["continued_from"] = None
     st.session_state[_STATE_KEY]["chat_history"] = []
+    st.session_state[_STATE_KEY]["pending_clarification"] = None
+
+
+def is_awaiting_clarification() -> bool:
+    """True when a clarifying question is pending a user A/B/C reply."""
+    try:
+        state = get_state()
+        return bool(state.get("pending_clarification"))
+    except Exception:
+        return False
+
+
+def set_pending_clarification(question: str, options: dict | None = None) -> None:
+    """Store ambiguous question awaiting A/B/C clarification."""
+    state = _ensure_state()
+    state["pending_clarification"] = {
+        "question": question,
+        "options": options or {
+            "a": "Revenue",
+            "b": "Units Sold",
+            "c": "Order count",
+        },
+    }
+
+
+def resolve_clarification(choice: str) -> str | None:
+    """
+    Map A/B/C (or 1/2/3) to a reconstructed data question.
+    Clears pending_clarification. Returns None if nothing pending.
+    """
+    state = _ensure_state()
+    pending = state.get("pending_clarification")
+    if not pending:
+        return None
+    opts = pending.get("options") or {
+        "a": "Revenue", "b": "Units Sold", "c": "Order count",
+    }
+    key = str(choice or "").strip().lower()
+    digit_map = {"1": "a", "2": "b", "3": "c"}
+    key = digit_map.get(key, key)
+    metric = opts.get(key) or opts.get(key[:1])
+    original = pending.get("question") or ""
+    state["pending_clarification"] = None
+    if not metric:
+        return original
+    # Reconstruct: prefer "show {metric} by colour" style
+    return f"show {metric} by colour"
+
+
+def clear_pending_clarification() -> None:
+    state = _ensure_state()
+    state["pending_clarification"] = None
 
 
 def detect_followup(question: str) -> bool:

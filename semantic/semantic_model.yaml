@@ -38,6 +38,11 @@ tables:
         type: integer
         role: foreign_key
         references: dim_salesman.sales_person_id
+      region_id:
+        display_name: "Region ID"
+        type: integer
+        role: foreign_key
+        references: dim_region.region_id
       sales_date:
         display_name: "Sales Date"
         type: date
@@ -147,6 +152,34 @@ tables:
         type: boolean
         role: attribute
 
+  dim_region:
+    type: dimension
+    physical_name: dim_region
+    display_name: "Region / Geography"
+    description: "Sales region and city geography dimension"
+    primary_key: region_id
+    columns:
+      region_id:
+        display_name: "Region ID"
+        type: integer
+        role: key
+      region_name:
+        display_name: "Region Name"
+        type: string
+        role: attribute
+      city:
+        display_name: "City"
+        type: string
+        role: attribute
+      state_code:
+        display_name: "State Code"
+        type: string
+        role: attribute
+      country:
+        display_name: "Country"
+        type: string
+        role: attribute
+
 # ══════════════════════════════════════════
 # RELATIONSHIPS
 # ══════════════════════════════════════════
@@ -174,6 +207,14 @@ relationships:
     to_column: sales_person_id
     type: many_to_one
     display_name: "Sales to Salesperson"
+
+  - name: sales_to_region
+    from_table: fact_sales
+    from_column: region_id
+    to_table: dim_region
+    to_column: region_id
+    type: many_to_one
+    display_name: "Sales to Region"
 
 # ══════════════════════════════════════════
 # MEASURES
@@ -384,6 +425,25 @@ dimensions:
       - vehicle color
       - paint color
 
+  Region:
+    display_name: "Region"
+    source_table: dim_region
+    attributes:
+      - region_name
+      - city
+      - state_code
+      - country
+    synonyms:
+      - geography
+      - area
+      - territory
+      - zone
+      - city
+      - state
+      - location
+      - market
+      - region name
+
 # ══════════════════════════════════════════
 # HIERARCHIES
 # ══════════════════════════════════════════
@@ -415,6 +475,19 @@ hierarchies:
       - name: Car Line
         column: carline_name
 
+  Region_Hierarchy:
+    display_name: "Region Hierarchy"
+    dimension: Region
+    levels:
+      - name: Country
+        column: country
+      - name: Region
+        column: region_name
+      - name: State
+        column: state_code
+      - name: City
+        column: city
+
 # ══════════════════════════════════════════
 # DRILL PATHS
 # ══════════════════════════════════════════
@@ -425,6 +498,9 @@ drill_paths:
 
   - name: "Vehicle Drill"
     path: [Make, Car Type, Model, Car Line]
+
+  - name: "Region Drill"
+    path: [Country, Region, State, City]
 
 # ══════════════════════════════════════════
 # BUSINESS ENTITIES
@@ -446,3 +522,7 @@ business_entities:
   - name: "Colour Variant"
     table: dim_color
     description: "A colour option for a vehicle"
+
+  - name: "Region"
+    table: dim_region
+    description: "A geographic sales region / city"
