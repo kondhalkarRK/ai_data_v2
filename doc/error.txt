@@ -1,6 +1,3 @@
-ModuleNotFoundError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
-Traceback:
-File "/mount/src/ai_data_v2/app.py", line 4, in <module>
-    from config.settings   import init_session_state
-File "/mount/src/ai_data_v2/config/settings.py", line 7, in <module>
-    from dotenv import load_dotenv
+CAPGEMINI_LLM_API_KEY = "none"
+CAPGEMINI_LLM_BASE_URL = "none"
+CAPGEMINI_LLM_MODEL = "none"
