@@ -318,7 +318,13 @@ def render_ask_mode(working_df, tables, dfs):
             unsafe_allow_html=True,
         )
 
-    col_in, col_btn = st.columns([9, 1])
+    # Apply pending clear BEFORE widgets are created (Streamlit key constraint)
+    if st.session_state.pop("_ask_clear_pending", False):
+        st.session_state["ask_question_input"] = ""
+        for _k in ("ask_last_bundle", "ask_custom_result", "editable_sql", "whatif_last_result"):
+            st.session_state.pop(_k, None)
+
+    col_in, col_btn, col_clear = st.columns([8, 1, 1])
     with col_in:
         question = st.text_input(
             "Ask a question",
@@ -330,6 +336,13 @@ def render_ask_mode(working_df, tables, dfs):
         st.markdown('<div class="ask-run-btn-wrap">', unsafe_allow_html=True)
         run_btn = st.button("▶", type="primary", use_container_width=True, key="ask_run_btn")
         st.markdown("</div>", unsafe_allow_html=True)
+    with col_clear:
+        clear_btn = st.button("Clear", use_container_width=True, key="ask_clear_btn")
+
+    if clear_btn:
+        st.session_state["_ask_clear_pending"] = True
+        st.toast("Query cleared", icon="🗑")
+        st.rerun()
 
     # Show custom SQL override if present
     custom = st.session_state.get("ask_custom_result")
@@ -375,6 +388,33 @@ def render_ask_mode(working_df, tables, dfs):
             status.update(label="✅ Scenario complete", state="complete", expanded=False)
             whatif_engine.generate_interactive_result(result, q, working_df, scenario)
             return
+
+        # Knowledge / SOP questions (e.g. EV demand) — answer with OKF + data
+        try:
+            from features.okf_knowledge.okf_answer import (
+                is_knowledge_question,
+                answer_knowledge_question,
+            )
+            if is_knowledge_question(q):
+                status.update(label="📚 Business knowledge + data...")
+                okf_payload = answer_knowledge_question(q, working_df)
+                if okf_payload and isinstance(okf_payload.get("result_df"), pd.DataFrame):
+                    elapsed = round(time.time() - start, 2)
+                    status.update(label="✅ Done", state="complete", expanded=False)
+                    bundle = {
+                        "result_df": okf_payload["result_df"],
+                        "sql": okf_payload.get("sql") or "",
+                        "evidence": okf_payload.get("evidence"),
+                        "elapsed": elapsed,
+                        "question": q,
+                        "narration": okf_payload.get("narration"),
+                    }
+                    st.session_state["ask_last_bundle"] = bundle
+                    st.session_state["editable_sql"] = (okf_payload.get("sql") or "").strip()
+                    _render_ask_bundle(bundle, working_df)
+                    return
+        except Exception:
+            pass
 
         status.update(label="🧭 Resolving with semantic layer...")
         out = run_query(working_df, q, status=status)
@@ -471,7 +511,7 @@ def _render_ask_bundle(bundle, working_df):
         except Exception:
             st.info("Chart not available")
     with tab_insights:
-        narr = _safe_narration(result_df, question, evidence)
+        narr = bundle.get("narration") or _safe_narration(result_df, question, evidence)
         render_narration_card(narr)
 
     with st.expander("🔍 Query Details"):
@@ -632,26 +672,27 @@ def _trust_band(score: int) -> tuple[str, str]:
     return "Low", "#ef4444"
 
 
-def render_trust_score_card(evidence: dict | None):
+def render_trust_score_card(evidence: dict | None, *, show_summary: bool = True):
+    """Render trust score. When show_summary=False (chat), only a collapsed expander."""
     if not evidence or evidence.get("trust_score") is None:
         return
     score = int(evidence.get("trust_score") or 0)
     bd = evidence.get("trust_breakdown") or {}
     label, color = _trust_band(score)
 
-    # Compact always-visible summary
-    st.markdown(
-        f"""
-        <div class="trust-score-summary" style="border-color:{color}33;">
-          <span class="trust-pct" style="color:{color};">🎯 {score}%</span>
-          <span class="trust-band" style="color:{color};">{label}</span>
-          <div class="trust-bar">
-            <div class="trust-bar-fill" style="width:{score}%;background:{color};"></div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    if show_summary:
+        st.markdown(
+            f"""
+            <div class="trust-score-summary" style="border-color:{color}33;">
+              <span class="trust-pct" style="color:{color};">🎯 {score}%</span>
+              <span class="trust-band" style="color:{color};">{label}</span>
+              <div class="trust-bar">
+                <div class="trust-bar-fill" style="width:{score}%;background:{color};"></div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     def row(name, key):
         v = int(bd.get(key, 0))
@@ -670,7 +711,7 @@ def render_trust_score_card(evidence: dict | None):
             "for accuracy before decisions</div>"
         )
 
-    with st.expander(f"🎯 Data Trust Score — {score}%", expanded=False):
+    with st.expander(f"🎯 Data Trust Score — {score}% ({label})", expanded=False):
         st.markdown(
             f"""
             <div class="trust-score-card" style="border-color:{color}33;">
@@ -1029,6 +1070,15 @@ def _conversational_reply(question: str, working_df: pd.DataFrame | None = None)
     except Exception:
         glossary_bits = ""
 
+    okf_bits = ""
+    try:
+        from features.okf_knowledge.okf_answer import ensure_okf_ready
+        from features.okf_knowledge.okf_retriever import get_relevant_context
+        ensure_okf_ready()
+        okf_bits = get_relevant_context(question, top_k=3, max_context_chars=900) or ""
+    except Exception:
+        okf_bits = ""
+
     hour = datetime.now().hour
     tod = "morning" if hour < 12 else ("afternoon" if hour < 17 else "evening")
 
@@ -1055,6 +1105,9 @@ Current dataset context:
 
 Semantic terms available:
 {glossary_bits}
+
+Business knowledge (SOPs) — use when relevant and cite document IDs:
+{okf_bits or "(none indexed — suggest seeding SOPs from the sidebar)"}
 
 Conversation history:
 {history}
@@ -1215,6 +1268,34 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             st.rerun()
             return
 
+        # Knowledge / SOP questions (EV demand, COVID narrative, reporting policy)
+        try:
+            from features.okf_knowledge.okf_answer import (
+                is_knowledge_question,
+                answer_knowledge_question,
+            )
+            if is_knowledge_question(q):
+                with st.spinner("📚 Checking business knowledge + data..."):
+                    t0 = time.time()
+                    okf_payload = answer_knowledge_question(q, working_df)
+                    elapsed = round(time.time() - t0, 2)
+                if okf_payload:
+                    narr = okf_payload.get("narration") or {}
+                    append_chat_exchange(
+                        q,
+                        result_summary=okf_payload.get("result_summary"),
+                        was_data_query=True,
+                    )
+                    _append_assistant(
+                        narr.get("summary") or "Here's the business knowledge answer.",
+                        "query",
+                        {**okf_payload, "elapsed": elapsed},
+                    )
+                    st.rerun()
+                    return
+        except Exception:
+            pass
+
         # What-if
         if whatif_engine is not None and whatif_engine.detect_whatif_query(q):
             with st.spinner("🔍 Running scenario..."):
@@ -1231,12 +1312,14 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
 
     # 7. Data query
     with st.spinner("⚡ Querying your data with semantic layer..."):
+        t0 = time.time()
         out = run_query(working_df, q)
         if isinstance(out, tuple) and len(out) == 4:
             df_result, sql, err, evidence = out
         else:
             df_result, sql, err = out[0], out[1], out[2]
             evidence = None
+        elapsed = round(time.time() - t0, 2)
 
     if err:
         err_s = str(err)
@@ -1300,6 +1383,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             "force_narration": force or narration_on,
             "source_question": q,
             "glossary_matches": list(st.session_state.get("last_glossary_matches") or []),
+            "elapsed": elapsed,
         },
     )
     st.rerun()
@@ -1389,57 +1473,23 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
 
     elif mtype == "query":
         evidence = data.get("evidence")
-        banner = _modification_banner(evidence)
-        if banner:
-            st.markdown(banner, unsafe_allow_html=True)
-        badge = get_execution_badge(evidence) if evidence else {"icon": "🧠", "label": "Semantic + AI"}
-        if (evidence or {}).get("modified"):
-            badge = {"icon": "✏️", "label": "Modified", "colour": "emerald"}
-        st.markdown(
-            f'<span class="{_badge_class(evidence)}">{badge.get("icon","")} '
-            f'{html.escape(badge.get("label",""))}</span>',
-            unsafe_allow_html=True,
-        )
-        matches = data.get("glossary_matches") or []
-        if matches:
-            chips = []
-            for m in matches[:3]:
-                label = html.escape(str(m.get("term_name") or ""))
-                expr = m.get("sql_expression") or m.get("source_column") or ""
-                expr_s = html.escape(" ".join(str(expr).split())[:40])
-                chips.append(
-                    f"<span class='sem-term-badge'>{label}"
-                    + (f"<span class='sem-expr'>= {expr_s}</span>" if expr_s else "")
-                    + "</span>"
-                )
-            st.markdown(" ".join(chips), unsafe_allow_html=True)
-
-        # Collapsible anchor context for modified turns
-        if (evidence or {}).get("modified"):
-            anchor = get_sql_anchor() or {}
-            with st.expander("📎 Query context", expanded=False):
-                st.caption(f"Metric: {anchor.get('sql_anchor_metric') or '—'}")
-                filt = anchor.get("sql_anchor_filters") or []
-                st.caption(f"Filters: {'; '.join(filt) if filt else '—'}")
-                cols = anchor.get("sql_anchor_columns") or []
-                st.caption(f"Columns: {', '.join(map(str, cols)) if cols else '—'}")
-                st.caption(f"Turn: {anchor.get('anchor_turn', 0)}")
-
-        force = data.get("force_narration") or False
-        show_narr = narration_on or force
-        if show_narr:
-            render_narration_card(data.get("narration"))
-
-        render_trust_score_card(evidence)
-
+        elapsed = data.get("elapsed")
         rdf = data.get("result_df")
         src_q = data.get("source_question") or msg.get("content") or ""
-        if isinstance(rdf, pd.DataFrame):
+
+        # Header: timing only (keep UI calm)
+        if elapsed is not None:
             st.markdown(
-                f'<div class="chat-results-label">📋 Query Results ({len(rdf):,} rows)</div>',
+                f'<span class="badge-semantic">⏱ {html.escape(str(elapsed))}s</span>',
                 unsafe_allow_html=True,
             )
-            # Unique key from timestamp + question hash
+
+        # 1) Table (+ chart) first — primary deliverable
+        if isinstance(rdf, pd.DataFrame) and not rdf.empty:
+            st.markdown(
+                f'<div class="chat-results-label">📋 Results ({len(rdf):,} rows)</div>',
+                unsafe_allow_html=True,
+            )
             key_base = f"chat_{html.escape(str(msg.get('timestamp','')))}_{abs(hash(src_q)) % 10_000}"
             tab_t, tab_c = st.tabs(["📊 Table", "📈 Chart"])
             with tab_t:
@@ -1450,11 +1500,58 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
                         st.dataframe(rdf, use_container_width=True)
             with tab_c:
                 _render_chat_chart(rdf, src_q, key_base)
+        elif isinstance(rdf, pd.DataFrame) and rdf.empty:
+            st.info("No rows returned for this question.")
 
-        sql = data.get("sql")
-        if sql and not str(sql).startswith("--"):
-            with st.expander("🔍 SQL used (click to inspect)"):
+        # 2) Narration directly under the table
+        force = data.get("force_narration") or False
+        show_narr = narration_on or force
+        if show_narr:
+            render_narration_card(data.get("narration"))
+
+        # 3) Everything else collapsed — optional details
+        with st.expander("🔎 Details (trust, context, SQL)", expanded=False):
+            badge = get_execution_badge(evidence) if evidence else {"icon": "🧠", "label": "Semantic + AI"}
+            if (evidence or {}).get("modified"):
+                badge = {"icon": "✏️", "label": "Modified", "colour": "emerald"}
+            st.markdown(
+                f'<span class="{_badge_class(evidence)}">{badge.get("icon","")} '
+                f'{html.escape(badge.get("label",""))}</span>',
+                unsafe_allow_html=True,
+            )
+            banner = _modification_banner(evidence)
+            if banner:
+                st.markdown(banner, unsafe_allow_html=True)
+
+            matches = data.get("glossary_matches") or []
+            if matches:
+                chips = []
+                for m in matches[:3]:
+                    label = html.escape(str(m.get("term_name") or ""))
+                    expr = m.get("sql_expression") or m.get("source_column") or ""
+                    expr_s = html.escape(" ".join(str(expr).split())[:40])
+                    chips.append(
+                        f"<span class='sem-term-badge'>{label}"
+                        + (f"<span class='sem-expr'>= {expr_s}</span>" if expr_s else "")
+                        + "</span>"
+                    )
+                st.markdown(" ".join(chips), unsafe_allow_html=True)
+
+            if (evidence or {}).get("modified"):
+                anchor = get_sql_anchor() or {}
+                st.caption(f"Metric: {anchor.get('sql_anchor_metric') or '—'}")
+                filt = anchor.get("sql_anchor_filters") or []
+                st.caption(f"Filters: {'; '.join(filt) if filt else '—'}")
+                cols = anchor.get("sql_anchor_columns") or []
+                st.caption(f"Columns: {', '.join(map(str, cols)) if cols else '—'}")
+
+            render_trust_score_card(evidence, show_summary=False)
+
+            sql = data.get("sql")
+            if sql and not str(sql).startswith("-- Answered from OKF"):
                 st.code(sql, language="sql")
+            elif sql:
+                st.caption(sql)
 
     st.markdown("</div></div>", unsafe_allow_html=True)
     st.markdown(

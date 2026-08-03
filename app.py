@@ -130,6 +130,15 @@ if not st.session_state.dfs:
 
 glossary_store.seed_glossary_once()
 
+# Auto-seed India PV SOPs into OKF when the knowledge index is empty
+if not st.session_state.get("_okf_autosseed_done"):
+    try:
+        from features.okf_knowledge.okf_answer import ensure_okf_ready
+        ensure_okf_ready()
+    except Exception:
+        pass
+    st.session_state["_okf_autosseed_done"] = True
+
 tables     = list(st.session_state.dfs.keys())
 working_df = get_working_df()
 

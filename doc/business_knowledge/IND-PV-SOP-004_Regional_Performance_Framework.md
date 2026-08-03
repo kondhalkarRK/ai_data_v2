@@ -1,22 +1,21 @@
-# IND-PV-SOP-004 — Regional Territory Performance Framework
+# IND-PV-SOP-004 — Dealer Network Territory Review & Escalation
 
 **Document ID:** IND-PV-SOP-004  
-**Version:** 1.3  
+**Version:** 2.0  
 **Effective date:** 01-Jul-2023  
-**Last review:** 01-Jun-2026  
-**Owner:** Regional Sales Excellence  
-**Audience:** Regional Heads, City Managers, Sales Ops, Executives  
-**Related tables:** `dim_region` (`region_name`, `city`, `state_code`, `country`), `fact_sales.region_id`
+**Last review:** 01-Jul-2026  
+**Owner:** Regional Sales Excellence / Network Development  
+**Audience:** Regional Heads, City Managers, Dealer Principals, Sales Ops  
 
 ---
 
 ## 1. Purpose
 
-Define how India geographic performance is measured, reviewed, and narrated using the five commercial zones and fourteen city hubs in the analytics dataset.
+Define the **monthly territory review** for India passenger-vehicle retail: how zones and city hubs are scored, when underperformance escalates, and how drill-downs must run before model-level conclusions.
 
-## 2. Territory master (certified)
+## 2. Territory master
 
-| Zone (`region_name`) | Hub cities in dataset | Review cadence |
+| Zone (`region_name`) | Hub cities | Primary review |
 |---|---|---|
 | North | Delhi NCR, Chandigarh, Jaipur | Monthly + festive deep-dive |
 | West | Mumbai, Pune, Ahmedabad | Monthly |
@@ -24,54 +23,47 @@ Define how India geographic performance is measured, reviewed, and narrated usin
 | East | Kolkata, Bhubaneswar | Monthly |
 | Central | Indore, Nagpur | Monthly |
 
-Country is **India** for all hubs. External exports are out of scope.
+Country = **India** for all hubs. Export retail is out of scope.
 
-## 3. Performance scorecard (per territory)
+## 3. Monthly scorecard (per zone / city)
 
-For each zone or city, the monthly pack must show:
+Prepare in this order (Country → Zone → City → Make → Model):
 
-1. **Units Sold** — `SUM(order_qty)`  
-2. **Revenue** — `SUM(total_sales)`  
-3. **ASP** — revenue / units  
-4. **Orders** — `COUNT(order_id)`  
-5. **Mix** — share of SUV vs Hatchback; EV share (SOP-003)  
-6. **Concentration** — top make share (watch Maruti/Tata/Mahindra dominance)
+1. Units Sold — `SUM(order_qty)`  
+2. Revenue — `SUM(total_sales)`  
+3. ASP — revenue / units  
+4. Orders — `COUNT(order_id)`  
+5. Mix — SUV vs Hatch; EV share (SOP-003)  
+6. Concentration — top make share (watch Maruti / Tata / Mahindra)
 
-### 3.1 Metro bias note
+### 3.1 Metro bias
 
-Delhi NCR, Mumbai, Bengaluru, Chennai, Hyderabad typically carry higher order weights in the extract. Narratives should not conclude “South is weak” from raw totals without normalising by hub count or comparing **per-city** run-rates.
+Metro hubs can dominate zone totals. Always show **city contribution %** before declaring a zone “weak”.
 
-## 4. Colour & preference overlays (optional)
+## 4. Escalation thresholds
 
-India retail colour preference in this dataset skews to **White, Silver, Black, Grey, Pearl White**. Regional packs may show `colour_name` mix; treat colour as secondary insight, not a primary KPI.
-
-## 5. Salesperson productivity
-
-- Display name: `first_name || ' ' || last_name`.
-- Active flag comes from `dim_salesman.active`.
-- Territory questions about “who sells best in West” must filter `region_name = 'West'` then rank people by units or revenue as asked (default revenue for “best salesperson”, units for “volume leader”).
-
-## 6. Drill path (mandatory for AI & analysts)
-
-Country → Zone (`region_name`) → City → Make → Model → Colour
-
-Never jump from Country straight to Model in an executive narrative without an intermediate geographic or brand roll-up when the question is regional.
-
-## 7. Red / amber / green thresholds (guidance)
-
-| Signal | Amber | Red |
+| Signal | Threshold | Action |
 |---|---|---|
-| YoY units (vs non-2020 base) | −5% to −15% | < −15% |
-| EV share lag vs national | −3 to −5 pp | < −5 pp vs national |
-| Top-make concentration | > 45% | > 55% (diversification risk) |
+| Units vs prior year (same months) | ≤ −15% for 2 months | City Manager corrective plan |
+| Units vs prior year | ≤ −25% for 2 months | Regional Head on-site review |
+| EV share vs national | Gap ≥ 5 pp with stock available | EV Champion + marketing push |
+| Aged retail stock > 90 days | > 10% of dealer stock | Stock liquidation plan |
 
-Actions:
+## 5. Review meeting agenda (90 min)
 
-- Amber → regional review within 2 weeks.  
-- Red → escalation to Sales Head; attach COVID/festive context if relevant (SOP-002).
+1. Volume & revenue vs target (15)  
+2. Mix & EV (15)  
+3. Manpower / productivity (15)  
+4. Aged stock & colour skew (15)  
+5. Competitive losses (15)  
+6. Actions with owners & dates (15)
 
-## 8. Narrative examples
+## 6. Narrative rules
 
-> “West (Mumbai–Pune–Ahmedabad) leads revenue contribution among zones this period. Within West, review Pune vs Mumbai unit mix before reallocating demo stock.”
+- Do not blame East underperformance on “brand” without checking festive timing and network density.  
+- Do not aggregate all India then jump to one model — follow the drill path.  
+- Incomplete year → label **YTD**.
 
-> “East volumes remain thinner on a hub-count basis; evaluate Kolkata EV readiness separately from Bhubaneswar ICE demand.”
+## 7. Records
+
+Store MBR pack + action log for 3 years. Analytics keys: `region_id` → `dim_region`.

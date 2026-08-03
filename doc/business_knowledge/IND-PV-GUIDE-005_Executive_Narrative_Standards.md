@@ -1,96 +1,61 @@
-# IND-PV-GUIDE-005 — Executive Narrative & Insight Standards
+# IND-PV-GUIDE-005 — Monthly Business Review (MBR) Narrative Pack Standard
 
 **Document ID:** IND-PV-GUIDE-005  
-**Version:** 1.2  
+**Version:** 2.0  
 **Effective date:** 01-Jan-2025  
-**Last review:** 25-Jun-2026  
-**Owner:** Business Insights Office  
-**Audience:** AI Copilot designers, Analysts, CXO briefing authors  
-**Companion SOPs:** 001 (metrics), 002 (COVID), 003 (EV), 004 (regions)
+**Last review:** 25-Jul-2026  
+**Owner:** Business Insights Office / Commercial Excellence  
+**Audience:** Regional Controllers, Analysts, AI Copilot designers, CXO briefing authors  
+**Companion SOPs:** 001 (retail control), 002 (demand shock), 003 (EV), 004 (territory)  
 
 ---
 
 ## 1. Purpose
 
-Raise narrative quality from “chart caption” to **decision-grade commentary** that executives trust. This guide is the behavioural contract for AI-generated narration when OKF knowledge is available.
+Define how India PV **MBR commentary** is written so packs and AI narration read like dealer-network operating reviews — not glossary captions.
 
-## 2. Insight classes (use the highest that data supports)
+## 2. Pack structure (fixed order)
 
-| Class | Definition | Example |
+1. **Network pulse** — units, revenue, ASP, orders (SOP-001 definitions).  
+2. **Demand context** — shock / recovery flags (SOP-002).  
+3. **Powertrain / EV** — unit share + absolute EV units (SOP-003).  
+4. **Territory** — Country → Zone → City (SOP-004).  
+5. **Actions** — max 5, each with owner and due date.
+
+## 3. Insight quality bar
+
+| Class | Meaning | Example |
 |---|---|---|
-| L1 Descriptive | What happened | “Maruti leads units in 2024.” |
-| L2 Comparative | Vs peer / prior | “Tata units grew faster than Maruti YoY.” |
-| L3 Contextual | Links to SOP market knowledge | “2020 dip is COVID lockdown, not brand failure (SOP-002).” |
-| L4 Prescriptive | Recommended action | “Reallocate demo inventory to South EV hubs where EV share > national.” |
+| L1 Descriptive | What happened | “Maruti leads units in West.” |
+| L2 Comparative | Vs peer / prior | “Tata EV units grew faster than Maruti YoY.” |
+| L3 Contextual | Links to SOP operating reality | “2020 dip is lockdown demand shock (SOP-002).” |
+| L4 Prescriptive | Operating action | “Redeploy demo EVs to South hubs where EV share trails national by ≥5 pp (SOP-004).” |
 
-AI answers should aim for **L2 minimum**, **L3 when OKF retrieves a relevant SOP**, **L4 only when thresholds in SOP-004 are met**.
+Minimum for CXO pack: **L2**. Prefer **L3** when SOP knowledge applies.
 
-## 3. Structure of a best-in-class narrative
+## 4. Writing rules
 
-1. **Headline** — one line, metric + winner + period.  
-2. **Story** — 2–4 sentences: magnitude, leader, context.  
-3. **Findings** — max 3 bullets.  
-4. **Recommendation** — one next drill or action.  
-5. **Knowledge citation** — when SOP text influenced the story: `(IND-PV-SOP-00X)`.
+1. Headline = metric + leader + period.  
+2. Body = 2–4 sentences: magnitude, leader, operating context.  
+3. Max 3 findings; 1 recommendation.  
+4. Cite SOP IDs when guidance drove the story (`IND-PV-SOP-003`).  
+5. Currency = ₹ (Lakh / Crore). Volume = units with thousand separators.  
+6. Never present partial-year totals as full-year YoY without **YTD** label.
 
-### 3.1 Currency & volume formatting (India)
+## 5. Forbidden phrases
 
-- Revenue: ₹ with Lakh / Crore scaling for large numbers.  
-- Volume: integers with thousand separators + “units”.  
-- Never show £ or $ for this India PV domain.
+- “Sales collapsed because the brand failed” (when SOP-002 shock applies)  
+- “Everyone is buying EVs” (when ICE absolute units still dominate)  
+- “East is weak” without city contribution and network density  
 
-### 3.2 Forbidden narrative patterns
+## 6. AI Copilot checklist before publish
 
-- “Breakdown of revenue” without naming the leader.  
-- Decimal quarters (`2024-Q1.333`).  
-- Units Sold = 0 while orders exist (metric mapping bug).  
-- Blaming an OEM for 2020 industry trough.  
-- Calling Hybrid an EV without saying electrified.
+- [ ] Metrics match SOP-001  
+- [ ] 2020 / shock years contextualised (SOP-002)  
+- [ ] EV share is units-based (SOP-003)  
+- [ ] Geography drilled correctly (SOP-004)  
+- [ ] Actionable next step present  
 
-## 4. Domain storylines that resonate with leaders
+## 7. Retention
 
-Use these arcs when data supports them:
-
-1. **COVID scar & recovery** — 2019 baseline → 2020 trough → 2023+ strength (SOP-002).  
-2. **EV adoption curve** — share rising into mid-teens; ICE still majority (SOP-003).  
-3. **OEM oligopoly of volume** — Maruti, Tata, Mahindra concentration (SOP-001 / 004).  
-4. **SUVisation** — SUV share of body style mix.  
-5. **Festive H2 uplift** — Sep–Dec seasonality.
-
-## 5. Hybrid answer pattern (data + knowledge)
-
-When both SQL results and OKF snippets exist:
-
-```
-[Data finding]
-[SOP context sentence]
-[Recommended next question]
-Source: IND-PV-SOP-00X
-```
-
-Example:
-
-> Tata leads EV units in the latest period. Per IND-PV-SOP-003, EV share should be reported on units (not orders), and Petrol remains the volume backbone nationally. Next: compare EV share by South vs West metros.
-
-## 6. Role-based emphasis
-
-| Persona | Emphasise | De-emphasise |
-|---|---|---|
-| CXO | YoY, recovery, EV share, concentration risk | Colour SKUs, individual order IDs |
-| Regional Head | Zone/city units, salesperson productivity | National OEM philosophy |
-| FP&A | Revenue, ASP, AOV, certified formulas | Subjective brand stories |
-| Product | Powertrain, model, car_type mix | Corp ID lists |
-
-## 7. Quality checklist before publish / show in chat
-
-- [ ] Metric matches SOP-001  
-- [ ] Time label is Q1-YYYY / YYYY-MM compliant  
-- [ ] COVID disclaimer if 2020-centric  
-- [ ] EV formula stated if share discussed  
-- [ ] No raw surrogate keys  
-- [ ] Citation present if OKF used  
-- [ ] One clear next step
-
-## 8. Success definition
-
-A “best class” answer is one an executive can paste into a leadership email **without rewriting definitions**, and an analyst can reproduce exactly from certified SQL.
+MBR PDF + action tracker retained **3 years**.
