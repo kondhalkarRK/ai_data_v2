@@ -1,0 +1,185 @@
+================================================================================
+HOW OKF WORKS — MANAGER-FRIENDLY EXPLANATION
+AI Data Platform (India PV demo)
+================================================================================
+
+Use this note when managers ask: How does OKF work? How are PDFs read?
+How does it help answers in this app?
+
+--------------------------------------------------------------------------------
+WHAT IS OKF? (ONE LINE)
+--------------------------------------------------------------------------------
+
+OKF = Open Knowledge Format — a way to turn business PDFs/SOPs into small
+searchable knowledge pieces so the app can add BUSINESS CONTEXT to data
+answers (not replace the numbers).
+
+Think of it as:
+
+  CSV / database  ->  what happened (numbers)
+  OKF / SOPs      ->  what that means for the business (rules, definitions, policy)
+
+--------------------------------------------------------------------------------
+HOW IT WORKS (SIMPLE FLOW)
+--------------------------------------------------------------------------------
+
+  1. Manager/analyst uploads PDF or Markdown SOP
+          |
+          v
+  2. App reads the document (no AI yet — just text extraction)
+          |
+          v
+  3. Text is split into small "concepts" (chunks) and saved
+          |
+          v
+  4. Each chunk is indexed in a local search store
+     (like a mini Google for SOPs)
+          |
+          v
+  5. User asks a question in chat
+          |
+          v
+  6. App finds 2–3 relevant SOP snippets
+          |
+          v
+  7. Those snippets are added into:
+       - SQL generation guidance (metric meaning), and/or
+       - the narrative ("Business context…") with a citation
+
+--------------------------------------------------------------------------------
+HOW PDFs ARE READ (WHAT TO SAY IF ASKED)
+--------------------------------------------------------------------------------
+
+1. UPLOAD
+   Sidebar -> Knowledge Base (OKF) -> upload PDF/MD, or click
+   "SEED INDIA PV SOPs".
+
+2. EXTRACT TEXT
+   The app uses a PDF library (pypdf) to pull text page by page.
+   - No LLM/ChatGPT is called here -> cheap and auditable.
+   - It is reading text from the PDF, not "understanding" images/scans well
+     (scanned image-only PDFs are weak).
+
+3. BREAK INTO SMALL PIECES ("CONCEPTS")
+   Long pages are split by paragraphs into short chunks (about a few hundred
+   words each), so retrieval stays focused.
+
+4. SAVE AS OKF BUNDLE
+   Each chunk becomes a small Markdown file with metadata:
+   - title
+   - source document name
+   - page number
+   - tags
+   Stored under something like: rag_storage/okf_bundles/
+
+5. INDEX FOR SEARCH
+   Chunks are converted to vectors (embeddings) and stored in Chroma
+   (okf_knowledge collection).
+   That lets the app find similar meaning, not only exact keywords.
+
+6. AT QUESTION TIME
+   User question -> find top matching chunks -> inject into answer as
+   knowledge context + citation.
+
+--------------------------------------------------------------------------------
+WHAT OKF DOES NOT DO
+--------------------------------------------------------------------------------
+
+  Myth                                      Reality
+  ---------------------------------------   ------------------------------------
+  "OKF invents sales numbers"               No — numbers still come from CSV/SQL
+  "OKF replaces the semantic glossary"      No — glossary defines certified
+                                            metrics; OKF adds policy /
+                                            interpretation
+  "Every question uses OKF"                 Only when snippets are relevant
+                                            (COVID, EV rules, metric meaning,
+                                            regional policy, etc.)
+
+--------------------------------------------------------------------------------
+HOW OKF HELPS IN THIS APP (WITH EXAMPLES)
+--------------------------------------------------------------------------------
+
+EXAMPLE 1 — COVID QUESTION (SOP-002)
+
+  User asks: "Why were 2020 sales down?"
+
+  Without OKF:
+    Chart may show 2020 low, but narrative might sound like "brand failed."
+
+  With OKF:
+    Data still shows the dip. Narrative adds SOP context like:
+    2020 Apr–Jun was lockdown-driven demand freeze — treat as industry shock,
+    not automatic brand failure.
+    Citation: IND-PV-SOP-002…
+
+  Manager takeaway: Same numbers, safer leadership story.
+
+
+EXAMPLE 2 — EV QUESTION (SOP-003)
+
+  User asks: "Is EV demand increasing?"
+
+  Data: EV share of units rises over years.
+
+  OKF adds:
+  - EV share must be on units (SUM(order_qty)), not order count
+  - Petrol still dominates absolute volume
+  - Don't call Hybrid an "EV" unless saying "electrified"
+
+  Manager takeaway: Avoid wrong KPIs in board packs.
+
+
+EXAMPLE 3 — "TOP SELLING CAR" (SOP-001)
+
+  User asks: "Top selling car"
+
+  Semantic + OKF together:
+  "Top selling" = units sold, not revenue.
+  Cheap high-volume hatchback can correctly beat expensive low-volume SUV.
+
+  Manager takeaway: One company language for "selling."
+
+
+EXAMPLE 4 — HYBRID ANSWER (BEST DEMO)
+
+  1. "Units sold by year"           -> pure data
+  2. "Why was 2020 so low?"         -> data + OKF COVID SOP
+  3. "EV share by year"             -> data + OKF EV reporting SOP
+
+  Leaders see: numbers + policy + citation.
+
+--------------------------------------------------------------------------------
+30-SECOND ELEVATOR PITCH
+--------------------------------------------------------------------------------
+
+"We store sales in CSVs and define metrics in a semantic glossary.
+Separately, we ingest business SOPs into OKF — the PDF is read as text,
+split into small searchable pieces, and indexed. When someone asks a
+question, the app pulls the relevant SOP snippets and attaches them to
+the answer as business context with a source citation. So managers get
+accurate numbers AND the official interpretation rules."
+
+--------------------------------------------------------------------------------
+IF THEY ASK: IS THIS ACCURATE / AUDITABLE?
+--------------------------------------------------------------------------------
+
+Yes, for demo/enterprise messaging:
+
+- Ingestion is deterministic text extraction
+  (no hidden AI rewrite of the PDF)
+- Answers can show Knowledge source (document + section/page)
+- You can clear/re-seed the knowledge base from the sidebar
+
+--------------------------------------------------------------------------------
+RELATED FILES IN THIS PROJECT
+--------------------------------------------------------------------------------
+
+- Business SOPs:     doc/business_knowledge/
+- OKF code:          features/okf_knowledge/
+- Sidebar seed UI:   ui/sidebar.py
+- Narration + cites: features/narration_engine.py
+- Demo guide:        doc/leader_demo_guide.md
+
+================================================================================
+End of note
+================================================================================
