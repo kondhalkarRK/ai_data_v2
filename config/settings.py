@@ -24,23 +24,40 @@ except ImportError:
 def _secret(name: str, default=None):
     """Streamlit Cloud secrets first, then env / .env."""
     try:
-        if name in st.secrets:
-            return st.secrets[name]
+        val = st.secrets[name]
+        if val not in (None, ""):
+            return val
     except Exception:
         pass
-    return os.getenv(name, default)
+    try:
+        general = st.secrets["general"]
+        val = general[name]
+        if val not in (None, ""):
+            return val
+    except Exception:
+        pass
+    env = os.getenv(name)
+    if env not in (None, ""):
+        return env
+    return default
 
 
-# ─────────────────────────────────────────────────────────────────
-# LLM
-# ─────────────────────────────────────────────────────────────────
+def get_llm_config() -> dict:
+    """Read LLM settings at call time (Streamlit Cloud secrets load correctly)."""
+    return {
+        "base_url": _secret(
+            "CAPGEMINI_LLM_BASE_URL",
+            "https://openai.generative.engine.capgemini.com/v1",
+        ),
+        "api_key": _secret("CAPGEMINI_LLM_API_KEY"),
+        "model": _secret("CAPGEMINI_LLM_MODEL", "openai.gpt-5.1"),
+    }
 
-LLM_BASE_URL = _secret(
-    "CAPGEMINI_LLM_BASE_URL",
-    "https://openai.generative.engine.capgemini.com/v1",
-)
-LLM_API_KEY = _secret("CAPGEMINI_LLM_API_KEY")
-LLM_MODEL = _secret("CAPGEMINI_LLM_MODEL", "openai.gpt-5.1")
+
+# Back-compat module-level names (lazy via get_llm_config when init runs)
+LLM_BASE_URL = None
+LLM_API_KEY = None
+LLM_MODEL = None
 
 
 @st.cache_resource(show_spinner=False)
@@ -50,14 +67,26 @@ def init_llm() -> object | None:
     Returns None if the LLM package is unavailable or initialization fails,
     so calling code should handle the None case gracefully.
     """
+    global LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
+
+    cfg = get_llm_config()
+    LLM_BASE_URL = cfg["base_url"]
+    LLM_API_KEY = cfg["api_key"]
+    LLM_MODEL = cfg["model"]
+
     if not _LLM_AVAILABLE:
         logger.warning("langchain_openai is not installed; LLM features disabled.")
+        st.session_state["_llm_init_error"] = "langchain-openai package not installed"
         return None
 
     if not LLM_API_KEY:
         logger.error(
-            "CAPGEMINI_LLM_API_KEY is not set. Add it to your .env file "
-            "or environment variables before starting the app."
+            "CAPGEMINI_LLM_API_KEY is not set. Add it in Streamlit Cloud "
+            "Settings → Secrets, or in a local .env file."
+        )
+        st.session_state["_llm_init_error"] = (
+            "CAPGEMINI_LLM_API_KEY missing — add it in Streamlit "
+            "Settings → Secrets (see secrets.example.toml)"
         )
         return None
 
@@ -72,9 +101,11 @@ def init_llm() -> object | None:
             timeout=55,
             max_retries=1,
         )
+        st.session_state.pop("_llm_init_error", None)
         return llm
     except Exception as e:
         logger.error(f"Failed to initialize LLM client: {e}", exc_info=True)
+        st.session_state["_llm_init_error"] = f"LLM init failed: {e}"
         return None
 
 
