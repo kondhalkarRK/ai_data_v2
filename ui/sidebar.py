@@ -132,24 +132,6 @@ def render():
         section_spacer()
 
         # =========================
-        # APPEARANCE (Light / Dark / AI)
-        # =========================
-        with st.container(border=True):
-            section_title("🎨 APPEARANCE")
-            section_spacer()
-            theme_labels = {"light": "☀️ Light", "dark": "🌙 Dark", "ai": "✨ AI"}
-            st.radio(
-                "Theme",
-                options=list(theme_labels.keys()),
-                format_func=lambda k: theme_labels[k],
-                horizontal=True,
-                label_visibility="collapsed",
-                key="ui_theme",
-            )
-
-        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
-
-        # =========================
         # FILES
         # =========================
         with st.container(border=True):

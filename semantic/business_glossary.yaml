@@ -629,10 +629,10 @@ domain_rules:
     - Never rank top selling cars by revenue
     - Never answer between-year gain questions with only 2 columns (entity + one total)
   default_behaviours:
-    - No LIMIT specified: add LIMIT 500
-    - Top/bottom without N: use 10
-    - Trend without grain: use monthly
-    - Date filter without year: use all years
-    - Units sold means SUM(order_qty) not COUNT(*)
-    - Top selling car/model/make means units volume unless user says revenue
-    - "Which make/model gained most between years" defaults dimension to make unless user names model/car type
+    - "No LIMIT specified: add LIMIT 500"
+    - "Top/bottom without N: use 10"
+    - "Trend without grain: use monthly"
+    - "Date filter without year: use all years"
+    - "Units sold means SUM(order_qty) not COUNT(*)"
+    - "Top selling car/model/make means units volume unless user says revenue"
+    - "Which make/model gained most between years defaults dimension to make unless user names model/car type"
