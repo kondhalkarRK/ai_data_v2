@@ -7,18 +7,8 @@ import pandas as pd
 
 from core.schema_builder import build_rich_schema
 from features.rag_query_memory import embedder
-from features.rag_query_memory.vector_store import get_chroma_client, query_collection
-
-_COLLECTION_SCHEMA_CONTEXT = "schema_context"
-
-
-def _get_schema_collection():
-    """Get or create the schema_context collection; returns None on failure."""
-    try:
-        client = get_chroma_client()
-        return client.get_or_create_collection(_COLLECTION_SCHEMA_CONTEXT)
-    except Exception:
-        return None
+from features.rag_query_memory.vector_store import query_collection
+from features.vector_schema_retrieval.schema_indexer import get_schema_collection
 
 
 def retrieve_relevant_columns(question: str, all_columns: list[str], k: int = 12) -> list[str]:
@@ -30,7 +20,7 @@ def retrieve_relevant_columns(question: str, all_columns: list[str], k: int = 12
         embedding = embedder.embed_text(question)
         if not embedding:
             return all_columns
-        collection = _get_schema_collection()
+        collection = get_schema_collection()
         if collection is None:
             return all_columns
         if collection.count() == 0:

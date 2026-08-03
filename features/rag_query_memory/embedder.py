@@ -22,3 +22,11 @@ def embed_text(text: str) -> list[float]:
         return vector.tolist()
     except Exception:
         return []
+
+
+def truncate_text(text: str, max_len: int) -> str:
+    """Truncate text with ellipsis when longer than max_len."""
+    text = (text or "").strip()
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 3] + "..."

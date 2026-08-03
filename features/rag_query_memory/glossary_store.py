@@ -17,14 +17,6 @@ GLOSSARY_SEED = [
 _MAX_GLOSSARY_PROMPT_CHARS = 400  # ~100 tokens for glossary block
 
 
-def _truncate(text: str, max_len: int) -> str:
-    """Truncate text with ellipsis when longer than max_len."""
-    text = (text or "").strip()
-    if len(text) <= max_len:
-        return text
-    return text[: max_len - 3] + "..."
-
-
 def seed_glossary_once() -> None:
     """Seed glossary collection once when empty."""
     try:
@@ -66,7 +58,7 @@ def retrieve_glossary_terms(question: str, k: int = 2) -> list[dict]:
         for meta in metadatas[0]:
             meta = meta or {}
             term = (meta.get("term") or "").strip()
-            definition = _truncate(meta.get("definition") or "", 120)
+            definition = embedder.truncate_text(meta.get("definition") or "", 120)
             if term and definition:
                 terms.append({"term": term, "definition": definition})
         return terms[:k]

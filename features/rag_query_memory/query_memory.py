@@ -9,14 +9,6 @@ from features.rag_query_memory import embedder, vector_store
 _MAX_PROMPT_CHARS = 600  # ~150 tokens for examples block
 
 
-def _truncate(text: str, max_len: int) -> str:
-    """Truncate text with ellipsis when longer than max_len."""
-    text = (text or "").strip()
-    if len(text) <= max_len:
-        return text
-    return text[: max_len - 3] + "..."
-
-
 def store_successful_query(question: str, sql: str, max_len: int = 200) -> None:
     """Persist a successful question/SQL pair for future few-shot retrieval."""
     try:
@@ -24,7 +16,7 @@ def store_successful_query(question: str, sql: str, max_len: int = 200) -> None:
             return
         if sql.strip().startswith("-- served from materialized view --"):
             return
-        sql_trunc = _truncate(sql, max_len)
+        sql_trunc = embedder.truncate_text(sql, max_len)
         embedding = embedder.embed_text(question)
         if not embedding:
             return
@@ -61,7 +53,7 @@ def retrieve_similar_queries(question: str, k: int = 2) -> list[dict]:
             meta = meta or {}
             examples.append({
                 "question": meta.get("question") or doc or "",
-                "sql": _truncate(meta.get("sql") or "", 200),
+                "sql": embedder.truncate_text(meta.get("sql") or "", 200),
             })
         return examples[:k]
     except Exception:

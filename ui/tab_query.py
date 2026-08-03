@@ -301,8 +301,6 @@ def render_editable_sql(sql: str, working_df, result_key: str = "ask_custom_resu
 # ── Ask / Query mode ─────────────────────────────────────────────
 
 def render_ask_mode(working_df, tables, dfs):
-    st.session_state["_last_working_df"] = working_df
-
     insights = _safe_insights(working_df, limit=3)
     if insights:
         with st.expander(f"💡 {len(insights)} Proactive Insights", expanded=False):
@@ -384,7 +382,6 @@ def render_ask_mode(working_df, tables, dfs):
             scenario = whatif_engine.parse_scenario(q, working_df)
             result = whatif_engine.run_scenario(working_df, scenario)
             st.session_state["whatif_last_result"] = result
-            st.session_state["whatif_last_scenario"] = scenario
             status.update(label="✅ Scenario complete", state="complete", expanded=False)
             whatif_engine.generate_interactive_result(result, q, working_df, scenario)
             return
@@ -1392,11 +1389,10 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
 def render_user_bubble(msg):
     st.markdown(
         f"""
-        <div class="user-bubble chat-msg-gap">
-          <div class="user-bubble-text">{html.escape(str(msg.get('content','')))}</div>
-          <div class="user-avatar">👤</div>
+        <div class="cgpt-row cgpt-row-user chat-msg-gap">
+          <div class="cgpt-user-bubble">{html.escape(str(msg.get('content','')))}</div>
         </div>
-        <div class="msg-timestamp-right">{html.escape(str(msg.get('timestamp','')))}</div>
+        <div class="cgpt-meta cgpt-meta-right">{html.escape(str(msg.get('timestamp','')))}</div>
         """,
         unsafe_allow_html=True,
     )
@@ -1419,9 +1415,9 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
 
     st.markdown(
         f"""
-        <div class="assistant-bubble chat-msg-gap">
-          <div class="assistant-avatar">🤖</div>
-          <div class="{card_cls}">
+        <div class="cgpt-row cgpt-row-assistant chat-msg-gap">
+          <div class="cgpt-assistant-avatar">✦</div>
+          <div class="{card_cls} cgpt-assistant-card">
         """,
         unsafe_allow_html=True,
     )
@@ -1555,48 +1551,38 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
 
     st.markdown("</div></div>", unsafe_allow_html=True)
     st.markdown(
-        f'<div class="msg-timestamp">{html.escape(str(msg.get("timestamp","")))}</div>',
+        f'<div class="cgpt-meta">{html.escape(str(msg.get("timestamp","")))}</div>',
         unsafe_allow_html=True,
     )
 
 
 def render_chat_mode(working_df, tables, dfs):
-    st.session_state["_last_working_df"] = working_df
     st.session_state.setdefault("chat_messages", [])
     st.session_state.setdefault("chat_narration_on", True)
 
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        narration_on = st.toggle(
-            "📖 Narration",
-            value=st.session_state.chat_narration_on,
-            key="chat_narration_toggle",
-        )
-        st.session_state.chat_narration_on = narration_on
-    with c2:
-        if st.button("🗑 Clear Chat", use_container_width=True, key="clear_chat_btn"):
-            st.session_state.chat_messages = []
-            clear_state()
-            clear_sql_anchor()
-            st.toast("Chat cleared", icon="🗑")
-            st.rerun()
+    narration_on = st.toggle(
+        "Narration",
+        value=st.session_state.chat_narration_on,
+        key="chat_narration_toggle",
+        help="Show narrative insight under query results",
+    )
+    st.session_state.chat_narration_on = narration_on
 
-    chat_box = st.container(height=520, border=True)
+    st.markdown('<div class="cgpt-chat-shell">', unsafe_allow_html=True)
+    chat_box = st.container(height=560, border=False)
     with chat_box:
         if not st.session_state.chat_messages:
-            insights = _safe_insights(working_df, limit=4)
             st.markdown(
                 """
-                <div class="chat-welcome-card">
-                  <div class="chat-welcome-title">👋 Hi! I've analysed your data.</div>
-                  <div class="chat-welcome-subtitle">Ask about revenue, colours, makes — or say
-                  <b>surprise me</b>. Follow-ups like "same for 2023" work too.</div>
+                <div class="cgpt-welcome">
+                  <div class="cgpt-welcome-orb"></div>
+                  <div class="cgpt-welcome-title">How can I help with your data?</div>
+                  <div class="cgpt-welcome-sub">Ask about revenue, units, makes, regions, EV share — or try
+                  <span class="cgpt-chip">surprise me</span></div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
-            for ins in insights:
-                st.markdown(f"**{ins.get('title','')}** — {ins.get('summary','')}")
         else:
             for msg in st.session_state.chat_messages:
                 if msg.get("role") == "user":
@@ -1608,13 +1594,24 @@ def render_chat_mode(working_df, tables, dfs):
         st.markdown('<div id="chat-scroll-anchor"></div>', unsafe_allow_html=True)
 
     _chat_scroll_to_bottom()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="chat-input-area chat-input-area-visible">', unsafe_allow_html=True)
+    st.markdown('<div class="cgpt-input-wrap">', unsafe_allow_html=True)
     question = st.chat_input(
-        "Ask about your data, say hi, or try “surprise me”…",
+        "Message AI Data Concierge…",
         key="chat_main_input",
     )
     st.markdown("</div>", unsafe_allow_html=True)
+
+    clr_l, clr_r = st.columns([6, 1])
+    with clr_r:
+        if st.button("Clear chat", use_container_width=True, key="clear_chat_btn"):
+            st.session_state.chat_messages = []
+            clear_state()
+            clear_sql_anchor()
+            st.toast("Chat cleared", icon="🗑")
+            st.rerun()
+
     if question and question.strip():
         process_chat_message(question, working_df)
 

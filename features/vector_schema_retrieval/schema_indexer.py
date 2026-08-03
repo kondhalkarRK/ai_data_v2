@@ -11,7 +11,7 @@ from features.rag_query_memory.vector_store import get_chroma_client
 _COLLECTION_SCHEMA_CONTEXT = "schema_context"
 
 
-def _get_schema_collection():
+def get_schema_collection():
     """Get or create the schema_context collection; returns None on failure."""
     try:
         client = get_chroma_client()
@@ -42,7 +42,7 @@ def index_schema_columns(df: pd.DataFrame, table_name: str = "df") -> None:
     try:
         if df is None or df.empty or df.shape[1] <= 25:
             return
-        collection = _get_schema_collection()
+        collection = get_schema_collection()
         if collection is None:
             return
         ids, documents, embeddings, metadatas = [], [], [], []

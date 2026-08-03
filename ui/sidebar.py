@@ -59,11 +59,6 @@ def upload_dialog():
                     except Exception:
                         pass
 
-                    st.session_state.sidebar_uploaded_names = [
-                        getattr(f, "name", "uploaded_file")
-                        for f in uploaded_files
-                    ]
-
                     st.success(f"Loaded {len(uploaded_files)} file(s)")
                     st.rerun()
 
@@ -236,7 +231,6 @@ def render():
                     st.session_state.memory      = {}
                     st.session_state.last_plan   = None
                     st.session_state.last_query  = ""
-                    st.session_state.query_history = []
                     try:
                         from core.conversation_state import clear_sql_anchor
                         clear_sql_anchor()

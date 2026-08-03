@@ -5,22 +5,15 @@ import streamlit as st
 
 from core.join_engine import (
     auto_join,
-    manual_join,
     sql_join,
-    semantic_auto_join,        # ← new import only
+    semantic_auto_join,
 )
 
-# ─────────────────────────────────────────────────────────────────
-# TAB 1 — JOIN / COMBINE
-# ─────────────────────────────────────────────────────────────────
-def render(working_df, tables, dfs):
-    # st.markdown('<div class="hero-card glass-card"><div class="hero-left"><div class="hero-title">Data Fusion Studio</div><div class="hero-sub">Semantic Relationship Intelligence — design reliable joins</div></div></div>', unsafe_allow_html=True)
 
+def render(working_df, tables, dfs):
     if len(dfs) == 1:
         st.info("Only one table loaded — no joining needed. Go to AI Query.")
         return
-
-    # st.subheader("🔗 Combine Tables")
 
     semantic_used = st.session_state.get("semantic_join_used", None)
     semantic_loader = st.session_state.get("semantic_loader")
@@ -59,11 +52,7 @@ def render(working_df, tables, dfs):
         ["🤖 Auto-detect (recommended)", "📝 SQL Query"],
         horizontal=True,
     )
-    st.session_state.join_mode = (
-        "auto"   if "Auto"   in mode_label else
-        "manual" if "Manual" in mode_label else
-        "sql"
-    )
+    st.session_state.join_mode = "auto" if "Auto" in mode_label else "sql"
     st.markdown("---")
 
     # ─────────────────────────────────────────────────────────────
@@ -228,53 +217,7 @@ def render(working_df, tables, dfs):
                 )
 
     # ─────────────────────────────────────────────────────────────
-    # MANUAL MODE — unchanged from original
-    # # ─────────────────────────────────────────────────────────────
-    # elif st.session_state.join_mode == "manual":
-    #     joins = st.session_state.manual_joins
-    #     if not joins:
-    #         joins[0] = {
-    #             "left":     tables[0],
-    #             "right":    tables[min(1, len(tables) - 1)],
-    #             "left_on":  "",
-    #             "right_on": "",
-    #             "type":     "inner",
-    #         }
-    #     to_del = []
-    #     for i, j in joins.items():
-    #         c0, c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 2, 1, 0.5])
-    #         j["left"]    = c0.selectbox("Base",       tables, index=tables.index(j["left"])  if j["left"]  in tables else 0, key=f"l{i}")
-    #         j["right"]   = c1.selectbox("Join Table", tables, index=tables.index(j["right"]) if j["right"] in tables else 0, key=f"r{i}")
-    #         lc = list(dfs[j["left"]].columns)
-    #         rc = list(dfs[j["right"]].columns)
-    #         j["left_on"]  = c2.selectbox("Left Key",  lc, key=f"lk{i}")
-    #         j["right_on"] = c3.selectbox("Right Key", rc, key=f"rk{i}")
-    #         j["type"]     = c4.selectbox("Type", ["inner", "left", "right", "outer"], key=f"jt{i}")
-    #         if c5.button("❌", key=f"d{i}"):
-    #             to_del.append(i)
-    #     for r in to_del:
-    #         del st.session_state.manual_joins[r]
-    #     if to_del:
-    #         st.rerun()
-    #     ca, cb = st.columns(2)
-    #     if ca.button("➕ Add Join"):
-    #         nk = max(joins.keys(), default=-1) + 1
-    #         joins[nk] = {
-    #             "left":     tables[0],
-    #             "right":    tables[0],
-    #             "left_on":  "",
-    #             "right_on": "",
-    #             "type":     "inner",
-    #         }
-    #         st.rerun()
-    #     if cb.button("▶️ Preview"):
-    #         jdf = manual_join(dfs, joins)
-    #         if jdf is not None:
-    #             st.success(f"✅ {jdf.shape[0]:,} rows × {jdf.shape[1]} cols")
-    #             st.dataframe(jdf.head(100), use_container_width=True)
-
-    # ─────────────────────────────────────────────────────────────
-    # SQL MODE — unchanged from original
+    # SQL MODE
     # ─────────────────────────────────────────────────────────────
     elif st.session_state.join_mode == "sql":
         st.markdown(

@@ -101,17 +101,6 @@ def clear_state() -> None:
     clear_sql_anchor()
 
 
-def _extract_sql_clause(sql: str, keyword: str) -> str | None:
-    """Extract a top-level SQL clause body (rough, keyword → next keyword)."""
-    if not sql:
-        return None
-    pattern = rf"\b{keyword}\b\s+(.*?)(?=\b(?:WHERE|GROUP\s+BY|ORDER\s+BY|LIMIT|HAVING)\b|$)"
-    m = re.search(pattern, sql, flags=re.IGNORECASE | re.DOTALL)
-    if not m:
-        return None
-    return m.group(1).strip().rstrip(";")
-
-
 def set_sql_anchor(sql: str, question: str, df=None) -> None:
     """Parse successful SQL and store as surgical-edit anchor."""
     state = _ensure_state()
@@ -280,11 +269,6 @@ def resolve_clarification(choice: str) -> str | None:
         return original
     # Reconstruct: prefer "show {metric} by colour" style
     return f"show {metric} by colour"
-
-
-def clear_pending_clarification() -> None:
-    state = _ensure_state()
-    state["pending_clarification"] = None
 
 
 def detect_followup(question: str) -> bool:
@@ -633,23 +617,3 @@ def to_context_string() -> str:
     if state.get("is_followup"):
         parts.append("  This appears to be a follow-up query.")
     return "\n".join(parts)
-
-
-def get_badge_info() -> dict[str, Any]:
-    """Return display badge info for UI."""
-    state = get_state()
-    if state.get("is_followup"):
-        return {
-            "icon": "↩",
-            "label": "Follow-up",
-            "colour": "indigo",
-            "prior_question": state.get("continued_from") or state.get("last_question"),
-            "turn_count": state.get("turn_count", 0),
-        }
-    return {
-        "icon": "💬",
-        "label": "New query",
-        "colour": "slate",
-        "prior_question": None,
-        "turn_count": state.get("turn_count", 0),
-    }
