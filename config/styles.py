@@ -234,13 +234,12 @@ button[kind="primary"]:hover,
    AI COMMAND CENTER SIDEBAR
 ===================================== */
 .ai-loader{
-    position:fixed;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
+    position:relative;
     z-index:99999;
-    width:420px;
-    padding:24px;
+    width:300px;
+    max-width:90vw;
+    padding:26px 24px;
+    margin:0 auto;
     border-radius:18px;
     background:linear-gradient(180deg, rgba(10,15,30,.98), rgba(18,25,45,.98));
     border:1px solid rgba(79,124,255,.25);
@@ -998,7 +997,36 @@ div[role="radiogroup"] label{font-weight:700 !important;font-size:12.5px !import
     pointer-events:none !important;
 }
 
-/* Full-screen overlay */
+/* Boot / startup splash — full viewport, centred orb */
+.boot-screen-overlay{
+    position:fixed;
+    inset:0;
+    z-index:99997;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    background:rgba(3,7,17,0.88);
+    backdrop-filter:blur(6px);
+    pointer-events:none;
+}
+.boot-screen-overlay .ai-orb{
+    margin:0 auto 16px;
+}
+.boot-screen-title{
+    font-weight:800;
+    color:#f8fafc;
+    letter-spacing:.3px;
+    font-size:15px;
+}
+.boot-screen-sub{
+    margin-top:6px;
+    font-size:12px;
+    color:#8fa3ba;
+}
+
+/* Full-screen overlay (query / rerun spinner) */
 .ai-loader-overlay{
     position:fixed;inset:0;z-index:99998;
     display:none;align-items:center;justify-content:center;
@@ -1010,23 +1038,11 @@ div[role="radiogroup"] label{font-weight:700 !important;font-size:12.5px !import
 
 /* CHANGED: trigger overlay via Streamlit running state */
 body:has([data-testid="stStatusWidget"]) .ai-loader-overlay{
-    display:flex;
-}
-
-/* Loader card */
-.ai-loader{
-    position:static;
-    width:300px;
-    padding:26px 24px;
-    border-radius:20px;
-    background:linear-gradient(180deg, rgba(10,15,30,.98), rgba(18,25,45,.98));
-    border:1px solid rgba(79,124,255,.28);
-    box-shadow:0 0 50px rgba(79,124,255,.22), 0 20px 60px rgba(0,0,0,.5);
-    text-align:center;
+    display:flex !important;
 }
 
 /* AI orb spinner */
-.ai-orb{width:64px;height:64px;margin:2px auto 14px auto;position:relative;}
+.ai-orb{width:64px;height:64px;margin:0 auto 14px auto;position:relative;}
 .ai-orb .ring{position:absolute;inset:0;border-radius:50%;border:2px solid transparent;}
 .ai-orb .ring1{
     border-top-color:#4f7cff;

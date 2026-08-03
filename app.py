@@ -26,18 +26,14 @@ apply_styles()
 _boot_screen = st.empty()
 _boot_screen.markdown(
     """
-    <div style="display:flex;flex-direction:column;align-items:center;
-                justify-content:center;padding:90px 20px;">
+    <div class="boot-screen-overlay">
       <div class="ai-orb">
         <div class="ring ring1"></div>
         <div class="ring ring2"></div>
         <div class="core"></div>
       </div>
-      <div style="margin-top:16px;font-weight:800;color:#f8fafc;
-                  letter-spacing:.3px;">Initializing AI Data Platform…</div>
-      <div style="margin-top:4px;font-size:12px;color:#8fa3ba;">
-        Loading semantic model &amp; embedding engine
-      </div>
+      <div class="boot-screen-title">Initializing AI Data Platform…</div>
+      <div class="boot-screen-sub">Loading semantic model &amp; embedding engine</div>
     </div>
     """,
     unsafe_allow_html=True,
