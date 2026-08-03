@@ -44,6 +44,58 @@ def _fmt_number(v: float) -> str:
     if v >= 1_000:     return f"{v/1_000:.1f}K"
     return f"{v:,.0f}"
 
+
+def _same_period_yoy(df: pd.DataFrame, date_col: str, metric_col: str) -> dict:
+    """
+    YoY on a like-for-like calendar window.
+
+    If the latest year in the data is incomplete (max month < 12), compare
+    only months present in that year against the same months in the prior year
+    (YTD vs prior YTD). Otherwise compare full calendar years.
+    """
+    tmp = df[[date_col, metric_col]].copy()
+    tmp["__dt__"] = pd.to_datetime(tmp[date_col], errors="coerce")
+    tmp[metric_col] = pd.to_numeric(tmp[metric_col], errors="coerce")
+    tmp = tmp.dropna(subset=["__dt__", metric_col])
+    if tmp.empty:
+        return {}
+
+    tmp["__year__"] = tmp["__dt__"].dt.year
+    tmp["__month__"] = tmp["__dt__"].dt.month
+    years = sorted(tmp["__year__"].unique())
+    if len(years) < 2:
+        return {}
+
+    cy = int(years[-1])
+    py = int(years[-2])
+    max_month_cy = int(tmp.loc[tmp["__year__"] == cy, "__month__"].max())
+    incomplete = max_month_cy < 12
+    months = sorted(tmp.loc[tmp["__year__"] == cy, "__month__"].unique().tolist()) if incomplete else list(range(1, 13))
+
+    curr = float(tmp[(tmp["__year__"] == cy) & (tmp["__month__"].isin(months))][metric_col].sum())
+    prev = float(tmp[(tmp["__year__"] == py) & (tmp["__month__"].isin(months))][metric_col].sum())
+    if not prev:
+        return {}
+
+    month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    if incomplete and months:
+        period_label = f"{month_names[months[0]]}–{month_names[months[-1]]} YTD vs {py}"
+    else:
+        period_label = f"vs {py}"
+
+    return {
+        "yoy_growth": (curr - prev) / prev * 100,
+        "yoy_curr_year": cy,
+        "yoy_prev_year": py,
+        "yoy_incomplete": incomplete,
+        "yoy_months": months,
+        "yoy_label": period_label,
+        "yoy_curr_value": curr,
+        "yoy_prev_value": prev,
+    }
+
+
 # ─────────────────────────────────────────────────────────────────
 # KPI ENGINE
 # ─────────────────────────────────────────────────────────────────
@@ -92,14 +144,13 @@ def compute_kpis(df: pd.DataFrame) -> dict:
 
     if date_col and (rev_col or vol_col):
         try:
-            tmp = df.copy()
-            tmp["__year__"] = pd.to_datetime(tmp[date_col], errors="coerce").dt.year
+            # Same-period YoY: if the latest year is incomplete (e.g. data only
+            # through June 2026), compare YTD months to the same months prior year.
+            # Comparing full 2025 vs H1 2026 falsely shows ~-50% "decline".
             metric_col = rev_col or vol_col
-            yearly = (tmp.groupby("__year__")[metric_col].apply(lambda s: pd.to_numeric(s, errors="coerce").sum()).sort_index())
-            if len(yearly) >= 2:
-                cy = float(yearly.iloc[-1]); py = float(yearly.iloc[-2])
-                kpis["yoy_growth"]    = ((cy - py) / py * 100) if py else None
-                kpis["yoy_curr_year"] = int(yearly.index[-1])
+            yoy = _same_period_yoy(df, date_col, metric_col)
+            if yoy:
+                kpis.update(yoy)
         except Exception:
             pass
 
@@ -218,18 +269,28 @@ def compute_kpis(df: pd.DataFrame) -> dict:
 
     if seg_col and date_col and (vol_col or rev_col):
         try:
+            # Same-period YoY for segments (avoids full-year vs partial-year skew)
             metric_col = vol_col or rev_col
             tmp = df.copy()
-            tmp["__year__"] = pd.to_datetime(tmp[date_col], errors="coerce").dt.year
+            tmp["__dt__"] = pd.to_datetime(tmp[date_col], errors="coerce")
             tmp[metric_col] = pd.to_numeric(tmp[metric_col], errors="coerce")
-            years = sorted(tmp["__year__"].dropna().unique())
+            tmp = tmp.dropna(subset=["__dt__", metric_col, seg_col])
+            tmp["__year__"] = tmp["__dt__"].dt.year
+            tmp["__month__"] = tmp["__dt__"].dt.month
+            years = sorted(tmp["__year__"].unique())
             if len(years) >= 2:
-                cy, py = years[-1], years[-2]
-                curr = tmp[tmp["__year__"]==cy].groupby(seg_col)[metric_col].sum()
-                prev = tmp[tmp["__year__"]==py].groupby(seg_col)[metric_col].sum()
+                cy, py = int(years[-1]), int(years[-2])
+                max_m = int(tmp.loc[tmp["__year__"] == cy, "__month__"].max())
+                months = (
+                    sorted(tmp.loc[tmp["__year__"] == cy, "__month__"].unique().tolist())
+                    if max_m < 12 else list(range(1, 13))
+                )
+                curr = tmp[(tmp["__year__"] == cy) & (tmp["__month__"].isin(months))].groupby(seg_col)[metric_col].sum()
+                prev = tmp[(tmp["__year__"] == py) & (tmp["__month__"].isin(months))].groupby(seg_col)[metric_col].sum()
                 growth = ((curr - prev) / prev.replace(0, np.nan) * 100).dropna()
                 if not growth.empty:
-                    kpis["fastest_seg"] = str(growth.idxmax()); kpis["fastest_seg_pct"] = round(float(growth.max()), 1)
+                    kpis["fastest_seg"] = str(growth.idxmax())
+                    kpis["fastest_seg_pct"] = round(float(growth.max()), 1)
         except Exception:
             pass
 
@@ -269,56 +330,99 @@ def render_kpi_tab(df: pd.DataFrame):
         st.warning("No data available for KPI analysis.")
         return
 
-    date_col_detect = _find_col(df, _DATE_CANDIDATES)
     filtered_df = df.copy()
+    st.session_state.setdefault("kpi_filter_slots", 1)
 
-    if date_col_detect:
-        try:
-            filtered_df[date_col_detect] = pd.to_datetime(
-                filtered_df[date_col_detect], errors="coerce"
+    # Dimension-like columns only (exclude measures / high-noise ids)
+    _MEASURE_EXACT = {
+        "total_sales", "order_qty", "price_per_unit", "revenue", "amount",
+        "qty", "quantity", "units", "asp", "aov",
+    }
+    _ID_EXACT = {
+        "order_id", "carline_id", "colour_id", "color_id",
+        "sales_person_id", "salesperson_id", "region_id",
+    }
+
+    def _is_filter_col(col: str) -> bool:
+        n = str(col).lower().strip()
+        if n in _MEASURE_EXACT or n in _ID_EXACT:
+            return False
+        series = filtered_df[col]
+        # Always allow date columns (values shown as years)
+        if pd.api.types.is_datetime64_any_dtype(series) or "date" in n:
+            return True
+        if pd.api.types.is_numeric_dtype(series):
+            nunique = int(series.nunique(dropna=True))
+            return 1 < nunique <= 40
+        nunique = int(series.nunique(dropna=True))
+        return 1 < nunique <= 80
+
+    filter_cols = [c for c in filtered_df.columns if _is_filter_col(c)]
+
+    st.markdown('<div class="kpi-filter-row">', unsafe_allow_html=True)
+    slots = int(st.session_state.get("kpi_filter_slots", 1))
+    slots = 1 if slots < 1 else (2 if slots > 2 else slots)
+
+    applied_labels = []
+    for i in range(slots):
+        c1, c2 = st.columns(2)
+        col_opts = ["— Select column —"] + filter_cols
+        with c1:
+            sel_col = st.selectbox(
+                f"Filter {i + 1} — column",
+                options=col_opts,
+                key=f"kpi_custom_col_{i + 1}",
             )
-            all_years = sorted(
-                filtered_df[date_col_detect].dt.year.dropna().unique().astype(int).tolist()
-            )
-            month_names = {
-                1: "January", 2: "February", 3: "March", 4: "April",
-                5: "May", 6: "June", 7: "July", 8: "August",
-                9: "September", 10: "October", 11: "November", 12: "December",
-            }
-            all_months_in_data = sorted(
-                filtered_df[date_col_detect].dt.month.dropna().unique().astype(int).tolist()
-            )
-            st.markdown('<div class="kpi-filter-row">', unsafe_allow_html=True)
-            fcol1, fcol2 = st.columns(2)
-            sel_year = fcol1.selectbox(
-                "Year",
-                options=["All"] + [str(y) for y in all_years],
-                key="kpi_year_filter",
-            )
-            sel_month = fcol2.selectbox(
-                "Month",
-                options=["All"] + [month_names[m] for m in all_months_in_data],
-                key="kpi_month_filter",
-            )
-            st.markdown("</div>", unsafe_allow_html=True)
-            if sel_year != "All":
-                filtered_df = filtered_df[
-                    filtered_df[date_col_detect].dt.year == int(sel_year)
-                ]
-            if sel_month != "All":
-                month_num = {v: k for k, v in month_names.items()}[sel_month]
-                filtered_df = filtered_df[
-                    filtered_df[date_col_detect].dt.month == month_num
-                ]
-            if sel_year != "All" or sel_month != "All":
-                st.caption(
-                    f"📌 {'Year ' + sel_year if sel_year != 'All' else 'All Years'} · "
-                    f"{'Month: ' + sel_month if sel_month != 'All' else 'All Months'} — "
-                    f"{filtered_df.shape[0]:,} rows"
+        value_opts = ["— Select value —"]
+        if sel_col and sel_col != "— Select column —" and sel_col in filtered_df.columns:
+            series = filtered_df[sel_col]
+            if pd.api.types.is_datetime64_any_dtype(series) or "date" in str(sel_col).lower():
+                years = sorted(pd.to_datetime(series, errors="coerce").dt.year.dropna().unique().astype(int).tolist())
+                value_opts += [str(y) for y in years]
+                # Also allow month labels when filtering a date column as year-only is common
+            else:
+                vals = (
+                    series.dropna().astype(str).value_counts().index.tolist()
                 )
-            st.markdown('<hr class="kpi-filter-sep"/>', unsafe_allow_html=True)
-        except Exception:
-            filtered_df = df.copy()
+                value_opts += vals[:80]
+        with c2:
+            sel_val = st.selectbox(
+                f"Filter {i + 1} — value",
+                options=value_opts,
+                key=f"kpi_custom_val_{i + 1}",
+            )
+
+        if (
+            sel_col and sel_col != "— Select column —"
+            and sel_val and sel_val != "— Select value —"
+            and sel_col in filtered_df.columns
+        ):
+            series = filtered_df[sel_col]
+            if pd.api.types.is_datetime64_any_dtype(series) or "date" in str(sel_col).lower():
+                years = pd.to_datetime(series, errors="coerce").dt.year
+                filtered_df = filtered_df[years == int(sel_val)]
+            else:
+                filtered_df = filtered_df[series.astype(str) == str(sel_val)]
+            applied_labels.append(f"{sel_col} = {sel_val}")
+
+    b1, b2, _ = st.columns([1, 1, 4])
+    with b1:
+        if slots < 2 and st.button("＋ Add filter", key="kpi_add_filter_btn"):
+            st.session_state.kpi_filter_slots = 2
+            st.rerun()
+    with b2:
+        if slots > 1 and st.button("− Remove filter", key="kpi_remove_filter_btn"):
+            st.session_state.kpi_filter_slots = 1
+            st.session_state.pop("kpi_custom_col_2", None)
+            st.session_state.pop("kpi_custom_val_2", None)
+            st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+    if applied_labels:
+        st.caption(f"📌 {' · '.join(applied_labels)} — {filtered_df.shape[0]:,} rows")
+    else:
+        st.caption(f"📌 All data — {filtered_df.shape[0]:,} rows")
+    st.markdown('<hr class="kpi-filter-sep"/>', unsafe_allow_html=True)
 
     with st.spinner("Computing KPIs…"):
         kpis = compute_kpis(filtered_df)
@@ -357,11 +461,13 @@ def render_kpi_tab(df: pd.DataFrame):
     if "yoy_growth" in kpis and kpis["yoy_growth"] is not None:
         g = kpis["yoy_growth"]
         arrow = "▲" if g >= 0 else "▼"
-        prev_y = (kpis.get("yoy_curr_year") or 0) - 1
+        sub = kpis.get("yoy_label") or (
+            f"vs {(kpis.get('yoy_curr_year') or 0) - 1}" if kpis.get("yoy_curr_year") else "year over year"
+        )
         cards.append((
             "📈 YOY GROWTH",
             f"{arrow} {abs(g):.1f}%",
-            f"vs {prev_y}" if prev_y else "year over year",
+            sub,
             "yoy",
             f"{arrow} {abs(g):.1f}%",
             g >= 0,

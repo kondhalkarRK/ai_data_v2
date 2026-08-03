@@ -1,101 +1,83 @@
-# IND-PV-SOP-003 — EV & Powertrain Reporting Standards
+# IND-PV-SOP-003 — EV Retail Delivery, Stock Care & Powertrain Reporting
 
 **Document ID:** IND-PV-SOP-003  
-**Version:** 1.6  
+**Version:** 2.0  
 **Effective date:** 01-Apr-2022  
-**Last review:** 20-Jun-2026  
-**Owner:** Product Analytics / Electrification PMO  
-**Audience:** Product Heads, Marketing, Sales Ops, Data Science, Executives  
-**Related attributes:** `engine_type`, `engine_capacity`, `make`, `model`, `car_type`
+**Last review:** 20-Jul-2026  
+**Owner:** Electrification PMO / Product Analytics / Dealer Ops  
+**Audience:** EV Champions, Sales Managers, PDI / Workshop, Marketing, Executives  
 
 ---
 
 ## 1. Purpose
 
-Standardise how **Electric, Hybrid, Petrol, and Diesel** sales are counted, labelled, and narrated so EV growth stories remain credible and comparable year over year.
+Standardise **how EV retail is delivered at the dealership** and how EV / ICE mix is reported to leadership so “EV demand” stories are credible, unit-based, and comparable year over year.
 
-## 2. Powertrain classification
+## 2. Dealer EV delivery procedure
 
-| `engine_type` value | Business label | Notes |
+### 2.1 Pre-delivery (PDI)
+
+1. Confirm software version / OTA status per OEM bulletin.  
+2. Charge to OEM-specified handover SOC (typically 60–80%).  
+3. Verify charger accessories, app pairing checklist, warranty card.  
+4. Record usable pack size (kWh) from catalogue — maps to `engine_capacity` for Electric rows.
+
+### 2.2 Customer handover
+
+1. Demo: regenerative braking, charge ports, public charger workflow, connected services.  
+2. Explain home charger / public charging SLA and roadside assistance for EV.  
+3. Collect acknowledgement; only then close retail in DMS.
+
+### 2.3 Stock care (unsold EV)
+
+| Condition | Action | Owner |
 |---|---|---|
-| Electric | BEV / EV | Battery electric only |
-| Hybrid | Hybrid (HEV/strong hybrid family in this extract) | Not counted inside EV share unless asked “electrified” |
-| Petrol | ICE Petrol | Includes CNG siblings only if labelled separately later |
-| Diesel | ICE Diesel | Declining share expected in passenger cars |
+| SOC below OEM floor | Top-up charge within 48 hrs | Workshop / EV Champion |
+| Stationary > 14 days | Battery health check + drive cycle | Workshop |
+| Software campaign open | Apply before retail | Service Advisor |
 
-### 2.1 EV share formula (certified)
+## 3. Powertrain classification (reporting)
+
+| DMS / `engine_type` | Label in packs | Counts in **EV share**? |
+|---|---|---|
+| Electric | BEV / EV | **Yes** |
+| Hybrid | Hybrid | No (unless question says “electrified”) |
+| Petrol | ICE Petrol | No |
+| Diesel | ICE Diesel | No |
+
+### 3.1 Certified EV share formula
 
 **EV share (%)** =  
-`SUM(order_qty WHERE engine_type = 'Electric') / NULLIF(SUM(order_qty), 0) * 100`
+`SUM(order_qty WHERE engine_type = 'Electric') / NULLIF(SUM(order_qty), 0) × 100`
 
-- Default grain: year, then region or make.
-- Do **not** use order count when the question says “share of sales volume”.
-- “Electrified share” (if asked) = Electric + Hybrid units / total units. Always label explicitly.
+- Grain: year → region → make.  
+- Use **units**, not order count, when leadership asks about demand / share of sales.  
+- “Electrified share” = Electric + Hybrid — label explicitly.
 
-### 2.2 Expected EV trajectory (India context for this dataset)
+## 4. Is EV demand increasing? (executive answer playbook)
 
-| Year | Indicative EV order share (reference extract) | Narrative cue |
-|---|---|---|
-| 2019 | ~0.5% | Nascent |
-| 2020 | ~1% | Still early despite COVID |
-| 2021–22 | ~2–4% | Early adoption |
-| 2023 | ~7% | Inflection |
-| 2024 | ~10% | Mainstream awareness |
-| 2025–26 | ~14–16% | Structural shift |
+When asked *“Is EV demand increasing?”* / *“Are EVs taking off?”*:
 
-Narratives should celebrate EV growth **and** remind leaders that ICE (especially Petrol SUV/hatch) still dominates absolute volume.
+1. Show **EV share by year** using the formula above.  
+2. Show **absolute EV units** alongside share (share can rise while ICE volume stays larger).  
+3. Call out inflection after **2023** as new EV nameplates enter the catalogue.  
+4. Cite this SOP (IND-PV-SOP-003).  
+5. Never say “everyone is buying EVs” while Petrol still leads absolute units.
 
-## 3. Engine capacity field rules
+Indicative trajectory in the India PV analytics extract: EV unit share moves from well under 1% (2019–20) into **mid-teens by 2025–26**, with Petrol remaining the volume backbone.
 
-| Powertrain | Meaning of `engine_capacity` | Example |
-|---|---|---|
-| Petrol / Diesel / Hybrid | Engine displacement (litres) | 1.2, 1.5, 2.0 |
-| Electric | **Usable battery pack (kWh)** | 24.0, 40.5, 59.0, 72.6 |
+## 5. OEM EV nameplates (catalogue alignment)
 
-### 3.1 Data-quality rule
+Tata (Nexon EV, Punch EV, Tiago EV, Curvv EV, Harrier EV), Mahindra (XUV400, BE 6, XEV 9e), Maruti (e Vitara), Hyundai (Ioniq 5, Creta Electric), Toyota (Urban Cruiser EV), Kia (EV6, EV9), MG (ZS EV, Comet EV, Windsor EV), BYD (Atto 3, Seal).
 
-- EV `engine_capacity` must be **> 0**. Zero kWh is invalid and must not be used to imply “no engine”.
-- Do **not** run financial IQR outlier logic on `engine_capacity` — it is a catalogue attribute, not a revenue metric.
-- Never average EV kWh with ICE litres in one KPI without separating powertrains.
+Newer EV nameplates are expected mainly from **2023 onward** in retail extracts.
 
-## 4. OEM EV storytelling (aligned to catalogue)
+## 6. Data-quality rules
 
-High-visibility EV models in the reference catalogue include:
-
-- Tata: Nexon EV, Punch EV, Tiago EV, Curvv EV, Harrier EV  
-- Mahindra: XUV400, BE 6, XEV 9e  
-- Maruti: e Vitara  
-- Hyundai: Ioniq 5, Creta Electric  
-- Toyota: Urban Cruiser EV  
-- Kia: EV6, EV9  
-- MG: ZS EV, Comet EV, Windsor EV  
-- BYD: Atto 3, Seal  
-
-When ranking “top EV by volume”, filter `engine_type = 'Electric'` then rank by `SUM(order_qty)`. Newer EV nameplates (Curvv EV, e Vitara, Creta Electric, XEV 9e, Windsor EV, BYD) are expected mainly from **2023 onward** in this extract.
-
-ICE volume leaders (Maruti / Tata / Mahindra overall) must not be narrated as “losing” solely because EV share rises — check absolute units.
-
-## 5. Executive Q&A playbook
-
-| Question | Correct approach |
-|---|---|
-| “Are EVs taking off?” | Show EV share by year + absolute EV units; cite inflection post-2023 |
-| “Which brand leads EV?” | Filter Electric; rank makes by units; optionally revenue |
-| “Is SUV EV demand higher?” | Cross `car_type` × `engine_type` on units |
-| “What battery sizes sell?” | Among Electric only, distribute `engine_capacity` (kWh) |
-
-## 6. Narrative standards
-
-Approved phrasing:
-
-> “EV share of units rose from under 1% in 2019–20 to mid-teens by 2025–26 in this extract, while Petrol remains the volume backbone.”
-
-Avoid:
-
-> “Everyone is buying EVs now” (absolute ICE units still larger).  
-> Mixing kWh and litres in one average.  
-> Treating Hybrid as EV without saying “electrified”.
+- Electric `engine_capacity` = **kWh**, must be > 0.  
+- Do not average kWh with ICE litres in one KPI.  
+- Do not run revenue-style IQR outlier logic on `engine_capacity`.
 
 ## 7. Compliance
 
-Any published EV KPI must state the formula (units-based vs orders-based). Chat / OKF-assisted answers should cite this SOP when discussing EV demand.
+Any published EV KPI must state units-based share. Chat / OKF answers on EV demand must cite **IND-PV-SOP-003**.

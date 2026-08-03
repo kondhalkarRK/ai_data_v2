@@ -1,94 +1,63 @@
-# IND-PV-SOP-002 — COVID Impact Baseline & Recovery Playbook
+# IND-PV-SOP-002 — Showroom Demand Shock & Recovery Operating Playbook
 
 **Document ID:** IND-PV-SOP-002  
-**Version:** 1.4  
+**Version:** 2.0  
 **Effective date:** 01-Mar-2021  
-**Last review:** 10-May-2026  
-**Owner:** Commercial Excellence / India PV Strategy  
-**Audience:** CXO, Sales Heads, FP&A, Regional Controllers  
-**Related data:** India PV retail fact table 2019–2026 (`sales_date`, `order_qty`, `total_sales`)
+**Last review:** 10-Jul-2026  
+**Owner:** Commercial Excellence / India PV Network  
+**Audience:** Dealer Principals, Regional Heads, FP&A, CXO briefing teams  
 
 ---
 
 ## 1. Purpose
 
-Provide a **standard interpretation framework** for COVID-era volume shocks and post-COVID recovery so analysts and AI narratives do not mis-label 2020 weakness as “brand failure” or treat 2020 as a normal base year.
+Define how the dealer network and regional leadership **operate and narrate** during demand shocks (COVID-style lockdowns, chip shortages, festive spikes) so volume drops are not mis-labelled as brand failure, and recovery is measured against the correct base year.
 
-## 2. Market context (India PV)
+## 2. Trigger conditions
 
-| Period | Expected pattern in this dataset | Narrative stance |
+Activate this playbook when **any** of the following occur for 2+ consecutive weeks:
+
+- Outlet footfall −30% vs 4-week baseline  
+- Retail invoices −25% vs prior-year same weeks  
+- Government / OEM circular restricting showroom operations  
+- Supply constraint >40% of booked orders delayed >30 days  
+
+Historical reference in analytics extract: **2020** (esp. Apr–Jun) is a **depressed baseline**.
+
+## 3. Operating cadence (war-room)
+
+| Cadence | Owner | Agenda |
 |---|---|---|
-| 2019 | Pre-COVID baseline demand | Normal reference year |
-| 2020 (esp. Apr–Jun) | Sharp lockdown-driven collapse | **Depressed baseline** — cite COVID |
-| 2021 | Partial recovery / chip & supply constraints | Transition year |
-| 2022–2023 | Strong rebound + SUV mix shift | Recovery confirmation |
-| 2024–2025 | Near-peak retail momentum | Expansion / competitive intensity |
-| 2026 H1 | Partial year — do not annualise blindly | Flag incomplete year |
+| Daily (shock weeks) | Sales Manager | Bookings, cancellations, aged stock, EV charge / PDI backlog |
+| Weekly | Regional Head | Zone units & revenue, top 5 aged VINs, manpower utilisation |
+| Monthly MBR | FP&A + Regional | Vs 2019 baseline **and** vs prior year; never 2020-only without disclaimer |
 
-Observed shape in the reference extract (~55k orders): 2019 ~6.2k orders → 2020 ~2.5k → 2021 ~5.1k → rising through 2025. Narratives that ignore this arc are **non-compliant**.
+## 4. Analysis rules (mandatory)
 
-## 3. Mandatory analysis rules
+1. **Do not** use 2020 as a healthy YoY base without the phrase “COVID-depressed base”.  
+2. Prefer dual compare: vs **2019** and vs prior year.  
+3. Flag incomplete years (e.g. data only through June) as **YTD**, never full-year run-rate without label.  
+4. Separate **supply-loss** (no stock) from **demand-loss** (stock available, no retail).
 
-### 3.1 Never use 2020 as a “healthy” YoY base without disclaimer
+## 5. Dealer actions during shock
 
-When computing YoY growth vs 2020:
+1. Freeze non-critical demo creation; protect high-turn colour/model stock.  
+2. Shift enquiries to phone / video; keep CRM follow-up SLA ≤ 4 hours.  
+3. Prioritise booked customers for allotment before walk-ins.  
+4. Maintain EV battery health on stock (see SOP-003).  
+5. Document force-majeure cancellations with reason codes for audit.
 
-- Always add context: “vs COVID-depressed 2020 base”.
-- Prefer dual comparison: vs 2019 **and** vs prior year.
-- If only one YoY is shown and base is 2020, mark trust commentary as “context-sensitive”.
+## 6. Recovery exit criteria
 
-### 3.2 Lockdown months
+Playbook stands down when, for 4 consecutive weeks:
 
-April–June 2020 are **structural outliers**, not forecasting training months for “normal seasonality”.
+- Retail units ≥ 90% of pre-shock 4-week average, **or**  
+- Vs 2019 same weeks ≥ 85%, whichever is agreed in Regional MBR.
 
-Allowed language:
+## 7. Narrative standard (for AI / packs)
 
-- “Lockdown-driven trough”
-- “Demand freeze / dealership closure effect”
+Approved:  
+> “2020 retail collapsed under lockdown — treat as depressed baseline; recovery confirmed when 2022–23 volumes exceed 2019.”
 
-Disallowed language without evidence:
-
-- “Maruti lost competitiveness in Q2-2020”
-- “Brand collapse” when the dip is industry-wide
-
-### 3.3 Recovery confirmation checklist
-
-A region or OEM is considered **recovered** when:
-
-1. Units in the latest full year ≥ 90% of 2019 units for that slice, **or**
-2. Two consecutive full years of YoY unit growth post-2021, **and**
-3. No reliance on a single festive month spike alone.
-
-## 4. How to answer executive questions
-
-| Executive question | Required analytical approach |
-|---|---|
-| “Why were 2020 sales down?” | Show units by month/quarter 2019–2021; attribute Apr–Jun trough to lockdown; avoid OEM blame unless share shifted vs peers |
-| “Have we recovered?” | Compare latest full year units & revenue vs 2019; show EV share separately (see SOP-003) |
-| “Is 2025 growth sustainable?” | Separate festive Q4 uplift from underlying H1 run-rate; check OEM concentration (Maruti/Tata/Mahindra) |
-| “Where should we invest next?” | Regions still below 2019 units; EV white-space cities; under-indexed makes |
-
-## 5. Narrative templates (approved)
-
-**Template A — COVID trough**
-
-> “Units fell sharply in 2020 versus 2019, with the deepest trough in Apr–Jun during national lockdowns. This should be read as an industry demand shock, not an isolated brand failure, unless share vs peers also deteriorated.”
-
-**Template B — Recovery**
-
-> “From 2021 onward, order volumes rebuilt and surpassed pre-COVID levels by 2023–2024. Leadership should treat 2019 as the strategic baseline and 2020 as a one-time discontinuity.”
-
-**Template C — Incomplete year**
-
-> “2026 figures cover only H1 in the current extract. Do not annualise H1 × 2 without adjusting for festive-weighted H2.”
-
-## 6. KPI overlays during recovery reviews
-
-Always present **Units** and **Revenue** together:
-
-- Volume recovery can precede ASP recovery (discounting).
-- Revenue recovery without units may indicate mix shift to higher ASP SUVs / EVs.
-
-## 7. Governance
-
-Any board pack that shows a 2020 YoY chart **must** include the COVID disclaimer footnote. AI narratives must inject the same disclaimer when the result set is dominated by 2020 comparisons.
+Forbidden:  
+> “Brand X failed in 2020” without lockdown context.
