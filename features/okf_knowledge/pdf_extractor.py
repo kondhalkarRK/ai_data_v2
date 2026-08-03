@@ -29,15 +29,11 @@ _MAX_CONCEPT_CHARS = 1400   # keeps each concept file small -> low token cost pe
 _MIN_CONCEPT_CHARS = 40     # skip near-empty fragments (e.g. blank pages)
 
 
+from features.okf_knowledge.md_extractor import _clean_text
+
+
 def pdf_extraction_available() -> bool:
     return _PDF_AVAILABLE
-
-
-def _clean_text(text: str) -> str:
-    text = text.replace("\x00", " ")
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
 
 
 def _guess_title(chunk_text: str, fallback: str) -> str:

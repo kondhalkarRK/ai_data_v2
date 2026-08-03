@@ -1,38 +1,38 @@
 carline_id,carline_name,model,make,car_type,engine_capacity,engine_type
 1,Maruti Swift,Swift,Maruti,Hatchback,1.2,Petrol
 2,Maruti Baleno,Baleno,Maruti,Hatchback,1.2,Petrol
-3,Maruti Brezza,Brezza,Maruti,SUV,1.5,Petrol
+3,Maruti Brezza,Brezza,Maruti,Compact SUV,1.5,Petrol
 4,Maruti Ertiga,Ertiga,Maruti,MPV,1.5,Petrol
 5,Maruti Grand Vitara,Grand Vitara,Maruti,SUV,1.5,Hybrid
 6,Maruti WagonR,WagonR,Maruti,Hatchback,1.2,Petrol
 7,Maruti Dzire,Dzire,Maruti,Sedan,1.2,Petrol
-8,Maruti Fronx,Fronx,Maruti,SUV,1.2,Petrol
-51,Maruti e Vitara,e Vitara,Maruti,SUV,61.0,Electric
-9,Tata Nexon,Nexon,Tata,SUV,1.5,Petrol
-10,Tata Punch,Punch,Tata,SUV,1.2,Petrol
+8,Maruti Fronx,Fronx,Maruti,Compact SUV,1.2,Petrol
+51,Maruti e Vitara,e Vitara,Maruti,Compact SUV,61.0,Electric
+9,Tata Nexon,Nexon,Tata,Compact SUV,1.5,Petrol
+10,Tata Punch,Punch,Tata,Compact SUV,1.2,Petrol
 11,Tata Harrier,Harrier,Tata,SUV,2.0,Diesel
 12,Tata Safari,Safari,Tata,SUV,2.0,Diesel
 13,Tata Altroz,Altroz,Tata,Hatchback,1.2,Petrol
 14,Tata Tiago,Tiago,Tata,Hatchback,1.2,Petrol
-15,Tata Nexon EV,Nexon EV,Tata,SUV,40.5,Electric
-16,Tata Punch EV,Punch EV,Tata,SUV,35.0,Electric
+15,Tata Nexon EV,Nexon EV,Tata,Compact SUV,40.5,Electric
+16,Tata Punch EV,Punch EV,Tata,Compact SUV,35.0,Electric
 17,Tata Tiago EV,Tiago EV,Tata,Hatchback,24.0,Electric
-18,Tata Curvv,Curvv,Tata,SUV,1.5,Petrol
-52,Tata Curvv EV,Curvv EV,Tata,SUV,55.0,Electric
+18,Tata Curvv,Curvv,Tata,Compact SUV,1.5,Petrol
+52,Tata Curvv EV,Curvv EV,Tata,Compact SUV,55.0,Electric
 53,Tata Harrier EV,Harrier EV,Tata,SUV,65.0,Electric
 19,Mahindra Scorpio-N,Scorpio-N,Mahindra,SUV,2.2,Diesel
 20,Mahindra XUV700,XUV700,Mahindra,SUV,2.0,Petrol
 21,Mahindra Thar,Thar,Mahindra,SUV,2.0,Diesel
-22,Mahindra XUV300,XUV300,Mahindra,SUV,1.2,Petrol
+22,Mahindra XUV300,XUV300,Mahindra,Compact SUV,1.2,Petrol
 23,Mahindra Bolero,Bolero,Mahindra,SUV,1.5,Diesel
-24,Mahindra XUV400,XUV400,Mahindra,SUV,39.4,Electric
+24,Mahindra XUV400,XUV400,Mahindra,Compact SUV,39.4,Electric
 25,Mahindra BE 6,BE 6,Mahindra,SUV,59.0,Electric
 54,Mahindra XEV 9e,XEV 9e,Mahindra,SUV,59.0,Electric
 26,Hyundai Creta,Creta,Hyundai,SUV,1.5,Petrol
-27,Hyundai Venue,Venue,Hyundai,SUV,1.2,Petrol
+27,Hyundai Venue,Venue,Hyundai,Compact SUV,1.2,Petrol
 28,Hyundai i20,i20,Hyundai,Hatchback,1.2,Petrol
 29,Hyundai Verna,Verna,Hyundai,Sedan,1.5,Petrol
-30,Hyundai Exter,Exter,Hyundai,SUV,1.2,Petrol
+30,Hyundai Exter,Exter,Hyundai,Compact SUV,1.2,Petrol
 31,Hyundai Ioniq 5,Ioniq 5,Hyundai,SUV,72.6,Electric
 55,Hyundai Creta Electric,Creta Electric,Hyundai,SUV,51.0,Electric
 32,Toyota Innova Crysta,Innova Crysta,Toyota,MPV,2.4,Diesel
@@ -40,22 +40,22 @@ carline_id,carline_name,model,make,car_type,engine_capacity,engine_type
 34,Toyota Glanza,Glanza,Toyota,Hatchback,1.2,Petrol
 35,Toyota Hyryder,Hyryder,Toyota,SUV,1.5,Hybrid
 36,Toyota Camry,Camry,Toyota,Sedan,2.5,Hybrid
-56,Toyota Urban Cruiser EV,Urban Cruiser EV,Toyota,SUV,49.0,Electric
+56,Toyota Urban Cruiser EV,Urban Cruiser EV,Toyota,Compact SUV,49.0,Electric
 37,Kia Seltos,Seltos,Kia,SUV,1.5,Petrol
-38,Kia Sonet,Sonet,Kia,SUV,1.2,Petrol
+38,Kia Sonet,Sonet,Kia,Compact SUV,1.2,Petrol
 39,Kia Carens,Carens,Kia,MPV,1.5,Petrol
 40,Kia EV6,EV6,Kia,SUV,77.4,Electric
 57,Kia EV9,EV9,Kia,SUV,99.8,Electric
 41,Honda City,City,Honda,Sedan,1.5,Petrol
-42,Honda Elevate,Elevate,Honda,SUV,1.5,Petrol
+42,Honda Elevate,Elevate,Honda,Compact SUV,1.5,Petrol
 43,Honda Amaze,Amaze,Honda,Sedan,1.2,Petrol
 44,MG Hector,Hector,MG,SUV,1.5,Petrol
-45,MG Astor,Astor,MG,SUV,1.5,Petrol
+45,MG Astor,Astor,MG,Compact SUV,1.5,Petrol
 46,MG ZS EV,ZS EV,MG,SUV,50.3,Electric
 47,MG Comet EV,Comet EV,MG,Hatchback,17.3,Electric
-58,MG Windsor EV,Windsor EV,MG,SUV,38.0,Electric
-48,Skoda Kushaq,Kushaq,Skoda,SUV,1.5,Petrol
+58,MG Windsor EV,Windsor EV,MG,Compact SUV,38.0,Electric
+48,Skoda Kushaq,Kushaq,Skoda,Compact SUV,1.5,Petrol
 49,Skoda Slavia,Slavia,Skoda,Sedan,1.5,Petrol
-50,Ford EcoSport,EcoSport,Ford,SUV,1.5,Petrol
+50,Ford EcoSport,EcoSport,Ford,Compact SUV,1.5,Petrol
 59,BYD Atto 3,Atto 3,BYD,SUV,60.5,Electric
 60,BYD Seal,Seal,BYD,Sedan,82.5,Electric

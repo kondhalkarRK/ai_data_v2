@@ -51,13 +51,6 @@ def _normalise_month(value: Any) -> int | None:
     return None
 
 
-def _col_exists(df: pd.DataFrame, col: str) -> bool:
-    if col in df.columns:
-        return True
-    lower_map = {c.lower(): c for c in df.columns}
-    return col.lower() in lower_map
-
-
 def _resolve_col(df: pd.DataFrame, col: str) -> str | None:
     if col in df.columns:
         return col

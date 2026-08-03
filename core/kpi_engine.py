@@ -405,7 +405,7 @@ def render_kpi_tab(df: pd.DataFrame):
                 filtered_df = filtered_df[series.astype(str) == str(sel_val)]
             applied_labels.append(f"{sel_col} = {sel_val}")
 
-    b1, b2, _ = st.columns([1, 1, 4])
+    b1, b2, b3, _ = st.columns([1, 1, 1, 3])
     with b1:
         if slots < 2 and st.button("＋ Add filter", key="kpi_add_filter_btn"):
             st.session_state.kpi_filter_slots = 2
@@ -415,6 +415,16 @@ def render_kpi_tab(df: pd.DataFrame):
             st.session_state.kpi_filter_slots = 1
             st.session_state.pop("kpi_custom_col_2", None)
             st.session_state.pop("kpi_custom_val_2", None)
+            st.rerun()
+    with b3:
+        if st.button("Clear filters", key="kpi_clear_filters_btn"):
+            st.session_state.kpi_filter_slots = 1
+            for k in (
+                "kpi_custom_col_1", "kpi_custom_val_1",
+                "kpi_custom_col_2", "kpi_custom_val_2",
+            ):
+                st.session_state.pop(k, None)
+            st.toast("Filters cleared", icon="🧹")
             st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)

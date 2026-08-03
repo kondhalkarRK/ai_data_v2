@@ -68,17 +68,11 @@ def init_llm() -> object | None:
 DEFAULTS = {
     "dfs": {}, "join_mode": "auto",
     "manual_joins": {}, "sql_join_text": "",
-    "memory": {}, "query_history": [],
+    "memory": {},
     "last_query": "", "last_plan": None,
-    "last_result": None,
-    # "last_exec_summary": None,
     "llm_calls": 0, "total_tokens": 0,
-    "max_llm_calls": 60, "max_tokens": 30000,
-    "query_input": "",
-    "pending_suggestion": None,
-    # "last_insights": None,
+    "max_llm_calls": 60,
     "auto_join_base": None,
-    "last_analysis": None,
 }
 
 def init_session_state() -> None:

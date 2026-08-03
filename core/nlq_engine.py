@@ -53,7 +53,6 @@ except ImportError:
 try:
     from core.question_normaliser import (
         detect_oob,
-        fingerprint_question,
         classify_followup_intent,
         extract_intent_subject,
     )
@@ -63,9 +62,6 @@ except ImportError:
 
     def detect_oob(q):
         return False
-
-    def fingerprint_question(q):
-        return ""
 
     def classify_followup_intent(q, anchor):
         return "new_question"
@@ -83,9 +79,6 @@ except ImportError:
 def update_history(q: str, plan: dict):
     st.session_state.last_query = q
     st.session_state.last_plan = plan
-    if q not in st.session_state.query_history:
-        st.session_state.query_history.insert(0, q)
-    st.session_state.query_history = st.session_state.query_history[:8]
 
 
 def format_result_dates(df: pd.DataFrame) -> pd.DataFrame:
@@ -522,11 +515,8 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
                 "region interpretation; do NOT invent columns from documents):\n"
                 f"{okf_ctx}\n\n"
             )
-            st.session_state["last_okf_context"] = okf_ctx
-        else:
-            st.session_state["last_okf_context"] = ""
     except Exception:
-        st.session_state["last_okf_context"] = ""
+        pass
 
     prompt = f"""You are an expert DuckDB SQL generator.
 
