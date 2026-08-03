@@ -83,6 +83,61 @@ def indexed_concept_count() -> int:
         return 0
 
 
+def get_relevant_snippets(
+    question: str,
+    top_k: int = 3,
+    max_context_chars: int = _MAX_CONTEXT_CHARS_DEFAULT,
+) -> list[dict]:
+    """
+    Return structured OKF hits for UI citations / narration enrichment.
+
+    Each item: {title, source_doc, source_page, snippet, entry}
+    """
+    collection = get_okf_collection()
+    if collection is None:
+        return []
+
+    try:
+        if collection.count() == 0:
+            return []
+        embedding = embed_text(question)
+        if not embedding:
+            return []
+        results = collection.query(
+            query_embeddings=[embedding],
+            n_results=min(top_k, collection.count()),
+        )
+    except Exception:
+        return []
+
+    docs = (results or {}).get("documents", [[]])[0]
+    metas = (results or {}).get("metadatas", [[]])[0]
+    if not docs:
+        return []
+
+    out: list[dict] = []
+    used = 0
+    for doc, meta in zip(docs, metas):
+        snippet = (doc or "").strip()[:_SNIPPET_CHARS_DEFAULT]
+        if not snippet:
+            continue
+        title = (meta or {}).get("title", "")
+        source = (meta or {}).get("source_doc", "")
+        page = (meta or {}).get("source_page", "")
+        entry = f"- ({source}, p.{page} — {title}): {snippet}"
+        if used + len(entry) > max_context_chars:
+            break
+        out.append({
+            "title": title,
+            "source_doc": source,
+            "source_page": page,
+            "snippet": snippet,
+            "entry": entry,
+        })
+        used += len(entry)
+    return out
+
+
 def get_relevant_context(
     question: str,
     top_k: int = 3,
@@ -91,59 +146,13 @@ def get_relevant_context(
     """
     Given a natural-language question, return a small, ready-to-inject
     text block with the most relevant OKF concept snippets — capped at
-    max_context_chars so token impact on the LLM prompt stays minimal
-    (roughly max_context_chars / 4 tokens, e.g. ~200 tokens at the
-    default 800-char cap).
+    max_context_chars so token impact on the LLM prompt stays minimal.
 
     Returns "" if no knowledge base is indexed or nothing relevant is
     found — safe to always call and concatenate.
     """
-    collection = get_okf_collection()
-    if collection is None:
+    snippets = get_relevant_snippets(question, top_k=top_k, max_context_chars=max_context_chars)
+    if not snippets:
         return ""
+    return "Relevant knowledge base excerpts:\n" + "\n".join(s["entry"] for s in snippets)
 
-    try:
-        if collection.count() == 0:
-            return ""
-
-        embedding = embed_text(question)
-        if not embedding:
-            return ""
-
-        results = collection.query(
-            query_embeddings=[embedding],
-            n_results=min(top_k, collection.count()),
-        )
-    except Exception:
-        return ""
-
-    docs  = (results or {}).get("documents", [[]])[0]
-    metas = (results or {}).get("metadatas", [[]])[0]
-
-    if not docs:
-        return ""
-
-    parts = []
-    used_chars = 0
-
-    for doc, meta in zip(docs, metas):
-        snippet = (doc or "").strip()[:_SNIPPET_CHARS_DEFAULT]
-        if not snippet:
-            continue
-
-        title = (meta or {}).get("title", "")
-        source = (meta or {}).get("source_doc", "")
-        page = (meta or {}).get("source_page", "")
-
-        entry = f"- ({source}, p.{page} — {title}): {snippet}"
-
-        if used_chars + len(entry) > max_context_chars:
-            break
-
-        parts.append(entry)
-        used_chars += len(entry)
-
-    if not parts:
-        return ""
-
-    return "Relevant knowledge base excerpts:\n" + "\n".join(parts)

@@ -481,74 +481,119 @@ def render():
                             st.rerun()
 
         # CHANGED: spacer between sections
-        section_spacer()
 
-        # # =========================
-        # # KNOWLEDGE BASE — OKF (NEW)
-        # # =========================
-        # if _OKF_AVAILABLE:
+        # =========================
+        # KNOWLEDGE BASE — OKF
+        # =========================
+        if _OKF_AVAILABLE:
+            with st.container(border=True):
+                section_title("📚 KNOWLEDGE BASE (OKF)")
+                section_spacer()
 
-        #     with st.container(border=True):
+                bundles = list_bundles()
+                doc_count = len(bundles)
+                concept_count = indexed_concept_count()
 
-        #         section_title("📚 KNOWLEDGE BASE (OKF)")
+                c1, c2 = st.columns(2)
+                with c1:
+                    status_row("Docs", doc_count, "#38bdf8")
+                with c2:
+                    status_row("Concepts", concept_count, "#38bdf8")
 
-        #         # CHANGED: spacer below title
-        #         section_spacer()
+                section_spacer()
+                st.caption(
+                    "India PV SOPs in doc/business_knowledge/. "
+                    "Seed them, or upload extra PDF/MD files."
+                )
 
-        #         bundles       = list_bundles()
-        #         doc_count     = len(bundles)
-        #         concept_count = indexed_concept_count()
+                if st.button(
+                    "SEED INDIA PV SOPs",
+                    use_container_width=True,
+                    key="okf_seed_sops",
+                ):
+                    with st.spinner("Seeding packaged SOPs into OKF (no LLM tokens)..."):
+                        try:
+                            from features.okf_knowledge.okf_bootstrap import (
+                                bootstrap_business_knowledge,
+                            )
+                            summary = bootstrap_business_knowledge(force=True)
+                            st.success(
+                                f"Seeded {summary.get('docs', 0)} doc(s), "
+                                f"{summary.get('concepts', 0)} concepts, "
+                                f"indexed {summary.get('indexed', 0)}."
+                            )
+                        except Exception as e:
+                            st.error(f"Seed failed: {e}")
+                    st.rerun()
 
-        #         c1, c2 = st.columns(2)
-        #         with c1:
-        #             status_row("Docs",     doc_count,     "#38bdf8")
-        #         with c2:
-        #             status_row("Concepts", concept_count, "#38bdf8")
+                uploaded_kb = st.file_uploader(
+                    "Add business PDF or Markdown",
+                    type=["pdf", "md", "markdown", "txt"],
+                    label_visibility="collapsed",
+                    key="okf_pdf_upload",
+                )
 
-        #         # CHANGED: spacer before uploader
-        #         section_spacer()
+                if uploaded_kb is not None:
+                    if st.button(
+                        "INGEST INTO KNOWLEDGE BASE",
+                        use_container_width=True,
+                        key="okf_ingest_btn",
+                    ):
+                        with st.spinner("Extracting and indexing (no LLM tokens used)..."):
+                            try:
+                                name = uploaded_kb.name
+                                raw = uploaded_kb.read()
+                                if name.lower().endswith((".md", ".markdown", ".txt")):
+                                    from features.okf_knowledge.md_extractor import (
+                                        extract_markdown_to_concepts,
+                                    )
+                                    text = (
+                                        raw.decode("utf-8-sig")
+                                        if isinstance(raw, bytes)
+                                        else str(raw)
+                                    )
+                                    concepts = extract_markdown_to_concepts(text, name)
+                                else:
+                                    if not pdf_extraction_available():
+                                        st.error("Install pypdf to ingest PDFs.")
+                                        concepts = []
+                                    else:
+                                        concepts = extract_pdf_to_concepts(raw, name)
+                                if concepts:
+                                    write_bundle(concepts)
+                                    newly_indexed = reindex_all()
+                                    st.success(
+                                        f"Ingested {len(concepts)} concept(s), "
+                                        f"indexed {newly_indexed}."
+                                    )
+                                else:
+                                    st.warning("No concepts extracted from file.")
+                            except Exception as e:
+                                st.error(str(e))
+                        st.rerun()
 
-        #         if not pdf_extraction_available():
-        #             st.caption("Install pypdf to enable PDF ingestion.")
-        #         else:
-        #             uploaded_pdf = st.file_uploader(
-        #                 "Add a business PDF",
-        #                 type=["pdf"],
-        #                 label_visibility="collapsed",
-        #                 key="okf_pdf_upload",
-        #             )
+                if doc_count > 0:
+                    section_spacer()
+                    with st.expander(f"Ingested docs ({doc_count})", expanded=False):
+                        for b in bundles[:12]:
+                            st.caption(
+                                f"• {b.get('source_doc')} "
+                                f"({b.get('concept_count')} concepts)"
+                            )
+                    if st.button(
+                        "CLEAR KNOWLEDGE BASE",
+                        use_container_width=True,
+                        key="okf_clear_btn",
+                    ):
+                        removed = clear_all_bundles()
+                        try:
+                            reindex_all()
+                        except Exception:
+                            pass
+                        st.success(f"Cleared {removed} document(s)")
+                        st.rerun()
+        else:
+            with st.container(border=True):
+                section_title("📚 KNOWLEDGE BASE")
+                st.caption("OKF modules unavailable — check features/okf_knowledge.")
 
-        #             if uploaded_pdf is not None:
-        #                 if st.button(
-        #                     "INGEST INTO KNOWLEDGE BASE",
-        #                     use_container_width=True
-        #                 ):
-        #                     # CHANGED: replaced st.spinner string with
-        #                     # clearer message; spinner now properly wraps
-        #                     # both extract AND reindex calls
-        #                     with st.spinner(
-        #                         "Extracting & indexing (no LLM tokens used)..."
-        #                     ):
-        #                         concepts      = extract_pdf_to_concepts(
-        #                             uploaded_pdf.read(),
-        #                             uploaded_pdf.name,
-        #                         )
-        #                         write_bundle(concepts)
-        #                         newly_indexed = reindex_all()
-
-        #                     st.success(
-        #                         f"Ingested {len(concepts)} concept(s), "
-        #                         f"indexed {newly_indexed}."
-        #                     )
-        #                     st.rerun()
-
-        #         # CHANGED: spacer before clear button
-        #         if doc_count > 0:
-        #             section_spacer()
-        #             if st.button(
-        #                 "CLEAR KNOWLEDGE BASE",
-        #                 use_container_width=True
-        #             ):
-        #                 removed = clear_all_bundles()
-        #                 st.success(f"Cleared {removed} document(s)")
-        #                 st.rerun()

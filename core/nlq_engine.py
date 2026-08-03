@@ -511,6 +511,23 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
     except Exception:
         pass
 
+    # OKF business-document context (SOPs) — capped, optional
+    okf_block = ""
+    try:
+        from features.okf_knowledge.okf_retriever import get_relevant_context
+        okf_ctx = get_relevant_context(question, top_k=3, max_context_chars=900)
+        if okf_ctx:
+            okf_block = (
+                "BUSINESS KNOWLEDGE (SOPs — use for metric meaning / COVID / EV / "
+                "region interpretation; do NOT invent columns from documents):\n"
+                f"{okf_ctx}\n\n"
+            )
+            st.session_state["last_okf_context"] = okf_ctx
+        else:
+            st.session_state["last_okf_context"] = ""
+    except Exception:
+        st.session_state["last_okf_context"] = ""
+
     prompt = f"""You are an expert DuckDB SQL generator.
 
 {semantic_context}
@@ -539,14 +556,16 @@ RULES:
 7. For "by X and Y" queries: GROUP BY both columns
 8. For count of orders: COUNT(order_id); for units: SUM(order_qty)
 9. Revenue always means SUM(total_sales) — never price_per_unit
-10. Always use meaningful column aliases
-11. Specific values (ford, red, SUV): WHERE col ILIKE '%value%'
-12. Never return more than 500 rows unless explicitly asked
-13. Return ONLY the SQL string, no explanation, no markdown fences
+10. "top selling" / "best selling" / "most sold" / "top car" / "most popular" → SUM(order_qty) DESC (units), NEVER SUM(total_sales). Prefer grouping by model or carline_name (then make).
+11. Always use meaningful column aliases
+12. Specific values (ford, red, SUV): WHERE col ILIKE '%value%'
+13. Never return more than 500 rows unless explicitly asked
+14. Return ONLY the SQL string, no explanation, no markdown fences
+15. Follow-up questions inherit filters/metric/dimensions from PRIOR CONTEXT / SQL ANCHOR when present
 
 NAME COLUMNS DETECTED: {name_cols}
 
-QUESTION: {question}
+{okf_block}QUESTION: {question}
 
 SQL:"""
 
@@ -574,16 +593,39 @@ def run_sql(sql: str, df: pd.DataFrame) -> tuple[pd.DataFrame | None, str | None
 
 
 def enrich_query(q: str) -> str:
+    """
+    Legacy string-concat enrich — only when there is NO SQL anchor.
+    With an anchor, surgical modification prompts handle follow-ups;
+    concatenating prior+current confuses intent and breaks memory.
+    """
+    if not q:
+        return q
+    # Prefer SQL-anchor continuity over string stitching
+    try:
+        if _CONV_OK and should_use_anchor(q):
+            return q
+        if _CONV_OK and get_sql_anchor():
+            # Short relative follow-ups stay as-is; anchor path will classify
+            ql = q.strip().lower()
+            follow_cues = (
+                "same", "also", "only", "add ", "remove ", "what about",
+                "how about", "and for", "now for", "filter", "top ", "bottom ",
+            )
+            if any(c in ql for c in follow_cues) and len(ql.split()) <= 12:
+                return q
+    except Exception:
+        pass
+
     if not st.session_state.get("last_plan"):
         return q
     triggers = [
-        "top", "lowest", "highest", "now", "only", "for", "in",
-        "show", "filter", "same", "also",
+        "now", "only", "for", "same", "also", "filter",
     ]
+    # Do NOT trigger on bare "top"/"show"/"highest" — those are often new questions
     if any(w in q.lower() for w in triggers) and len(q.split()) <= 7:
         prev = st.session_state.get("last_query", "")
-        if prev:
-            return prev + " " + q
+        if prev and prev.strip().lower() != q.strip().lower():
+            return prev + " — follow-up: " + q
     return q
 
 
@@ -632,7 +674,9 @@ def run_query(working_df: pd.DataFrame, question: str, status=None):
             )
 
         q = enrich_query(question)
-        cache_key = f"nlq_{q}"
+        # Keep original question for anchor classification / evidence
+        st.session_state["_original_question"] = question
+        cache_key = f"nlq_{question.strip().lower()}"
         if cache_key in st.session_state.memory:
             cached = st.session_state.memory[cache_key]
             result, sql, err = cached[0], cached[1], cached[2]
@@ -643,8 +687,8 @@ def run_query(working_df: pd.DataFrame, question: str, status=None):
             update_history(question, {"sql": sql, "evidence": evidence, "execution_path": "cache"})
             return _pack_return(result, sql, err, evidence)
 
-        # PRIMARY: semantic-enriched LLM SQL
-        sql = nlq_to_sql(q, working_df, status=status)
+        # PRIMARY: semantic-enriched LLM SQL (pass original for follow-up routing)
+        sql = nlq_to_sql(question, working_df, status=status)
         if not sql:
             evidence = (
                 build_evidence("", None, "fallback", question)

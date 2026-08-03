@@ -51,6 +51,8 @@ def write_bundle(concepts: list[dict]) -> str:
             "ingested_at": concept["ingested_at"],
             "concept_id":  concept["concept_id"],
         }
+        if concept.get("doc_code"):
+            frontmatter["doc_code"] = concept["doc_code"]
         fm_yaml = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True)
 
         file_path = os.path.join(out_dir, f"{concept['concept_id']}.md")

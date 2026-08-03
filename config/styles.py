@@ -1524,6 +1524,11 @@ div[data-testid="stExpander"] details:hover summary{
 .trust-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;}
 .trust-note{font-size:11px;margin-top:8px;color:#94a3b8;}
 .trust-note.warn{color:#fcd34d;}
+.okf-citation{
+  font-size:11px;color:#7dd3fc;margin:6px 0 4px;
+  background:rgba(14,165,233,0.06);border-left:3px solid #38bdf8;
+  padding:6px 10px;border-radius:0 6px 6px 0;
+}
 .badge-modified{
   display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;
   background:rgba(16,185,129,0.12);color:#6ee7b7;border:1px solid rgba(16,185,129,0.25);

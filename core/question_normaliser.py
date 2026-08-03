@@ -227,6 +227,12 @@ FILTER_CHANGE_PATTERNS = [
     r"\blast\s+month\b",
     r"\bthis\s+year\b",
     r"\bfor\s+[A-Za-z][\w\s-]{1,30}$",
+    r"\bwhat\s+about\s+\w+",
+    r"\bhow\s+about\s+\w+",
+    r"\band\s+for\s+\w+",
+    r"\bnow\s+for\s+\w+",
+    r"\bsame\s+but\s+\w+",
+    r"\bonly\s+[A-Za-z][\w-]*$",
 ]
 
 SORT_CHANGE_PATTERNS = [
@@ -239,6 +245,7 @@ SORT_CHANGE_PATTERNS = [
     r"\branked\s+by\s+\w+",
     r"\bshow\s+\d+\b",
     r"\btop\s+\d+\s+only\b",
+    r"\blimit\s+\d+\b",
 ]
 
 NEW_TOPIC_SIGNALS = [
@@ -258,6 +265,10 @@ def classify_followup_intent(question: str, anchor: dict | None) -> str:
     if not anchor or not anchor.get("sql_anchor"):
         return "new_question"
 
+    # Explicit new-topic first
+    if any(sig in q for sig in NEW_TOPIC_SIGNALS):
+        return "new_question"
+
     for p in ADDITIVE_PATTERNS:
         if re.search(p, q, re.I):
             return "additive"
@@ -274,12 +285,28 @@ def classify_followup_intent(question: str, anchor: dict | None) -> str:
     if detect_followup(question):
         return "filter_change"
 
-    if any(sig in q for sig in NEW_TOPIC_SIGNALS):
-        return "new_question"
+    # Short relative utterances while an anchor exists → treat as filter/refine
+    words = q.split()
+    if len(words) <= 6 and not any(
+        q.startswith(p) for p in ("show me revenue", "show me units", "how many", "what is the")
+    ):
+        # Single make/year/region-like token after a prior query
+        if re.search(r"\b(20\d{2}|19\d{2})\b", q):
+            return "filter_change"
+        if re.search(
+            r"\b(ford|tata|maruti|mahindra|hyundai|toyota|kia|honda|mg|skoda|"
+            r"north|south|east|west|central|suv|petrol|diesel|electric|ev)\b",
+            q,
+            re.I,
+        ):
+            return "filter_change"
 
-    if len(q.split()) > 10:
+    # Long standalone analytical question → new
+    if len(words) > 10 and any(
+        q.startswith(p) for p in ("show ", "what ", "how ", "which ", "list ", "compare ")
+    ):
         return "new_question"
-    if any(q.startswith(p) for p in ("show ", "what ", "how ", "which ", "list ")):
+    if any(q.startswith(p) for p in ("show me ", "how many ", "what is ", "compare ")):
         return "new_question"
     return "new_question"
 
@@ -316,11 +343,16 @@ def extract_intent_subject(
             r"\bonly\s+for\s+(.+)$",
             r"\bsame\s+(?:but\s+)?for\s+(.+)$",
             r"\bfilter\s+by\s+(.+)$",
+            r"\bwhat\s+about\s+(.+)$",
+            r"\bhow\s+about\s+(.+)$",
+            r"\band\s+for\s+(.+)$",
+            r"\bnow\s+for\s+(.+)$",
             r"\bfor\s+(.+)$",
             r"\bin\s+(20\d{2}|19\d{2})\b",
             r"\b(20\d{2}|19\d{2})\b",
             r"\blast\s+month\b",
             r"\bthis\s+year\b",
+            r"\bonly\s+([A-Za-z][\w-]*)$",
         ],
         "sort_change": [
             r"\btop\s+(\d+)",

@@ -51,6 +51,8 @@ terms:
       - "If user says 'sales' without specifying count vs value, assume revenue (SUM total_sales) not order count"
       - "'sales performance' means revenue"
       - "'sales figures' means revenue"
+      - "'top selling' / 'best selling' / 'most sold' means Units Sold (SUM order_qty) — NOT revenue"
+      - "'highest revenue' / 'most revenue' / 'top by revenue' means Revenue"
     category: Financial
     maps_to_measure: revenue
 
@@ -74,9 +76,19 @@ terms:
       - number sold
       - total units
       - how many sold
+      - top selling
+      - best selling
+      - most sold
+      - top seller
+      - best seller
+      - top selling car
+      - best selling car
+      - top selling model
+      - most popular car
     calculation_rules:
       - Use order_qty not order count
       - SUM not COUNT for quantity
+      - "top selling / best selling / most sold ALWAYS means SUM(order_qty) never revenue"
     related_terms:
       - Revenue
       - Orders
@@ -85,9 +97,12 @@ terms:
       - "How many units sold by colour"
       - "Units sold per salesperson"
       - "Total vehicles sold in 2023"
+      - "Top selling car"
+      - "Best selling model by volume"
     disambiguation:
-      - Different from Orders — one order can have multiple units
-      - Use when user asks how many vehicles/cars/units
+      - "Different from Orders - one order can have multiple units"
+      - "Use when user asks how many vehicles/cars/units"
+      - "top selling / best selling / most sold = Units Sold SUM(order_qty), NOT Revenue"
     category: Sales Volume
     maps_to_measure: units_sold
 
@@ -531,15 +546,18 @@ domain_rules:
     - "For month grouping use strftime('%Y-%m') never DATE_TRUNC which returns timestamps"
     - "For quarter labels use CASE WHEN month bands → Q1-YYYY … Q4-YYYY — never float /3"
     - "Dataset is India PV sales 2019–2026; COVID 2020 dip and rising EV share are expected patterns"
+    - "top selling / best selling / most sold / top car / most popular → SUM(order_qty) ordered DESC — never SUM(total_sales)"
   never_rules:
     - Never use price_per_unit for revenue
     - Never average total_sales directly
     - Never show raw IDs without labels
     - Never use ORDER BY on unaggregated columns when GROUP BY is present
     - Never produce decimal quarter labels like Q1.333
+    - Never rank top selling cars by revenue
   default_behaviours:
     - No LIMIT specified: add LIMIT 500
     - Top/bottom without N: use 10
     - Trend without grain: use monthly
     - Date filter without year: use all years
     - Units sold means SUM(order_qty) not COUNT(*)
+    - Top selling car/model/make means units volume unless user says revenue

@@ -253,6 +253,20 @@ def render_narration_card(narration: dict | None):
             f'<div class="narration-recommendation">💡 {html.escape(str(narration["recommendation"]))}</div>',
             unsafe_allow_html=True,
         )
+    cites = narration.get("knowledge_citations") or []
+    if cites:
+        bits = []
+        for c in cites[:3]:
+            src = html.escape(str(c.get("source_doc") or "SOP"))
+            title = html.escape(str(c.get("title") or ""))
+            page = html.escape(str(c.get("source_page") or ""))
+            bits.append(f"{src}" + (f" §{page}" if page else "") + (f" — {title}" if title else ""))
+        st.markdown(
+            '<div class="okf-citation">📎 Knowledge: '
+            + " · ".join(bits)
+            + "</div>",
+            unsafe_allow_html=True,
+        )
 
 
 def render_editable_sql(sql: str, working_df, result_key: str = "ask_custom_result"):
@@ -1260,7 +1274,19 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     summary = (narr or {}).get("result_summary") or (
         f"{len(df_result)} rows returned" if isinstance(df_result, pd.DataFrame) else "Done"
     )
-    append_chat_exchange(q, result_summary=summary, was_data_query=True)
+    append_chat_exchange(
+        q,
+        result_summary=summary,
+        metric_used=(
+            "units_sold"
+            if any(
+                w in q.lower()
+                for w in ("top selling", "best selling", "units", "volume", "how many")
+            )
+            else None
+        ),
+        was_data_query=True,
+    )
 
     _append_assistant(
         (narr or {}).get("summary", "Here are the results."),

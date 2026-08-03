@@ -38,9 +38,10 @@ class NarrationEngine:
         intent: dict | None = None,
         evidence: dict | None = None,
         mode: str = "standard",
+        knowledge_snippets: list | None = None,
     ) -> dict[str, Any]:
         if result_df is None or result_df.empty:
-            return {
+            base = {
                 "headline": "No results",
                 "narrative_text": "The query returned no rows.",
                 "key_findings": ["No data matched this question."],
@@ -48,7 +49,9 @@ class NarrationEngine:
                 "result_summary": "No rows returned",
                 "summary": "The query returned no rows.",
                 "word_count": 6,
+                "knowledge_citations": [],
             }
+            return self._enrich_with_knowledge(base, question, knowledge_snippets)
 
         num_cols = result_df.select_dtypes(include="number").columns.tolist()
         str_cols = result_df.select_dtypes(exclude="number").columns.tolist()
@@ -76,68 +79,38 @@ class NarrationEngine:
             kind = "grouped"
 
         fmt = "currency" if any(x in metric.lower() for x in ("sales", "revenue", "price", "amount")) else "decimal"
+        if any(x in metric.lower() for x in ("qty", "unit", "order_qty", "volume")):
+            fmt = "integer"
 
         if kind == "scalar":
-            val = float(result_df[metric].iloc[0])
-            headline = f"Total {metric_label}"
-            narrative = f"The total {metric_label} across all records is {self.format_value(val, fmt)}."
-            findings = [f"Single aggregated value: {self.format_value(val, fmt)}"]
-            recommendation = "Ask to break this down by a dimension (colour, make, region)."
-            result_summary = f"Total {metric_label}: {self.format_value(val, fmt)}"
-
-        elif kind == "ranked":
-            ordered = result_df.sort_values(metric, ascending=False)
-            top = ordered.iloc[0]
-            bot = ordered.iloc[-1]
-            total = float(ordered[metric].sum()) or 1.0
-            top_pct = float(top[metric]) / total * 100
-            top3_pct = float(ordered[metric].head(3).sum()) / total * 100
-            headline = f"{metric_label.title()} by {dim_label}"
-            narrative = (
-                f"Across {n} {dim_label} values, {top[dim]} leads with "
-                f"{self.format_value(top[metric], fmt)} ({top_pct:.0f}% of total). "
-                f"{bot[dim]} is lowest at {self.format_value(bot[metric], fmt)}. "
-                f"Total {metric_label}: {self.format_value(total, fmt)}."
-            )
-            findings = [
-                f"{top[dim]} holds the top position with {top_pct:.0f}% share",
-                f"Top 3 account for {top3_pct:.0f}% of total",
-                f"Range spans from {self.format_value(bot[metric], fmt)} to {self.format_value(top[metric], fmt)}",
-            ]
-            recommendation = f"Drill into why {bot[dim]} is low, or compare top vs bottom."
-            result_summary = (
-                f"{metric_label.title()} by {dim_label}: {top[dim]} leads "
-                f"{self.format_value(top[metric], fmt)}, {n} values, "
-                f"range {self.format_value(bot[metric], fmt)}-{self.format_value(top[metric], fmt)}"
-            )
-
+            val = result_df[metric].iloc[0]
+            headline = f"{metric_label.title()}: {self.format_value(val, fmt)}"
+            narrative = f"The result for your question is {self.format_value(val, fmt)}."
+            findings = [f"{metric_label}: {self.format_value(val, fmt)}"]
+            recommendation = "Ask to break this down by make, region, or month."
+            result_summary = headline
         elif kind == "trend":
             time_c = next(
-                (c for c in result_df.columns
-                 if c.lower() in ("month", "year", "quarter", "period") or "date" in c.lower()),
-                result_df.columns[0],
+                (
+                    c for c in result_df.columns
+                    if c.lower() in ("month", "year", "quarter", "period", "day")
+                    or "date" in c.lower()
+                ),
+                str_cols[0] if str_cols else result_df.columns[0],
             )
             ordered = result_df.sort_values(time_c)
-            last = ordered.iloc[-1]
-            prior = ordered.iloc[-2] if n > 1 else None
-            last_v = float(last[metric])
-            change_bit = ""
-            if prior is not None:
-                prev_v = float(prior[metric])
-                change = ((last_v - prev_v) / abs(prev_v) * 100) if prev_v else 0.0
-                direction = "up" if change > 0 else "down"
-                change_bit = f", {direction} {abs(change):.1f}% from prior period"
-            avg = float(ordered[metric].mean())
+            first, last = ordered.iloc[0], ordered.iloc[-1]
+            first_v, last_v = float(first[metric]), float(last[metric])
+            chg = ((last_v - first_v) / abs(first_v) * 100) if first_v else 0
             headline = f"{metric_label.title()} trend"
             narrative = (
-                f"The {metric_label} trend shows {n} periods. "
-                f"The most recent period ({last[time_c]}) reached "
-                f"{self.format_value(last_v, fmt)}{change_bit}. "
-                f"Average across all periods: {self.format_value(avg, fmt)}."
+                f"{metric_label.title()} moved from {self.format_value(first_v, fmt)} "
+                f"({first[time_c]}) to {self.format_value(last_v, fmt)} ({last[time_c]}), "
+                f"a {chg:+.0f}% change across {n} periods."
             )
             findings = [
-                f"Latest: {last[time_c]} = {self.format_value(last_v, fmt)}",
-                f"Average: {self.format_value(avg, fmt)}",
+                f"Start: {first[time_c]} = {self.format_value(first_v, fmt)}",
+                f"End: {last[time_c]} = {self.format_value(last_v, fmt)}",
                 f"{n} periods in series",
             ]
             recommendation = "Ask for a year filter or compare two periods."
@@ -145,7 +118,6 @@ class NarrationEngine:
                 f"{metric_label} trend: latest {last[time_c]} "
                 f"{self.format_value(last_v, fmt)}, {n} periods"
             )
-
         else:
             # Multi-dimension / generic result — clear leader summary, not "Breakdown"
             if dim and metric in result_df.columns:
@@ -190,7 +162,7 @@ class NarrationEngine:
                 result_summary = f"{n} rows returned"
                 recommendation = "Try a more specific metric or dimension."
 
-        return {
+        base = {
             "headline": headline,
             "narrative_text": narrative,
             "summary": narrative,
@@ -199,7 +171,71 @@ class NarrationEngine:
             "result_summary": result_summary,
             "data_points": [{"label": metric, "rows": n}],
             "word_count": len(narrative.split()),
+            "knowledge_citations": [],
         }
+        return self._enrich_with_knowledge(base, question, knowledge_snippets)
+
+    def _enrich_with_knowledge(
+        self,
+        narration: dict[str, Any],
+        question: str,
+        knowledge_snippets: list | None = None,
+    ) -> dict[str, Any]:
+        """Merge OKF / SOP context into narrative (L3 contextual insights)."""
+        snippets = knowledge_snippets
+        if snippets is None:
+            try:
+                from features.okf_knowledge.okf_retriever import get_relevant_snippets
+                snippets = get_relevant_snippets(question or "", top_k=2, max_context_chars=700)
+            except Exception:
+                snippets = []
+
+        if not snippets:
+            return narration
+
+        citations = []
+        context_bits = []
+        for s in snippets[:2]:
+            src = s.get("source_doc") or "SOP"
+            title = s.get("title") or ""
+            snip = (s.get("snippet") or "").replace("\n", " ")
+            # Prefer short actionable sentence
+            if len(snip) > 220:
+                snip = snip[:217] + "…"
+            context_bits.append(snip)
+            citations.append({
+                "source_doc": src,
+                "source_page": s.get("source_page"),
+                "title": title,
+            })
+
+        # Append contextual sentence (SOP-guided)
+        extra = " ".join(context_bits[:1])
+        if extra:
+            narration["narrative_text"] = (
+                f"{narration.get('narrative_text', '')} "
+                f"Business context: {extra}"
+            ).strip()
+            narration["summary"] = narration["narrative_text"]
+
+        findings = list(narration.get("key_findings") or [])
+        src0 = citations[0]["source_doc"] if citations else "SOP"
+        findings.append(f"Knowledge: guided by {src0}")
+        narration["key_findings"] = findings[:4]
+
+        # Soft recommendation upgrade when EV/COVID/region keywords hit
+        q = (question or "").lower()
+        rec = narration.get("recommendation") or ""
+        if any(w in q for w in ("covid", "2020", "recovery")):
+            rec = "Compare vs 2019 baseline — treat 2020 as COVID-depressed (IND-PV-SOP-002)."
+        elif any(w in q for w in ("ev", "electric", "powertrain")):
+            rec = "Report EV share on units (not orders) and separate ICE volume (IND-PV-SOP-003)."
+        elif any(w in q for w in ("region", "territory", "city", "metro")):
+            rec = "Drill Country → Zone → City before model-level conclusions (IND-PV-SOP-004)."
+        narration["recommendation"] = rec
+        narration["knowledge_citations"] = citations
+        narration["word_count"] = len(str(narration.get("narrative_text", "")).split())
+        return narration
 
     def generate_whatif_narration(self, scenario_result: dict) -> str:
         return (scenario_result or {}).get("narrative") or "Scenario analysis complete."

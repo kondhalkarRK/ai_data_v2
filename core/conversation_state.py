@@ -223,20 +223,10 @@ def should_use_anchor(question: str) -> bool:
     q = question.strip().lower()
     new_topic = (
         "new question", "start over", "forget that", "different question",
-        "actually", "instead show me",
+        "instead show me",
     )
     if any(sig in q for sig in new_topic):
         return False
-
-    # Long question with no column overlap → new topic
-    words = q.split()
-    cols = [str(c).lower() for c in (anchor.get("sql_anchor_columns") or [])]
-    if len(words) > 12 and cols:
-        if not any(c in q for c in cols if len(c) >= 3):
-            # still allow short follow-up tokens
-            from core.question_normaliser import detect_followup as _df
-            if not _df(question):
-                return False
 
     try:
         from core.question_normaliser import classify_followup_intent
@@ -475,14 +465,38 @@ def append_chat_exchange(
 
 
 def build_chat_context_string(n_turns: int = 5) -> str:
-    """Build conversation history string for LLM injection."""
+    """Build conversation history + SQL anchor summary for LLM injection."""
     state = get_state()
     hist = list(state.get("chat_history") or [])[-n_turns:]
+    lines: list[str] = []
+
+    anchor = None
+    try:
+        anchor = get_sql_anchor()
+    except Exception:
+        anchor = None
+
+    if anchor and anchor.get("sql_anchor"):
+        lines.append("ACTIVE SQL ANCHOR (preserve unless user starts a new topic):")
+        lines.append(f"  Prior question: {anchor.get('sql_anchor_question') or '—'}")
+        if anchor.get("sql_anchor_metric"):
+            lines.append(f"  Metric: {anchor['sql_anchor_metric']}")
+        cols = anchor.get("sql_anchor_columns") or []
+        if cols:
+            lines.append(f"  Columns: {', '.join(map(str, cols))}")
+        filt = anchor.get("sql_anchor_filters") or []
+        if filt:
+            lines.append(f"  Filters: {'; '.join(filt)}")
+        if anchor.get("sql_anchor_order"):
+            lines.append(f"  Order: {anchor['sql_anchor_order']}")
+        if anchor.get("sql_anchor_limit") is not None:
+            lines.append(f"  Limit: {anchor['sql_anchor_limit']}")
+        lines.append(f"  SQL:\n{anchor['sql_anchor']}")
 
     # Also pull from session chat_messages if richer
     msgs = st.session_state.get("chat_messages") or []
     if msgs and not hist:
-        lines = [f"CONVERSATION HISTORY (last {n_turns} turns):"]
+        lines.append(f"CONVERSATION HISTORY (last {n_turns} turns):")
         for msg in msgs[-n_turns * 2:]:
             role = "User" if msg.get("role") == "user" else "Assistant"
             content = msg.get("content") or ""
@@ -493,16 +507,17 @@ def build_chat_context_string(n_turns: int = 5) -> str:
             narr = data.get("narration") or {}
             if narr.get("result_summary"):
                 lines.append(f"[Result: {narr['result_summary']}]")
-        return "\n".join(lines) if len(lines) > 1 else ""
+        return "\n".join(lines) if lines else ""
 
-    if not hist:
-        return ""
+    if hist:
+        lines.append(f"CONVERSATION HISTORY (last {len(hist)} turns):")
+        for ex in hist:
+            lines.append(f"User: {ex.get('user_question', '')}")
+            if ex.get("result_summary"):
+                lines.append(f"Result: {ex['result_summary']}")
+            if ex.get("metric_used"):
+                lines.append(f"Metric used: {ex['metric_used']}")
 
-    lines = [f"CONVERSATION HISTORY (last {len(hist)} turns):"]
-    for ex in hist:
-        lines.append(f"User: {ex.get('user_question', '')}")
-        if ex.get("result_summary"):
-            lines.append(f"Result: {ex['result_summary']}")
     return "\n".join(lines)
 
 

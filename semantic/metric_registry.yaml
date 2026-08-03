@@ -27,6 +27,11 @@ measures:
       - units
       - cars sold
       - vehicles sold
+      - top selling
+      - best selling
+      - most sold
+      - top seller
+      - sales volume
 
   order_count:
     column: order_id

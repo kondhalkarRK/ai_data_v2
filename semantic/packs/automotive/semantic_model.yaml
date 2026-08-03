@@ -283,6 +283,15 @@ measures:
       - total units
       - sales volume
       - number sold
+      - top selling
+      - best selling
+      - most sold
+      - top seller
+      - best seller
+      - top selling car
+      - best selling car
+      - top selling model
+      - most popular
 
   average_selling_price:
     display_name: "Average Selling Price"
