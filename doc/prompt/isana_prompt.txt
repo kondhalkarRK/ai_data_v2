@@ -1,0 +1,1028 @@
+PROMPT 1 — ISANA Integration into ai_data_v2
+PROMPT 1: ISANA ARCHITECTURE INTEGRATION
+=========================================
+
+You are an expert Python/Streamlit engineer. You are upgrading an existing 
+AI Data Platform (ai_data_v2) by adopting architectural patterns from ISANA 
+(an enterprise inventory risk intelligence platform). 
+
+The goal is to make ai_data_v2's NLQ pipeline more deterministic, 
+conversation-aware, and enterprise-grade — while keeping it working on 
+CSV/DataFrame data (no database connection yet).
+
+════════════════════════════════════════════════════════════════
+EXISTING PROJECT STRUCTURE (ai_data_v2)
+════════════════════════════════════════════════════════════════
+
+ai_data_v2/
+├── .streamlit/config.toml
+├── config/
+│   ├── __init__.py
+│   ├── constants.py
+│   ├── settings.py
+│   └── styles.py
+├── core/
+│   ├── __init__.py
+│   ├── analysis_engine.py
+│   ├── chart_engine.py
+│   ├── data_quality_engine.py
+│   ├── intent_cache.py          ← DO NOT CHANGE (already excellent)
+│   ├── intent_resolver.py       ← CHANGE
+│   ├── join_engine.py
+│   ├── kpi_engine.py
+│   ├── llm_client.py            ← DO NOT CHANGE
+│   ├── nlq_engine.py            ← CHANGE
+│   ├── question_normaliser.py   ← CHANGE
+│   ├── schema_builder.py        ← MINOR CHANGE
+│   ├── sql_compiler.py          ← CHANGE
+│   ├── sql_guardrails.py
+│   └── utils.py                 ← DO NOT CHANGE
+├── features/
+│   ├── materialized_views/
+│   ├── rag_query_memory/
+│   └── vector_schema_retrieval/
+├── semantic/
+│   ├── packs/
+│   ├── __init__.py
+│   ├── business_glossary.yaml   ← MINOR CHANGE
+│   ├── industry_packs.py
+│   ├── semantic_context_builder.py ← CHANGE
+│   ├── semantic_loader.py          ← CHANGE
+│   ├── semantic_model.yaml         ← MINOR CHANGE
+│   └── semantic_vector_search.py   ← MINOR CHANGE
+├── ui/
+│   ├── __init__.py
+│   ├── sidebar.py               ← CHANGE
+│   ├── tab_join.py
+│   ├── tab_kpi.py               ← MINOR CHANGE
+│   ├── tab_preview.py           ← NO CHANGE
+│   └── tab_query.py             ← CHANGE
+├── app.py                       ← MINOR CHANGE
+└── prompt.md
+
+════════════════════════════════════════════════════════════════
+NEW FILES TO CREATE
+════════════════════════════════════════════════════════════════
+
+core/conversation_state.py       ← NEW
+core/semantic_resolver.py        ← NEW
+core/metric_registry.py          ← NEW
+core/evidence_builder.py         ← NEW
+semantic/metric_registry.yaml    ← NEW
+
+════════════════════════════════════════════════════════════════
+TASK 1 — CREATE: semantic/metric_registry.yaml
+════════════════════════════════════════════════════════════════
+
+Create a YAML file that is the single source of truth for all 
+business metrics in the automotive sales domain.
+
+Structure exactly as follows:
+
+version: "1.0"
+domain: "Automotive Sales"
+
+measures:
+  revenue:
+    column: total_sales
+    aggregation: SUM
+    display_label: "Revenue"
+    format: currency
+    synonyms:
+      - sales
+      - turnover
+      - income
+      - total revenue
+      - gross sales
+      - earnings
+      - money made
+
+  units_sold:
+    column: order_qty
+    aggregation: SUM
+    display_label: "Units Sold"
+    format: integer
+    synonyms:
+      - volume
+      - quantity
+      - units
+      - cars sold
+      - vehicles sold
+
+  order_count:
+    column: order_id
+    aggregation: COUNT
+    display_label: "Orders"
+    format: integer
+    synonyms:
+      - orders
+      - transactions
+      - deals
+      - bookings
+      - purchases
+
+  avg_price:
+    column: price_per_unit
+    aggregation: AVG
+    display_label: "Average Price"
+    format: currency
+    synonyms:
+      - average price
+      - price
+      - ASP
+      - avg selling price
+
+derived_measures:
+  average_selling_price:
+    formula: "SUM(total_sales) / NULLIF(SUM(order_qty), 0)"
+    display_label: "Average Selling Price"
+    format: currency
+    dependencies:
+      - total_sales
+      - order_qty
+    synonyms:
+      - asp
+      - average unit price
+      - price per car
+
+  revenue_per_order:
+    formula: "SUM(total_sales) / NULLIF(COUNT(order_id), 0)"
+    display_label: "Revenue Per Order"
+    format: currency
+    dependencies:
+      - total_sales
+      - order_id
+    synonyms:
+      - average order value
+      - aov
+      - basket size
+
+metrics:
+  revenue_growth:
+    type: derived
+    formula: "yoy_growth"
+    display_label: "Revenue Growth"
+    description: "Year over year revenue growth percentage"
+
+  market_share:
+    type: derived
+    formula: "SUM(order_qty) / NULLIF(SUM(SUM(order_qty)) OVER(), 0) * 100"
+    display_label: "Market Share %"
+    description: "Share of total units sold"
+
+════════════════════════════════════════════════════════════════
+TASK 2 — CREATE: core/metric_registry.py
+════════════════════════════════════════════════════════════════
+
+Create a MetricRegistry class that:
+
+1. Loads semantic/metric_registry.yaml on init
+2. Implements these methods:
+   - list_metrics() → list of all metric keys
+   - list_measures() → list of base measure keys
+   - resolve_metric(name: str) → dict with:
+       formula, display_label, format, 
+       aggregation, column, source
+   - get_synonyms(name: str) → list of synonyms
+   - get_synonym_map() → dict mapping every 
+       synonym (lowercase) → canonical metric name
+   - find_metric_by_synonym(text: str) → 
+       canonical name or None
+3. Implements singleton pattern via 
+   get_metric_registry() function
+4. Handles FileNotFoundError gracefully
+5. Caches loaded registry in memory
+
+════════════════════════════════════════════════════════════════
+TASK 3 — CREATE: core/conversation_state.py
+════════════════════════════════════════════════════════════════
+
+Create a ConversationState manager that:
+
+1. Stores state in st.session_state under 
+   key "conversation_state"
+
+2. State structure:
+   {
+     "active_intent": str | None,
+     "last_resolved": {
+       "metric": str | None,
+       "dimensions": list[str],
+       "filters": dict,
+       "time_grain": str | None,
+       "sql": str | None
+     },
+     "prior_metric": str | None,
+     "prior_dimensions": list[str],
+     "prior_filters": dict,
+     "prior_time_grain": str | None,
+     "turn_count": int,
+     "last_question": str | None,
+     "is_followup": bool,
+     "inherited_context": dict
+   }
+
+3. Implements these functions:
+   - get_state() → current state dict
+   - update_state(intent, resolved, question) 
+       → updates after successful query
+   - detect_followup(question: str) → bool
+       checks for tokens: same, now, also, but,
+       only, filter, show, and, too, instead,
+       additionally, what about, how about
+   - inherit_context(question: str) → dict
+       returns what to inherit from prior turn
+   - clear_state() → resets to empty
+   - to_context_string() → str
+       formats state for LLM prompt injection
+   - get_badge_info() → dict
+       returns display badge for UI
+
+4. Follow-up detection rules (from ISANA):
+   - Short question (≤ 7 words) + trigger token
+     → is follow-up
+   - "same but for X" → inherit all, change X
+   - "now show by Y" → inherit metric+filters, 
+       change dimension to Y
+   - "only for Z" → inherit all, add filter Z
+   - "what about W" → inherit metric, 
+       change dimension/filter to W
+
+════════════════════════════════════════════════════════════════
+TASK 4 — CREATE: core/semantic_resolver.py
+════════════════════════════════════════════════════════════════
+
+Create a semantic resolver adapted from ISANA's 
+semantic_resolver.py for DataFrame (CSV) domain.
+
+Function: resolve_semantics(validated: dict, df: pd.DataFrame) → dict
+
+Input validated dict contains:
+{
+  "intent_type": str,
+  "metric": str | None,
+  "dimensions": list[str],
+  "filters": list[dict],
+  "time_grain": str | None,
+  "limit": int | None,
+  "order_by": list[dict]
+}
+
+Steps to implement:
+
+STEP 1 — Intent bypass routing:
+  - If intent_type in 
+    ["unsupported", "scenario_analysis", 
+     "objective_override"]:
+    return pass-through contract with 
+    expression="1", bypass=True
+
+STEP 2 — Metric resolution:
+  - Try metric_registry.resolve_metric(metric)
+  - If not found, try synonym lookup:
+    metric_registry.find_metric_by_synonym(metric)
+  - If still not found, try 
+    semantic phrase mapping from 
+    semantic_loader synonyms
+  - If found: use registry expression
+  - If not found: fall back to 
+    intent expression (LLM-provided)
+  - Track resolution source:
+    "registry" | "synonym" | "llm_fallback"
+
+STEP 3 — Dimension normalisation:
+  Alias map:
+    "regions" → "region"
+    "categories" → "category"  
+    "colours" → "colour_name"
+    "colors" → "colour_name"
+    "salespeople" → "salesperson"
+    "reps" → "salesperson"
+    "models" → "model"
+    "makes" → "make"
+    "brands" → "make"
+  
+  Also validate each dimension column 
+  exists in df.columns
+
+STEP 4 — Filter validation:
+  - Validate each filter column 
+    exists in df.columns
+  - Normalise date filters:
+    year as integer
+    month as integer (1-12)
+    support month names → integers
+
+STEP 5 — Smart defaults:
+  - If no time filter and date column exists
+    in df: add advisory warning 
+    (do NOT auto-apply filter for CSV,
+     data may be single-period)
+  - If metric has default_filters in registry:
+    apply them
+
+STEP 6 — Build execution contract:
+  Return dict:
+  {
+    "expression": str,
+    "display_label": str,
+    "format": str,
+    "dimensions": list[str],
+    "filters": dict,
+    "time_grain": str | None,
+    "limit": int | None,
+    "order": str,
+    "metric_name": str | None,
+    "resolution_source": str,
+    "bypass": bool,
+    "warnings": list[str]
+  }
+
+════════════════════════════════════════════════════════════════
+TASK 5 — CREATE: core/evidence_builder.py
+════════════════════════════════════════════════════════════════
+
+Create a lightweight evidence builder inspired by ISANA PHASE 7.5.
+
+Implement:
+
+1. build_evidence(
+     sql: str,
+     result_df: pd.DataFrame | None,
+     execution_path: str,
+     question: str
+   ) → dict
+
+   Returns:
+   {
+     "evidence_id": uuid str,
+     "query_hash": sha256(sql)[:16],
+     "execution_path": 
+       "deterministic" | "fallback" | "cache",
+     "result_row_count": int,
+     "result_col_count": int,
+     "execution_status": "success" | "error",
+     "timestamp": iso datetime str,
+     "question_fingerprint": sha256(question)[:12],
+     "advisory_only": True
+   }
+
+2. get_execution_badge(evidence: dict) → dict
+   Returns:
+   {
+     "icon": "✅" | "⚠️" | "🔒",
+     "label": "Deterministic" | 
+               "AI Generated" | "Cached",
+     "colour": "green" | "orange" | "blue",
+     "tooltip": str explaining what it means
+   }
+
+3. Store evidence in 
+   st.session_state["execution_evidence"]
+   as a list (last 20 entries)
+
+════════════════════════════════════════════════════════════════
+TASK 6 — CHANGE: core/question_normaliser.py
+════════════════════════════════════════════════════════════════
+
+ADD these functions to existing file:
+
+1. detect_followup(question: str) → bool
+   Checks for follow-up signal tokens:
+   ["same", "now", "also", "but", "only", 
+    "filter", "instead", "what about", 
+    "how about", "additionally", "too",
+    "and what", "show only", "just show"]
+   Rules: short question (≤8 words) + token
+   OR explicit reference tokens present
+
+2. detect_oob(question: str) → bool
+   OOB patterns for CSV analytics domain:
+   - r"\bwrite\s+(me\s+)?code\b"
+   - r"\bdelete\s+(the\s+)?data\b"
+   - r"\bdrop\s+table\b"
+   - r"\binsert\s+into\b"
+   - r"\bupdate\s+.*set\b"
+   - r"\bpredict\s+future\b"
+   - r"\bforecast\s+next\b"
+   - r"\bml\s+model\b"
+   - r"\btrain\s+(a\s+)?model\b"
+   - r"\bpersonal\s+data\b"
+   - r"\bpassword\b"
+   - r"\bcredit\s+card\b"
+   Returns True if any pattern matches
+
+3. detect_scenario(question: str) → bool
+   Scenario signal patterns:
+   - r"\bwhat\s+if\b"
+   - r"\bif\s+.*\bchange[sd]?\b"
+   - r"\bsuppose\b"
+   - r"\bassume\b"
+   - r"\b\d+\s*%\s*(increase|decrease|change)\b"
+   - r"\b(increase|decrease)\s+by\s+\d+\b"
+   Returns True if any pattern matches
+
+4. extract_followup_tokens(question: str) → dict
+   Returns what changed in follow-up:
+   {
+     "dimension_change": str | None,
+     "filter_change": str | None,
+     "metric_change": str | None,
+     "time_change": str | None
+   }
+
+════════════════════════════════════════════════════════════════
+TASK 7 — CHANGE: core/intent_resolver.py
+════════════════════════════════════════════════════════════════
+
+MODIFY existing resolve_intent() and validate_intent():
+
+1. Update resolve_intent() signature to:
+   resolve_intent(
+     question: str, 
+     df: pd.DataFrame, 
+     status=None,
+     conv_state: dict | None = None
+   ) → dict | None
+
+2. Before LLM call:
+   - Run detect_oob(question) 
+     → if True return:
+       {"intent_type": "out_of_scope",
+        "reason": "Question is outside 
+        the scope of this dataset analytics tool"}
+   
+   - If conv_state provided:
+     inject context string into prompt
+     using conv_state["to_context_string"]
+
+3. Update build_intent_prompt() to include:
+   - Metric registry context block:
+     "KNOWN METRICS: revenue=SUM(total_sales),
+      units_sold=SUM(order_qty), ..."
+   - Conversation context block:
+     "PRIOR CONTEXT: {conv_state_string}"
+   - OOB guidance:
+     "OUT OF SCOPE: code generation, 
+      data modification, predictions"
+
+4. Update intent JSON schema in prompt to 
+   include new field:
+   "metric_name": "<canonical metric name 
+                   from KNOWN METRICS list>"
+
+5. Update validate_intent() to:
+   - Allow "out_of_scope" as valid intent type
+   - Check "metric_name" field if present
+   - Return detailed validation messages
+
+════════════════════════════════════════════════════════════════
+TASK 8 — CHANGE: core/nlq_engine.py
+════════════════════════════════════════════════════════════════
+
+MAJOR CHANGES to run_query() function:
+
+1. Import new modules:
+   from core.conversation_state import (
+     get_state, update_state, 
+     detect_followup, inherit_context
+   )
+   from core.semantic_resolver import resolve_semantics
+   from core.evidence_builder import (
+     build_evidence, get_execution_badge
+   )
+   from core.metric_registry import get_metric_registry
+
+2. At start of run_query():
+   - Load conv_state = get_state()
+   - Detect follow-up:
+     is_followup = detect_followup(question)
+   - If is_followup: 
+     inherited = inherit_context(question)
+     merge inherited into question context
+
+3. After intent resolution:
+   - Call resolve_semantics(intent, working_df)
+   - Use execution_contract from resolver
+     instead of raw intent for sql_compiler
+   - If execution_contract["bypass"]:
+     skip to fallback directly
+
+4. After execution:
+   - Build evidence:
+     evidence = build_evidence(
+       sql, result, execution_path, question
+     )
+   - Update conversation state:
+     update_state(intent, resolved, question)
+   - Return evidence with result:
+     return result, sql, None, evidence
+
+5. Update return signature throughout:
+   All return paths return 4-tuple:
+   (result, sql, error, evidence)
+   where evidence can be None
+
+6. Update update_history() to also 
+   store evidence in plan dict
+
+════════════════════════════════════════════════════════════════
+TASK 9 — CHANGE: core/sql_compiler.py
+════════════════════════════════════════════════════════════════
+
+MINOR changes:
+
+1. Add function compile_from_contract(
+     contract: dict
+   ) → str
+   
+   Accepts execution_contract from 
+   semantic_resolver and converts to
+   existing intent format for compilation.
+   
+   Maps:
+   contract["expression"] → measure expression
+   contract["dimensions"] → dimension columns
+   contract["filters"] → filter list
+   contract["time_grain"] → time_grain
+   contract["limit"] → limit
+   contract["order"] → order_by
+
+2. Add contract validation before compile:
+   validate_contract(contract: dict) → 
+     tuple[bool, str]
+   Checks expression is not empty,
+   dimensions are strings,
+   filters are properly structured
+
+3. Document the quarter formula fix 
+   with clear comments:
+   # CORRECT: ((month - 1) / 3) + 1
+   # NOT: month / 4 + 1 (wrong for Jul/Oct/Nov)
+
+════════════════════════════════════════════════════════════════
+TASK 10 — CHANGE: semantic/semantic_loader.py
+════════════════════════════════════════════════════════════════
+
+ADD to existing SemanticLoader class:
+
+1. Add _metric_registry: dict = {} 
+   as instance variable
+
+2. Add _METRIC_REGISTRY_PATH pointing to
+   semantic/metric_registry.yaml
+
+3. Update load() to also load 
+   metric_registry.yaml if it exists
+   (non-fatal if missing)
+
+4. Add methods:
+   - get_metric_registry() → dict
+   - get_metric_expressions() → dict
+       metric_name → SQL expression
+   - get_all_metric_synonyms() → dict
+       synonym → canonical name
+   - get_metric_display_labels() → dict
+       metric_name → display label
+
+5. Update get_all_semantic_terms() to 
+   also include metric registry terms
+   so vector search can resolve metric names
+
+════════════════════════════════════════════════════════════════
+TASK 11 — CHANGE: semantic/semantic_context_builder.py
+════════════════════════════════════════════════════════════════
+
+ADD to SemanticContextBuilder:
+
+1. New method build_metric_context() → str
+   Shows LLM all known metrics:
+   "KNOWN BUSINESS METRICS:
+    Revenue: SUM(total_sales) [currency]
+    Units Sold: SUM(order_qty) [integer]
+    ..."
+   Uses metric_registry from semantic_loader
+
+2. New method build_conversation_context(
+     conv_state: dict
+   ) → str
+   Injects prior turn info:
+   "CONVERSATION CONTEXT:
+    Prior metric: Revenue
+    Prior dimensions: colour_name
+    Prior filters: year=2023
+    This appears to be a follow-up query."
+
+3. New method build_scope_context() → str
+   Tells LLM what is in/out of scope:
+   "SCOPE: Answer questions about 
+    automotive sales data only.
+    Cannot: write code, modify data,
+    make future predictions."
+
+4. Update build_full_context() to include
+   all three new blocks when relevant:
+   - Always include metric context
+   - Include conversation context 
+     only when conv_state provided
+   - Always include scope context
+
+════════════════════════════════════════════════════════════════
+TASK 12 — CHANGE: ui/tab_query.py
+════════════════════════════════════════════════════════════════
+
+UPDATE the query tab render function:
+
+1. Update call to run_query() to handle 
+   new 4-tuple return:
+   result, sql, err, evidence = run_query(...)
+
+2. Add execution badge display:
+   - After result, show small badge:
+     ✅ Deterministic | ⚠️ AI Generated | 🔒 Cached
+   - Use evidence["execution_path"] to determine
+   - Style with appropriate colour
+
+3. Add conversation context indicator:
+   - If conv_state shows follow-up:
+     show subtle banner:
+     "↩ Continuing from: [prior question]"
+
+4. Add OOB deflection display:
+   - If error contains "out_of_scope":
+     show friendly message:
+     "This question is outside what I can 
+      answer from your dataset. 
+      Try asking about [suggest topics]"
+
+5. Add evidence detail expander:
+   "Query Details" expander showing:
+   - Execution path
+   - Query hash (short)
+   - Row count
+   - Timestamp
+   - Resolution source (registry/llm)
+
+6. Add metric context tooltip:
+   - When metric is resolved from registry:
+     show info: "Using: Revenue = SUM(total_sales)"
+
+════════════════════════════════════════════════════════════════
+TASK 13 — CHANGE: ui/sidebar.py
+════════════════════════════════════════════════════════════════
+
+ADD to sidebar render:
+
+1. Conversation State Panel:
+   - Current active metric
+   - Current active filters
+   - Turn count
+   - "Clear Conversation" button
+     that calls clear_state()
+
+2. Query Path Stats (this session):
+   - X deterministic queries
+   - Y AI fallback queries
+   - Z cached queries
+   Pull from st.session_state 
+   execution_evidence list
+
+3. Domain Scope Hint:
+   - Collapsible panel
+   - "I can answer questions about:"
+   - List key metrics and dimensions
+   - Pull from metric_registry
+
+════════════════════════════════════════════════════════════════
+TASK 14 — CHANGE: config/constants.py
+════════════════════════════════════════════════════════════════
+
+ADD these constants:
+
+# Conversation
+MAX_CONVERSATION_TURNS = 10
+FOLLOWUP_TRIGGER_TOKENS = [
+  "same", "now", "also", "but", "only",
+  "filter", "instead", "what about",
+  "how about", "additionally", "too",
+  "and what", "show only", "just"
+]
+MAX_FOLLOWUP_QUESTION_WORDS = 8
+
+# OOB Guard
+OOB_PATTERNS = [
+  r"\bwrite\s+(me\s+)?code\b",
+  r"\bdelete\s+(the\s+)?data\b",
+  r"\bdrop\s+table\b",
+  r"\binsert\s+into\b",
+  r"\bpredict\s+future\b",
+  r"\bml\s+model\b",
+  r"\btrain\s+(a\s+)?model\b"
+]
+
+# Evidence
+EXECUTION_PATHS = ["deterministic", "fallback", "cache"]
+MAX_EVIDENCE_HISTORY = 20
+
+# Registry
+METRIC_REGISTRY_PATH = "semantic/metric_registry.yaml"
+
+# Badges
+BADGE_DETERMINISTIC = {"icon": "✅", 
+  "label": "Deterministic", "colour": "green"}
+BADGE_FALLBACK = {"icon": "⚠️", 
+  "label": "AI Generated", "colour": "orange"}
+BADGE_CACHED = {"icon": "🔒", 
+  "label": "Cached", "colour": "blue"}
+BADGE_OOB = {"icon": "🚫", 
+  "label": "Out of Scope", "colour": "red"}
+
+════════════════════════════════════════════════════════════════
+TASK 15 — CHANGE: config/settings.py
+════════════════════════════════════════════════════════════════
+
+ADD to init_session_state():
+
+# Conversation state
+if "conversation_state" not in st.session_state:
+    st.session_state.conversation_state = {
+        "active_intent": None,
+        "last_resolved": {},
+        "prior_metric": None,
+        "prior_dimensions": [],
+        "prior_filters": {},
+        "prior_time_grain": None,
+        "turn_count": 0,
+        "last_question": None,
+        "is_followup": False,
+        "inherited_context": {}
+    }
+
+# Evidence tracking
+if "execution_evidence" not in st.session_state:
+    st.session_state.execution_evidence = []
+
+# Query path stats
+if "query_stats" not in st.session_state:
+    st.session_state.query_stats = {
+        "deterministic": 0,
+        "fallback": 0,
+        "cache": 0
+    }
+
+════════════════════════════════════════════════════════════════
+TASK 16 — CHANGE: app.py
+════════════════════════════════════════════════════════════════
+
+ADD after semantic singletons init:
+
+# Initialise metric registry singleton
+from core.metric_registry import get_metric_registry
+_init_semantic_component(
+    "metric_registry",
+    get_metric_registry,
+    "Metric registry not loaded
+
+══════════════════════════════════════════════════════════════
+TASK 16 — CHANGE: app.py (CONTINUED)
+════════════════════════════════════════════════════════════════
+
+# Store in session for tab access
+if st.session_state.get("metric_registry"):
+    st.session_state.metric_registry = (
+        st.session_state.metric_registry
+    )
+
+# Initialise conversation state
+from core.conversation_state import get_state
+if "conversation_state" not in st.session_state:
+    get_state()  # initialises with empty state
+
+════════════════════════════════════════════════════════════════
+TASK 17 — CHANGE: config/styles.py
+════════════════════════════════════════════════════════════════
+
+ADD these CSS classes for new UI elements:
+
+/* Execution path badges */
+.badge-deterministic {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    display: inline-block;
+}
+
+.badge-fallback {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+}
+
+.badge-cached {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+}
+
+.badge-oob {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+}
+
+/* Conversation context banner */
+.conv-context-banner {
+    background: rgba(99, 102, 241, 0.1);
+    border-left: 3px solid #6366f1;
+    padding: 6px 12px;
+    border-radius: 0 8px 8px 0;
+    font-size: 12px;
+    color: #a5b4fc;
+    margin-bottom: 8px;
+}
+
+/* OOB deflection card */
+.oob-card {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 12px 0;
+}
+
+/* Evidence detail panel */
+.evidence-panel {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+/* Metric resolution info */
+.metric-info-pill {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #6ee7b7;
+    display: inline-block;
+    margin: 4px 0;
+}
+
+/* Conversation state panel in sidebar */
+.conv-state-panel {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 10px;
+    padding: 12px;
+    margin: 8px 0;
+}
+
+/* Query stats row */
+.query-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(99,102,241,0.08);
+    font-size: 11px;
+}
+
+════════════════════════════════════════════════════════════════
+INTEGRATION WIRING — HOW ALL PIECES CONNECT
+════════════════════════════════════════════════════════════════
+
+The complete flow after integration:
+
+1. User types question in tab_query.py
+
+2. tab_query.py calls run_query(working_df, question)
+
+3. nlq_engine.run_query():
+   a. Load conv_state = get_state()
+   b. detect_oob(question) 
+      → if True: return OOB evidence immediately
+   c. detect_followup(question)
+      → if True: inherit_context() from conv_state
+   d. Normalise + fingerprint question
+   e. Check session cache (Layer 1)
+   f. Check disk cache (Layer 2)
+   g. Call intent_resolver.resolve_intent(
+        question, df, status, conv_state
+      )
+   h. Call semantic_resolver.resolve_semantics(
+        intent, df
+      ) → execution_contract
+   i. If not bypass:
+        sql_compiler.compile_from_contract(
+          execution_contract
+        )
+      Else: fallback to nlq_to_sql()
+   j. run_sql(sql, df)
+   k. build_evidence(sql, result, path, question)
+   l. update_state(intent, resolved, question)
+   m. Cache both layers
+   n. Return (result, sql, None, evidence)
+
+4. tab_query.py receives 4-tuple:
+   - Renders result table
+   - Shows execution badge
+   - Shows conversation context banner
+   - Shows evidence detail expander
+   - Shows metric resolution info
+
+════════════════════════════════════════════════════════════════
+IMPORTANT RULES FOR IMPLEMENTATION
+════════════════════════════════════════════════════════════════
+
+1. DO NOT break existing functionality
+   All existing cache, LLM fallback, and 
+   SQL compilation must still work
+
+2. DO NOT change these files:
+   - core/intent_cache.py
+   - core/llm_client.py  
+   - core/utils.py
+   - ui/tab_preview.py
+
+3. All new functions must be backward compatible
+   - run_query() return can be 3-tuple OR 4-tuple
+   - Handle both in tab_query.py with:
+     result = run_query(...)
+     if len(result) == 4:
+       df, sql, err, evidence = result
+     else:
+       df, sql, err = result
+       evidence = None
+
+4. metric_registry.yaml missing = 
+   graceful fallback, NOT crash
+
+5. conversation_state missing from 
+   session = reinitialise, NOT crash
+
+6. All new imports wrapped in try/except
+   with graceful fallback
+
+7. Keep all existing intent_types working:
+   simple, ranking, filtered, time_series,
+   comparison, multi_dim, derived_kpi,
+   rank_within_group, running_total, yoy_growth
+
+════════════════════════════════════════════════════════════════
+TESTING CHECKLIST
+════════════════════════════════════════════════════════════════
+
+After implementation, verify:
+
+□ "Show revenue by colour" 
+  → resolves via metric_registry
+  → badge shows ✅ Deterministic
+
+□ "Same but for 2023"
+  → detected as follow-up
+  → inherits revenue + colour
+  → adds year=2023 filter
+
+□ "Write me code to delete data"
+  → OOB detected before LLM call
+  → shows 🚫 Out of Scope message
+
+□ Repeated question
+  → served from cache
+  → badge shows 🔒 Cached
+
+□ Unknown metric question
+  → falls back to LLM
+  → badge shows ⚠️ AI Generated
+
+□ Clear conversation button
+  → resets conv_state
+  → next query starts fresh
+
+□ Sidebar shows correct stats
+  → deterministic/fallback/cache counts
+
+□ Evidence expander shows
+  → query hash, timestamp, row count
+
+END OF PROMPT 1
