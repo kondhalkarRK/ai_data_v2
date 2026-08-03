@@ -464,11 +464,13 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
                         continue
                     desc = pat_val.get("description", pat_name)
                     triggers = pat_val.get("trigger_words", [])
-                    trigger_str = ", ".join(triggers[:5]) if triggers else ""
-                    lines.append(
-                        f"  {desc}"
-                        + (f" (triggers: {trigger_str})" if trigger_str else "")
-                    )
+                    trigger_str = ", ".join(triggers[:8]) if triggers else ""
+                    lines.append(f"  {pat_name}: {desc}")
+                    if trigger_str:
+                        lines.append(f"    triggers: {trigger_str}")
+                    if pat_val.get("pattern"):
+                        pat = " ".join(str(pat_val["pattern"]).split())
+                        lines.append(f"    pattern: {pat}")
                 sql_patterns_block = "\n".join(lines)
         except Exception:
             sql_patterns_block = ""
@@ -481,8 +483,10 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
         )
     if len(glossary_sql_hints) > 800:
         glossary_sql_hints = glossary_sql_hints[:800] + "\n...[hints trimmed]"
-    if len(domain_rules) > 600:
-        domain_rules = domain_rules[:600] + "\n...[rules trimmed]"
+    if len(domain_rules) > 900:
+        domain_rules = domain_rules[:900] + "\n...[rules trimmed]"
+    if len(sql_patterns_block) > 1200:
+        sql_patterns_block = sql_patterns_block[:1200] + "\n...[patterns trimmed]"
 
     # Persist for UI badges / expander
     try:
@@ -552,6 +556,13 @@ RULES:
 13. Never return more than 500 rows unless explicitly asked
 14. Return ONLY the SQL string, no explanation, no markdown fences
 15. Follow-up questions inherit filters/metric/dimensions from PRIOR CONTEXT / SQL ANCHOR when present
+16. "gained / lost / changed most between YEAR1 and YEAR2" (e.g. units between 2021 and 2025):
+    MUST return FOUR columns: [dimension], units_YEAR1, units_YEAR2, units_gained (= YEAR2 - YEAR1).
+    Use SUM(CASE WHEN year=YEAR1 ...) / SUM(CASE WHEN year=YEAR2 ...) pivot — NEVER one combined total for both years.
+    Default dimension = make unless the user asks for model / car_type / region.
+    ORDER BY units_gained DESC LIMIT 10.
+17. EV / electric vehicle / electric car / "ev car" / BEV → filter engine_type = 'Electric' (exact).
+    Do NOT use Hybrid unless the user says electrified. Prefer SUM(order_qty) for EV volume/share.
 
 NAME COLUMNS DETECTED: {name_cols}
 

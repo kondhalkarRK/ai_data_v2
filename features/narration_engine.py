@@ -31,6 +31,35 @@ class NarrationEngine:
             return f"{sign}₹{av:,.0f}"
         return f"{v:,.2f}"
 
+    def _metric_format(self, metric: str) -> str:
+        m = str(metric).lower()
+        if any(x in m for x in ("sales", "revenue", "price", "amount", "aov", "asp")):
+            return "currency"
+        if any(x in m for x in ("qty", "unit", "order_qty", "volume", "count", "gained", "diff")):
+            return "integer"
+        if any(x in m for x in ("pct", "share", "percent", "rate")):
+            return "percent"
+        return "decimal"
+
+    def _find_gain_cols(self, df: pd.DataFrame) -> tuple[str | None, str | None, str | None]:
+        """Detect year1 / year2 / diff columns from between-year pivots."""
+        cols = {str(c).lower(): c for c in df.columns}
+        gained = None
+        for key, orig in cols.items():
+            if any(t in key for t in ("gained", "diff", "delta", "change")):
+                gained = orig
+                break
+        year_cols = []
+        for key, orig in cols.items():
+            if key.startswith("units_") and key.replace("units_", "").isdigit():
+                year_cols.append((int(key.replace("units_", "")), orig))
+            elif key.startswith("revenue_") and key.replace("revenue_", "").isdigit():
+                year_cols.append((int(key.replace("revenue_", "")), orig))
+        year_cols.sort()
+        if len(year_cols) >= 2:
+            return year_cols[0][1], year_cols[-1][1], gained
+        return None, None, gained
+
     def generate_narration(
         self,
         result_df: pd.DataFrame,
@@ -56,7 +85,15 @@ class NarrationEngine:
         num_cols = result_df.select_dtypes(include="number").columns.tolist()
         str_cols = result_df.select_dtypes(exclude="number").columns.tolist()
         n = len(result_df)
-        metric = num_cols[0] if num_cols else "value"
+        y1_col, y2_col, gain_col = self._find_gain_cols(result_df)
+
+        # Prefer gain / latest year metric when present
+        if gain_col and gain_col in result_df.columns:
+            metric = gain_col
+        elif y2_col and y2_col in result_df.columns:
+            metric = y2_col
+        else:
+            metric = num_cols[0] if num_cols else "value"
         metric_label = str(metric).replace("_", " ")
         dim = str_cols[0] if str_cols else None
         dim_label = str(dim).replace("_", " ") if dim else "group"
@@ -67,7 +104,9 @@ class NarrationEngine:
             for c in result_df.columns
         )
 
-        if n == 1 and num_cols and not str_cols:
+        if y1_col and y2_col and dim and gain_col:
+            kind = "yoy_gain"
+        elif n == 1 and num_cols and not str_cols:
             kind = "scalar"
         elif is_time and num_cols:
             kind = "trend"
@@ -78,11 +117,37 @@ class NarrationEngine:
         else:
             kind = "grouped"
 
-        fmt = "currency" if any(x in metric.lower() for x in ("sales", "revenue", "price", "amount")) else "decimal"
-        if any(x in metric.lower() for x in ("qty", "unit", "order_qty", "volume")):
-            fmt = "integer"
+        fmt = self._metric_format(metric)
 
-        if kind == "scalar":
+        if kind == "yoy_gain":
+            ordered = result_df.sort_values(gain_col, ascending=False)
+            top = ordered.iloc[0]
+            bottom = ordered.iloc[-1]
+            total_gain = float(pd.to_numeric(result_df[gain_col], errors="coerce").fillna(0).sum())
+            top_gain = float(top[gain_col])
+            share = (top_gain / total_gain * 100) if total_gain else 0
+            y1_lab = str(y1_col).replace("_", " ")
+            y2_lab = str(y2_col).replace("_", " ")
+            headline = f"{top[dim]} gained the most units"
+            narrative = (
+                f"{top[dim]} leads the gain with "
+                f"{self.format_value(top[y1_col], 'integer')} → "
+                f"{self.format_value(top[y2_col], 'integer')} "
+                f"({self.format_value(top_gain, 'integer')} net units, "
+                f"{share:.0f}% of total net gains across {n} {dim_label}s)."
+            )
+            findings = [
+                f"Leader: {top[dim]} (+{self.format_value(top_gain, 'integer')})",
+                f"{y1_lab}: {self.format_value(top[y1_col], 'integer')} · "
+                f"{y2_lab}: {self.format_value(top[y2_col], 'integer')}",
+                f"Softest: {bottom[dim]} "
+                f"({self.format_value(bottom[gain_col], 'integer')})",
+            ]
+            recommendation = "Drill the leader by region or car type next."
+            result_summary = (
+                f"{top[dim]} gained {self.format_value(top_gain, 'integer')} units"
+            )
+        elif kind == "scalar":
             val = result_df[metric].iloc[0]
             headline = f"{metric_label.title()}: {self.format_value(val, fmt)}"
             narrative = f"The result for your question is {self.format_value(val, fmt)}."
@@ -102,16 +167,19 @@ class NarrationEngine:
             first, last = ordered.iloc[0], ordered.iloc[-1]
             first_v, last_v = float(first[metric]), float(last[metric])
             chg = ((last_v - first_v) / abs(first_v) * 100) if first_v else 0
+            peak_idx = ordered[metric].astype(float).idxmax()
+            peak = ordered.loc[peak_idx]
             headline = f"{metric_label.title()} trend"
             narrative = (
                 f"{metric_label.title()} moved from {self.format_value(first_v, fmt)} "
                 f"({first[time_c]}) to {self.format_value(last_v, fmt)} ({last[time_c]}), "
-                f"a {chg:+.0f}% change across {n} periods."
+                f"a {chg:+.0f}% change across {n} periods. "
+                f"Peak was {peak[time_c]} at {self.format_value(peak[metric], fmt)}."
             )
             findings = [
                 f"Start: {first[time_c]} = {self.format_value(first_v, fmt)}",
-                f"End: {last[time_c]} = {self.format_value(last_v, fmt)}",
-                f"{n} periods in series",
+                f"End: {last[time_c]} = {self.format_value(last_v, fmt)} ({chg:+.0f}%)",
+                f"Peak: {peak[time_c]} = {self.format_value(peak[metric], fmt)}",
             ]
             recommendation = "Ask for a year filter or compare two periods."
             result_summary = (
@@ -119,40 +187,52 @@ class NarrationEngine:
                 f"{self.format_value(last_v, fmt)}, {n} periods"
             )
         else:
-            # Multi-dimension / generic result — clear leader summary, not "Breakdown"
             if dim and metric in result_df.columns:
                 ordered = result_df.sort_values(metric, ascending=False)
                 top = ordered.iloc[0]
+                runner = ordered.iloc[1] if n > 1 else None
+                total = float(pd.to_numeric(result_df[metric], errors="coerce").fillna(0).sum())
+                top_v = float(top[metric])
+                share = (top_v / total * 100) if total else 0
                 dim2 = str_cols[1] if len(str_cols) > 1 else None
                 if dim2:
                     headline = f"Top result: {top[dim]} × {top[dim2]}"
                     narrative = (
                         f"Among {n} result rows, the leading combination is "
                         f"{top[dim]} with {top[dim2]} at "
-                        f"{self.format_value(top[metric], fmt)}."
+                        f"{self.format_value(top_v, fmt)} "
+                        f"({share:.0f}% of the total {metric_label})."
                     )
                     findings = [
                         f"Leader: {top[dim]} / {top[dim2]}",
-                        f"{self.format_value(top[metric], fmt)} on {metric_label}",
+                        f"{self.format_value(top_v, fmt)} · {share:.0f}% share",
                         f"{n} rows in the result",
                     ]
                     result_summary = (
                         f"Top: {top[dim]} / {top[dim2]} = "
-                        f"{self.format_value(top[metric], fmt)} ({n} rows)"
+                        f"{self.format_value(top_v, fmt)} ({n} rows)"
                     )
                 else:
                     headline = f"Top {dim_label}: {top[dim]}"
                     narrative = (
                         f"Across {n} {dim_label} values, {top[dim]} leads with "
-                        f"{self.format_value(top[metric], fmt)}."
+                        f"{self.format_value(top_v, fmt)} "
+                        f"({share:.0f}% of total {metric_label})."
                     )
                     findings = [
-                        f"Leader: {top[dim]}",
-                        f"{n} groups in the result",
+                        f"Leader: {top[dim]} — {self.format_value(top_v, fmt)}",
+                        f"Share of total: {share:.0f}%",
                     ]
+                    if runner is not None:
+                        findings.append(
+                            f"Runner-up: {runner[dim]} — "
+                            f"{self.format_value(runner[metric], fmt)}"
+                        )
+                    else:
+                        findings.append(f"{n} groups in the result")
                     result_summary = (
                         f"{top[dim]} leads with "
-                        f"{self.format_value(top[metric], fmt)}"
+                        f"{self.format_value(top_v, fmt)} ({share:.0f}% share)"
                     )
                 recommendation = "Ask for a chart view, or filter to one region/make."
             else:
@@ -166,7 +246,7 @@ class NarrationEngine:
             "headline": headline,
             "narrative_text": narrative,
             "summary": narrative,
-            "key_findings": findings[:3],
+            "key_findings": findings[:4],
             "recommendation": recommendation,
             "result_summary": result_summary,
             "data_points": [{"label": metric, "rows": n}],
@@ -199,7 +279,6 @@ class NarrationEngine:
             src = s.get("source_doc") or "SOP"
             title = s.get("title") or ""
             snip = (s.get("snippet") or "").replace("\n", " ")
-            # Prefer short actionable sentence
             if len(snip) > 220:
                 snip = snip[:217] + "…"
             context_bits.append(snip)
@@ -209,7 +288,6 @@ class NarrationEngine:
                 "title": title,
             })
 
-        # Append contextual sentence (SOP-guided)
         extra = " ".join(context_bits[:1])
         if extra:
             narration["narrative_text"] = (
@@ -223,12 +301,11 @@ class NarrationEngine:
         findings.append(f"Knowledge: guided by {src0}")
         narration["key_findings"] = findings[:4]
 
-        # Soft recommendation upgrade when EV/COVID/region keywords hit
         q = (question or "").lower()
         rec = narration.get("recommendation") or ""
         if any(w in q for w in ("covid", "2020", "recovery")):
             rec = "Compare vs 2019 baseline — treat 2020 as COVID-depressed (IND-PV-SOP-002)."
-        elif any(w in q for w in ("ev", "electric", "powertrain")):
+        elif any(w in q for w in ("ev", "electric", "powertrain", "bev")):
             rec = "Report EV share on units (not orders) and separate ICE volume (IND-PV-SOP-003)."
         elif any(w in q for w in ("region", "territory", "city", "metro")):
             rec = "Drill Country → Zone → City before model-level conclusions (IND-PV-SOP-004)."

@@ -17,8 +17,8 @@ from features.vector_schema_retrieval import schema_indexer
 
 st.set_page_config(layout="wide", page_title="AI Data Platform", page_icon="🚀")
 
-apply_styles()
 init_session_state()
+apply_styles()
 
 # ── Immediate boot screen — avoids any blank-screen moment while the
 # semantic model / embedding engine (the slowest part of startup)
@@ -129,6 +129,11 @@ if not st.session_state.dfs:
     st.stop()
 
 glossary_store.seed_glossary_once()
+try:
+    from features.rag_query_memory import query_memory as _qm
+    _qm.seed_golden_queries_once()
+except Exception:
+    pass
 
 # Auto-seed India PV SOPs into OKF when the knowledge index is empty
 if not st.session_state.get("_okf_autosseed_done"):

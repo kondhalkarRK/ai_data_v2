@@ -3,8 +3,15 @@ config/styles.py
 """
 import streamlit as st
 
+from config.themes import theme_bg_html, theme_css
+
 
 def apply_styles() -> None:
+    theme = st.session_state.get("ui_theme", "dark")
+    if theme not in ("light", "dark", "ai"):
+        theme = "dark"
+        st.session_state.ui_theme = theme
+
     st.markdown(r"""
 <style>
 :root{
@@ -1540,6 +1547,22 @@ div[data-testid="stExpander"] details:hover summary{
   margin:6px 0 8px;
 }
 
+.cgpt-mode-bar{
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(30,41,59,0.55), rgba(15,23,42,0.35));
+  border: 1px solid rgba(148,163,184,0.14);
+}
+.cgpt-mode-bar [data-testid="stRadio"] label{
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #e2e8f0 !important;
+}
+.cgpt-mode-bar [data-testid="stRadio"] > div{
+  gap: 8px !important;
+}
+
 /* ═══ ChatGPT / Cursor-like chat shell ═══ */
 .cgpt-chat-shell{
   background:
@@ -1640,6 +1663,7 @@ div[data-testid="stExpander"] details:hover summary{
   font-size:11px;color:#94a3b8;margin:10px 0 6px;font-weight:600;
   letter-spacing:0.04em;text-transform:uppercase;
 }
+""" + theme_css(theme) + r"""
 </style>
 
 <div class="ai-loader-overlay">
@@ -1655,10 +1679,4 @@ div[data-testid="stExpander"] details:hover summary{
     <div class="loader-dots"><span></span><span></span><span></span></div>
   </div>
 </div>
-
-<div class="ai-animated-bg">
-    <div class="glow g1"></div>
-    <div class="glow g2"></div>
-    <div class="glow g3"></div>
-</div>
-""", unsafe_allow_html=True)
+""" + theme_bg_html(theme), unsafe_allow_html=True)

@@ -322,7 +322,10 @@ def render_ask_mode(working_df, tables, dfs):
         for _k in ("ask_last_bundle", "ask_custom_result", "editable_sql", "whatif_last_result"):
             st.session_state.pop(_k, None)
 
-    col_in, col_btn, col_clear = st.columns([8, 1, 1])
+    try:
+        col_in, col_btn, col_clear = st.columns([8, 1, 1], vertical_alignment="bottom")
+    except TypeError:
+        col_in, col_btn, col_clear = st.columns([8, 1, 1])
     with col_in:
         question = st.text_input(
             "Ask a question",
@@ -331,9 +334,7 @@ def render_ask_mode(working_df, tables, dfs):
             key="ask_question_input",
         )
     with col_btn:
-        st.markdown('<div class="ask-run-btn-wrap">', unsafe_allow_html=True)
         run_btn = st.button("▶", type="primary", use_container_width=True, key="ask_run_btn")
-        st.markdown("</div>", unsafe_allow_html=True)
     with col_clear:
         clear_btn = st.button("Clear", use_container_width=True, key="ask_clear_btn")
 
@@ -451,7 +452,7 @@ def _render_ask_bundle(bundle, working_df):
     if result_df is None or (isinstance(result_df, pd.DataFrame) and result_df.empty):
         st.warning("⚠️ Query returned no rows.")
         if sql:
-            with st.expander("SQL"):
+            with st.expander("SQL", expanded=False):
                 st.code(sql, language="sql")
         return
 
@@ -467,21 +468,9 @@ def _render_ask_bundle(bundle, working_df):
         """,
         unsafe_allow_html=True,
     )
-    _render_semantic_layer_status(question)
 
-    # Trust score for ask mode (chat_ench Feature 2)
-    try:
-        evidence = evidence or {}
-        if "trust_score" not in evidence:
-            ts, tb = compute_trust_score(evidence, result_df, working_df)
-            evidence["trust_score"] = ts
-            evidence["trust_breakdown"] = tb
-            bundle["evidence"] = evidence
-        render_trust_score_card(evidence)
-    except Exception:
-        pass
-
-    tab_table, tab_chart, tab_insights = st.tabs(["📊 Table", "📈 Chart", "💡 Insights"])
+    # Primary deliverable — table + chart
+    tab_table, tab_chart = st.tabs(["📊 Table", "📈 Chart"])
     with tab_table:
         st.dataframe(result_df, use_container_width=True)
         st.download_button(
@@ -507,18 +496,33 @@ def _render_ask_bundle(bundle, working_df):
             build_chart(result_df, chart_type, x, y)
         except Exception:
             st.info("Chart not available")
-    with tab_insights:
-        narr = bundle.get("narration") or _safe_narration(result_df, question, evidence)
+
+    # Insights under table (zero LLM tokens — pure Python + optional OKF snippets)
+    narr = bundle.get("narration") or _safe_narration(result_df, question, evidence)
+    if narr:
+        st.markdown('<div class="chat-results-label">Insight</div>', unsafe_allow_html=True)
         render_narration_card(narr)
 
-    with st.expander("🔍 Query Details"):
+    # Details collapsed (same pattern as Chat)
+    with st.expander("🔎 Details (semantic, trust, SQL)", expanded=False):
+        _render_semantic_layer_status(question)
+        try:
+            evidence = evidence or {}
+            if "trust_score" not in evidence:
+                ts, tb = compute_trust_score(evidence, result_df, working_df)
+                evidence["trust_score"] = ts
+                evidence["trust_breakdown"] = tb
+                bundle["evidence"] = evidence
+            render_trust_score_card(evidence, show_summary=False)
+        except Exception:
+            pass
         if evidence:
             st.markdown(f"**Path:** `{evidence.get('execution_path')}`")
             st.markdown(f"**Hash:** `{evidence.get('query_hash')}`")
             st.markdown(f"**Resolution:** `{evidence.get('resolution_source')}`")
         st.code(sql or "", language="sql")
-    st.session_state["editable_sql"] = (sql or "").strip()  
-    render_editable_sql(sql or "", working_df)
+        st.session_state["editable_sql"] = (sql or "").strip()
+        render_editable_sql(sql or "", working_df)
 
 
 # ── Chat intelligence (chat_ench.md) ──────────────────────────────
@@ -1193,7 +1197,11 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         "data": {},
     })
 
-    narration_on = st.session_state.get("chat_narration_on", True)
+    mode = st.session_state.get("chat_answer_mode")
+    if mode in ("Narration", "Table", "Both"):
+        narration_on = mode in ("Narration", "Both")
+    else:
+        narration_on = st.session_state.get("chat_narration_on", True)
 
     # 1. Destructive
     if detect_destructive(q):
@@ -1398,9 +1406,16 @@ def render_user_bubble(msg):
     )
 
 
-def render_assistant_bubble(msg, working_df, narration_on: bool):
+def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
     data = msg.get("data") or {}
     mtype = msg.get("message_type", "chat")
+    # Back-compat: old callers may pass bool narration_on
+    if isinstance(view_mode, bool):
+        mode = "Both" if view_mode else "Table"
+    else:
+        mode = (view_mode or "Both").strip()
+    show_table = mode in ("Table", "Both")
+    show_narr = mode in ("Narration", "Both") or bool(data.get("force_narration"))
     card_cls = {
         "chat": "assistant-card card-chat",
         "query": "assistant-card card-query",
@@ -1423,7 +1438,6 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
     )
 
     if mtype in ("chat", "oob", "clarification", "blocked", "error", "error_friendly"):
-        # Preserve newlines
         body = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
         st.markdown(f'<div class="chat-reply-text">{body}</div>', unsafe_allow_html=True)
 
@@ -1473,39 +1487,40 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
         rdf = data.get("result_df")
         src_q = data.get("source_question") or msg.get("content") or ""
 
-        # Header: timing only (keep UI calm)
         if elapsed is not None:
             st.markdown(
                 f'<span class="badge-semantic">⏱ {html.escape(str(elapsed))}s</span>',
                 unsafe_allow_html=True,
             )
 
-        # 1) Table (+ chart) first — primary deliverable
-        if isinstance(rdf, pd.DataFrame) and not rdf.empty:
-            st.markdown(
-                f'<div class="chat-results-label">📋 Results ({len(rdf):,} rows)</div>',
-                unsafe_allow_html=True,
-            )
-            key_base = f"chat_{html.escape(str(msg.get('timestamp','')))}_{abs(hash(src_q)) % 10_000}"
-            tab_t, tab_c = st.tabs(["📊 Table", "📈 Chart"])
-            with tab_t:
-                show_n = min(10, len(rdf))
-                st.dataframe(rdf.head(show_n), use_container_width=True)
-                if len(rdf) > 10:
-                    with st.expander(f"Show all {len(rdf)} rows"):
-                        st.dataframe(rdf, use_container_width=True)
-            with tab_c:
-                _render_chat_chart(rdf, src_q, key_base)
-        elif isinstance(rdf, pd.DataFrame) and rdf.empty:
-            st.info("No rows returned for this question.")
-
-        # 2) Narration directly under the table
-        force = data.get("force_narration") or False
-        show_narr = narration_on or force
-        if show_narr:
+        if show_narr and not show_table:
             render_narration_card(data.get("narration"))
+            if not data.get("narration"):
+                body = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
+                st.markdown(f'<div class="chat-reply-text">{body}</div>', unsafe_allow_html=True)
 
-        # 3) Everything else collapsed — optional details
+        if show_table:
+            if isinstance(rdf, pd.DataFrame) and not rdf.empty:
+                st.markdown(
+                    f'<div class="chat-results-label">📋 Results ({len(rdf):,} rows)</div>',
+                    unsafe_allow_html=True,
+                )
+                key_base = f"chat_{html.escape(str(msg.get('timestamp','')))}_{abs(hash(src_q)) % 10_000}"
+                tab_t, tab_c = st.tabs(["📊 Table", "📈 Chart"])
+                with tab_t:
+                    show_n = min(10, len(rdf))
+                    st.dataframe(rdf.head(show_n), use_container_width=True)
+                    if len(rdf) > 10:
+                        with st.expander(f"Show all {len(rdf)} rows"):
+                            st.dataframe(rdf, use_container_width=True)
+                with tab_c:
+                    _render_chat_chart(rdf, src_q, key_base)
+            elif isinstance(rdf, pd.DataFrame) and rdf.empty:
+                st.info("No rows returned for this question.")
+
+            if show_narr:
+                render_narration_card(data.get("narration"))
+
         with st.expander("🔎 Details (trust, context, SQL)", expanded=False):
             badge = get_execution_badge(evidence) if evidence else {"icon": "🧠", "label": "Semantic + AI"}
             if (evidence or {}).get("modified"):
@@ -1558,15 +1573,23 @@ def render_assistant_bubble(msg, working_df, narration_on: bool):
 
 def render_chat_mode(working_df, tables, dfs):
     st.session_state.setdefault("chat_messages", [])
-    st.session_state.setdefault("chat_narration_on", True)
+    if "chat_answer_mode" not in st.session_state:
+        legacy = st.session_state.get("chat_narration_on", True)
+        st.session_state.chat_answer_mode = "Both" if legacy else "Table"
 
-    narration_on = st.toggle(
-        "Narration",
-        value=st.session_state.chat_narration_on,
-        key="chat_narration_toggle",
-        help="Show narrative insight under query results",
+    st.markdown('<div class="cgpt-mode-bar">', unsafe_allow_html=True)
+    mode = st.radio(
+        "Answer mode",
+        options=["Narration", "Table", "Both"],
+        index=["Narration", "Table", "Both"].index(st.session_state.chat_answer_mode)
+        if st.session_state.chat_answer_mode in ("Narration", "Table", "Both") else 2,
+        horizontal=True,
+        key="chat_answer_mode_radio",
+        help="Narration = insight text only · Table = table + chart · Both = combined",
     )
-    st.session_state.chat_narration_on = narration_on
+    st.session_state.chat_answer_mode = mode
+    st.session_state.chat_narration_on = mode in ("Narration", "Both")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="cgpt-chat-shell">', unsafe_allow_html=True)
     chat_box = st.container(height=560, border=False)
@@ -1589,7 +1612,7 @@ def render_chat_mode(working_df, tables, dfs):
                     render_user_bubble(msg)
                 else:
                     render_assistant_bubble(
-                        msg, working_df, st.session_state.chat_narration_on
+                        msg, working_df, st.session_state.chat_answer_mode
                     )
         st.markdown('<div id="chat-scroll-anchor"></div>', unsafe_allow_html=True)
 
@@ -1614,6 +1637,7 @@ def render_chat_mode(working_df, tables, dfs):
 
     if question and question.strip():
         process_chat_message(question, working_df)
+
 
 
 # ── Entry ────────────────────────────────────────────────────────

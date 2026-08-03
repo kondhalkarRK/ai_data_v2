@@ -73,6 +73,7 @@ DEFAULTS = {
     "llm_calls": 0, "total_tokens": 0,
     "max_llm_calls": 60,
     "auto_join_base": None,
+    "ui_theme": "dark",  # light | dark | ai
 }
 
 def init_session_state() -> None:

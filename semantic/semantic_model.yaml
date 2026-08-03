@@ -420,6 +420,9 @@ dimensions:
       - product
       - make
       - brand
+      - ev car
+      - electric car
+      - electric vehicle
 
   Colour:
     display_name: "Colour"

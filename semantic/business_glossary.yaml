@@ -432,7 +432,7 @@ terms:
     maps_to_attribute: dim_carline.model
 
   Car Type:
-    definition: "Body style / segment (SUV, Sedan, Hatchback)"
+    definition: "Body style / segment (SUV, Compact SUV, Sedan, Hatchback, MPV)"
     source_column: "car_type"
     synonyms:
       - body type
@@ -441,8 +441,64 @@ terms:
       - body style
       - category
       - class
+      - compact suv
+      - compact SUV
     category: Product
     maps_to_attribute: dim_carline.car_type
+
+  Electric Vehicle:
+    definition: >
+      Battery-electric passenger vehicles. Always filter engine_type = 'Electric'.
+      EV share of demand uses units (SUM(order_qty)), not order count (IND-PV-SOP-003).
+    sql_expression: "engine_type = 'Electric'"
+    source_column: "engine_type"
+    display_label: "EV / Electric"
+    synonyms:
+      - ev
+      - evs
+      - EV
+      - EVs
+      - electric
+      - electric vehicle
+      - electric vehicles
+      - electric car
+      - electric cars
+      - ev car
+      - ev cars
+      - battery electric
+      - bev
+      - BEVs
+      - powertrain electric
+      - electric vechile
+      - electric vehical
+      - electrified car
+    calculation_rules:
+      - "Filter with engine_type = 'Electric' (exact value in dataset)"
+      - "Do not treat Hybrid as Electric unless user says electrified"
+      - "EV share = SUM(order_qty WHERE Electric) / SUM(order_qty)"
+    related_terms:
+      - Units Sold
+      - Engine Type
+      - Car Type
+    example_questions:
+      - "EV cars by make"
+      - "Electric vehicle units by year"
+      - "Show revenue for electric cars"
+      - "Top EV models by units"
+    category: Product
+    maps_to_attribute: dim_carline.engine_type
+
+  Engine Type:
+    definition: "Powertrain classification — Petrol, Diesel, Hybrid, or Electric"
+    source_column: "engine_type"
+    display_label: "Engine Type / Powertrain"
+    synonyms:
+      - powertrain
+      - fuel type
+      - propulsion
+      - drivetrain type
+    category: Product
+    maps_to_attribute: dim_carline.engine_type
 
   Region:
     definition: >
@@ -527,9 +583,20 @@ sql_patterns:
       - growth
 
   comparison_query:
-    description: "When user compares two dimensions"
+    description: >
+      Year-over-year or between-years comparison (gained / lost / changed most).
+      NEVER filter both years into one total — always pivot years into separate columns.
     pattern: >
-      GROUP BY [dimension1], [dimension2]
+      SELECT [dimension],
+        SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = [year1] THEN order_qty ELSE 0 END) AS units_[year1],
+        SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = [year2] THEN order_qty ELSE 0 END) AS units_[year2],
+        (SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = [year2] THEN order_qty ELSE 0 END)
+         - SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = [year1] THEN order_qty ELSE 0 END)) AS units_gained
+      FROM df
+      WHERE CAST(strftime('%Y', sales_date) AS INTEGER) IN ([year1], [year2])
+      GROUP BY [dimension]
+      ORDER BY units_gained DESC
+      LIMIT 10
     trigger_words:
       - compare
       - vs
@@ -537,6 +604,10 @@ sql_patterns:
       - between
       - difference
       - against
+      - gained
+      - lost
+      - growth
+      - changed
 
 domain_rules:
   always_rules:
@@ -547,6 +618,8 @@ domain_rules:
     - "For quarter labels use CASE WHEN month bands → Q1-YYYY … Q4-YYYY — never float /3"
     - "Dataset is India PV sales 2019–2026; COVID 2020 dip and rising EV share are expected patterns"
     - "top selling / best selling / most sold / top car / most popular → SUM(order_qty) ordered DESC — never SUM(total_sales)"
+    - "gained/lost/changed most between YEAR1 and YEAR2 → pivot both years + diff column (units_YEAR1, units_YEAR2, units_gained); never collapse into one total"
+    - "EV / electric vehicle / electric car / ev car → WHERE engine_type = 'Electric'"
   never_rules:
     - Never use price_per_unit for revenue
     - Never average total_sales directly
@@ -554,6 +627,7 @@ domain_rules:
     - Never use ORDER BY on unaggregated columns when GROUP BY is present
     - Never produce decimal quarter labels like Q1.333
     - Never rank top selling cars by revenue
+    - Never answer between-year gain questions with only 2 columns (entity + one total)
   default_behaviours:
     - No LIMIT specified: add LIMIT 500
     - Top/bottom without N: use 10
@@ -561,3 +635,4 @@ domain_rules:
     - Date filter without year: use all years
     - Units sold means SUM(order_qty) not COUNT(*)
     - Top selling car/model/make means units volume unless user says revenue
+    - "Which make/model gained most between years" defaults dimension to make unless user names model/car type

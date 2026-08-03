@@ -8,8 +8,47 @@ from features.rag_query_memory import embedder, vector_store
 
 _MAX_PROMPT_CHARS = 600  # ~150 tokens for examples block
 
+# Golden few-shots — overwrite bad truncated/hallucinated examples after cleanup
+_GOLDEN_QUERIES = [
+    (
+        "Which make gained the most units between 2021 and 2025",
+        """SELECT make,
+  SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = 2021 THEN order_qty ELSE 0 END) AS units_2021,
+  SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = 2025 THEN order_qty ELSE 0 END) AS units_2025,
+  (SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = 2025 THEN order_qty ELSE 0 END)
+   - SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = 2021 THEN order_qty ELSE 0 END)) AS units_gained
+FROM df
+WHERE CAST(strftime('%Y', sales_date) AS INTEGER) IN (2021, 2025)
+GROUP BY make
+ORDER BY units_gained DESC
+LIMIT 10""",
+    ),
+    (
+        "Compare units sold by make for 2019 versus 2020",
+        """SELECT make,
+  SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = 2019 THEN order_qty ELSE 0 END) AS units_2019,
+  SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = 2020 THEN order_qty ELSE 0 END) AS units_2020,
+  (SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = 2020 THEN order_qty ELSE 0 END)
+   - SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = 2019 THEN order_qty ELSE 0 END)) AS units_diff
+FROM df
+WHERE CAST(strftime('%Y', sales_date) AS INTEGER) IN (2019, 2020)
+GROUP BY make
+ORDER BY units_diff DESC
+LIMIT 10""",
+    ),
+]
 
-def store_successful_query(question: str, sql: str, max_len: int = 200) -> None:
+
+def seed_golden_queries_once() -> None:
+    """Upsert certified comparison SQL examples into query memory."""
+    try:
+        for question, sql in _GOLDEN_QUERIES:
+            store_successful_query(question, sql, max_len=900)
+    except Exception:
+        pass
+
+
+def store_successful_query(question: str, sql: str, max_len: int = 700) -> None:
     """Persist a successful question/SQL pair for future few-shot retrieval."""
     try:
         if not question or not sql:
@@ -53,7 +92,7 @@ def retrieve_similar_queries(question: str, k: int = 2) -> list[dict]:
             meta = meta or {}
             examples.append({
                 "question": meta.get("question") or doc or "",
-                "sql": embedder.truncate_text(meta.get("sql") or "", 200),
+                "sql": embedder.truncate_text(meta.get("sql") or "", 700),
             })
         return examples[:k]
     except Exception:
