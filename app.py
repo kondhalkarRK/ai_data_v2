@@ -110,37 +110,34 @@ except Exception:
 _boot_screen.empty()
 
 # ═══════════════════════════════════════════════════════════════
-# MAIN UI HEADER  (+ appearance dropdown on the right)
+# MAIN UI HEADER  (single bar: title + GPT pill + theme)
 # ═══════════════════════════════════════════════════════════════
-_hdr_left, _hdr_right = st.columns([5, 2])
-with _hdr_left:
-    st.markdown("""
-    <div class="brand-header brand-header-left">
-      <div class="brand-left">
-        <div class="brand-eyebrow">🚀 AI DATA PLATFORM</div>
-        <div class="brand-tagline">Semantic AI Analytics Workspace — Ask business questions in natural language</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-with _hdr_right:
-    st.markdown('<div class="brand-header-actions">', unsafe_allow_html=True)
-    _act_pill, _act_theme = st.columns([1.15, 1])
-    with _act_pill:
-        st.markdown(
-            '<div class="brand-pill brand-pill-inline">⚡ GPT-4o · DuckDB</div>',
-            unsafe_allow_html=True,
-        )
-    with _act_theme:
-        _theme_labels = {"light": "☀️ Light", "dark": "🌙 Dark", "ai": "✨ AI"}
-        st.selectbox(
-            "Appearance",
-            options=list(_theme_labels.keys()),
-            format_func=lambda k: _theme_labels[k],
-            label_visibility="collapsed",
-            key="ui_theme",
-            help="Switch Light / Dark / AI appearance",
-        )
-    st.markdown("</div>", unsafe_allow_html=True)
+_h1, _h2, _h3 = st.columns([4.6, 1.35, 1.05])
+with _h1:
+    st.markdown(
+        """
+        <div class="brand-title-stack">
+          <div class="brand-eyebrow">🚀 AI DATA PLATFORM</div>
+          <div class="brand-tagline">Semantic AI Analytics Workspace — Ask business questions in natural language</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with _h2:
+    st.markdown(
+        '<div class="brand-pill brand-pill-inline">⚡ GPT-4o · DuckDB</div>',
+        unsafe_allow_html=True,
+    )
+with _h3:
+    _theme_labels = {"light": "☀️ Light", "dark": "🌙 Dark", "ai": "✨ AI"}
+    st.selectbox(
+        "Appearance",
+        options=list(_theme_labels.keys()),
+        format_func=lambda k: _theme_labels[k],
+        label_visibility="collapsed",
+        key="ui_theme",
+        help="Switch Light / Dark / AI appearance",
+    )
 
 sidebar.render()
 if not st.session_state.dfs:

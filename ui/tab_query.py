@@ -231,12 +231,17 @@ def render_narration_card(narration: dict | None):
     if not narration:
         return
     headline = html.escape(str(narration.get("headline") or "Insight"))
-    body = html.escape(str(narration.get("narrative_text") or narration.get("summary") or ""))
+    raw = str(narration.get("narrative_text") or narration.get("summary") or "")
+    # Preserve paragraph breaks as readable multi-line insight
+    paras = [html.escape(p.strip()) for p in raw.split("\n\n") if p.strip()]
+    if not paras and raw.strip():
+        paras = [html.escape(raw.strip())]
+    body_html = "".join(f"<p class='narration-para'>{p}</p>" for p in paras)
     st.markdown(
         f"""
         <div class="narration-card">
           <div class="narration-headline">📊 {headline}</div>
-          <div class="narration-body">{body}</div>
+          <div class="narration-body">{body_html}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1577,20 +1582,6 @@ def render_chat_mode(working_df, tables, dfs):
         legacy = st.session_state.get("chat_narration_on", True)
         st.session_state.chat_answer_mode = "Both" if legacy else "Table"
 
-    st.markdown('<div class="cgpt-mode-bar">', unsafe_allow_html=True)
-    mode = st.radio(
-        "Answer mode",
-        options=["Narration", "Table", "Both"],
-        index=["Narration", "Table", "Both"].index(st.session_state.chat_answer_mode)
-        if st.session_state.chat_answer_mode in ("Narration", "Table", "Both") else 2,
-        horizontal=True,
-        key="chat_answer_mode_radio",
-        help="Narration = insight text only · Table = table + chart · Both = combined",
-    )
-    st.session_state.chat_answer_mode = mode
-    st.session_state.chat_narration_on = mode in ("Narration", "Both")
-    st.markdown("</div>", unsafe_allow_html=True)
-
     st.markdown('<div class="cgpt-chat-shell">', unsafe_allow_html=True)
     chat_box = st.container(height=560, border=False)
     with chat_box:
@@ -1619,7 +1610,27 @@ def render_chat_mode(working_df, tables, dfs):
     _chat_scroll_to_bottom()
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="cgpt-input-wrap">', unsafe_allow_html=True)
+    # Composer: mode picker (Cursor-style) + chat input
+    _mode_labels = {
+        "Both": "Narration + Table",
+        "Narration": "Narration",
+        "Table": "Table",
+    }
+    if st.session_state.chat_answer_mode not in _mode_labels:
+        st.session_state.chat_answer_mode = "Both"
+
+    st.markdown('<div class="cgpt-composer">', unsafe_allow_html=True)
+    mode_col, _spacer = st.columns([1.35, 4.65])
+    with mode_col:
+        mode = st.selectbox(
+            "Answer mode",
+            options=list(_mode_labels.keys()),
+            format_func=lambda k: _mode_labels[k],
+            label_visibility="collapsed",
+            key="chat_answer_mode",
+            help="Narration = insight text · Table = table + chart · Narration + Table = both",
+        )
+    st.session_state.chat_narration_on = mode in ("Narration", "Both")
     question = st.chat_input(
         "Message AI Data Concierge…",
         key="chat_main_input",
@@ -1650,9 +1661,8 @@ def render(working_df, tables, dfs):
     st.markdown(
         """
         <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:700;color:#818cf8;letter-spacing:1.5px;
-                      text-transform:uppercase;">⚡ AI QUERY ENGINE</div>
-          <div style="font-size:13px;color:#94a3b8;">Semantic-powered analytics — ask or chat</div>
+          <div class="tab-section-eyebrow">⚡ AI QUERY ENGINE</div>
+          <div class="tab-section-sub">Semantic-powered analytics — ask or chat</div>
         </div>
         """,
         unsafe_allow_html=True,

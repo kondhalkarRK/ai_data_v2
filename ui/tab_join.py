@@ -39,10 +39,10 @@ def render(working_df, tables, dfs):
             loader_text = "Semantic layer load error"
 
     st.markdown(
-        f"<div class='status-card' style='background:#050a14;border:1px solid rgba(255,255,255,0.10);border-radius:14px;padding:14px 16px;box-shadow:0 10px 28px rgba(0,0,0,0.28);'>"
-        f"<div style='font-size:13px;font-weight:800;color:#7ec8ff;margin-bottom:8px;'>{semantic_status}</div>"
-        f"<div style='font-size:12px;color:#f8fafc;line-height:1.5;'>{semantic_desc}</div>"
-        f"<div style='font-size:12px;color:#cbd5e1;line-height:1.5;margin-top:8px;'>{loader_text}</div>"
+        f"<div class='join-status-card status-card'>"
+        f"<div class='join-status-title'>{semantic_status}</div>"
+        f"<div class='join-status-desc'>{semantic_desc}</div>"
+        f"<div class='join-status-meta'>{loader_text}</div>"
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -70,8 +70,7 @@ def render(working_df, tables, dfs):
         # ── Strategy description banner ───────────────────────────
         if semantic_used is True:
             st.markdown(
-                "<div style='background:#050a14;border-left:4px solid #e5e7eb;"
-                "padding:10px 16px;border-radius:6px;margin-bottom:12px;'>"
+                "<div class='join-info-banner'>"
                 "🧠 <b>Semantic Join Active</b> — tables joined using relationships "
                 "defined in <code>semantic_model.yaml</code>. "
                 "This is the authoritative join path for this domain."
@@ -80,8 +79,7 @@ def render(working_df, tables, dfs):
             )
         elif semantic_used is False:
             st.markdown(
-                "<div style='background:#050a14;border-left:4px solid #e5e7eb;"
-                "padding:10px 16px;border-radius:6px;margin-bottom:12px;'>"
+                "<div class='join-info-banner'>"
                 "⚠️ <b>Fallback Join Active</b> — uploaded files did not match "
                 "tables in <code>semantic_model.yaml</code>. "
                 "Using fuzzy column-name + value-overlap scoring instead."
@@ -151,8 +149,7 @@ def render(working_df, tables, dfs):
 
                 # Fall back to original fuzzy auto_join() for preview
                 st.markdown(
-                    "<div style='background:#050a14;border-left:4px solid #22c55e;"
-                    "padding:8px 14px;border-radius:6px;'>"
+                    "<div class='join-info-banner join-info-warn'>"
                     "⚠️ Falling back to fuzzy column-match join."
                     "</div>",
                     unsafe_allow_html=True,

@@ -149,14 +149,27 @@ button[kind="primary"],.stButton > button[kind="primary"]{
   border-color:transparent !important;
 }
 .glass-card,.hero-card,.kpi-card,.status-card,
-.card-chat,.card-query,.trust-score-card,.cgpt-assistant-card{
+.card-chat,.card-query,.trust-score-card,.cgpt-assistant-card,
+.kpi-chart-card,.stat-card,.dq-stat-box{
   background:#ffffff !important;
   border:1px solid rgba(15,23,42,0.08) !important;
   color:#0f172a !important;
   box-shadow:0 6px 20px rgba(15,23,42,0.05) !important;
 }
-.kpi-card .kpi-label,.kpi-card .kpi-sub,.hero-sub{color:#64748b !important;}
-.kpi-card .kpi-value,.hero-title{color:#0f172a !important;}
+.kpi-card{
+  background:linear-gradient(145deg,#ffffff,#f8fafc) !important;
+}
+.kpi-card .kv,.kpi-card .kpi-value{color:#0f172a !important;-webkit-text-fill-color:#0f172a !important;}
+.kpi-card .kl,.kpi-card .kpi-label{color:#64748b !important;}
+.kpi-card .ks,.kpi-card .kpi-sub,.hero-sub{color:#475569 !important;}
+.kpi-section-title{
+  background:none !important;
+  -webkit-text-fill-color:#0f172a !important;
+  color:#0f172a !important;
+}
+.kpi-section-sub,.stat-card .sl,.dq-stat-box .sl{color:#64748b !important;}
+.stat-card .sv,.dq-stat-box .sv{color:#4f46e5 !important;}
+.hero-title{color:#0f172a !important;}
 .cgpt-user-bubble{
   background:linear-gradient(145deg,#eef2ff,#e0e7ff) !important;
   border:1px solid rgba(79,70,229,0.18) !important;
@@ -168,8 +181,15 @@ button[kind="primary"],.stButton > button[kind="primary"]{
   color:transparent !important;
 }
 .cgpt-welcome-sub,.chat-reply-text,.finding-bullet,
-.assistant-card,.assistant-bubble{color:#334155 !important;}
-.cgpt-input-wrap{
+.assistant-card,.assistant-bubble,
+.narration-card,.narration-headline,.narration-body,.narration-recommendation{
+  color:#1e293b !important;
+}
+.narration-card{
+  background:#fff !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+}
+.cgpt-input-wrap,.cgpt-composer{
   background:#fff !important;
   border:1px solid rgba(15,23,42,0.12) !important;
   box-shadow:0 8px 24px rgba(15,23,42,0.06) !important;
@@ -186,12 +206,32 @@ div[data-baseweb="select"] span,
 div[data-baseweb="select"] div{
   color:#0f172a !important;
 }
+
+/* Dataframes — force light readable cells (all tabs) */
+div[data-testid="stDataFrame"] div[role="grid"],
+div[data-testid="stDataFrame"] div[role="grid"] *,
+div[data-testid="stDataFrame"] div[role="row"],
+div[data-testid="stDataFrame"] div[role="row"] > div,
+div[data-testid="stDataFrame"] div[role="gridcell"],
+div[data-testid="stDataFrame"] div[role="columnheader"],
 div[data-testid="stDataFrame"] table,
 div[data-testid="stDataFrame"] th,
-div[data-testid="stDataFrame"] td{
+div[data-testid="stDataFrame"] td,
+div[data-testid="stDataFrame"] thead th,
+div[data-testid="stDataFrame"] tbody td,
+div[data-testid="stDataFrame"] div.stDataFrame,
+div[data-testid="stDataFrame"] div.stDataFrame > div{
   background:#ffffff !important;
   color:#0f172a !important;
+  border-color:rgba(15,23,42,0.08) !important;
 }
+div[data-testid="stDataFrame"] thead th,
+div[data-testid="stDataFrame"] div[role="columnheader"]{
+  background:#f1f5f9 !important;
+  color:#0f172a !important;
+  font-weight:700 !important;
+}
+
 [data-testid="stMetricValue"]{color:#4f46e5 !important;}
 [data-testid="stMetricLabel"]{color:#475569 !important;}
 [data-testid="stTabs"] button,
@@ -206,6 +246,12 @@ div[data-testid="stExpander"] summary,
 div[data-testid="stExpander"] summary p{
   color:#1e293b !important;
 }
+div[data-testid="stRadio"] label,
+div[data-testid="stRadio"] p,
+div[role="radiogroup"] label,
+div[role="radiogroup"] p{
+  color:#1e293b !important;
+}
 .ai-animated-bg{opacity:0.22 !important;filter:saturate(0.7) brightness(1.3);}
 .ai-animated-bg .glow{opacity:0.18 !important;}
 .sb-divider{border-color:rgba(15,23,42,0.08) !important;opacity:1 !important;}
@@ -216,8 +262,22 @@ div[data-testid="stExpander"] summary p{
 .conv-context-banner{color:#1e293b !important;background:rgba(79,70,229,0.08) !important;}
 .status-card{background:#fff !important;color:#0f172a !important;border-color:rgba(15,23,42,0.1) !important;}
 .status-card code{color:#4f46e5 !important;background:rgba(79,70,229,0.08) !important;}
+.join-status-card,.join-info-banner{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.10) !important;
+  color:#0f172a !important;
+}
+.join-status-card .join-status-title{color:#1d4ed8 !important;}
+.join-status-card .join-status-desc,
+.join-status-card .join-status-meta,
+.join-info-banner{color:#334155 !important;}
 
-/* Header theme dropdown — dark text on light */
+/* Light hero bar */
+div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-ui_theme"]){
+  background:linear-gradient(115deg,rgba(255,255,255,0.98),rgba(241,245,249,0.95)) !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+  box-shadow:0 8px 24px rgba(15,23,42,0.05) !important;
+}
 div[class*="st-key-ui_theme"] div[data-baseweb="select"] > div{
   background:#ffffff !important;
   border:1px solid rgba(15,23,42,0.16) !important;
@@ -227,6 +287,11 @@ div[class*="st-key-ui_theme"] div[data-baseweb="select"] > div{
 div[class*="st-key-ui_theme"] svg{fill:#334155 !important;}
 div[class*="st-key-ui_theme"] span,
 div[class*="st-key-ui_theme"] div{color:#0f172a !important;}
+div[class*="st-key-chat_answer_mode"] div[data-baseweb="select"] > div{
+  background:#f8fafc !important;
+  border:1px solid rgba(15,23,42,0.14) !important;
+  color:#0f172a !important;
+}
 """
 
 AI_THEME_CSS = r"""
@@ -379,21 +444,29 @@ div[class*="st-key-ask_run_btn"] button{
   padding-bottom:0 !important;
 }
 
-/* Header: GPT pill + theme dropdown aligned on the right */
-.brand-header-left{
-  margin-bottom:0 !important;
-  height:100%;
-  min-height:64px;
+/* Unified hero bar: title + pill + theme in one aligned strip */
+div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-ui_theme"]){
+  align-items:center !important;
+  gap:12px !important;
+  padding:14px 18px !important;
+  margin:-6px 0 14px 0 !important;
+  border-radius:16px !important;
+  background:linear-gradient(100deg, rgba(79,124,255,0.14), rgba(124,58,237,0.10) 55%, rgba(0,209,122,0.06)) !important;
+  border:1px solid rgba(255,255,255,0.08) !important;
+  position:relative;overflow:hidden;
 }
-.brand-header-actions{
-  display:flex;align-items:center;justify-content:flex-end;
-  gap:8px;min-height:64px;padding-top:4px;
+div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-ui_theme"]):before{
+  content:"";position:absolute;left:0;top:0;width:100%;height:2px;
+  background:linear-gradient(90deg,#4f7cff,#7c3aed,#00d17a,#4f7cff);
+  background-size:300% 100%;animation:brandSheen 6s linear infinite;
 }
+.brand-title-stack{padding:2px 0;position:relative;z-index:1;}
 .brand-pill-inline{
   display:inline-flex;align-items:center;justify-content:center;
-  height:38px;margin-top:2px;width:100%;
-  box-sizing:border-box;text-align:center;
+  height:38px;width:100%;box-sizing:border-box;text-align:center;
+  position:relative;z-index:1;
 }
+div[class*="st-key-ui_theme"]{position:relative;z-index:1;}
 div[class*="st-key-ui_theme"] div[data-baseweb="select"] > div{
   min-height:38px !important;
   border-radius:999px !important;
@@ -404,6 +477,30 @@ div[class*="st-key-ui_theme"] div[data-baseweb="select"] > div{
   font-size:12px !important;
 }
 div[class*="st-key-ui_theme"] svg{fill:#e2e8f0 !important;}
+
+/* Chat answer-mode picker inside input bar */
+.cgpt-composer{
+  display:block;
+  background: linear-gradient(180deg, rgba(30,41,59,0.65), rgba(15,23,42,0.9));
+  border: 1px solid rgba(148,163,184,0.22);
+  border-radius: 16px;
+  padding: 8px 10px 6px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+  margin-top: 8px;
+}
+div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-chat_answer_mode"]){
+  align-items:center !important;
+  gap:8px !important;
+  margin-bottom:2px !important;
+}
+div[class*="st-key-chat_answer_mode"] div[data-baseweb="select"] > div{
+  min-height:34px !important;
+  border-radius:10px !important;
+  background:rgba(15,23,42,0.55) !important;
+  border:1px solid rgba(148,163,184,0.22) !important;
+  font-size:12px !important;
+  font-weight:600 !important;
+}
 """
 
 
