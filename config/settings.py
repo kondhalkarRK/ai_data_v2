@@ -4,9 +4,12 @@ config/settings.py
 import os
 import logging
 import streamlit as st
-from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -17,14 +20,27 @@ try:
 except ImportError:
     _LLM_AVAILABLE = False
 
+
+def _secret(name: str, default=None):
+    """Streamlit Cloud secrets first, then env / .env."""
+    try:
+        if name in st.secrets:
+            return st.secrets[name]
+    except Exception:
+        pass
+    return os.getenv(name, default)
+
+
 # ─────────────────────────────────────────────────────────────────
 # LLM
 # ─────────────────────────────────────────────────────────────────
 
-# Load sensitive/configurable values from environment (.env) instead of hardcoding
-LLM_BASE_URL = os.getenv("CAPGEMINI_LLM_BASE_URL", "https://openai.generative.engine.capgemini.com/v1")
-LLM_API_KEY = os.getenv("CAPGEMINI_LLM_API_KEY")
-LLM_MODEL = os.getenv("CAPGEMINI_LLM_MODEL", "openai.gpt-5.1")
+LLM_BASE_URL = _secret(
+    "CAPGEMINI_LLM_BASE_URL",
+    "https://openai.generative.engine.capgemini.com/v1",
+)
+LLM_API_KEY = _secret("CAPGEMINI_LLM_API_KEY")
+LLM_MODEL = _secret("CAPGEMINI_LLM_MODEL", "openai.gpt-5.1")
 
 
 @st.cache_resource(show_spinner=False)
