@@ -62,13 +62,16 @@ Narratives should celebrate EV growth **and** remind leaders that ICE (especiall
 
 High-visibility EV models in the reference catalogue include:
 
-- Tata: Nexon EV, Punch EV, Tiago EV  
-- Mahindra: XUV400, BE 6  
-- Hyundai: Ioniq 5  
-- Kia: EV6  
-- MG: ZS EV, Comet EV  
+- Tata: Nexon EV, Punch EV, Tiago EV, Curvv EV, Harrier EV  
+- Mahindra: XUV400, BE 6, XEV 9e  
+- Maruti: e Vitara  
+- Hyundai: Ioniq 5, Creta Electric  
+- Toyota: Urban Cruiser EV  
+- Kia: EV6, EV9  
+- MG: ZS EV, Comet EV, Windsor EV  
+- BYD: Atto 3, Seal  
 
-When ranking “top EV by volume”, filter `engine_type = 'Electric'` then rank by `SUM(order_qty)`.
+When ranking “top EV by volume”, filter `engine_type = 'Electric'` then rank by `SUM(order_qty)`. Newer EV nameplates (Curvv EV, e Vitara, Creta Electric, XEV 9e, Windsor EV, BYD) are expected mainly from **2023 onward** in this extract.
 
 ICE volume leaders (Maruti / Tata / Mahindra overall) must not be narrated as “losing” solely because EV share rises — check absolute units.
 
