@@ -1,0 +1,25 @@
+flowchart LR
+  U[User] -->|asks| UI[Chat UI]
+  UI -->|routes| Q[Query Brain]
+  Q -->|uses| SEM[Semantic Layer]
+  Q -->|uses| OKF[OKF SOPs]
+  Q -->|SQL| DB[(DuckDB Data)]
+  DB -->|results| INS[Narration + Trust]
+  INS -->|answer| UI
+  UI -->|shows| U
+
+  classDef user fill:#0f766e,stroke:#5eead4,stroke-width:2px,color:#ffffff
+  classDef ui fill:#1d4ed8,stroke:#93c5fd,stroke-width:2px,color:#ffffff
+  classDef brain fill:#7c3aed,stroke:#c4b5fd,stroke-width:2px,color:#ffffff
+  classDef data fill:#b45309,stroke:#fcd34d,stroke-width:2px,color:#ffffff
+  classDef know fill:#be185d,stroke:#f9a8d4,stroke-width:2px,color:#ffffff
+  classDef out fill:#047857,stroke:#6ee7b7,stroke-width:2px,color:#ffffff
+
+  class U user
+  class UI ui
+  class Q,SEM brain
+  class DB data
+  class OKF know
+  class INS out
+
+  linkStyle default stroke:#94a3b8,stroke-width:2px

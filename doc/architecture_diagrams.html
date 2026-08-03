@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Data Platform — Architecture Diagrams</title>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      flowchart: { curve: "basis", htmlLabels: true },
+    });
+  </script>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.5rem; margin: 0 0 8px; }
+    h2 { font-size: 1.15rem; margin: 28px 0 12px; color: var(--accent); }
+    p { color: var(--muted); margin: 0 0 16px; max-width: 720px; }
+    .card {
+      background: var(--card);
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+    .mermaid { display: flex; justify-content: center; }
+    .actions {
+      display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 20px;
+    }
+    button, a.btn {
+      background: #1d4ed8;
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    button.secondary { background: #334155; }
+    @media print {
+      body { background: #fff; color: #000; }
+      .actions { display: none; }
+      .card { border: 1px solid #ccc; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <h1>AI Data Platform — Architecture Diagrams</h1>
+  <p>
+    Open this file in Chrome/Edge. Use <b>Print → Save as PDF</b>, or right-click a diagram and
+    <b>Save image as…</b> after it renders. Source also lives in
+    <code>doc/leader_demo_guide.md</code>.
+  </p>
+
+  <div class="actions">
+    <button onclick="window.print()">Print / Save as PDF</button>
+    <a class="btn secondary" href="architecture_high_level.mmd" download>Download architecture .mmd</a>
+    <a class="btn secondary" href="architecture_question_flow.mmd" download>Download flow .mmd</a>
+  </div>
+
+  <h2>1. High-level architecture</h2>
+  <div class="card">
+    <pre class="mermaid">
+flowchart LR
+  U[User] -->|asks| UI[Chat UI]
+  UI -->|routes| Q[Query Brain]
+  Q -->|uses| SEM[Semantic Layer]
+  Q -->|uses| OKF[OKF SOPs]
+  Q -->|SQL| DB[(DuckDB Data)]
+  DB -->|results| INS[Narration + Trust]
+  INS -->|answer| UI
+  UI -->|shows| U
+
+  classDef user fill:#0f766e,stroke:#5eead4,stroke-width:2px,color:#ffffff
+  classDef ui fill:#1d4ed8,stroke:#93c5fd,stroke-width:2px,color:#ffffff
+  classDef brain fill:#7c3aed,stroke:#c4b5fd,stroke-width:2px,color:#ffffff
+  classDef data fill:#b45309,stroke:#fcd34d,stroke-width:2px,color:#ffffff
+  classDef know fill:#be185d,stroke:#f9a8d4,stroke-width:2px,color:#ffffff
+  classDef out fill:#047857,stroke:#6ee7b7,stroke-width:2px,color:#ffffff
+
+  class U user
+  class UI ui
+  class Q,SEM brain
+  class DB data
+  class OKF know
+  class INS out
+
+  linkStyle default stroke:#94a3b8,stroke-width:2px
+    </pre>
+  </div>
+
+  <h2>2. Question flow (DFD)</h2>
+  <div class="card">
+    <pre class="mermaid">
+flowchart TD
+  A[1 User question] -->|plain English| B[2 Router]
+  B -->|off-topic| C[Polite redirect]
+  B -->|follow-up| D[3 Edit prior SQL]
+  B -->|new question| E[3 Semantic + OKF]
+  D --> F[4 Generate / modify SQL]
+  E --> F
+  F -->|safe SQL| G[5 DuckDB runs query]
+  G -->|rows| H[6 Narration + Trust + Citations]
+  H -->|table chart story| I[7 Answer in Chat]
+
+  classDef step fill:#1e40af,stroke:#93c5fd,stroke-width:2px,color:#ffffff
+  classDef warn fill:#9a3412,stroke:#fdba74,stroke-width:2px,color:#ffffff
+  classDef endn fill:#6b21a8,stroke:#d8b4fe,stroke-width:2px,color:#ffffff
+
+  class A,B,D,E,F,G,H step
+  class C warn
+  class I endn
+
+  linkStyle default stroke:#94a3b8,stroke-width:2px
+    </pre>
+  </div>
+
+  <h2>Legend</h2>
+  <div class="card">
+    <p style="color:#e5e7eb;margin:0">
+      Teal = User · Blue = UI / steps · Purple = Query brain / answer ·
+      Amber = Data · Pink = OKF knowledge · Green = Insights ·
+      Slate arrows = flow (2px, not overpowering)
+    </p>
+  </div>
+</body>
+</html>

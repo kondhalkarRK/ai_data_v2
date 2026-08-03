@@ -1,0 +1,20 @@
+flowchart TD
+  A[1 User question] -->|plain English| B[2 Router]
+  B -->|off-topic| C[Polite redirect]
+  B -->|follow-up| D[3 Edit prior SQL]
+  B -->|new question| E[3 Semantic + OKF]
+  D --> F[4 Generate / modify SQL]
+  E --> F
+  F -->|safe SQL| G[5 DuckDB runs query]
+  G -->|rows| H[6 Narration + Trust + Citations]
+  H -->|table chart story| I[7 Answer in Chat]
+
+  classDef step fill:#1e40af,stroke:#93c5fd,stroke-width:2px,color:#ffffff
+  classDef warn fill:#9a3412,stroke:#fdba74,stroke-width:2px,color:#ffffff
+  classDef endn fill:#6b21a8,stroke:#d8b4fe,stroke-width:2px,color:#ffffff
+
+  class A,B,D,E,F,G,H step
+  class C warn
+  class I endn
+
+  linkStyle default stroke:#94a3b8,stroke-width:2px
