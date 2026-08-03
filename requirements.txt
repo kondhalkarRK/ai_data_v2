@@ -1,11 +1,13 @@
-streamlit>=1.32
-pandas>=2.0
-numpy>=1.24
-duckdb>=0.10
+# Streamlit Cloud — keep in sync with app.py (same folder as entrypoint)
+streamlit>=1.32,<2
+pandas>=2.0,<3
+numpy>=1.24,<3
+duckdb>=1.0.0
 plotly>=5.18
 pyyaml>=6.0
 python-dotenv>=1.0
 langchain-openai>=0.1
+openai>=1.0
 chromadb>=0.4
 sentence-transformers>=2.2
 pypdf>=4.0
