@@ -228,15 +228,28 @@ def _render_semantic_layer_status(question: str = ""):
 
 
 def render_narration_card(narration: dict | None):
+    """Prose insight card (Query + Chat) — paragraphs only, no bullet lists."""
     if not narration:
         return
     headline = html.escape(str(narration.get("headline") or "Insight"))
     raw = str(narration.get("narrative_text") or narration.get("summary") or "")
-    # Preserve paragraph breaks as readable multi-line insight
-    paras = [html.escape(p.strip()) for p in raw.split("\n\n") if p.strip()]
+
+    # If older payloads still carry short key_findings, fold them into prose
+    findings = [str(f).strip() for f in (narration.get("key_findings") or []) if str(f).strip()]
+    if findings and len(raw.split()) < 40:
+        raw = (raw + "\n\n" + " ".join(findings)).strip()
+
+    paras = [p.strip() for p in raw.split("\n\n") if p.strip()]
     if not paras and raw.strip():
-        paras = [html.escape(raw.strip())]
-    body_html = "".join(f"<p class='narration-para'>{p}</p>" for p in paras)
+        paras = [raw.strip()]
+
+    rec = str(narration.get("recommendation") or "").strip()
+    if rec and rec.lower() not in raw.lower():
+        paras.append(rec)
+
+    body_html = "".join(
+        f"<p class='narration-para'>{html.escape(p)}</p>" for p in paras
+    )
     st.markdown(
         f"""
         <div class="narration-card">
@@ -246,18 +259,6 @@ def render_narration_card(narration: dict | None):
         """,
         unsafe_allow_html=True,
     )
-    findings = narration.get("key_findings") or []
-    if findings:
-        for f in findings:
-            st.markdown(
-                f'<div class="finding-bullet">{html.escape(str(f))}</div>',
-                unsafe_allow_html=True,
-            )
-    if narration.get("recommendation"):
-        st.markdown(
-            f'<div class="narration-recommendation">💡 {html.escape(str(narration["recommendation"]))}</div>',
-            unsafe_allow_html=True,
-        )
     cites = narration.get("knowledge_citations") or []
     if cites:
         bits = []
@@ -1499,10 +1500,20 @@ def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
             )
 
         if show_narr and not show_table:
-            render_narration_card(data.get("narration"))
-            if not data.get("narration"):
-                body = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
-                st.markdown(f'<div class="chat-reply-text">{body}</div>', unsafe_allow_html=True)
+            narr = data.get("narration")
+            if narr:
+                render_narration_card(narr)
+            else:
+                # Fallback prose (no bullet formatting)
+                raw = str(msg.get("content", "")).replace("•", "").replace("- ", "")
+                paras = [html.escape(p.strip()) for p in raw.split("\n\n") if p.strip()]
+                if not paras:
+                    paras = [html.escape(raw.strip())] if raw.strip() else []
+                body = "".join(f"<p class='narration-para'>{p}</p>" for p in paras)
+                st.markdown(
+                    f'<div class="narration-card"><div class="narration-body">{body}</div></div>',
+                    unsafe_allow_html=True,
+                )
 
         if show_table:
             if isinstance(rdf, pd.DataFrame) and not rdf.empty:

@@ -214,19 +214,23 @@ def answer_knowledge_question(
     if share_df is not None:
         headline, findings = _trend_summary(share_df)
         kb_bits = " ".join((s.get("snippet") or "")[:180] for s in snippets[:2])
-        narrative = (
+        paras = [
             f"{headline} Per IND-PV-SOP-003, EV demand is tracked as unit share of "
-            f"retail volume, not order count. "
-            + (f"Business guidance: {kb_bits}" if kb_bits else "")
+            f"retail volume, not order count.",
+            " ".join(findings),
+        ]
+        if kb_bits:
+            paras.append(f"Business guidance: {kb_bits}")
+        paras.append(
+            "Drill EV share by make and region next; cite SOP-003 when presenting to leadership."
         )
+        narrative = "\n\n".join(paras)
         narr = {
             "headline": headline,
             "narrative_text": narrative.strip(),
             "summary": headline,
-            "key_findings": findings,
-            "recommendation": (
-                "Drill EV share by make and region next; cite SOP-003 when presenting to leadership."
-            ),
+            "key_findings": [],
+            "recommendation": "",
             "knowledge_citations": citations,
             "result_summary": f"EV share by year — {len(share_df)} years",
         }
@@ -275,15 +279,20 @@ Answer:"""
     except Exception:
         text = ""
     if not text:
-        # Fallback: stitch snippets
-        text = "Based on our business SOPs:\n" + "\n".join(
-            f"• {s.get('title')}: {(s.get('snippet') or '')[:220]}" for s in snippets[:3]
-        )
+        # Fallback: stitch snippets as prose paragraphs (not bullets)
+        bits = []
+        for s in snippets[:3]:
+            title = s.get("title") or "Guidance"
+            snip = (s.get("snippet") or "").replace("\n", " ").strip()
+            if len(snip) > 220:
+                snip = snip[:217] + "…"
+            bits.append(f"{title}: {snip}" if snip else str(title))
+        text = "Based on our business SOPs:\n\n" + "\n\n".join(bits)
     narr = {
         "headline": "Business knowledge answer",
         "narrative_text": text,
         "summary": text.split(".")[0][:160] if text else "See SOP guidance.",
-        "key_findings": [s.get("title") for s in snippets[:3] if s.get("title")],
+        "key_findings": [],
         "recommendation": "Open the cited SOP in Knowledge Base for full procedure steps.",
         "knowledge_citations": citations,
         "result_summary": "Answered from OKF business knowledge",
