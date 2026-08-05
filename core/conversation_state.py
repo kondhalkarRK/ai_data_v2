@@ -234,41 +234,67 @@ def is_awaiting_clarification() -> bool:
         return False
 
 
-def set_pending_clarification(question: str, options: dict | None = None) -> None:
-    """Store ambiguous question awaiting A/B/C clarification."""
+def set_pending_clarification(
+    question: str,
+    options: dict | None = None,
+    suggestions: list[str] | None = None,
+) -> None:
+    """Store ambiguous/incomplete question awaiting one follow-up turn."""
     state = _ensure_state()
+    sugs = [s for s in (suggestions or []) if s][:2]
     state["pending_clarification"] = {
         "question": question,
-        "options": options or {
-            "a": "Revenue",
-            "b": "Units Sold",
-            "c": "Order count",
-        },
+        "options": options or {},
+        "suggestions": sugs,
+        "mode": "suggestions" if sugs else "legacy",
     }
+
+
+def get_pending_clarification() -> dict | None:
+    try:
+        return get_state().get("pending_clarification")
+    except Exception:
+        return None
 
 
 def resolve_clarification(choice: str) -> str | None:
     """
-    Map A/B/C (or 1/2/3) to a reconstructed data question.
+    Map follow-up to a reconstructed data question.
     Clears pending_clarification. Returns None if nothing pending.
     """
     state = _ensure_state()
     pending = state.get("pending_clarification")
     if not pending:
         return None
+
+    original = pending.get("question") or ""
+    reply = str(choice or "").strip()
+    suggestions = pending.get("suggestions") or []
+    state["pending_clarification"] = None
+
+    if pending.get("mode") == "suggestions" and suggestions:
+        low = reply.lower().strip(".) ")
+        if low in ("1", "a", "option 1", "first") and len(suggestions) >= 1:
+            return suggestions[0]
+        if low in ("2", "b", "option 2", "second") and len(suggestions) >= 2:
+            return suggestions[1]
+        for s in suggestions:
+            if reply.lower() == s.lower():
+                return s
+        # Second attempt: always run user text (or original if empty)
+        return reply if reply else original
+
     opts = pending.get("options") or {
         "a": "Revenue", "b": "Units Sold", "c": "Order count",
     }
-    key = str(choice or "").strip().lower()
+    key = reply.lower()
     digit_map = {"1": "a", "2": "b", "3": "c"}
     key = digit_map.get(key, key)
     metric = opts.get(key) or opts.get(key[:1])
-    original = pending.get("question") or ""
-    state["pending_clarification"] = None
     if not metric:
-        return original
-    # Reconstruct: prefer "show {metric} by colour" style
+        return reply or original
     return f"show {metric} by colour"
+
 
 
 def detect_followup(question: str) -> bool:

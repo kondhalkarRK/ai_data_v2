@@ -8,6 +8,7 @@ from core.join_engine import (
     sql_join,
     semantic_auto_join,
 )
+from ui.safe_display import safe_dataframe
 
 
 def render(working_df, tables, dfs):
@@ -128,7 +129,7 @@ def render(working_df, tables, dfs):
                             unsafe_allow_html=True,
                         )
 
-                st.dataframe(sem_result.head(100), use_container_width=True)
+                safe_dataframe(sem_result.head(100), use_container_width=True)
 
             else:
                 # ── Semantic join failed — show fallback result ───
@@ -189,7 +190,7 @@ def render(working_df, tables, dfs):
                                 f"&nbsp; _{entry.get('note', '')}_",
                                 unsafe_allow_html=True,
                             )
-                    st.dataframe(joined.head(100), use_container_width=True)
+                    safe_dataframe(joined.head(100), use_container_width=True)
 
         # ── Base table selector (kept for fallback path) ──────────
         with st.expander("⚙️ Fallback Join Settings", expanded=False):
@@ -236,4 +237,4 @@ def render(working_df, tables, dfs):
             jdf = sql_join(dfs, sql_text)
             if jdf is not None:
                 st.success(f"✅ {jdf.shape[0]:,} rows × {jdf.shape[1]} cols")
-                st.dataframe(jdf.head(100), use_container_width=True)
+                safe_dataframe(jdf.head(100), use_container_width=True)

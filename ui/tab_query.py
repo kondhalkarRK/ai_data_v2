@@ -15,6 +15,13 @@ from core.nlq_engine import run_query, run_sql
 from core.sql_guardrails import sql_is_safe
 from core.chart_engine import auto_chart_type, build_chart
 from core.llm_client import call_llm
+from ui.safe_display import safe_dataframe
+
+try:
+    from core.incomplete_question import assess_question_completeness
+except Exception:
+    def assess_question_completeness(question, df=None):
+        return {"incomplete": False, "suggestions": [], "reason": "ok"}
 
 try:
     from core.conversation_state import (
@@ -26,6 +33,7 @@ try:
         is_awaiting_clarification,
         set_pending_clarification,
         resolve_clarification,
+        get_pending_clarification,
         get_sql_anchor,
         clear_sql_anchor,
     )
@@ -52,6 +60,9 @@ except Exception:
         pass
 
     def resolve_clarification(choice):
+        return None
+
+    def get_pending_clarification():
         return None
 
     def get_sql_anchor():
@@ -353,7 +364,7 @@ def render_ask_mode(working_df, tables, dfs):
     custom = st.session_state.get("ask_custom_result")
     if custom and not run_btn:
         st.markdown('<span class="badge-fallback">🔧 Custom SQL</span>', unsafe_allow_html=True)
-        st.dataframe(custom["result_df"], use_container_width=True)
+        safe_dataframe(custom["result_df"], use_container_width=True)
         render_editable_sql(custom.get("sql", ""), working_df)
         return
 
@@ -478,7 +489,7 @@ def _render_ask_bundle(bundle, working_df):
     # Primary deliverable — table + chart
     tab_table, tab_chart = st.tabs(["📊 Table", "📈 Chart"])
     with tab_table:
-        st.dataframe(result_df, use_container_width=True)
+        safe_dataframe(result_df, use_container_width=True)
         st.download_button(
             "⬇️ Download CSV",
             data=result_df.to_csv(index=False).encode(),
@@ -1003,7 +1014,22 @@ def _greeting_reply(working_df: pd.DataFrame) -> str:
     return body
 
 
-def _clarification_prompt(question: str) -> str:
+def _clarification_prompt(question: str, suggestions: list[str] | None = None) -> str:
+    sugs = [s for s in (suggestions or []) if s][:2]
+    if sugs:
+        lines = [
+            "Your question looks incomplete. Did you mean one of these?",
+            "",
+            f"1) {sugs[0]}",
+        ]
+        if len(sugs) > 1:
+            lines.append(f"2) {sugs[1]}")
+        lines.extend([
+            "",
+            "Reply **1** or **2**, tap a suggestion below, or type your question once more — "
+            "I will run it on your next message (no further prompts).",
+        ])
+        return "\n".join(lines)
     return (
         "I want to make sure I give you the right answer! Are you asking about:\n"
         "A) Revenue performance\n"
@@ -1229,22 +1255,22 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         st.rerun()
         return
 
-    # 3. Clarification reply A/B/C
-    if is_awaiting_clarification() and q.strip().lower() in (
-        "a", "b", "c", "1", "2", "3", "a)", "b)", "c)",
-    ):
-        reconstructed = resolve_clarification(q.strip().lower()[0])
+    # 3. One-turn clarification follow-up (suggestions or legacy A/B/C)
+    clarification_followup = False
+    if is_awaiting_clarification():
+        reconstructed = resolve_clarification(q)
         if reconstructed:
             q = reconstructed
-            # fall through to data query with reconstructed question
+            clarification_followup = True
         else:
             _append_assistant(
-                "I lost the clarification context — could you ask again?",
+                "I lost the clarification context — please ask again in one sentence.",
                 "chat",
             )
             st.rerun()
             return
-    else:
+
+    if not clarification_followup:
         # 4. OOB warm redirect
         if detect_oob(q):
             with st.spinner("💬 Thinking..."):
@@ -1262,10 +1288,16 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             st.rerun()
             return
 
-        # 6. Ambiguous → clarification
-        if detect_ambiguous(q):
-            set_pending_clarification(q)
-            _append_assistant(_clarification_prompt(q), "clarification")
+        # 6. Incomplete → two suggestions (no LLM; one follow-up only)
+        assessment = assess_question_completeness(q, working_df)
+        if assessment.get("incomplete"):
+            sugs = (assessment.get("suggestions") or [])[:2]
+            set_pending_clarification(q, suggestions=sugs)
+            _append_assistant(
+                _clarification_prompt(q, sugs),
+                "clarification",
+                {"suggestions": sugs},
+            )
             append_chat_exchange(q, result_summary=None, was_data_query=False)
             st.rerun()
             return
@@ -1446,6 +1478,17 @@ def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
     if mtype in ("chat", "oob", "clarification", "blocked", "error", "error_friendly"):
         body = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
         st.markdown(f'<div class="chat-reply-text">{body}</div>', unsafe_allow_html=True)
+        if mtype == "clarification":
+            sugs = (data.get("suggestions") or [])[:2]
+            if sugs:
+                chips = "".join(
+                    f'<div class="clarification-chip">{i + 1}. {html.escape(s)}</div>'
+                    for i, s in enumerate(sugs)
+                )
+                st.markdown(
+                    f'<div class="clarification-chip-row">{chips}</div>',
+                    unsafe_allow_html=True,
+                )
 
     elif mtype == "surprise":
         sur = data.get("surprise") or {}
@@ -1525,10 +1568,10 @@ def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
                 tab_t, tab_c = st.tabs(["📊 Table", "📈 Chart"])
                 with tab_t:
                     show_n = min(10, len(rdf))
-                    st.dataframe(rdf.head(show_n), use_container_width=True)
+                    safe_dataframe(rdf.head(show_n), use_container_width=True)
                     if len(rdf) > 10:
                         with st.expander(f"Show all {len(rdf)} rows"):
-                            st.dataframe(rdf, use_container_width=True)
+                            safe_dataframe(rdf, use_container_width=True)
                 with tab_c:
                     _render_chat_chart(rdf, src_q, key_base)
             elif isinstance(rdf, pd.DataFrame) and rdf.empty:
@@ -1620,6 +1663,31 @@ def render_chat_mode(working_df, tables, dfs):
 
     _chat_scroll_to_bottom()
     st.markdown("</div>", unsafe_allow_html=True)
+
+    # One-turn clarification: tap a suggested complete question (no extra LLM)
+    pending = get_pending_clarification() if is_awaiting_clarification() else None
+    sugs = (pending or {}).get("suggestions") or []
+    if sugs:
+        st.markdown(
+            '<div class="clarification-suggestions-label">Pick a suggested question (or type your own below):</div>',
+            unsafe_allow_html=True,
+        )
+        s1, s2 = st.columns(2)
+        with s1:
+            if st.button(
+                f"1) {sugs[0][:72]}{'…' if len(sugs[0]) > 72 else ''}",
+                key="chat_pick_sug_0",
+                use_container_width=True,
+            ):
+                process_chat_message(sugs[0], working_df)
+        if len(sugs) > 1:
+            with s2:
+                if st.button(
+                    f"2) {sugs[1][:72]}{'…' if len(sugs[1]) > 72 else ''}",
+                    key="chat_pick_sug_1",
+                    use_container_width=True,
+                ):
+                    process_chat_message(sugs[1], working_df)
 
     # Composer: mode picker (Cursor-style) + chat input
     _mode_labels = {

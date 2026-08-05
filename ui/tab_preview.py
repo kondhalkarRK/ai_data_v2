@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from core.data_quality_engine import render_data_quality
+from ui.safe_display import safe_dataframe
 
 
 def render(working_df, tables, dfs):
@@ -26,7 +27,7 @@ def render(working_df, tables, dfs):
         </div>""",
             unsafe_allow_html=True,
         )
-        st.dataframe(working_preview_df.head(100), use_container_width=True)
+        safe_dataframe(working_preview_df.head(100), use_container_width=True)
         if len(working_preview_df) > 100:
             st.caption(f"Showing first 100 of {len(working_preview_df):,} rows")
 
@@ -42,7 +43,7 @@ def render(working_df, tables, dfs):
     </div>""",
         unsafe_allow_html=True,
     )
-    st.dataframe(pdf.head(100), use_container_width=True)
+    safe_dataframe(pdf.head(100), use_container_width=True)
     if len(pdf) > 100:
         st.caption(f"Showing first 100 of {len(pdf):,} rows")
 

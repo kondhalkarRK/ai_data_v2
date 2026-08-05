@@ -859,6 +859,9 @@ div[data-testid="stDataFrame"] tbody td{
     text-shadow:0 0 10px rgba(251,191,36,.25);display:flex;align-items:center;gap:8px;
 }
 .brand-tagline{font-size:11.5px;font-weight:500;color:#aebbd0;letter-spacing:.2px;}
+.brand-logo-wrap{display:flex;align-items:center;min-height:44px;padding:2px 0;}
+.brand-capgemini-logo{height:34px;width:auto;max-width:150px;display:block;}
+.brand-capgemini-text{font-size:17px;font-weight:800;color:#0070AD;letter-spacing:.3px;}
 .brand-pill{
     font-size:10.5px;font-weight:800;letter-spacing:1px;color:#dce7ff;
     background:linear-gradient(90deg, rgba(79,124,255,.18), rgba(124,58,237,.18));
@@ -1538,6 +1541,12 @@ div[data-testid="stExpander"] details:hover summary{
   background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);
   border-left:3px solid #818cf8;border-radius:4px 18px 18px 18px;
 }
+.clarification-chip-row{margin-top:10px;display:flex;flex-direction:column;gap:6px;}
+.clarification-chip{
+  font-size:12px;color:#c7d2fe;padding:7px 11px;border-radius:8px;
+  background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.18);
+}
+.clarification-suggestions-label{font-size:12px;color:#94a3b8;margin:4px 0 6px;font-weight:600;}
 .card-error{
   background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.12);
   border-left:3px solid #ef4444;border-radius:4px 18px 18px 18px;
