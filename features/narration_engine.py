@@ -100,6 +100,29 @@ class NarrationEngine:
             }
             return self._enrich_with_knowledge(base, question, knowledge_snippets)
 
+        align_cols = {"actual_units", "target_units", "variance_pct", "status"}
+        if align_cols.issubset(set(result_df.columns)):
+            try:
+                from features.okf_knowledge.target_narration import generate_target_alignment_narration
+                payload = {
+                    "result_df": result_df,
+                    "registry": {},
+                    "scope": (
+                        str(result_df.iloc[0]["scope"])
+                        if "scope" in result_df.columns
+                        else "National"
+                    ),
+                    "grain": "monthly" if "month" in result_df.columns else "ytd",
+                    "fy_label": "FY2026",
+                    "doc_code": "IND-PV-REG-001",
+                    "question": question,
+                }
+                narr = generate_target_alignment_narration(payload, knowledge_snippets or [])
+                narr["word_count"] = len(narr.get("narrative_text", "").split())
+                return narr
+            except Exception:
+                pass
+
         num_cols = result_df.select_dtypes(include="number").columns.tolist()
         str_cols = result_df.select_dtypes(exclude="number").columns.tolist()
         n = len(result_df)
@@ -314,7 +337,7 @@ class NarrationEngine:
         base = {
             "headline": headline,
             "narrative_text": narrative,
-            "summary": narrative,
+            "summary": headline,
             "key_findings": [],  # prose carries the insight; avoid one-word bullet noise
             "recommendation": recommendation,
             "result_summary": result_summary,

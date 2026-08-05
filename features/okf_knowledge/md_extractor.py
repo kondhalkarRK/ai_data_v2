@@ -47,10 +47,58 @@ def _split_oversized(body: str) -> list[str]:
     return final
 
 
+def _infer_doc_meta(text: str, source_filename: str, file_path: str | None = None) -> dict:
+    """Extract document code, type, and owner from header / path / filename."""
+    doc_code = ""
+    m = re.search(
+        r"\b(IND-PV-(?:SOP|GUIDE|HB|REG|STR)-\d{3})\b",
+        text,
+        re.I,
+    )
+    if m:
+        doc_code = m.group(1).upper()
+    else:
+        m2 = re.search(r"(IND-PV-[A-Z]+-\d{3})", source_filename, re.I)
+        if m2:
+            doc_code = m2.group(1).upper()
+
+    doc_type = "sop"
+    type_m = re.search(r"\*\*Document type:\*\*\s*(\S+)", text, re.I)
+    if type_m:
+        doc_type = type_m.group(1).strip().lower().replace(" ", "_")
+    elif doc_code:
+        prefix = doc_code.split("-")[2] if doc_code.count("-") >= 2 else ""
+        doc_type = {
+            "SOP": "sop",
+            "GUIDE": "guide",
+            "HB": "handbook",
+            "REG": "regional_targets",
+            "STR": "strategy_plan",
+        }.get(prefix.upper(), "sop")
+    elif file_path:
+        low = file_path.replace("\\", "/").lower()
+        if "/handbooks/" in low:
+            doc_type = "handbook"
+        elif "/regional/" in low:
+            doc_type = "regional_targets"
+        elif "/strategy/" in low:
+            doc_type = "strategy_plan"
+        elif "/guides/" in low:
+            doc_type = "guide"
+
+    owner = ""
+    owner_m = re.search(r"\*\*Owner:\*\*\s*(.+)$", text, re.M | re.I)
+    if owner_m:
+        owner = owner_m.group(1).strip()
+
+    return {"doc_code": doc_code, "doc_type": doc_type, "owner": owner}
+
+
 def extract_markdown_to_concepts(
     text: str,
     source_filename: str,
     default_tags: list[str] | None = None,
+    file_path: str | Path | None = None,
 ) -> list[dict]:
     """
     Split Markdown on AT2 headings into OKF concepts.
@@ -62,13 +110,14 @@ def extract_markdown_to_concepts(
 
     doc_id = str(uuid.uuid4())[:8]
     now = datetime.now(timezone.utc).isoformat()
-    tags = list(default_tags or ["markdown", "business-doc", "sop"])
+    fp = str(file_path) if file_path else source_filename
+    meta = _infer_doc_meta(text, source_filename, fp)
+    doc_tag = meta.get("doc_code") or ""
+    doc_type = meta.get("doc_type") or "sop"
+    owner = meta.get("owner") or ""
 
-    # Detect document id from first heading / filename
-    doc_tag = None
-    m = re.search(r"\b(IND-PV-(?:SOP|GUIDE)-\d{3})\b", text)
-    if m:
-        doc_tag = m.group(1)
+    tags = list(default_tags or ["markdown", "business-doc", doc_type])
+    if doc_tag:
         tags.append(doc_tag.lower())
 
     sections: list[tuple[str, str]] = []
@@ -110,8 +159,12 @@ def extract_markdown_to_concepts(
                 concept_tags.append("region")
             if any(w in low for w in ("metric", "kpi", "revenue", "units")):
                 concept_tags.append("metrics")
-            if any(w in low for w in ("narrative", "executive", "insight")):
-                concept_tags.append("narrative")
+            if any(w in low for w in ("target", "threshold", "goal", "fy20")):
+                concept_tags.append("targets")
+            if any(w in low for w in ("strategy", "pillar", "competitive", "growth plan")):
+                concept_tags.append("strategy")
+            if any(w in low for w in ("handbook", "dealer", "handover", "booking")):
+                concept_tags.append("handbook")
 
             concepts.append({
                 "concept_id": f"{doc_id}_{page_proxy}_{len(concepts)}",
@@ -122,6 +175,8 @@ def extract_markdown_to_concepts(
                 "body": full_body,
                 "ingested_at": now,
                 "doc_code": doc_tag or "",
+                "doc_type": doc_type,
+                "owner": owner,
             })
         page_proxy += 1
 
@@ -131,4 +186,4 @@ def extract_markdown_to_concepts(
 def extract_markdown_file(path: str | Path) -> list[dict]:
     p = Path(path)
     text = p.read_text(encoding="utf-8")
-    return extract_markdown_to_concepts(text, p.name)
+    return extract_markdown_to_concepts(text, p.name, file_path=str(p))

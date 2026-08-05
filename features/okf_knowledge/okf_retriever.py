@@ -63,6 +63,8 @@ def reindex_all() -> int:
                     "title": concept["title"],
                     "source_doc": concept["source_doc"],
                     "source_page": str(concept["source_page"]),
+                    "doc_code": concept.get("doc_code") or "",
+                    "doc_type": concept.get("doc_type") or "sop",
                 }],
             )
             indexed += 1
@@ -133,6 +135,8 @@ def get_relevant_snippets(
             "source_page": page,
             "snippet": snippet,
             "entry": entry,
+            "doc_code": (meta or {}).get("doc_code", ""),
+            "doc_type": (meta or {}).get("doc_type", "sop"),
         })
         used += len(entry)
     return out

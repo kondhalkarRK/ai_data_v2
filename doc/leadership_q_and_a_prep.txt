@@ -1,0 +1,217 @@
+================================================================================
+AI DATA PLATFORM — LEADERSHIP Q&A PREP (WHAT THEY WILL ASK YOU)
+================================================================================
+Use this to prepare answers when presenting to executives.
+Each item: likely question → correct answer → what NOT to say
+
+--------------------------------------------------------------------------------
+1. STRATEGY & VALUE
+--------------------------------------------------------------------------------
+
+Q: What problem does this solve that Excel or Power BI doesn't?
+A: It lets leaders ask ad-hoc questions in plain English without waiting for
+   an analyst. The semantic layer ensures "units sold" and "revenue" always
+   map to the same SQL — and OKF business documents explain targets, policy,
+   and strategy when the data alone isn't enough.
+NOT: "It replaces your BI team." (It augments them; governance still matters.)
+
+Q: Is this just ChatGPT on our data?
+A: No. Three layers: (1) Semantic glossary → correct SQL on our model,
+   (2) DuckDB execution on our joined dataset, (3) OKF business documents
+   for targets/SOPs/handbooks — separate from the metric definitions.
+   Every answer can show SQL + trust score for audit.
+NOT: "The AI always knows the right answer." (It can misinterpret vague asks.)
+
+Q: What's the ROI / business case?
+A: Faster MBR prep, fewer back-and-forth tickets to analytics, consistent
+   metric definitions across regions, and policy-grounded narratives
+   (e.g. EV share per SOP-003, targets per REG-001).
+NOT: Promise exact FTE savings without a pilot measurement.
+
+--------------------------------------------------------------------------------
+2. DATA TRUST & ACCURACY
+--------------------------------------------------------------------------------
+
+Q: How do we know the numbers are correct?
+A: Show the Details panel: generated SQL (auditable), Data Trust Score
+   (semantic match, glossary, SQL path), and row counts. Analysts can
+   validate SQL before sharing externally.
+NOT: "Trust the AI." Always show SQL for material decisions.
+
+Q: What if someone asks a vague question like "show sales"?
+A: Chat mode suggests two complete questions — one follow-up only — then
+   runs the query. The ℹ️ user guide tells people to include metric +
+   dimension + time (e.g. units by make for 2025).
+NOT: "Users can ask anything." (Vague asks waste tokens or need clarification.)
+
+Q: Can it answer "are we on track vs target"?
+A: Yes — for FY2026 it compares actuals from sales data against targets
+   in IND-PV-REG-001 (OKF document, not the glossary). Shows monthly
+   actual vs plan, variance %, and On Track / Behind status with
+   escalation guidance from SOP-004 when gaps are large.
+NOT: "Targets are in the database." (Targets live in OKF business docs.)
+
+Q: What about PII — salesperson names, emails?
+A: Display layer masks PII in tables (names, emails, phones). Query engine
+   is unchanged; masking is for safe leadership screen-sharing.
+NOT: "We removed PII from the database." (Masking is display-only.)
+
+--------------------------------------------------------------------------------
+3. OKF vs GLOSSARY (EXPECT THIS QUESTION)
+--------------------------------------------------------------------------------
+
+Q: What's the difference between the glossary and OKF?
+A:
+   • business_glossary.yaml = HOW to query (Units Sold = SUM(order_qty),
+     column synonyms, SQL patterns)
+   • OKF documents = WHAT the business decided (FY2026 zone targets,
+     dealer handbook, growth strategy, COVID/EV SOPs)
+   Example: "Show units by region" → glossary + SQL.
+   "What is the North target?" → OKF REG-001 only.
+   "Are monthly sales aligned with target?" → BOTH (data + OKF).
+NOT: "They're the same knowledge base." (Different purpose, different files.)
+
+Q: Who owns OKF documents?
+A: Business owners (Sales Excellence, CSO office, Dealer Development).
+   Analytics maintains glossary; business maintains OKF packs under
+   doc/business_knowledge/ (handbooks, regional/, strategy/, SOPs).
+NOT: "IT writes all the content." (Business must own policy docs.)
+
+Q: Can we upload our own PDFs?
+A: Yes — Sidebar → Knowledge Base → upload PDF/Markdown; reindex.
+   Packaged India PV docs seed automatically on first run.
+NOT: "Any PDF works perfectly." (Quality depends on clear structure/headings.)
+
+--------------------------------------------------------------------------------
+4. CONVERSATION & FOLLOW-UPS
+--------------------------------------------------------------------------------
+
+Q: Does it remember the last question?
+A: Yes in Chat mode. Follow-ups like "same but for 2024", "drill down by
+   region", "only North" modify the prior SQL anchor instead of starting
+   fresh — similar to Copilot in a thread.
+NOT: "It remembers everything forever." (Context is last few turns + SQL anchor.)
+
+Q: Ask tab vs Chat tab?
+A: Ask = single-shot analytics, status steps, editable SQL.
+   Chat = multi-turn, follow-ups, incomplete-question help, OOB handling,
+   mixed policy + data questions.
+NOT: "They're identical." (Different UX for different workflows.)
+
+--------------------------------------------------------------------------------
+5. SECURITY & GUARDRAILS
+--------------------------------------------------------------------------------
+
+Q: Can users delete or corrupt data?
+A: Destructive intents (delete data, drop table, etc.) are blocked in chat.
+   SQL guardrails restrict unsafe operations. Read-only analytics on uploaded
+   CSVs — not a production write path.
+NOT: "Fully production-hardened." (Position as analytics workspace / pilot.)
+
+Q: What happens for off-topic questions (recipes, jokes)?
+A: OOB detection gives a warm redirect to data questions — avoids burning
+   LLM tokens on non-analytics chat.
+NOT: "It answers general knowledge." (By design it stays on dataset + OKF.)
+
+Q: Where does the LLM run? Is our data sent externally?
+A: LLM calls use configured API (e.g. Capgemini / OpenAI-compatible endpoint)
+   with prompts containing schema snippets and question — not full raw CSV.
+   Secrets via Streamlit secrets / env — not in code.
+NOT: Share API keys in the demo. Have secrets pre-configured.
+
+--------------------------------------------------------------------------------
+6. TECHNICAL (CTO / ARCHITECT MAY ASK)
+--------------------------------------------------------------------------------
+
+Q: What's under the hood?
+A: Streamlit UI, DuckDB in-process SQL, semantic YAML model, Chroma OKF
+   vector index, sentence-transformers for retrieval, optional materialized
+   view cache for repeat queries.
+NOT: Over-promise real-time streaming or petabyte scale without architecture review.
+
+Q: How is SQL generated?
+A: Primary path: semantic context + glossary hints + optional RAG examples
+   → LLM generates SQL → guardrails validate → DuckDB executes.
+   Follow-ups can surgically edit prior SQL anchor.
+NOT: "100% deterministic." (LLM path exists; trust score reflects path used.)
+
+Q: Can we plug in our warehouse instead of CSV?
+A: Today: CSV upload + join. Roadmap conversation: warehouse connector,
+   certified metrics layer, row-level security — not in current demo scope.
+NOT: "Works on any database out of the box today."
+
+--------------------------------------------------------------------------------
+7. OPERATIONS & DEMO DAY CHECKLIST
+--------------------------------------------------------------------------------
+
+Q: What do you need before the demo?
+A:
+   [ ] All sample_data CSVs uploaded (or customer anonymized extract)
+   [ ] Semantic join completed (Join tab green)
+   [ ] OKF seeded (Sidebar → SEED BUSINESS DOCUMENTS)
+   [ ] LLM API key in secrets (or demo will fail on pure NLQ)
+   [ ] Theme set (Dark recommended for room projection)
+   [ ] Chat answer mode: Narration + Table
+NOT: Demo without data loaded — app shows "Upload CSV" only.
+
+Q: What if the LLM is slow or down?
+A: OKF-only answers (targets, strategy, handbook) can work without SQL.
+   Target alignment uses Python + OKF YAML — no LLM required.
+   Pure NLQ questions need LLM — have one pre-run screenshot as backup.
+NOT: Pretend latency doesn't exist — set expectation for first query warm-up.
+
+Q: What if a question fails?
+A: Show SQL in Details, rephrase with metric + dimension + year, or use
+   Ask tab for a cleaner single shot. Use suggested questions from
+   incomplete-question flow in Chat.
+NOT: Improvise numbers — if query fails, say "let me refine the question."
+
+--------------------------------------------------------------------------------
+8. HARD QUESTIONS — HONEST ANSWERS
+--------------------------------------------------------------------------------
+
+Q: Will demo sample data match our real FY2026 plan numbers?
+A: Demo uses IND-PV-REG-001 targets against sample fact_sales volume.
+   Sample data is smaller than real retail — alignment may show "Behind"
+   even when logic is correct. Production uses customer data + approved
+   target documents.
+NOT: Claim demo variance equals real business performance.
+
+Q: Does this replace our semantic layer / Fabric / Power BI investment?
+A: Complements them. This is a conversational layer on a semantic model
+   plus OKF policy docs. Certified metrics should still live in glossary
+   with governance sign-off.
+NOT: "Rip and replace."
+
+Q: How much does each question cost?
+A: Sidebar shows LLM call/token counters. OKF retrieval and target alignment
+   are designed to minimize tokens. Vague questions and long chats cost more —
+   user guide trains better prompts.
+NOT: "Negligible cost at enterprise scale" without measurement.
+
+--------------------------------------------------------------------------------
+9. ONE-SLIDE ELEVATOR ANSWERS (MEMORIZE)
+--------------------------------------------------------------------------------
+
+What is it?
+  → Semantic AI analytics workspace: ask in English, get SQL-backed answers
+    + leadership narration + business document citations.
+
+Why now?
+  → Leaders want instant answers; analytics backlog grows; metric definitions
+    drift across regions. This standardizes metrics and embeds policy.
+
+What's unique?
+  → Glossary (SQL) + OKF (policy/targets/strategy) + conversation memory
+    + target vs actual alignment + trust scores — in one UI.
+
+Is it safe to show the board?
+  → Yes if you show SQL, trust score, and OKF citations; mask PII on screen.
+
+What's next?
+  → Certified question suite, warehouse connector, executive brief export,
+    expanded OKF packs per region/brand.
+
+================================================================================
+End of leadership Q&A prep — AI Data Platform V10
+================================================================================

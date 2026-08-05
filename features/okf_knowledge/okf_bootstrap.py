@@ -27,14 +27,22 @@ def business_knowledge_dir() -> Path:
 
 
 def list_packaged_sop_files() -> list[Path]:
+    """All packaged OKF business documents (recursive under business_knowledge/)."""
     root = business_knowledge_dir()
     if not root.is_dir():
         return []
-    files = [
-        p for p in sorted(root.glob("IND-PV-*.md")) + sorted(root.glob("IND-PV-*.pdf"))
-        if p.is_file()
-    ]
-    return files
+    files: list[Path] = []
+    for pattern in ("IND-PV-*.md", "IND-PV-*.pdf"):
+        files.extend(sorted(root.rglob(pattern)))
+    # De-dupe same path
+    seen: set[str] = set()
+    unique: list[Path] = []
+    for p in files:
+        key = str(p.resolve())
+        if p.is_file() and key not in seen:
+            seen.add(key)
+            unique.append(p)
+    return unique
 
 
 def bootstrap_business_knowledge(force: bool = False) -> dict:

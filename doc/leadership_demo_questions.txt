@@ -1,0 +1,183 @@
+================================================================================
+AI DATA PLATFORM — LEADERSHIP DEMO QUESTION SCRIPT
+================================================================================
+Audience: C-suite, Sales leadership, Regional heads, Analytics COE
+Duration: 20–30 minutes (pick sections by audience)
+Prerequisite: Load sample_data CSVs (fact_sales + dim_* tables) before demo
+Sidebar: Click "SEED BUSINESS DOCUMENTS" under Knowledge Base (OKF) once
+
+Use Chat tab for conversation-style demos; Ask tab for one-shot analytics.
+
+--------------------------------------------------------------------------------
+A. OPENING — PLATFORM & DATA (2 min)
+   Tabs: Sidebar → Join → Data Preview
+--------------------------------------------------------------------------------
+
+1.  [Setup — show sidebar]
+    "We upload dealer/OEM CSVs; the semantic layer knows our sales model."
+
+2.  [Join / Combine tab]
+    "Show me that tables joined correctly using the semantic model."
+    → Point out: Semantic Join Active, row/column counts
+
+3.  [Data Preview tab]
+    "What does data quality look like for our working dataset?"
+    → Point out: DQ intelligence, row/column stats, PII-safe preview
+
+--------------------------------------------------------------------------------
+B. KPI COCKPIT (3 min)
+   Tab: KPI Summary
+--------------------------------------------------------------------------------
+
+4.  "Give me an executive snapshot of sales performance."
+    → Point out: KPI cards, trends, segment views
+
+--------------------------------------------------------------------------------
+C. ASK TAB — SEMANTIC NLQ (5 min)
+   Tab: AI Query → Query
+--------------------------------------------------------------------------------
+
+5.  "Show total units sold by make for 2025"
+    → Table + chart + narration + trust score + SQL in Details
+
+6.  "Monthly revenue trend by region in 2024"
+    → Time-series chart; leadership narrative (headline + paragraphs)
+
+7.  "Which make gained the most units between 2020 and 2025?"
+    → YoY / gain analysis; semantic glossary mapping
+
+8.  "Top 10 salespeople by revenue in 2025"
+    → Ranking query; note PII masking if name columns appear in results
+
+--------------------------------------------------------------------------------
+D. CHAT TAB — CONVERSATION & MEMORY (8 min)
+   Tab: AI Query → Chat
+   Set answer mode: "Narration + Table"
+--------------------------------------------------------------------------------
+
+--- First question (establishes SQL anchor / memory) ---
+
+9.  "Show units sold by region for 2025"
+
+--- Follow-up (same thread — no re-explaining) ---
+
+10. "Same but for 2024"
+    → Inherits prior metric/dimensions; surgical SQL edit
+
+11. "Drill down by make"
+    → Follow-up / additive dimension; conversation memory
+
+12. "Now filter only North"
+    → Filter change on anchored query
+
+--- Incomplete question handling (one clarification only) ---
+
+13. "Show sales"
+    → App suggests 2 complete questions; pick one OR type full question
+    → Second message always runs — no repeated correction loop
+
+--- Target vs actual (data + OKF business document) ---
+
+14. "Does monthly sales align with target?"
+    → Table: actual vs target vs variance vs status (On Track / Behind)
+    → Narration cites IND-PV-REG-001; not the metric glossary
+
+15. "Are we on track for South?"
+    → Zone-level alignment vs FY2026 plan
+
+--- OKF business knowledge (handbooks, strategy, SOPs — not glossary) ---
+
+16. "What is the North zone unit target for FY2026?"
+    → Answer from OKF regional targets document (IND-PV-REG-001)
+
+17. "What is our EV growth strategy for FY2026?"
+    → Answer from strategy plan (IND-PV-STR-001)
+
+18. "When does a booking count as a retail sale?"
+    → Answer from dealer handbook (IND-PV-HB-001)
+
+19. "Is EV demand increasing?"
+    → EV share computed from data + SOP-003 reporting rules cited
+
+20. "Why were 2020 sales down?"
+    → COVID recovery playbook (IND-PV-SOP-002) + optional data context
+
+--- Guardrails ---
+
+21. "What's a good recipe for dinner tonight?"
+    → Warm OOB redirect — stays professional, no wasted LLM on analytics
+
+22. "Delete all data from the database"
+    → Blocked / destructive intent handled safely
+
+--- Delight features ---
+
+23. "Surprise me"
+    → Proactive insight discovery across dimensions
+
+24. "What if we increase price by 10% on SUV models?"
+    → What-if scenario (if enabled in your build)
+
+--------------------------------------------------------------------------------
+E. TRUST & GOVERNANCE (2 min)
+   Use any query result → expand "Details (trust, context, SQL)"
+--------------------------------------------------------------------------------
+
+25. After any data question, open Details panel:
+    → Execution path badge (Semantic + AI / Cache / Modified)
+    → Data Trust Score (semantic match, glossary, SQL validation)
+    → Generated SQL (auditable)
+    → OKF knowledge citations where applicable
+
+26. [Sidebar] Show:
+    → LLM usage counters
+    → Materialized views (cache for repeat heavy queries)
+    → Knowledge Base doc/concept counts after seed
+
+--------------------------------------------------------------------------------
+F. UI & EXPERIENCE (1 min)
+--------------------------------------------------------------------------------
+
+27. Toggle theme: Light / Dark / AI (top-right)
+28. User guide (ℹ️ top-right): good vs bad questions to save LLM calls
+29. Chat answer modes: Narration only | Table only | Both
+
+--------------------------------------------------------------------------------
+G. CLOSING LINE (30 sec)
+--------------------------------------------------------------------------------
+
+"This is not a chatbot on raw CSVs — it is a semantic analytics workspace:
+ business glossary for correct SQL, OKF documents for targets and policy,
+ conversation memory for follow-ups, and auditable trust scores for every answer."
+
+--------------------------------------------------------------------------------
+QUICK REFERENCE — FEATURE → DEMO QUESTION
+--------------------------------------------------------------------------------
+
+Feature                          | Demo question
+---------------------------------|------------------------------------------
+Semantic join                    | Load multi-table sample_data
+Data quality                     | Data Preview → DQ expander
+KPI cockpit                      | KPI Summary tab
+NLQ / SQL generation             | Show units by make for 2025
+Charts                           | Any trend or ranking question
+Leadership narration             | Any query — read headline + paragraphs
+Trust score + SQL audit          | Details expander on result
+Chat memory / follow-up          | Same but for 2024 / drill down by make
+Incomplete Q → 2 suggestions     | Show sales
+Target vs actual alignment       | Does monthly sales align with target?
+OKF regional targets             | What is the East zone target?
+OKF strategy                     | What is our EV strategy?
+OKF handbook                     | When does a sale count?
+OKF SOP (EV / COVID)             | Is EV demand increasing? / Why 2020 down?
+OOB redirect                     | Recipe / weather question
+Destructive block                | Delete all data
+PII masking                      | Query with salesperson names visible
+Surprise me                      | surprise me
+What-if                          | What if price increases 10%?
+OKF seed                         | Sidebar → SEED BUSINESS DOCUMENTS
+Themes                           | Dark / Light / AI toggle
+
+================================================================================
+End of demo script — AI Data Platform V10
+================================================================================

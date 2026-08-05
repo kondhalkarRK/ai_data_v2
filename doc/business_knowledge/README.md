@@ -1,32 +1,64 @@
-# Business Knowledge Pack — India Passenger Vehicles (Dealer / OEM Ops)
+# Business Knowledge Pack — India Passenger Vehicles
 
-These documents are **operating SOPs / MBR standards** used in India passenger-vehicle
-retail networks. They align to the sample warehouse in `sample_data/`
-(`fact_sales` + dimensions, 2019–mid 2026) but are written as **real dealership /
-regional operating procedures**, not a glossary dump.
+These files are **OKF business documents** — handbooks, regional targets, strategy plans, and operating SOPs for India PV retail. They power **policy / interpretation answers** when users ask things the CSV alone cannot explain.
 
-## Documents
+## OKF vs semantic glossary (important)
 
-| ID | File | What it governs |
+| Layer | Location | Purpose | Example question |
+|---|---|---|---|
+| **Semantic glossary** | `semantic/business_glossary.yaml` | SQL metrics, columns, synonyms | *Show units sold by make* |
+| **OKF business docs** | `doc/business_knowledge/` | Handbooks, targets, strategy, SOPs | *What is the North zone FY2026 target?* |
+
+Do **not** duplicate full policy prose in the glossary. The glossary may **reference** OKF doc IDs (e.g. `IND-PV-SOP-003`) but operational detail lives here.
+
+## Document library
+
+### Operating SOPs (root folder)
+
+| ID | File | Type |
 |---|---|---|
-| IND-PV-SOP-001 | Retail Booking, Invoicing & Handover | When a retail unit is recognised |
-| IND-PV-SOP-002 | Demand Shock & Recovery Playbook | Lockdown / shock operating cadence |
-| IND-PV-SOP-003 | EV Delivery, Stock Care & Reporting | EV handover + EV share formula |
-| IND-PV-SOP-004 | Territory Review & Escalation | Zone/city MBR + thresholds |
-| IND-PV-GUIDE-005 | MBR Narrative Pack Standard | How packs / AI commentary are written |
+| IND-PV-SOP-001 | Sales Metric Definitions | sop |
+| IND-PV-SOP-002 | COVID Recovery Playbook | sop |
+| IND-PV-SOP-003 | EV Powertrain Reporting | sop |
+| IND-PV-SOP-004 | Regional Performance Framework | sop |
+| IND-PV-GUIDE-005 | Executive Narrative Standards | guide |
 
-Markdown = source of truth. PDF twins (if present) are for stakeholder sharing.
+### Handbooks (`handbooks/`)
 
-## How to load into the app
+| ID | File | Type |
+|---|---|---|
+| IND-PV-HB-001 | Dealer Operations Handbook | handbook |
+
+### Regional targets (`regional/`)
+
+| ID | File | Type |
+|---|---|---|
+| IND-PV-REG-001 | Regional Sales Targets FY2026 | regional_targets |
+
+### Strategy plans (`strategy/`)
+
+| ID | File | Type |
+|---|---|---|
+| IND-PV-STR-001 | Annual Growth Strategy FY2026 | strategy_plan |
+
+Markdown = source of truth. PDF twins (if generated) are for stakeholder sharing only.
+
+## Example questions → OKF (not glossary)
+
+- *What is our EV strategy for FY2026?* → STR-001  
+- *What is the East zone unit target?* → REG-001  
+- ***Does monthly sales align with target?*** → **actuals from data + targets from REG-001**  
+- ***Are we on track for North?*** → **YTD / monthly alignment vs REG-001**  
+- *When does a booking count as a retail sale?* → HB-001 / SOP-001  
+- *What escalation threshold applies for aged stock?* → SOP-004  
+- *Is EV demand increasing?* → SOP-003 + optional data check  
+
+## Load into the app
 
 1. Sidebar → **Knowledge Base (OKF)** → **SEED INDIA PV SOPs**  
-   (App also auto-seeds when the OKF index is empty.)
-2. Example questions:
-   - “Is EV demand increasing?”
-   - “Why were 2020 sales down?”
-   - “Units sold by make”
-3. Answers should show a **table** (when data-backed) + **narration** with **📎 Knowledge** citations.
+2. App auto-seeds on startup when the index is empty or content version changes.  
+3. Answers cite document IDs in **📎 Knowledge** citations.
 
-## Force refresh after SOP edits
+## After editing documents
 
-Use **SEED** with clear/reindex (or Clear Knowledge + Seed) so Chroma picks up new text.
+Bump `_OKF_CONTENT_VERSION` in `features/okf_knowledge/okf_answer.py`, then **Clear Knowledge + Seed** in the sidebar.

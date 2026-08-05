@@ -496,16 +496,16 @@ def render():
 
                 section_spacer()
                 st.caption(
-                    "India PV SOPs in doc/business_knowledge/. "
-                    "Seed them, or upload extra PDF/MD files."
+                    "Business documents (handbooks, targets, strategy, SOPs) in "
+                    "doc/business_knowledge/ — separate from business_glossary.yaml."
                 )
 
                 if st.button(
-                    "SEED INDIA PV SOPs",
+                    "SEED BUSINESS DOCUMENTS",
                     use_container_width=True,
                     key="okf_seed_sops",
                 ):
-                    with st.spinner("Seeding packaged SOPs into OKF (no LLM tokens)..."):
+                    with st.spinner("Seeding handbooks, targets, strategy & SOPs…"):
                         try:
                             from features.okf_knowledge.okf_bootstrap import (
                                 bootstrap_business_knowledge,

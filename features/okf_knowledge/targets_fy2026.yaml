@@ -1,0 +1,38 @@
+# Machine-readable targets — synced with IND-PV-REG-001 (OKF business document)
+# Used for target vs actual alignment (not business_glossary.yaml)
+
+doc_code: IND-PV-REG-001
+fy_label: FY2026
+fy_start: "2026-04-01"
+fy_end: "2027-03-31"
+h1_months: [2026-04, 2026-05, 2026-06, 2026-07, 2026-08, 2026-09]
+h2_months: [2026-10, 2026-11, 2026-12, 2027-01, 2027-02, 2027-03]
+
+national:
+  annual_units: 142000
+  h1_units: 65320
+  h2_units: 76680
+  annual_revenue_cr: 18400
+  ev_share_pct: 11.5
+
+zones:
+  North:
+    annual_units: 38500
+    ev_share_pct: 10.5
+  West:
+    annual_units: 41200
+    ev_share_pct: 12.0
+  South:
+    annual_units: 36800
+    ev_share_pct: 13.5
+  East:
+    annual_units: 14200
+    ev_share_pct: 8.0
+  Central:
+    annual_units: 11300
+    ev_share_pct: 9.5
+
+thresholds:
+  on_track_min_pct: -5.0
+  ahead_min_pct: 5.0
+  escalation_behind_pct: -15.0
