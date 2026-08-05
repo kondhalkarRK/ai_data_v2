@@ -569,6 +569,7 @@ def is_data_question(question: str, df=None) -> bool:
     followup_phrases = [
         "same but", "same for", "and for", "now for", "tell me more",
         "why is", "why are", "what about", "break that down", "drill",
+        "drill down", "drill into", "slice by", "split by", "zoom in",
         "previous", "that again", "those results", "the result",
     ]
     if any(p in q for p in followup_phrases):

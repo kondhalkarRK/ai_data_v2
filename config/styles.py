@@ -257,9 +257,22 @@ button[kind="primary"]:hover,
 }
 
 .ai-loader-main{
-    color:white;
-    font-size:20px;
-    font-weight:700;
+    font-size:14px;font-weight:700;color:#e2e8f0;margin-top:4px;
+    min-height:22px;position:relative;width:100%;
+}
+.ai-loader-main .phase{
+    position:absolute;left:50%;transform:translateX(-50%);
+    opacity:0;white-space:nowrap;
+    animation:statusPhase 8s ease-in-out infinite;
+}
+.ai-loader-main .phase:nth-child(1){animation-delay:0s;}
+.ai-loader-main .phase:nth-child(2){animation-delay:2s;}
+.ai-loader-main .phase:nth-child(3){animation-delay:4s;}
+.ai-loader-main .phase:nth-child(4){animation-delay:6s;}
+@keyframes statusPhase{
+    0%,8%{opacity:0;transform:translateX(-50%) translateY(4px);}
+    12%,22%{opacity:1;transform:translateX(-50%) translateY(0);}
+    26%,100%{opacity:0;transform:translateX(-50%) translateY(-4px);}
 }
 
 .ai-loader-sub{
@@ -859,9 +872,6 @@ div[data-testid="stDataFrame"] tbody td{
     text-shadow:0 0 10px rgba(251,191,36,.25);display:flex;align-items:center;gap:8px;
 }
 .brand-tagline{font-size:11.5px;font-weight:500;color:#aebbd0;letter-spacing:.2px;}
-.brand-logo-wrap{display:flex;align-items:center;min-height:44px;padding:2px 0;}
-.brand-capgemini-logo{height:34px;width:auto;max-width:150px;display:block;}
-.brand-capgemini-text{font-size:17px;font-weight:800;color:#0070AD;letter-spacing:.3px;}
 .brand-pill{
     font-size:10.5px;font-weight:800;letter-spacing:1px;color:#dce7ff;
     background:linear-gradient(90deg, rgba(79,124,255,.18), rgba(124,58,237,.18));
@@ -871,6 +881,32 @@ div[data-testid="stDataFrame"] tbody td{
 .brand-header:hover .brand-pill{
     border-color:rgba(124,158,255,.5);
     box-shadow:0 0 14px rgba(79,124,255,.25);
+}
+.brand-pill-inline{margin-top:8px;}
+.header-toolbar{
+    display:flex;align-items:center;justify-content:flex-end;
+    gap:6px;margin-top:4px;min-height:38px;
+}
+.header-toolbar [data-testid="column"]{
+    display:flex !important;align-items:center !important;justify-content:flex-end !important;
+}
+.header-toolbar [data-testid="stPopover"] button,
+.header-toolbar [data-testid="stPopover"] > button{
+    min-width:36px !important;width:36px !important;height:36px !important;
+    padding:0 !important;border-radius:50% !important;
+    background:rgba(30,41,59,0.75) !important;
+    border:1px solid rgba(148,163,184,0.28) !important;
+    color:#cbd5e1 !important;font-size:16px !important;
+    display:inline-flex !important;align-items:center !important;justify-content:center !important;
+    transition:all .2s ease !important;
+}
+.header-toolbar [data-testid="stPopover"] button:hover{
+    border-color:rgba(129,140,248,0.55) !important;
+    background:rgba(51,65,85,0.9) !important;
+    box-shadow:0 0 12px rgba(99,102,241,0.2) !important;
+}
+.header-toolbar [data-testid="stSelectbox"] > div > div{
+    min-height:36px !important;
 }
 .join-status-card{
     background:var(--panel-2, #050a14);border:1px solid var(--border, rgba(255,255,255,0.10));
@@ -1623,7 +1659,7 @@ div[data-testid="stExpander"] details:hover summary{
     linear-gradient(180deg, rgba(15,23,42,0.55), rgba(2,6,23,0.72));
   border: 1px solid rgba(148,163,184,0.14);
   border-radius: 18px;
-  padding: 8px 6px 4px;
+  padding: 4px 0 6px;
   margin-bottom: 10px;
   box-shadow: 0 18px 48px rgba(0,0,0,0.28);
 }
@@ -1715,6 +1751,87 @@ div[data-testid="stExpander"] details:hover summary{
   font-size:11px;color:#94a3b8;margin:10px 0 6px;font-weight:600;
   letter-spacing:0.04em;text-transform:uppercase;
 }
+
+/* ── Native Streamlit chat (ChatGPT / Claude alignment) ── */
+.cgpt-thread{
+  max-width:880px;margin:0 auto;padding:8px 12px 16px;width:100%;
+}
+[data-testid="stChatMessage"]{
+  max-width:880px !important;margin:0 auto 6px !important;
+  padding:4px 0 !important;background:transparent !important;
+}
+[data-testid="stChatMessage"] [data-testid="stChatMessageAvatar"]{
+  width:32px !important;height:32px !important;min-width:32px !important;
+  border-radius:50% !important;
+  background:linear-gradient(135deg,#67e8f9,#a78bfa 55%,#86efac) !important;
+  border:1px solid rgba(255,255,255,0.12) !important;
+  box-shadow:0 0 12px rgba(103,232,249,0.2) !important;
+  font-size:14px !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) [data-testid="stChatMessageAvatar"],
+[data-testid="stChatMessage"] [data-testid="chatAvatarIcon-user"]{
+  background:linear-gradient(135deg,rgba(71,85,105,0.95),rgba(51,65,85,0.95)) !important;
+  border:1px solid rgba(148,163,184,0.25) !important;
+  box-shadow:none !important;
+}
+[data-testid="stChatMessageContent"]{
+  font-size:14px !important;line-height:1.65 !important;
+  color:#e2e8f0 !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]){
+  flex-direction:row-reverse !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) [data-testid="stChatMessageContent"]{
+  background:linear-gradient(145deg,rgba(51,65,85,0.88),rgba(30,41,59,0.92)) !important;
+  border:1px solid rgba(148,163,184,0.18) !important;
+  border-radius:18px 18px 6px 18px !important;
+  padding:10px 14px !important;
+  max-width:min(78%,640px) !important;
+  margin-left:auto !important;
+  box-shadow:0 6px 20px rgba(0,0,0,0.15) !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) [data-testid="stChatMessageContent"],
+[data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])) [data-testid="stChatMessageContent"]{
+  background:transparent !important;border:none !important;
+  padding:4px 0 8px 2px !important;max-width:100% !important;
+}
+.cgpt-starter-hints{
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
+  margin-top:20px;max-width:520px;margin-left:auto;margin-right:auto;
+}
+.cgpt-hint{
+  font-size:12px;color:#94a3b8;padding:6px 12px;border-radius:999px;
+  background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.16);
+}
+.cgpt-composer{
+  max-width:880px;margin:0 auto 8px;padding:10px 12px 12px;
+  background:linear-gradient(180deg,rgba(30,41,59,0.55),rgba(15,23,42,0.88));
+  border:1px solid rgba(148,163,184,0.18);border-radius:18px;
+  box-shadow:0 12px 36px rgba(0,0,0,0.22);
+}
+.cgpt-composer-hint{
+  font-size:11px;color:#64748b;line-height:1.5;padding-top:8px;text-align:right;
+}
+.cgpt-composer-hint em{color:#94a3b8;font-style:normal;}
+.cgpt-composer [data-testid="stChatInput"]{
+  background:transparent !important;border:none !important;
+  box-shadow:none !important;padding:0 !important;
+}
+.cgpt-composer [data-testid="stChatInput"] textarea{
+  background:rgba(15,23,42,0.65) !important;
+  border:1px solid rgba(148,163,184,0.22) !important;
+  border-radius:14px !important;padding:12px 14px !important;
+  font-size:14px !important;
+}
+[data-testid="stStatusWidget"]{
+  border-radius:12px !important;
+  border:1px solid rgba(99,102,241,0.22) !important;
+  background:rgba(15,23,42,0.85) !important;
+  max-width:880px;margin:8px auto !important;
+}
+[data-testid="stSpinner"] > div{
+  border-color:rgba(129,140,248,0.35) transparent transparent transparent !important;
+}
 """ + theme_css(theme) + r"""
 </style>
 
@@ -1726,8 +1843,13 @@ div[data-testid="stExpander"] details:hover summary{
       <div class="ring ring2"></div>
       <div class="core"></div>
     </div>
-    <div class="ai-loader-main">Thinking…</div>
-    <div class="ai-loader-sub">Crunching data with semantic intelligence</div>
+    <div class="ai-loader-main">
+      <span class="phase">🧠 Thinking…</span>
+      <span class="phase">🗺️ Mapping semantic layer…</span>
+      <span class="phase">⚡ Running analytics…</span>
+      <span class="phase">✨ Crafting answer…</span>
+    </div>
+    <div class="ai-loader-sub">Semantic NLQ · DuckDB · your data</div>
     <div class="loader-dots"><span></span><span></span><span></span></div>
   </div>
 </div>

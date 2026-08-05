@@ -43,6 +43,8 @@ _FOLLOWUP_EXTRA = [
     "filter", "instead", "what about",
     "how about", "additionally", "too",
     "and what", "show only", "just show",
+    "drill down", "drill into", "break down", "break that down",
+    "deeper", "more detail", "zoom in", "dig into", "slice by", "split by",
 ]
 
 
@@ -149,6 +151,17 @@ SORT_CHANGE_PATTERNS = [
     r"\blimit\s+\d+\b",
 ]
 
+DRILL_DOWN_PATTERNS = [
+    r"\bdrill\s+down\b",
+    r"\bdrill\s+into\b",
+    r"\bbreak\s+(?:that\s+)?down\b",
+    r"\bmore\s+detail\b",
+    r"\bzoom\s+in\b",
+    r"\bdig\s+(?:deeper|into)\b",
+    r"\bslice\s+by\b",
+    r"\bsplit\s+by\b",
+]
+
 NEW_TOPIC_SIGNALS = [
     "new question", "start over", "forget that", "different question",
     "instead show me",
@@ -171,6 +184,9 @@ def classify_followup_intent(question: str, anchor: dict | None) -> str:
         return "new_question"
 
     for p in ADDITIVE_PATTERNS:
+        if re.search(p, q, re.I):
+            return "additive"
+    for p in DRILL_DOWN_PATTERNS:
         if re.search(p, q, re.I):
             return "additive"
     for p in SUBTRACTIVE_PATTERNS:

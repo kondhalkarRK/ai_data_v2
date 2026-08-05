@@ -5,7 +5,9 @@ Semantic-first Query + Chat UI (Master Prompt Sections 5–6).
 from __future__ import annotations
 
 import html
+import random
 import time
+from contextlib import contextmanager
 from datetime import datetime
 
 import pandas as pd
@@ -72,9 +74,12 @@ except Exception:
         pass
 
 try:
-    from core.question_normaliser import detect_oob
+    from core.question_normaliser import detect_oob, detect_followup
 except Exception:
     def detect_oob(q):
+        return False
+
+    def detect_followup(q):
         return False
 
 try:
@@ -100,6 +105,77 @@ try:
     proactive_engine = ProactiveEngine()
 except Exception:
     proactive_engine = None
+
+
+_CHAT_STATUS = {
+    "think": [
+        "🧠 Thinking…",
+        "💭 Reading your question…",
+        "🔍 Checking context…",
+    ],
+    "chat": [
+        "💬 Composing a reply…",
+        "✍️ Wording something helpful…",
+    ],
+    "semantic": [
+        "🗺️ Mapping semantic layer…",
+        "📐 Resolving metrics & dimensions…",
+        "🔗 Matching business glossary…",
+    ],
+    "run": [
+        "⚡ Running analytics…",
+        "🦆 DuckDB is crunching…",
+        "📊 Aggregating your data…",
+    ],
+    "build": [
+        "✨ Crafting your answer…",
+        "📝 Writing insights…",
+        "🎯 Almost there…",
+    ],
+    "surprise": ["✨ Digging for something interesting…"],
+    "okf": ["📚 Checking business knowledge…"],
+    "whatif": ["🔮 Simulating scenario…"],
+}
+
+_DRILL_SIGNALS = (
+    "drill down", "drill into", "break down", "break that down",
+    "deeper", "more detail", "zoom in", "dig into", "slice by", "split by",
+)
+
+
+@contextmanager
+def _chat_working(phase: str = "think", *, heavy: bool = False):
+    """ChatGPT-style working indicator — light spinner or status for data queries."""
+    pool = _CHAT_STATUS.get(phase, _CHAT_STATUS["think"])
+    label = random.choice(pool)
+    if heavy:
+        with st.status(label, expanded=False) as status:
+            yield status
+            status.update(label="✅ Ready", state="complete")
+    else:
+        with st.spinner(label):
+            yield None
+
+
+def _is_followup_or_drill(question: str) -> bool:
+    """Skip incomplete-question prompt when user is clearly refining prior context."""
+    q = (question or "").strip().lower()
+    if not q:
+        return False
+    if any(sig in q for sig in _DRILL_SIGNALS):
+        return True
+    try:
+        if detect_followup(question):
+            return True
+    except Exception:
+        pass
+    try:
+        from core.conversation_state import get_sql_anchor, should_use_anchor
+        if get_sql_anchor() and should_use_anchor(question):
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def _safe_insights(df, limit=4):
@@ -1244,7 +1320,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
 
     # 2. Surprise me
     if detect_surprise_me(q):
-        with st.spinner("✨ Digging for something interesting..."):
+        with _chat_working("surprise"):
             result = run_surprise_analysis(working_df)
         _append_assistant(
             "✨ Here's something interesting I found in your data...",
@@ -1273,7 +1349,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     if not clarification_followup:
         # 4. OOB warm redirect
         if detect_oob(q):
-            with st.spinner("💬 Thinking..."):
+            with _chat_working("think"):
                 reply = _oob_redirect(q, working_df)
             _append_assistant(reply, "oob")
             append_chat_exchange(q, result_summary=None, was_data_query=False)
@@ -1288,23 +1364,24 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             st.rerun()
             return
 
-        # 6. Incomplete → two suggestions (no LLM; one follow-up only)
-        assessment = assess_question_completeness(q, working_df)
-        if assessment.get("incomplete"):
-            sugs = (assessment.get("suggestions") or [])[:2]
-            set_pending_clarification(q, suggestions=sugs)
-            _append_assistant(
-                _clarification_prompt(q, sugs),
-                "clarification",
-                {"suggestions": sugs},
-            )
-            append_chat_exchange(q, result_summary=None, was_data_query=False)
-            st.rerun()
-            return
+        # 6. Incomplete → two suggestions (skip for follow-ups / drill-down)
+        if not _is_followup_or_drill(q):
+            assessment = assess_question_completeness(q, working_df)
+            if assessment.get("incomplete"):
+                sugs = (assessment.get("suggestions") or [])[:2]
+                set_pending_clarification(q, suggestions=sugs)
+                _append_assistant(
+                    _clarification_prompt(q, sugs),
+                    "clarification",
+                    {"suggestions": sugs},
+                )
+                append_chat_exchange(q, result_summary=None, was_data_query=False)
+                st.rerun()
+                return
 
         # Conversational (non-data) — before data path
         if not is_data_question(q, working_df):
-            with st.spinner("💬 Thinking..."):
+            with _chat_working("chat"):
                 reply = _conversational_reply(q, working_df)
             append_chat_exchange(q, result_summary=None, was_data_query=False)
             _append_assistant(reply, "chat")
@@ -1318,7 +1395,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
                 answer_knowledge_question,
             )
             if is_knowledge_question(q):
-                with st.spinner("📚 Checking business knowledge + data..."):
+                with _chat_working("okf"):
                     t0 = time.time()
                     okf_payload = answer_knowledge_question(q, working_df)
                     elapsed = round(time.time() - t0, 2)
@@ -1341,7 +1418,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
 
         # What-if
         if whatif_engine is not None and whatif_engine.detect_whatif_query(q):
-            with st.spinner("🔍 Running scenario..."):
+            with _chat_working("whatif"):
                 scenario = whatif_engine.parse_scenario(q, working_df)
                 result = whatif_engine.run_scenario(working_df, scenario)
             append_chat_exchange(q, result_summary=result.get("narrative"), was_data_query=True)
@@ -1353,8 +1430,10 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             st.rerun()
             return
 
-    # 7. Data query
-    with st.spinner("⚡ Querying your data with semantic layer..."):
+    # 7. Data query — semantic NLQ path
+    with _chat_working("semantic", heavy=True) as status:
+        if status is not None:
+            status.update(label=random.choice(_CHAT_STATUS["run"]))
         t0 = time.time()
         out = run_query(working_df, q)
         if isinstance(out, tuple) and len(out) == 4:
@@ -1433,18 +1512,20 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
 
 
 def render_user_bubble(msg):
+    """Legacy HTML bubble — prefer st.chat_message in render_chat_mode."""
     st.markdown(
         f"""
         <div class="cgpt-row cgpt-row-user chat-msg-gap">
           <div class="cgpt-user-bubble">{html.escape(str(msg.get('content','')))}</div>
         </div>
-        <div class="cgpt-meta cgpt-meta-right">{html.escape(str(msg.get('timestamp','')))}</div>
         """,
         unsafe_allow_html=True,
     )
+    if msg.get("timestamp"):
+        st.caption(msg["timestamp"])
 
 
-def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
+def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
     data = msg.get("data") or {}
     mtype = msg.get("message_type", "chat")
     # Back-compat: old callers may pass bool narration_on
@@ -1466,18 +1547,12 @@ def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
         "error": "assistant-card card-error",
     }.get(mtype, "assistant-card card-chat")
 
-    st.markdown(
-        f"""
-        <div class="cgpt-row cgpt-row-assistant chat-msg-gap">
-          <div class="cgpt-assistant-avatar">✦</div>
-          <div class="{card_cls} cgpt-assistant-card">
-        """,
-        unsafe_allow_html=True,
-    )
-
     if mtype in ("chat", "oob", "clarification", "blocked", "error", "error_friendly"):
         body = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
-        st.markdown(f'<div class="chat-reply-text">{body}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="chat-reply-text {card_cls}">{body}</div>',
+            unsafe_allow_html=True,
+        )
         if mtype == "clarification":
             sugs = (data.get("suggestions") or [])[:2]
             if sugs:
@@ -1623,11 +1698,14 @@ def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
             elif sql:
                 st.caption(sql)
 
-    st.markdown("</div></div>", unsafe_allow_html=True)
-    st.markdown(
-        f'<div class="cgpt-meta">{html.escape(str(msg.get("timestamp","")))}</div>',
-        unsafe_allow_html=True,
-    )
+    if msg.get("timestamp"):
+        st.caption(msg["timestamp"])
+
+
+def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
+    """Back-compat wrapper — renders inside native chat message shell."""
+    with st.chat_message("assistant", avatar="✦"):
+        _render_assistant_content(msg, working_df, view_mode)
 
 
 def render_chat_mode(working_df, tables, dfs):
@@ -1637,8 +1715,9 @@ def render_chat_mode(working_df, tables, dfs):
         st.session_state.chat_answer_mode = "Both" if legacy else "Table"
 
     st.markdown('<div class="cgpt-chat-shell">', unsafe_allow_html=True)
-    chat_box = st.container(height=560, border=False)
+    chat_box = st.container(height=580, border=False)
     with chat_box:
+        st.markdown('<div class="cgpt-thread">', unsafe_allow_html=True)
         if not st.session_state.chat_messages:
             st.markdown(
                 """
@@ -1647,18 +1726,27 @@ def render_chat_mode(working_df, tables, dfs):
                   <div class="cgpt-welcome-title">How can I help with your data?</div>
                   <div class="cgpt-welcome-sub">Ask about revenue, units, makes, regions, EV share — or try
                   <span class="cgpt-chip">surprise me</span></div>
+                  <div class="cgpt-starter-hints">
+                    <span class="cgpt-hint">Show units by make for 2025</span>
+                    <span class="cgpt-hint">Monthly revenue trend</span>
+                    <span class="cgpt-hint">Drill down by region</span>
+                  </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
         else:
+            view_mode = st.session_state.chat_answer_mode
             for msg in st.session_state.chat_messages:
                 if msg.get("role") == "user":
-                    render_user_bubble(msg)
+                    with st.chat_message("user"):
+                        st.markdown(str(msg.get("content", "")))
+                        if msg.get("timestamp"):
+                            st.caption(msg["timestamp"])
                 else:
-                    render_assistant_bubble(
-                        msg, working_df, st.session_state.chat_answer_mode
-                    )
+                    with st.chat_message("assistant", avatar="✦"):
+                        _render_assistant_content(msg, working_df, view_mode)
+        st.markdown("</div>", unsafe_allow_html=True)
         st.markdown('<div id="chat-scroll-anchor"></div>', unsafe_allow_html=True)
 
     _chat_scroll_to_bottom()
@@ -1689,7 +1777,7 @@ def render_chat_mode(working_df, tables, dfs):
                 ):
                     process_chat_message(sugs[1], working_df)
 
-    # Composer: mode picker (Cursor-style) + chat input
+    # Composer — pinned input bar (ChatGPT / Cursor style)
     _mode_labels = {
         "Both": "Narration + Table",
         "Narration": "Narration",
@@ -1699,8 +1787,8 @@ def render_chat_mode(working_df, tables, dfs):
         st.session_state.chat_answer_mode = "Both"
 
     st.markdown('<div class="cgpt-composer">', unsafe_allow_html=True)
-    mode_col, _spacer = st.columns([1.35, 4.65])
-    with mode_col:
+    top_row_l, top_row_r = st.columns([1.35, 4.65])
+    with top_row_l:
         mode = st.selectbox(
             "Answer mode",
             options=list(_mode_labels.keys()),
@@ -1708,6 +1796,12 @@ def render_chat_mode(working_df, tables, dfs):
             label_visibility="collapsed",
             key="chat_answer_mode",
             help="Narration = insight text · Table = table + chart · Narration + Table = both",
+        )
+    with top_row_r:
+        st.markdown(
+            '<div class="cgpt-composer-hint">Enter to send · Follow-ups like '
+            '<em>same but for 2024</em> or <em>drill down by region</em> use prior context</div>',
+            unsafe_allow_html=True,
         )
     st.session_state.chat_narration_on = mode in ("Narration", "Both")
     question = st.chat_input(

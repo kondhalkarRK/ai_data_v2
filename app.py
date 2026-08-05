@@ -1,7 +1,4 @@
 # app.py - AI Data Platform V10
-import base64
-from pathlib import Path
-
 import streamlit as st
 
 from config.settings   import init_session_state
@@ -109,26 +106,9 @@ except Exception:
 _boot_screen.empty()
 
 # ═══════════════════════════════════════════════════════════════
-# MAIN UI HEADER  (logo + title + guide + theme)
+# MAIN UI HEADER  (title + guide + theme)
 # ═══════════════════════════════════════════════════════════════
-_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "capgemini_logo.svg"
-_logo_html = ""
-if _LOGO_PATH.is_file():
-    try:
-        _logo_b64 = base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
-        _logo_html = (
-            f'<img class="brand-capgemini-logo" src="data:image/svg+xml;base64,{_logo_b64}" '
-            'alt="Capgemini" />'
-        )
-    except Exception:
-        _logo_html = '<span class="brand-capgemini-text">Capgemini</span>'
-
-_h0, _h1, _h2, _h3 = st.columns([1.15, 3.55, 1.25, 1.35])
-with _h0:
-    st.markdown(
-        f'<div class="brand-logo-wrap">{_logo_html}</div>',
-        unsafe_allow_html=True,
-    )
+_h1, _h2, _h3 = st.columns([5.4, 1.35, 1.55])
 with _h1:
     st.markdown(
         """
@@ -145,7 +125,8 @@ with _h2:
         unsafe_allow_html=True,
     )
 with _h3:
-    _guide_col, _theme_col = st.columns([0.42, 0.58])
+    st.markdown('<div class="header-toolbar">', unsafe_allow_html=True)
+    _guide_col, _theme_col = st.columns([0.38, 0.62], gap="small")
     with _guide_col:
         with st.popover("ℹ️", help="How to ask questions"):
             st.markdown("#### Ask better questions")
@@ -157,13 +138,15 @@ with _h3:
 - **Top 10** salespeople by **revenue** in **Q3 2025**
 - Compare **EV unit share by year** between **2020 and 2025**
 
-**Avoid (wastes LLM calls or needs clarification):**
-- Vague prompts: *“show sales”*, *“performance”*, *“tell me about EV”*
-- Off-topic: recipes, weather, jokes, general chat unrelated to your data
-- Repeated re-phrasing of the same vague question — pick a suggestion or add **metric + dimension + year**
-- Asking for columns that are not in your uploaded dataset
+**Follow-ups & drill-downs (uses prior context):**
+- *Same but for 2024* · *What about Ford?* · *Drill down by region*
+- *Break that down by month* · *Now show by colour*
 
-**Tip:** Use **Chat** for follow-ups (*“same but for 2024”*). Use **Ask** tab for one-shot SQL analytics.
+**Avoid (wastes LLM calls):**
+- Vague: *“show sales”*, *“performance”*, *“tell me about EV”*
+- Off-topic: recipes, weather, jokes unrelated to your data
+
+**Tip:** Chat remembers your last query — use follow-up phrases instead of re-asking from scratch.
                 """
             )
     with _theme_col:
@@ -176,6 +159,7 @@ with _h3:
             key="ui_theme",
             help="Switch Light / Dark / AI appearance",
         )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 sidebar.render()
 if not st.session_state.dfs:
