@@ -5,7 +5,7 @@ ui/sidebar.py
 import streamlit as st
 
 from core.utils import load_files
-from features.materialized_views import view_store
+from features.question_cache import cache_store
 
 try:
     from semantic.semantic_loader import get_semantic_loader
@@ -22,7 +22,7 @@ except ImportError:
 try:
     from features.okf_knowledge.pdf_extractor import extract_pdf_to_concepts, pdf_extraction_available
     from features.okf_knowledge.okf_store import write_bundle, list_bundles, clear_all_bundles
-    from features.okf_knowledge.okf_retriever import reindex_all, indexed_concept_count
+    from features.okf_knowledge.okf_retriever import reindex_all, indexed_concept_count, clear_index
     _OKF_AVAILABLE = True
 except ImportError:
     _OKF_AVAILABLE = False
@@ -218,46 +218,43 @@ def render():
             st.progress(min(calls / max_calls, 1.0))
             section_spacer()
 
-            c1, c2 = st.columns(2)
-
-            with c1:
-                if st.button("RESET", use_container_width=True, key="sidebar_reset"):
-                    st.session_state.llm_calls    = 0
-                    st.session_state.total_tokens = 0
-                    st.rerun()
-
-            with c2:
-                if st.button("CACHE", use_container_width=True, key="sidebar_cache"):
-                    st.session_state.memory      = {}
-                    st.session_state.last_plan   = None
-                    st.session_state.last_query  = ""
-                    try:
-                        from core.conversation_state import clear_sql_anchor
-                        clear_sql_anchor()
-                    except Exception:
-                        pass
-                    st.rerun()
+            if st.button("RESET", use_container_width=True, key="sidebar_reset"):
+                st.session_state.llm_calls    = 0
+                st.session_state.total_tokens = 0
+                st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
 
         # =========================
-        # MATERIALIZED VIEWS
+        # SAVED QUESTIONS (LLM cost saver)
         # =========================
         with st.container(border=True):
             st.markdown('<div class="sb-views-wrap">', unsafe_allow_html=True)
-            section_title("🗂️ VIEWS")
+            section_title("💾 SAVED QUESTIONS")
             section_spacer()
 
-            active_views = view_store.count_active_views()
+            saved_count = cache_store.count_active()
 
-            status_row("Active", active_views, "#a5b4fc")
+            status_row("Saved", saved_count, "#a5b4fc")
 
             section_spacer()
 
-            if st.button("CLEAR", use_container_width=True, key="sidebar_clear_views"):
-                removed = view_store.clear_all_views()
-                st.success(f"Cleared {removed} view(s)")
+            with st.expander("Recent saved questions", expanded=False):
+                recent = cache_store.list_recent(limit=6)
+                if recent:
+                    for item in recent:
+                        q_text = (item.get("question") or "")[:72]
+                        if len(item.get("question") or "") > 72:
+                            q_text += "…"
+                        tag = "⚡ instant" if item.get("has_result") else "SQL only"
+                        st.caption(f"• {q_text} ({tag})")
+                else:
+                    st.caption("Ask a question once — repeats skip the LLM.")
+
+            if st.button("CLEAR", use_container_width=True, key="sidebar_clear_saved"):
+                removed = cache_store.clear_all()
+                st.success(f"Cleared {removed} saved question(s)")
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -387,35 +384,6 @@ def render():
                 else:
                     st.caption("No queries yet this session.")
 
-        section_spacer()
-
-        # =========================
-        # DOMAIN SCOPE HINT (Prompt 2)
-        # =========================
-        with st.container(border=True):
-
-            section_title("🎯 DOMAIN SCOPE")
-            section_spacer()
-
-            with st.expander("💡 What can I ask?", expanded=False):
-                try:
-                    from core.metric_registry import get_metric_registry
-                    registry = get_metric_registry()
-                    metrics = registry.list_measures() or registry.list_metrics()
-                    st.markdown("**Available Metrics:**")
-                    for m in metrics[:8]:
-                        st.markdown(f"• {m.replace('_', ' ').title()}")
-                    st.markdown("---")
-                    st.markdown("**Example Questions:**")
-                    st.markdown("• *Show revenue by colour for 2023*")
-                    st.markdown("• *Top 10 salespeople by units sold*")
-                    st.markdown("• *What if revenue increased by 20%?*")
-                    st.markdown("• *Find anomalies in my data*")
-                    st.markdown("• *Why is silver performing low?*")
-                except Exception:
-                    st.caption("Ask questions about your uploaded data.")
-
-        # CHANGED: spacer between sections
         section_spacer()
 
         # =========================
@@ -581,7 +549,7 @@ def render():
                     ):
                         removed = clear_all_bundles()
                         try:
-                            reindex_all()
+                            clear_index()
                         except Exception:
                             pass
                         st.success(f"Cleared {removed} document(s)")

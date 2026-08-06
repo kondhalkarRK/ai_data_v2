@@ -1,5 +1,5 @@
 """
-Lightweight test suite for Materialized Views, RAG Query Memory,
+Lightweight test suite for Question Cache, RAG Query Memory,
 and Vector Schema Retrieval. Skips heavy deps when unavailable.
 """
 from __future__ import annotations
@@ -56,15 +56,15 @@ def source(path: str) -> str:
 print("\n=== 1. Static structure ===")
 
 EXPECTED = {
-    "features/materialized_views/view_store.py": {
-        "save_view", "get_view", "is_view_fresh", "clear_expired_views",
-        "clear_all_views", "count_active_views",
+    "features/question_cache/cache_store.py": {
+        "save_entry", "get_entry", "clear_expired", "clear_all",
+        "count_active", "list_recent",
     },
-    "features/materialized_views/view_manager.py": {
-        "build_view_key", "get_or_none", "materialize",
+    "features/question_cache/cache_manager.py": {
+        "build_cache_key", "lookup", "save", "normalize_question",
     },
-    "features/materialized_views/view_triggers.py": {
-        "should_materialize",
+    "features/question_cache/cache_triggers.py": {
+        "should_cache_result",
     },
     "features/rag_query_memory/embedder.py": {
         "get_embedder", "embed_text",
@@ -114,12 +114,12 @@ schema = source("core/schema_builder.py")
 sidebar = source("ui/sidebar.py")
 
 checks = [
-    ("nlq imports view_manager/view_triggers",
-     "view_manager" in nlq and "view_triggers" in nlq),
-    ("nlq materialized cache guard",
-     "view_manager.get_or_none" in nlq and "served from materialized view" in nlq),
-    ("nlq materialize after success",
-     "view_triggers.should_materialize" in nlq and "view_manager.materialize" in nlq),
+    ("nlq imports question cache",
+     "cache_manager" in nlq and "cache_triggers" in nlq),
+    ("nlq saved question cache guard",
+     "cache_manager.lookup" in nlq and "saved question" in nlq),
+    ("nlq saves question after success",
+     "cache_triggers.should_cache_result" in nlq and "cache_manager.save" in nlq),
     ("nlq imports query_memory/glossary_store",
      "query_memory" in nlq and "glossary_store" in nlq),
     ("nlq RAG retrieve k=2",
@@ -139,10 +139,10 @@ checks = [
      "glossary_store.seed_glossary_once()" in app),
     ("app indexes schema when >25 cols",
      "schema_indexer.index_schema_columns(working_df, \"df\")" in app),
-    ("sidebar materialized views UI",
-     "count_active_views" in sidebar and "Clear Materialized Views" in sidebar),
+    ("sidebar saved questions UI",
+     "count_active" in sidebar and "SAVED QUESTIONS" in sidebar),
     ("no second call_llm in feature packages",
-     "call_llm" not in source("features/materialized_views/view_store.py")
+     "call_llm" not in source("features/question_cache/cache_store.py")
      and "call_llm" not in source("features/rag_query_memory/query_memory.py")
      and "call_llm" not in source("features/vector_schema_retrieval/schema_retriever.py")),
 ]
@@ -152,19 +152,18 @@ for name, cond in checks:
 
 
 # ---------------------------------------------------------------------------
-# 3. Materialized Views functional (needs pandas + streamlit)
+# 3. Question Cache functional (needs pandas + streamlit)
 # ---------------------------------------------------------------------------
-print("\n=== 3. Materialized Views functional ===")
+print("\n=== 3. Question Cache functional ===")
 
 if not (has_mod("pandas") and has_mod("streamlit")):
-    skip("materialized views runtime", "pandas/streamlit not installed")
+    skip("question cache runtime", "pandas/streamlit not installed")
 else:
     try:
         import pandas as pd
         import streamlit as st
-        from features.materialized_views import view_store, view_manager, view_triggers
+        from features.question_cache import cache_store, cache_manager, cache_triggers
 
-        # Fake session_state
         class SS(dict):
             def __getattr__(self, k):
                 try:
@@ -178,33 +177,32 @@ else:
 
         df = pd.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
         result = pd.DataFrame({"a": [1], "sum": [6]})
+        sql = "SELECT SUM(a) AS sum FROM df"
 
-        # triggers
-        assert view_triggers.should_materialize("top sales", df, result) is True
-        assert view_triggers.should_materialize("sales today", df, result) is False
-        assert view_triggers.should_materialize("q", df, pd.DataFrame({"x": range(5001)})) is False
-        ok("should_materialize heuristics")
+        assert cache_triggers.should_cache_result("top sales", df, result) is True
+        assert cache_triggers.should_cache_result("sales today", df, result) is False
+        assert cache_triggers.should_cache_result("q", df, pd.DataFrame({"x": range(5001)})) is False
+        ok("should_cache_result heuristics")
 
-        # key stability
-        k1 = view_manager.build_view_key("  Top Sales ", df)
-        k2 = view_manager.build_view_key("top sales", df)
+        k1 = cache_manager.build_cache_key("  Top Sales ", df)
+        k2 = cache_manager.build_cache_key("top sales", df)
         assert k1 == k2 and len(k1) == 64
-        ok("build_view_key normalize+hash")
+        ok("build_cache_key normalize+hash")
 
-        # store/get with temp disk
         with tempfile.TemporaryDirectory() as td:
-            view_store._CACHE_DIR = Path(td)
-            view_manager.materialize("top sales", df, result)
-            got = view_manager.get_or_none("top sales", df)
-            assert got is not None and list(got.columns) == ["a", "sum"]
-            ok("materialize + get_or_none")
-            assert view_store.count_active_views() >= 1
-            ok("count_active_views")
-            n = view_store.clear_all_views()
-            assert n >= 1 and view_manager.get_or_none("top sales", df) is None
-            ok("clear_all_views")
+            cache_store._CACHE_DIR = Path(td)
+            cache_manager.save("top sales", df, sql, result)
+            got = cache_manager.lookup("top sales", df)
+            assert got is not None and got["sql"] == sql
+            assert list(got["result_df"].columns) == ["a", "sum"]
+            ok("save + lookup with result")
+            assert cache_store.count_active() >= 1
+            ok("count_active")
+            n = cache_store.clear_all()
+            assert n >= 1 and cache_manager.lookup("top sales", df) is None
+            ok("clear_all")
     except Exception:
-        fail("materialized views runtime", traceback.format_exc(limit=3))
+        fail("question cache runtime", traceback.format_exc(limit=3))
 
 
 # ---------------------------------------------------------------------------
@@ -236,9 +234,8 @@ try:
         assert len(ex) + len(gl) <= 1000
         ok("combined prompt blocks <= ~250 tokens (1000 chars)")
 
-        # skip materialized-view SQL
-        query_memory.store_successful_query("q", "-- served from materialized view --")
-        ok("store skips materialized-view SQL")
+        query_memory.store_successful_query("q", "-- served from saved question --")
+        ok("store skips saved-question marker SQL")
     else:
         # AST-level: confirm caps exist in source
         qm = source("features/rag_query_memory/query_memory.py")
@@ -312,7 +309,7 @@ else:
 # ---------------------------------------------------------------------------
 print("\n=== 7. Encoding ===")
 for rel in [
-    "features/materialized_views/view_store.py",
+    "features/question_cache/cache_store.py",
     "features/rag_query_memory/query_memory.py",
     "features/vector_schema_retrieval/schema_indexer.py",
     "core/nlq_engine.py",

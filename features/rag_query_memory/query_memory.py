@@ -55,6 +55,8 @@ def store_successful_query(question: str, sql: str, max_len: int = 700) -> None:
             return
         if sql.strip().startswith("-- served from materialized view --"):
             return
+        if sql.strip().startswith("-- served from saved question --"):
+            return
         sql_trunc = embedder.truncate_text(sql, max_len)
         embedding = embedder.embed_text(question)
         if not embedding:

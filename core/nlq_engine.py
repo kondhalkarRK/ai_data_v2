@@ -11,7 +11,7 @@ import streamlit as st
 from core.llm_client import call_llm
 from core.sql_guardrails import sql_is_safe
 from core.schema_builder import build_rich_schema
-from features.materialized_views import view_manager, view_triggers
+from features.question_cache import cache_manager, cache_triggers
 from features.rag_query_memory import query_memory, glossary_store
 from features.vector_schema_retrieval import schema_retriever
 
@@ -660,22 +660,7 @@ def run_query(working_df: pd.DataFrame, question: str, status=None):
         if status is not None:
             status.update(label="🧠 Loading metadata & schema...")
 
-        cached_view = view_manager.get_or_none(question, working_df)
-        if cached_view is not None:
-            if status is not None:
-                status.update(label="⚡ Served from cached materialized view...")
-            evidence = (
-                build_evidence(
-                    "-- served from materialized view --",
-                    cached_view, "cache", question,
-                ) if _EVIDENCE_OK else None
-            )
-            return _pack_return(
-                cached_view, "-- served from materialized view --", None, evidence
-            )
-
         q = enrich_query(question)
-        # Keep original question for anchor classification / evidence
         st.session_state["_original_question"] = question
         cache_key = f"nlq_{question.strip().lower()}"
         if cache_key in st.session_state.memory:
@@ -687,6 +672,42 @@ def run_query(working_df: pd.DataFrame, question: str, status=None):
             )
             update_history(question, {"sql": sql, "evidence": evidence, "execution_path": "cache"})
             return _pack_return(result, sql, err, evidence)
+
+        saved = cache_manager.lookup(question, working_df)
+        if saved is not None:
+            sql = saved["sql"]
+            if saved.get("result_df") is not None:
+                if status is not None:
+                    status.update(label="⚡ Served from saved question...")
+                evidence = (
+                    build_evidence(sql, saved["result_df"], "cache", question)
+                    if _EVIDENCE_OK else None
+                )
+                if evidence is not None:
+                    evidence["resolution_source"] = "saved_question"
+                update_history(
+                    question,
+                    {"sql": sql, "evidence": evidence, "execution_path": "cache"},
+                )
+                return _pack_return(saved["result_df"], sql, None, evidence)
+
+            if status is not None:
+                status.update(label="⚡ Reusing saved SQL (no LLM)...")
+            result, err = run_sql(sql, working_df)
+            if result is not None and not err:
+                if cache_triggers.should_cache_result(question, working_df, result):
+                    cache_manager.save(question, working_df, sql, result)
+                evidence = (
+                    build_evidence(sql, result, "cache", question)
+                    if _EVIDENCE_OK else None
+                )
+                if evidence is not None:
+                    evidence["resolution_source"] = "saved_question"
+                update_history(
+                    question,
+                    {"sql": sql, "evidence": evidence, "execution_path": "cache"},
+                )
+                return _pack_return(result, sql, None, evidence)
 
         # PRIMARY: semantic-enriched LLM SQL (pass original for follow-up routing)
         sql = nlq_to_sql(question, working_df, status=status)
@@ -726,8 +747,12 @@ Fix and return ONLY corrected SQL:"""
 
         if result is not None:
             st.session_state.memory[cache_key] = (result, sql, None)
-            if view_triggers.should_materialize(question, working_df, result):
-                view_manager.materialize(question, working_df, result)
+            cache_manager.save(
+                question,
+                working_df,
+                sql,
+                result if cache_triggers.should_cache_result(question, working_df, result) else None,
+            )
 
             if _EVIDENCE_OK:
                 evidence = build_evidence(sql, result, execution_path, question)

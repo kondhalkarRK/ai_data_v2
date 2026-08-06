@@ -358,40 +358,69 @@ def render_kpi_tab(df: pd.DataFrame):
         return 1 < nunique <= 80
 
     filter_cols = [c for c in filtered_df.columns if _is_filter_col(c)]
-
-    st.markdown('<div class="kpi-filter-row">', unsafe_allow_html=True)
     slots = int(st.session_state.get("kpi_filter_slots", 1))
     slots = 1 if slots < 1 else (2 if slots > 2 else slots)
 
-    applied_labels = []
-    for i in range(slots):
-        c1, c2 = st.columns(2)
+    main_col, filter_col = st.columns([4, 1])
+
+    with filter_col:
+        st.markdown(
+            '<div class="kpi-filter-panel-title">Filters</div>',
+            unsafe_allow_html=True,
+        )
         col_opts = ["— Select column —"] + filter_cols
-        with c1:
+        for i in range(slots):
+            st.markdown(
+                f'<div class="kpi-filter-slot-label">Filter {i + 1}</div>',
+                unsafe_allow_html=True,
+            )
             sel_col = st.selectbox(
-                f"Filter {i + 1} — column",
+                "Column",
                 options=col_opts,
                 key=f"kpi_custom_col_{i + 1}",
+                label_visibility="collapsed",
             )
-        value_opts = ["— Select value —"]
-        if sel_col and sel_col != "— Select column —" and sel_col in filtered_df.columns:
-            series = filtered_df[sel_col]
-            if pd.api.types.is_datetime64_any_dtype(series) or "date" in str(sel_col).lower():
-                years = sorted(pd.to_datetime(series, errors="coerce").dt.year.dropna().unique().astype(int).tolist())
-                value_opts += [str(y) for y in years]
-                # Also allow month labels when filtering a date column as year-only is common
-            else:
-                vals = (
-                    series.dropna().astype(str).value_counts().index.tolist()
-                )
-                value_opts += vals[:80]
-        with c2:
-            sel_val = st.selectbox(
-                f"Filter {i + 1} — value",
+            value_opts = ["— Select value —"]
+            if sel_col and sel_col != "— Select column —" and sel_col in df.columns:
+                series = df[sel_col]
+                if pd.api.types.is_datetime64_any_dtype(series) or "date" in str(sel_col).lower():
+                    years = sorted(
+                        pd.to_datetime(series, errors="coerce")
+                        .dt.year.dropna().unique().astype(int).tolist()
+                    )
+                    value_opts += [str(y) for y in years]
+                else:
+                    vals = series.dropna().astype(str).value_counts().index.tolist()
+                    value_opts += vals[:80]
+            st.selectbox(
+                "Value",
                 options=value_opts,
                 key=f"kpi_custom_val_{i + 1}",
+                label_visibility="collapsed",
             )
 
+        if slots < 2 and st.button("＋ Add filter", key="kpi_add_filter_btn", use_container_width=True):
+            st.session_state.kpi_filter_slots = 2
+            st.rerun()
+        if slots > 1 and st.button("− Remove filter", key="kpi_remove_filter_btn", use_container_width=True):
+            st.session_state.kpi_filter_slots = 1
+            st.session_state.pop("kpi_custom_col_2", None)
+            st.session_state.pop("kpi_custom_val_2", None)
+            st.rerun()
+        if st.button("Clear filters", key="kpi_clear_filters_btn", use_container_width=True):
+            st.session_state.kpi_filter_slots = 1
+            for k in (
+                "kpi_custom_col_1", "kpi_custom_val_1",
+                "kpi_custom_col_2", "kpi_custom_val_2",
+            ):
+                st.session_state.pop(k, None)
+            st.toast("Filters cleared", icon="🧹")
+            st.rerun()
+
+    applied_labels = []
+    for i in range(slots):
+        sel_col = st.session_state.get(f"kpi_custom_col_{i + 1}", "— Select column —")
+        sel_val = st.session_state.get(f"kpi_custom_val_{i + 1}", "— Select value —")
         if (
             sel_col and sel_col != "— Select column —"
             and sel_val and sel_val != "— Select value —"
@@ -405,254 +434,230 @@ def render_kpi_tab(df: pd.DataFrame):
                 filtered_df = filtered_df[series.astype(str) == str(sel_val)]
             applied_labels.append(f"{sel_col} = {sel_val}")
 
-    b1, b2, b3, _ = st.columns([1, 1, 1, 3])
-    with b1:
-        if slots < 2 and st.button("＋ Add filter", key="kpi_add_filter_btn"):
-            st.session_state.kpi_filter_slots = 2
-            st.rerun()
-    with b2:
-        if slots > 1 and st.button("− Remove filter", key="kpi_remove_filter_btn"):
-            st.session_state.kpi_filter_slots = 1
-            st.session_state.pop("kpi_custom_col_2", None)
-            st.session_state.pop("kpi_custom_val_2", None)
-            st.rerun()
-    with b3:
-        if st.button("Clear filters", key="kpi_clear_filters_btn"):
-            st.session_state.kpi_filter_slots = 1
-            for k in (
-                "kpi_custom_col_1", "kpi_custom_val_1",
-                "kpi_custom_col_2", "kpi_custom_val_2",
-            ):
-                st.session_state.pop(k, None)
-            st.toast("Filters cleared", icon="🧹")
-            st.rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
-    if applied_labels:
-        st.caption(f"📌 {' · '.join(applied_labels)} — {filtered_df.shape[0]:,} rows")
-    else:
-        st.caption(f"📌 All data — {filtered_df.shape[0]:,} rows")
-    st.markdown('<hr class="kpi-filter-sep"/>', unsafe_allow_html=True)
-
-    with st.spinner("Computing KPIs…"):
-        kpis = compute_kpis(filtered_df)
-
-    if not kpis:
-        st.info("Could not detect standard KPI columns.")
-        return
-
-    st.markdown(
-        '<div class="kpi-section-title">Executive KPI Summary</div>'
-        '<div class="kpi-section-sub">📊 Live metrics · Zero AI · Pure data</div>',
-        unsafe_allow_html=True,
-    )
-
-    cards: list[tuple] = []
-    order_n = kpis.get("avg_order_n") or kpis.get("total_orders") or len(filtered_df)
-
-    if "revenue" in kpis:
-        cards.append((
-            "💰 TOTAL REVENUE",
-            _fmt_currency(kpis["revenue"]),
-            f"based on {order_n:,} orders",
-            "revenue",
-            None,
-            None,
-        ))
-    if "units_sold" in kpis:
-        cards.append((
-            "🚗 UNITS SOLD",
-            _fmt_number(kpis["units_sold"]),
-            "total vehicle units",
-            "units",
-            None,
-            None,
-        ))
-    if "yoy_growth" in kpis and kpis["yoy_growth"] is not None:
-        g = kpis["yoy_growth"]
-        arrow = "▲" if g >= 0 else "▼"
-        sub = kpis.get("yoy_label") or (
-            f"vs {(kpis.get('yoy_curr_year') or 0) - 1}" if kpis.get("yoy_curr_year") else "year over year"
-        )
-        cards.append((
-            "📈 YOY GROWTH",
-            f"{arrow} {abs(g):.1f}%",
-            sub,
-            "yoy",
-            f"{arrow} {abs(g):.1f}%",
-            g >= 0,
-        ))
-    if "market_share" in kpis:
-        cards.append((
-            "🏷️ MARKET SHARE",
-            f"{kpis['market_share']:.1f}%",
-            "average share",
-            "share",
-            None,
-            None,
-        ))
-    if "best_salesperson" in kpis:
-        cards.append((
-            "🌟 BEST PERSON",
-            kpis["best_salesperson"],
-            f"month {kpis.get('best_salesperson_month', '')}".strip(),
-            "person",
-            None,
-            None,
-        ))
-    if "top_model" in kpis:
-        units = kpis.get("top_model_units")
-        if units is not None:
-            sub = f"{units:,} units sold"
+    with main_col:
+        if applied_labels:
+            st.caption(f"📌 {' · '.join(applied_labels)} — {filtered_df.shape[0]:,} rows")
         else:
-            sub = "by units sold"
-        cards.append((
-            "📦 TOP MODEL BY VOLUME",
-            kpis["top_model"],
-            sub,
-            "model",
-            None,
-            None,
-        ))
-    if "active_regions" in kpis:
-        cards.append((
-            "🌍 ACTIVE REGIONS",
-            str(kpis["active_regions"]),
-            "unique regions",
-            "regions",
-            None,
-            None,
-        ))
-    if "avg_order_value" in kpis:
-        cards.append((
-            "🛒 AVG ORDER VALUE",
-            _fmt_currency(kpis["avg_order_value"]),
-            f"based on {kpis.get('avg_order_n', order_n):,} orders",
-            "aov",
-            None,
-            None,
-        ))
-    if "top_colour" in kpis:
-        cards.append((
-            "🎨 TOP COLOUR",
-            kpis["top_colour"],
-            "by revenue",
-            "colour",
-            None,
-            None,
-        ))
-    if "total_orders" in kpis:
-        cards.append((
-            "📦 TOTAL ORDERS",
-            _fmt_number(kpis["total_orders"]),
-            "distinct orders",
-            "orders",
-            None,
-            None,
-        ))
-    if "rev_per_unit" in kpis:
-        cards.append((
-            "💰 REV PER UNIT",
-            _fmt_currency(kpis["rev_per_unit"]),
-            "revenue ÷ units",
-            "rpu",
-            None,
-            None,
-        ))
-    if "date_range" in kpis:
-        cards.append((
-            "📅 DATE RANGE",
-            kpis["date_range"],
-            kpis["date_range"],
-            "date",
-            None,
-            None,
-        ))
-    if "top_make" in kpis:
-        cards.append((
-            "🏭 TOP MAKE",
-            kpis["top_make"],
-            "by units" if kpis.get("_vol_col") else "by revenue",
-            "make",
-            None,
-            None,
-        ))
+            st.caption(f"📌 All data — {filtered_df.shape[0]:,} rows")
 
-    # Uniform 4-column grid (empty slots stay empty)
-    for i in range(0, len(cards), 4):
-        row = cards[i:i + 4]
-        cols = st.columns(4)
-        for j, col in enumerate(cols):
-            with col:
-                if j < len(row):
-                    label, value, sub, accent, trend, trend_up = row[j]
-                    delay = (i + j) * 0.05
-                    featured = (i + j) == 0
-                    st.markdown(
-                        _kpi_card_html(
-                            label, value, sub, accent, delay, trend, trend_up, featured
-                        ),
-                        unsafe_allow_html=True,
-                    )
+        with st.spinner("Computing KPIs…"):
+            kpis = compute_kpis(filtered_df)
+
+        if not kpis:
+            st.info("Could not detect standard KPI columns.")
+            return
+
         st.markdown(
-            "<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True
+            '<div class="kpi-section-title">Executive KPI Summary</div>'
+            '<div class="kpi-section-sub">📊 Live metrics · Zero AI · Pure data</div>',
+            unsafe_allow_html=True,
         )
 
-    st.markdown("---")
+        cards: list[tuple] = []
+        order_n = kpis.get("avg_order_n") or kpis.get("total_orders") or len(filtered_df)
 
-    with st.expander("📋 Show Detailed KPIs ▼", expanded=False):
-        if "segment_mix" in kpis:
-            st.markdown("#### 🥧 Vehicle Sales Mix by Segment")
-            seg_df = pd.DataFrame([
-                {"Segment": k, "Units Sold": v["units"], "Share %": v["pct"]}
-                for k, v in kpis["segment_mix"].items()
-            ])
-            c1, c2 = st.columns([1, 1])
-            with c1:
-                st.markdown('<div class="kpi-chart-card">', unsafe_allow_html=True)
-                fig = px.pie(
-                    seg_df, names="Segment", values="Units Sold", hole=0.35,
-                    color_discrete_sequence=px.colors.qualitative.Plotly, title="Sales Mix",
-                )
-                fig.update_layout(
-                    margin=dict(l=0, r=0, t=30, b=0),
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-            with c2:
-                st.dataframe(seg_df, use_container_width=True, hide_index=True)
-            st.markdown("---")
-
-        if "top5_models" in kpis:
-            st.markdown("#### 🏎️ Top 5 Models by Revenue")
-            m5_df = pd.DataFrame(kpis["top5_models"])
-            m5_df.columns = ["Model", "Revenue", "Contribution %"]
-            m5_df["Revenue Display"] = m5_df["Revenue"].apply(_fmt_currency)
-            c1, c2 = st.columns([1, 1])
-            with c1:
-                st.markdown('<div class="kpi-chart-card">', unsafe_allow_html=True)
-                fig = px.bar(
-                    m5_df, y="Model", x="Revenue", orientation="h",
-                    text="Revenue Display", color_discrete_sequence=["#818cf8"],
-                    title="Revenue by Model",
-                )
-                fig.update_layout(
-                    margin=dict(l=0, r=0, t=30, b=0),
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-            with c2:
-                st.dataframe(
-                    m5_df[["Model", "Revenue Display", "Contribution %"]],
-                    use_container_width=True, hide_index=True,
-                )
-            st.markdown("---")
-
-        if "fastest_seg" in kpis:
-            st.markdown("#### 🚀 Fastest Growing Segment")
-            st.success(
-                f"**{kpis['fastest_seg']}** grew **{kpis['fastest_seg_pct']}%** YoY"
+        if "revenue" in kpis:
+            cards.append((
+                "💰 TOTAL REVENUE",
+                _fmt_currency(kpis["revenue"]),
+                f"based on {order_n:,} orders",
+                "revenue",
+                None,
+                None,
+            ))
+        if "units_sold" in kpis:
+            cards.append((
+                "🚗 UNITS SOLD",
+                _fmt_number(kpis["units_sold"]),
+                "total vehicle units",
+                "units",
+                None,
+                None,
+            ))
+        if "yoy_growth" in kpis and kpis["yoy_growth"] is not None:
+            g = kpis["yoy_growth"]
+            arrow = "▲" if g >= 0 else "▼"
+            sub = kpis.get("yoy_label") or (
+                f"vs {(kpis.get('yoy_curr_year') or 0) - 1}" if kpis.get("yoy_curr_year") else "year over year"
             )
-            st.markdown("---")
+            cards.append((
+                "📈 YOY GROWTH",
+                f"{arrow} {abs(g):.1f}%",
+                sub,
+                "yoy",
+                f"{arrow} {abs(g):.1f}%",
+                g >= 0,
+            ))
+        if "market_share" in kpis:
+            cards.append((
+                "🏷️ MARKET SHARE",
+                f"{kpis['market_share']:.1f}%",
+                "average share",
+                "share",
+                None,
+                None,
+            ))
+        if "best_salesperson" in kpis:
+            cards.append((
+                "🌟 BEST PERSON",
+                kpis["best_salesperson"],
+                f"month {kpis.get('best_salesperson_month', '')}".strip(),
+                "person",
+                None,
+                None,
+            ))
+        if "top_model" in kpis:
+            units = kpis.get("top_model_units")
+            if units is not None:
+                sub = f"{units:,} units sold"
+            else:
+                sub = "by units sold"
+            cards.append((
+                "📦 TOP MODEL BY VOLUME",
+                kpis["top_model"],
+                sub,
+                "model",
+                None,
+                None,
+            ))
+        if "active_regions" in kpis:
+            cards.append((
+                "🌍 ACTIVE REGIONS",
+                str(kpis["active_regions"]),
+                "unique regions",
+                "regions",
+                None,
+                None,
+            ))
+        if "avg_order_value" in kpis:
+            cards.append((
+                "🛒 AVG ORDER VALUE",
+                _fmt_currency(kpis["avg_order_value"]),
+                f"based on {kpis.get('avg_order_n', order_n):,} orders",
+                "aov",
+                None,
+                None,
+            ))
+        if "top_colour" in kpis:
+            cards.append((
+                "🎨 TOP COLOUR",
+                kpis["top_colour"],
+                "by revenue",
+                "colour",
+                None,
+                None,
+            ))
+        if "total_orders" in kpis:
+            cards.append((
+                "📦 TOTAL ORDERS",
+                _fmt_number(kpis["total_orders"]),
+                "distinct orders",
+                "orders",
+                None,
+                None,
+            ))
+        if "rev_per_unit" in kpis:
+            cards.append((
+                "💰 REV PER UNIT",
+                _fmt_currency(kpis["rev_per_unit"]),
+                "revenue ÷ units",
+                "rpu",
+                None,
+                None,
+            ))
+        if "date_range" in kpis:
+            cards.append((
+                "📅 DATE RANGE",
+                kpis["date_range"],
+                kpis["date_range"],
+                "date",
+                None,
+                None,
+            ))
+        if "top_make" in kpis:
+            cards.append((
+                "🏭 TOP MAKE",
+                kpis["top_make"],
+                "by units" if kpis.get("_vol_col") else "by revenue",
+                "make",
+                None,
+                None,
+            ))
+
+        for i in range(0, len(cards), 4):
+            row = cards[i:i + 4]
+            cols = st.columns(4)
+            for j, col in enumerate(cols):
+                with col:
+                    if j < len(row):
+                        label, value, sub, accent, trend, trend_up = row[j]
+                        delay = (i + j) * 0.05
+                        featured = (i + j) == 0
+                        st.markdown(
+                            _kpi_card_html(
+                                label, value, sub, accent, delay, trend, trend_up, featured
+                            ),
+                            unsafe_allow_html=True,
+                        )
+            st.markdown(
+                "<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True
+            )
+
+        st.markdown("---")
+
+        with st.expander("📋 Show Detailed KPIs ▼", expanded=False):
+            if "segment_mix" in kpis:
+                st.markdown("#### 🥧 Vehicle Sales Mix by Segment")
+                seg_df = pd.DataFrame([
+                    {"Segment": k, "Units Sold": v["units"], "Share %": v["pct"]}
+                    for k, v in kpis["segment_mix"].items()
+                ])
+                c1, c2 = st.columns([1, 1])
+                with c1:
+                    st.markdown('<div class="kpi-chart-card">', unsafe_allow_html=True)
+                    fig = px.pie(
+                        seg_df, names="Segment", values="Units Sold", hole=0.35,
+                        color_discrete_sequence=px.colors.qualitative.Plotly, title="Sales Mix",
+                    )
+                    fig.update_layout(
+                        margin=dict(l=0, r=0, t=30, b=0),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                with c2:
+                    st.dataframe(seg_df, use_container_width=True, hide_index=True)
+                st.markdown("---")
+
+            if "top5_models" in kpis:
+                st.markdown("#### 🏎️ Top 5 Models by Revenue")
+                m5_df = pd.DataFrame(kpis["top5_models"])
+                m5_df.columns = ["Model", "Revenue", "Contribution %"]
+                m5_df["Revenue Display"] = m5_df["Revenue"].apply(_fmt_currency)
+                c1, c2 = st.columns([1, 1])
+                with c1:
+                    st.markdown('<div class="kpi-chart-card">', unsafe_allow_html=True)
+                    fig = px.bar(
+                        m5_df, y="Model", x="Revenue", orientation="h",
+                        text="Revenue Display", color_discrete_sequence=["#818cf8"],
+                        title="Revenue by Model",
+                    )
+                    fig.update_layout(
+                        margin=dict(l=0, r=0, t=30, b=0),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                with c2:
+                    st.dataframe(
+                        m5_df[["Model", "Revenue Display", "Contribution %"]],
+                        use_container_width=True, hide_index=True,
+                    )
+                st.markdown("---")
+
+            if "fastest_seg" in kpis:
+                st.markdown("#### 🚀 Fastest Growing Segment")
+                st.success(
+                    f"**{kpis['fastest_seg']}** grew **{kpis['fastest_seg_pct']}%** YoY"
+                )
+                st.markdown("---")

@@ -1704,7 +1704,7 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
 
 def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
     """Back-compat wrapper — renders inside native chat message shell."""
-    with st.chat_message("assistant", avatar="✦"):
+    with st.chat_message("assistant"):
         _render_assistant_content(msg, working_df, view_mode)
 
 
@@ -1744,7 +1744,7 @@ def render_chat_mode(working_df, tables, dfs):
                         if msg.get("timestamp"):
                             st.caption(msg["timestamp"])
                 else:
-                    with st.chat_message("assistant", avatar="✦"):
+                    with st.chat_message("assistant"):
                         _render_assistant_content(msg, working_df, view_mode)
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown('<div id="chat-scroll-anchor"></div>', unsafe_allow_html=True)

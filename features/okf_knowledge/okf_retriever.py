@@ -32,6 +32,29 @@ def get_okf_collection():
         return None
 
 
+def clear_index() -> int:
+    """Remove all concepts from the OKF vector index. Returns count cleared."""
+    collection = get_okf_collection()
+    if collection is None:
+        return 0
+    try:
+        count = collection.count()
+        if count <= 0:
+            return 0
+        data = collection.get()
+        ids = data.get("ids") or []
+        if ids:
+            collection.delete(ids=ids)
+        return count
+    except Exception:
+        try:
+            client = get_chroma_client()
+            client.delete_collection(_COLLECTION_OKF)
+        except Exception:
+            pass
+        return 0
+
+
 def reindex_all() -> int:
     """
     Re-embed and re-index every concept currently stored on disk
@@ -46,6 +69,7 @@ def reindex_all() -> int:
 
     concepts = read_all_concepts()
     if not concepts:
+        clear_index()
         return 0
 
     indexed = 0

@@ -827,6 +827,14 @@ div[data-testid="stDataFrame"] tbody td{
 }
 .kpi-filter-row{margin-bottom:8px}
 .kpi-filter-sep{border:none;border-top:1px solid rgba(99,102,241,0.1);margin:8px 0 14px 0}
+.kpi-filter-panel-title{
+  font-size:11px;font-weight:700;color:var(--subtext, #64748b);
+  text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px;
+}
+.kpi-filter-slot-label{
+  font-size:10px;font-weight:600;color:var(--subtext, #475569);
+  margin:8px 0 4px 0;
+}
 
 .sql-strip{display:flex;align-items:center;gap:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.008));border-radius:10px;padding:8px;border:1px solid var(--border)}
 .sql-strip .badge{background:rgba(79,124,255,0.12);color:var(--primary);padding:6px 8px;border-radius:6px;font-weight:800}
