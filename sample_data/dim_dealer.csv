@@ -1,0 +1,39 @@
+dealer_id,dealer_code,dealer_name,city,region_id,region_name,state_code,country,dealer_grade,active
+1,DLR-NDL-01,NDL Auto Hub,Delhi NCR,1,North,DL,India,A,True
+2,DLR-NDL-02,NDL Premium Drive,Delhi NCR,1,North,DL,India,B,True
+3,DLR-NDL-03,NDL Express Automotive,Delhi NCR,1,North,DL,India,B,True
+4,DLR-CHD-01,CHD Motors Pvt Ltd,Chandigarh,2,North,CH,India,C,True
+5,DLR-CHD-02,CHD Premium Car World,Chandigarh,2,North,CH,India,A,True
+6,DLR-CHD-03,CHD Express Motors,Chandigarh,2,North,CH,India,A,True
+7,DLR-JPR-01,JPR Motors & Services,Jaipur,3,North,RJ,India,B,True
+8,DLR-JPR-02,JPR Premium Auto Hub,Jaipur,3,North,RJ,India,B,True
+9,DLR-JPR-03,JPR Express Drive,Jaipur,3,North,RJ,India,C,True
+10,DLR-MUM-01,MUM Wheelers,Mumbai,4,West,MH,India,A,True
+11,DLR-MUM-02,MUM Premium Motors Pvt Ltd,Mumbai,4,West,MH,India,A,True
+12,DLR-MUM-03,MUM Express Car World,Mumbai,4,West,MH,India,B,True
+13,DLR-PNQ-01,PNQ Automotive,Pune,5,West,MH,India,B,True
+14,DLR-PNQ-02,PNQ Premium Motors & Services,Pune,5,West,MH,India,C,True
+15,DLR-PNQ-03,PNQ Express Auto Hub,Pune,5,West,MH,India,A,True
+16,DLR-AMD-01,AMD Motors,Ahmedabad,6,West,GJ,India,A,True
+17,DLR-AMD-02,AMD Premium Wheelers,Ahmedabad,6,West,GJ,India,B,True
+18,DLR-AMD-03,AMD Express Motors Pvt Ltd,Ahmedabad,6,West,GJ,India,B,True
+19,DLR-BLR-01,BLR Drive,Bengaluru,7,South,KA,India,C,True
+20,DLR-BLR-02,BLR Premium Automotive,Bengaluru,7,South,KA,India,A,True
+21,DLR-BLR-03,BLR Express Motors & Services,Bengaluru,7,South,KA,India,A,True
+22,DLR-MAA-01,MAA Car World,Chennai,8,South,TN,India,B,True
+23,DLR-MAA-02,MAA Premium Motors,Chennai,8,South,TN,India,B,True
+24,DLR-MAA-03,MAA Express Wheelers,Chennai,8,South,TN,India,C,True
+25,DLR-HYD-01,HYD Auto Hub,Hyderabad,9,South,TS,India,A,True
+26,DLR-HYD-02,HYD Premium Drive,Hyderabad,9,South,TS,India,A,True
+27,DLR-HYD-03,HYD Express Automotive,Hyderabad,9,South,TS,India,B,True
+28,DLR-COK-01,COK Motors Pvt Ltd,Kochi,10,South,KL,India,B,True
+29,DLR-COK-02,COK Premium Car World,Kochi,10,South,KL,India,C,True
+30,DLR-COK-03,COK Express Motors,Kochi,10,South,KL,India,A,True
+31,DLR-CCU-01,CCU Motors & Services,Kolkata,11,East,WB,India,A,True
+32,DLR-CCU-02,CCU Premium Auto Hub,Kolkata,11,East,WB,India,B,True
+33,DLR-BBI-01,BBI Auto Hub,Bhubaneswar,12,East,OD,India,B,True
+34,DLR-BBI-02,BBI Premium Drive,Bhubaneswar,12,East,OD,India,C,True
+35,DLR-IDR-01,IDR Drive,Indore,13,Central,MP,India,A,True
+36,DLR-IDR-02,IDR Premium Automotive,Indore,13,Central,MP,India,A,True
+37,DLR-NAG-01,NAG Automotive,Nagpur,14,Central,MH,India,B,True
+38,DLR-NAG-02,NAG Premium Motors & Services,Nagpur,14,Central,MH,India,B,True

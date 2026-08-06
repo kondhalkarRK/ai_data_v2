@@ -183,6 +183,95 @@ tables:
         type: string
         role: attribute
 
+  dim_targets:
+    type: dimension
+    physical_name: dim_targets
+    display_name: "Sales Targets by Make"
+    grain: "One row per make per month"
+    description: >
+      Monthly unit and revenue targets by vehicle make from Jan 2024 through Dec 2025.
+      Use with fact_sales via make and sales month for plan vs actual analysis.
+    primary_key: target_id
+    columns:
+      target_id:
+        display_name: "Target ID"
+        type: integer
+        role: key
+      year_month:
+        display_name: "Target Month"
+        type: string
+        role: attribute
+        description: "YYYY-MM format, e.g. 2024-06"
+      make:
+        display_name: "Make / Brand"
+        type: string
+        role: attribute
+        references: dim_carline.make
+      target_units:
+        display_name: "Target Units"
+        type: integer
+        role: measure
+      target_revenue:
+        display_name: "Target Revenue"
+        type: decimal
+        role: measure
+      grain:
+        display_name: "Target Grain"
+        type: string
+        role: attribute
+
+  dim_dealer:
+    type: dimension
+    physical_name: dim_dealer
+    display_name: "Dealer Network"
+    grain: "One row per authorized dealer outlet"
+    description: >
+      Dealer master — each dealer maps to a city and sales region (region_id).
+    primary_key: dealer_id
+    columns:
+      dealer_id:
+        display_name: "Dealer ID"
+        type: integer
+        role: key
+      dealer_code:
+        display_name: "Dealer Code"
+        type: string
+        role: attribute
+      dealer_name:
+        display_name: "Dealer Name"
+        type: string
+        role: attribute
+      city:
+        display_name: "City"
+        type: string
+        role: attribute
+        references: dim_region.city
+      region_id:
+        display_name: "Region ID"
+        type: integer
+        role: foreign_key
+        references: dim_region.region_id
+      region_name:
+        display_name: "Region Name"
+        type: string
+        role: attribute
+      state_code:
+        display_name: "State Code"
+        type: string
+        role: attribute
+      country:
+        display_name: "Country"
+        type: string
+        role: attribute
+      dealer_grade:
+        display_name: "Dealer Grade"
+        type: string
+        role: attribute
+      active:
+        display_name: "Active"
+        type: boolean
+        role: attribute
+
 # ══════════════════════════════════════════
 # RELATIONSHIPS
 # ══════════════════════════════════════════
@@ -218,6 +307,9 @@ relationships:
     to_column: region_id
     type: many_to_one
     display_name: "Sales to Region"
+
+# Note: dim_targets and dim_dealer are auxiliary — join in SQL at query time
+# (make + year_month for targets; region_id/city for dealers) to avoid row explosion.
 
 # ══════════════════════════════════════════
 # MEASURES
@@ -355,6 +447,50 @@ measures:
       - basket size
       - value per transaction
 
+  target_units:
+    display_name: "Target Units"
+    description: "Planned unit volume by make and month from dim_targets"
+    expression: "SUM(target_units)"
+    format: "integer"
+    aggregation: sum
+    source_table: dim_targets
+    source_column: target_units
+    synonyms:
+      - target volume
+      - plan units
+      - planned units
+      - budget units
+      - target qty
+      - sales target units
+
+  target_revenue:
+    display_name: "Target Revenue"
+    description: "Planned revenue by make and month from dim_targets"
+    expression: "SUM(target_revenue)"
+    format: "currency"
+    aggregation: sum
+    source_table: dim_targets
+    source_column: target_revenue
+    synonyms:
+      - target sales
+      - plan revenue
+      - budget revenue
+      - revenue target
+      - sales target value
+
+  variance_units:
+    display_name: "Unit Variance vs Target"
+    description: "Actual units minus target units (requires join to dim_targets)"
+    expression: "SUM(order_qty) - SUM(target_units)"
+    format: "integer"
+    aggregation: ratio
+    source_table: fact_sales
+    synonyms:
+      - gap to target
+      - variance units
+      - vs target units
+      - target gap
+
 # ══════════════════════════════════════════
 # DIMENSIONS
 # ══════════════════════════════════════════
@@ -459,6 +595,41 @@ dimensions:
       - market
       - region name
 
+  Dealer:
+    display_name: "Dealer"
+    source_table: dim_dealer
+    attributes:
+      - dealer_name
+      - dealer_code
+      - city
+      - region_name
+      - state_code
+      - dealer_grade
+      - active
+    synonyms:
+      - dealer
+      - dealership
+      - outlet
+      - dealer network
+      - authorized dealer
+      - dealer name
+      - showrooms
+
+  TargetPlan:
+    display_name: "Target Plan"
+    source_table: dim_targets
+    attributes:
+      - year_month
+      - make
+      - grain
+    synonyms:
+      - target
+      - plan
+      - budget
+      - target month
+      - sales plan
+      - monthly target
+
 # ══════════════════════════════════════════
 # HIERARCHIES
 # ══════════════════════════════════════════
@@ -524,6 +695,12 @@ drill_paths:
   - name: "Region Drill"
     path: [Country, Region, State, City]
 
+  - name: "Dealer Drill"
+    path: [Region, City, Dealer Name]
+
+  - name: "Target Drill"
+    path: [Make, Target Month]
+
 # ══════════════════════════════════════════
 # BUSINESS ENTITIES
 # ══════════════════════════════════════════
@@ -548,3 +725,11 @@ business_entities:
   - name: "Region"
     table: dim_region
     description: "A geographic sales region / city"
+
+  - name: "Sales Target"
+    table: dim_targets
+    description: "Monthly unit/revenue plan by make (2024–2025)"
+
+  - name: "Dealer"
+    table: dim_dealer
+    description: "Authorized dealer outlet mapped to city and region"

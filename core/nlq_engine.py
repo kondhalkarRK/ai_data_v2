@@ -588,6 +588,17 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
     except Exception:
         pass
 
+    aux_tables = "none"
+    try:
+        names = [
+            k for k, v in (st.session_state.get("dfs") or {}).items()
+            if isinstance(v, pd.DataFrame) and k not in ("df",)
+        ]
+        if names:
+            aux_tables = ", ".join(sorted(names))
+    except Exception:
+        pass
+
     # OKF business-document context — disabled (OKF_ENABLED)
     okf_block = ""
     try:
@@ -648,6 +659,13 @@ RULES:
     ORDER BY units_gained DESC LIMIT 10.
 17. EV / electric vehicle / electric car / "ev car" / BEV → filter engine_type = 'Electric' (exact).
     Do NOT use Hybrid unless the user says electrified. Prefer SUM(order_qty) for EV volume/share.
+18. Target / plan / vs target: use dim_targets (monthly by make, year_month YYYY-MM).
+    Join fact_sales → dim_carline ON carline_id, then dim_targets ON make AND strftime('%Y-%m', sales_date) = year_month.
+    Actual units = SUM(order_qty); target = SUM(target_units); variance = actual - target.
+19. Dealer questions: use dim_dealer joined to dim_region ON region_id OR city.
+    Count dealers with COUNT(dealer_id); list dealer_name, city, dealer_grade. Active only: WHERE active = true.
+
+AUXILIARY TABLES (also registered in DuckDB): {aux_tables}
 
 NAME COLUMNS DETECTED: {name_cols}
 
@@ -670,6 +688,13 @@ def run_sql(sql: str, df: pd.DataFrame) -> tuple[pd.DataFrame | None, str | None
     try:
         con = duckdb.connect()
         con.register("df", df)
+        try:
+            extra = st.session_state.get("dfs") or {}
+            for tname, tdf in extra.items():
+                if isinstance(tdf, pd.DataFrame) and not tdf.empty:
+                    con.register(str(tname), tdf)
+        except Exception:
+            pass
         result = con.execute(sql.strip()).df()
         con.close()
         result = format_result_dates(result)

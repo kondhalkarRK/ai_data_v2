@@ -531,6 +531,123 @@ terms:
     category: Geography
     maps_to_dimension: Region
 
+  Target Units:
+    definition: >
+      Planned monthly vehicle unit volume by make from dim_targets (Jan 2024–Dec 2025).
+      Compare to actuals via SUM(order_qty) from fact_sales joined on make and month.
+    sql_expression: "SUM(target_units)"
+    aggregation: "SUM"
+    source_column: "target_units"
+    source_table: "dim_targets"
+    format: "integer"
+    display_label: "Target Units"
+    synonyms:
+      - target volume
+      - plan units
+      - planned units
+      - budget units
+      - sales target
+      - unit target
+      - monthly target units
+    calculation_rules:
+      - Join dim_targets on make = dim_carline.make AND strftime('%Y-%m', sales_date) = year_month
+      - Use dim_targets table for plan; fact_sales for actual
+      - Filter year_month between 2024-01 and 2025-12 for target file coverage
+    related_terms:
+      - Units Sold
+      - Target Revenue
+      - Target vs Actual
+    example_questions:
+      - "Tata target vs actual for 2024"
+      - "Monthly target units by make"
+      - "Are we hitting target for Maruti in Q3 2025"
+      - "Gap to target by make"
+    category: Planning
+    maps_to_measure: target_units
+
+  Target Revenue:
+    definition: >
+      Planned monthly revenue by make from dim_targets. Pair with SUM(total_sales) for plan vs actual revenue.
+    sql_expression: "SUM(target_revenue)"
+    aggregation: "SUM"
+    source_column: "target_revenue"
+    source_table: "dim_targets"
+    format: "currency"
+    display_label: "Target Revenue"
+    synonyms:
+      - plan revenue
+      - budget revenue
+      - revenue target
+      - sales target value
+      - target sales
+    calculation_rules:
+      - Same join as Target Units — make + year_month
+    related_terms:
+      - Revenue
+      - Target Units
+    example_questions:
+      - "Revenue target vs actual for Hyundai 2025"
+      - "Target revenue by make for last month"
+    category: Planning
+    maps_to_measure: target_revenue
+
+  Target vs Actual:
+    definition: >
+      Compare planned performance (dim_targets) to actual sales (fact_sales) by make and month.
+      Variance = actual units minus target units; variance_pct = (actual - target) / target * 100.
+    sql_expression: >
+      SUM(order_qty) - SUM(target_units)
+    format: "integer"
+    display_label: "Variance vs Target"
+    synonyms:
+      - vs target
+      - against target
+      - plan vs actual
+      - target alignment
+      - gap to target
+      - behind plan
+      - ahead of plan
+      - on track
+    calculation_rules:
+      - JOIN fact_sales → dim_carline ON carline_id → dim_targets ON make AND strftime('%Y-%m', sales_date) = year_month
+      - Group by make and/or year_month as requested
+      - Behind plan when actual < target; ahead when actual > target
+    example_questions:
+      - "Which makes are behind target in 2025"
+      - "Tata actual vs target by month"
+      - "Show target vs actual units by make for 2024"
+    category: Planning
+
+  Dealer:
+    definition: >
+      Authorized sales outlet from dim_dealer. Each dealer maps to a city and region_id (same city as dim_region).
+      Join dealers to sales geography via region_id or city — not via fact_sales directly unless dealer_id exists.
+    source_table: "dim_dealer"
+    source_column: "dealer_name"
+    display_label: "Dealer"
+    synonyms:
+      - dealer
+      - dealership
+      - outlet
+      - dealer network
+      - authorized dealer
+      - showroom
+      - dealers in city
+    calculation_rules:
+      - Join dim_dealer.region_id = dim_region.region_id OR dim_dealer.city = dim_region.city
+      - Count dealers with COUNT(dealer_id); filter active = true when asked for active dealers
+      - For sales by dealer city, join fact_sales → dim_region → dim_dealer on city or region_id
+    related_terms:
+      - Region
+      - City
+    example_questions:
+      - "How many dealers in Mumbai"
+      - "List dealers by city"
+      - "Dealers in South region"
+      - "Grade A dealers in Bengaluru"
+    category: Network
+    maps_to_dimension: Dealer
+
 sql_patterns:
   top_n_query:
     description: "When user asks for top/best/highest N"
@@ -620,6 +737,9 @@ domain_rules:
     - "top selling / best selling / most sold / top car / most popular → SUM(order_qty) ordered DESC — never SUM(total_sales)"
     - "gained/lost/changed most between YEAR1 and YEAR2 → pivot both years + diff column (units_YEAR1, units_YEAR2, units_gained); never collapse into one total"
     - "EV / electric vehicle / electric car / ev car → WHERE engine_type = 'Electric'"
+    - "target / plan / budget / vs target → use dim_targets; join on make AND strftime('%Y-%m', sales_date) = year_month"
+    - "dealer / dealership / outlet → use dim_dealer; join to dim_region on region_id or city"
+    - "dim_targets and dim_dealer are registered DuckDB tables alongside df; use multi-table SQL when needed"
   never_rules:
     - Never use price_per_unit for revenue
     - Never average total_sales directly

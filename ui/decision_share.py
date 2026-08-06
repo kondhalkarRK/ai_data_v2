@@ -394,6 +394,7 @@ def render_proactive_landing(working_df: pd.DataFrame, insights: list[dict], on_
                 f'</div>',
                 unsafe_allow_html=True,
             )
+            sq = ins.get("suggested_question")
             if sq and st.button("Explore →", key=f"dr_proactive_{i}", use_container_width=True):
                 if callable(on_ask):
                     on_ask(sq)

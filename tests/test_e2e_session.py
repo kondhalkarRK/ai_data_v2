@@ -58,6 +58,8 @@ try:
         "dim_carline": pd.read_csv(sample / "dim_carline.csv"),
         "dim_color": pd.read_csv(sample / "dim_color.csv"),
         "dim_salesman": pd.read_csv(sample / "dim_salesman.csv"),
+        "dim_targets": pd.read_csv(sample / "dim_targets.csv"),
+        "dim_dealer": pd.read_csv(sample / "dim_dealer.csv"),
     }
     st.session_state.dfs = dfs
     st.session_state.join_mode = "auto"
