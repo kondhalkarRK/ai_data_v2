@@ -338,11 +338,36 @@ class SemanticLoader:
         self._ensure_loaded()
         result = []
         for rel in self.get_relationships():
-            result.append(
+            line = (
                 f"{rel['from_table']}.{rel['from_column']} "
                 f"-> {rel['to_table']}.{rel['to_column']}"
             )
+            if rel.get("auto_join") is False:
+                line += " [query-time join]"
+            if rel.get("join_condition"):
+                cond = " ".join(str(rel["join_condition"]).split())
+                line += f" WHERE {cond}"
+            if rel.get("path"):
+                line += f"  path: {' -> '.join(rel['path'])}"
+            result.append(line)
         return result
+
+    def get_join_paths(self) -> dict:
+        """Documented multi-table join recipes (e.g. target vs actual)."""
+        self._ensure_loaded()
+        return self._model.get("join_paths") or {}
+
+    def get_join_path_strings(self) -> list[str]:
+        self._ensure_loaded()
+        lines = []
+        for name, spec in (self.get_join_paths() or {}).items():
+            desc = spec.get("description") or name
+            tables = ", ".join(spec.get("tables") or [])
+            sql = " ".join(str(spec.get("join_sql") or "").split())
+            lines.append(f"{name}: {desc} [{tables}]")
+            if sql:
+                lines.append(f"  SQL: {sql}")
+        return lines
 
     # ── Metric registry accessors ────────────────────────────────
 

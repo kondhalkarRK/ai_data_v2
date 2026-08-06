@@ -16,8 +16,12 @@ def call_llm(prompt: str) -> str | None:
 
 
 def call_llm_narration(prompt: str) -> str | None:
-    """Higher token budget for executive narrations grounded in result data."""
-    return _invoke_llm(prompt, max_completion_tokens=1500)
+    """Compact narration budget — use only when explicitly enabled or requested."""
+    try:
+        from config.constants import NARRATION_MAX_COMPLETION_TOKENS
+    except ImportError:
+        NARRATION_MAX_COMPLETION_TOKENS = 400
+    return _invoke_llm(prompt, max_completion_tokens=NARRATION_MAX_COMPLETION_TOKENS)
 
 
 def _invoke_llm(prompt: str, *, max_completion_tokens: int) -> str | None:

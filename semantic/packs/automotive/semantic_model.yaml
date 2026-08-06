@@ -308,8 +308,61 @@ relationships:
     type: many_to_one
     display_name: "Sales to Region"
 
-# Note: dim_targets and dim_dealer are auxiliary — join in SQL at query time
-# (make + year_month for targets; region_id/city for dealers) to avoid row explosion.
+  - name: carline_to_targets
+    from_table: dim_carline
+    from_column: make
+    to_table: dim_targets
+    to_column: make
+    type: many_to_one
+    auto_join: false
+    display_name: "Vehicle Make → Monthly Targets"
+    join_condition: >
+      dim_carline.make = dim_targets.make
+      AND strftime('%Y-%m', fact_sales.sales_date) = dim_targets.year_month
+    path: [fact_sales, dim_carline, dim_targets]
+
+  - name: region_to_dealer
+    from_table: dim_region
+    from_column: region_id
+    to_table: dim_dealer
+    to_column: region_id
+    type: one_to_many
+    auto_join: false
+    display_name: "Region → Dealers"
+    path: [dim_region, dim_dealer]
+
+  - name: city_to_dealer
+    from_table: dim_region
+    from_column: city
+    to_table: dim_dealer
+    to_column: city
+    type: one_to_many
+    auto_join: false
+    display_name: "City → Dealers"
+    path: [dim_region, dim_dealer]
+
+join_paths:
+  target_vs_actual:
+    description: "Compare actual sales to monthly make targets (2024–2025)"
+    tables: [fact_sales, dim_carline, dim_targets]
+    join_sql: >
+      fact_sales fs
+      JOIN dim_carline dc ON fs.carline_id = dc.carline_id
+      JOIN dim_targets dt ON dc.make = dt.make
+        AND strftime('%Y-%m', fs.sales_date) = dt.year_month
+  dealer_network:
+    description: "Dealer outlets mapped to city and region"
+    tables: [dim_dealer, dim_region]
+    join_sql: >
+      dim_dealer dd
+      JOIN dim_region dr ON dd.region_id = dr.region_id
+  sales_with_dealer_geo:
+    description: "Sales attributed to dealer cities via region"
+    tables: [fact_sales, dim_region, dim_dealer]
+    join_sql: >
+      fact_sales fs
+      JOIN dim_region dr ON fs.region_id = dr.region_id
+      JOIN dim_dealer dd ON dd.region_id = dr.region_id
 
 # ══════════════════════════════════════════
 # MEASURES

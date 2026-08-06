@@ -53,6 +53,11 @@ MAX_EVIDENCE_HISTORY = 20
 # OKF business-document RAG — disabled until re-wired (see features/okf_knowledge/)
 OKF_ENABLED = False
 
+# Narration — rule-based default for speed/cost; LLM only when user asks explain/why
+NARRATION_USE_LLM = False
+NARRATION_MAX_COMPLETION_TOKENS = 400
+NARRATION_MAX_SAMPLE_ROWS = 12
+
 # Registry
 METRIC_REGISTRY_PATH = "semantic/metric_registry.yaml"
 

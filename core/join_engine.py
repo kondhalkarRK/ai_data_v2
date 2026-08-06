@@ -315,6 +315,8 @@ def _build_semantic_join_sql(
     while changed:
         changed = False
         for rel in relationships:
+            if rel.get("auto_join") is False:
+                continue
             from_t = rel["from_table"]
             to_t   = rel["to_table"]
 

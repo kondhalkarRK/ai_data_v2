@@ -17,6 +17,15 @@ try:
 except ImportError:
     OKF_ENABLED = False
 
+try:
+    from config.constants import (
+        NARRATION_USE_LLM,
+        NARRATION_MAX_SAMPLE_ROWS,
+    )
+except ImportError:
+    NARRATION_USE_LLM = False
+    NARRATION_MAX_SAMPLE_ROWS = 12
+
 
 class NarrationEngine:
     def format_value(self, value, format_type: str = "decimal") -> str:
@@ -77,11 +86,23 @@ class NarrationEngine:
             return q[:87].rstrip() + "…"
         return q
 
+    @staticmethod
+    def _wants_llm_narration(question: str) -> bool:
+        q = (question or "").lower()
+        return any(
+            w in q
+            for w in (
+                "why ", "explain", "how come", "interpret",
+                "tell me more", "what caused", "deep dive",
+            )
+        )
+
     def _join_paras(self, parts: list[str]) -> str:
         return "\n\n".join(p.strip() for p in parts if p and str(p).strip())
 
-    def _build_data_context(self, result_df: pd.DataFrame, max_rows: int = 50) -> str:
-        """Rich tabular + numeric summary for LLM narration (high token, high signal)."""
+    def _build_data_context(self, result_df: pd.DataFrame, max_rows: int | None = None) -> str:
+        """Compact tabular summary for optional LLM narration."""
+        cap = max_rows if max_rows is not None else NARRATION_MAX_SAMPLE_ROWS
         lines = [
             f"Shape: {len(result_df)} rows × {result_df.shape[1]} columns",
             f"Columns: {', '.join(str(c) for c in result_df.columns)}",
@@ -165,38 +186,22 @@ class NarrationEngine:
             if evidence and evidence.get("execution_path"):
                 sql_hint = f"Query path: {evidence.get('execution_path')}"
 
-            prompt = f"""You are a senior automotive sales analyst briefing leadership.
+            prompt = f"""You are a concise sales analyst. Answer ONLY from the data below.
 
-USER QUESTION:
-"{question}"
-
+QUESTION: "{question}"
 {sql_hint}
 
-QUERY RESULT DATA:
+DATA:
 {data_ctx}
 
-Write an impactful executive narration grounded ONLY in the numbers above.
-Do not invent columns, brands, or figures not present in the data.
+Format (keep brief — max ~120 words total):
 
-Use this exact structure:
+HEADLINE: one line with the key number
+NARRATIVE: 1–2 short paragraphs with specific values
+FINDINGS: 2–3 bullets with numbers
+RECOMMENDATION: one follow-up action
 
-HEADLINE:
-One sharp line with the main number or ranking (specific, not generic).
-
-NARRATIVE:
-3–5 short paragraphs covering:
-- Direct answer to the question with cited values
-- Concentration / spread (leader vs laggard, share %, trend direction)
-- Business implication (what this means for sales leadership)
-- Risk or opportunity the data exposes
-
-FINDINGS:
-- 3–5 bullet points, each with a concrete number from the table
-
-RECOMMENDATION:
-One specific follow-up question or action (e.g. drill by region, compare YoY)
-
-Rules: Be specific. Use ₹ for revenue when relevant. No fluff. No markdown fences."""
+No markdown fences. No invented figures."""
 
             text = call_llm_narration(prompt)
             parsed = self._parse_llm_narration(text or "", question)
@@ -231,7 +236,9 @@ Rules: Be specific. Use ₹ for revenue when relevant. No fluff. No markdown fen
                 "knowledge_citations": [],
             }
 
-        llm_narr = self._generate_llm_narration(result_df, question, evidence)
+        llm_narr = None
+        if NARRATION_USE_LLM or self._wants_llm_narration(question):
+            llm_narr = self._generate_llm_narration(result_df, question, evidence)
         if llm_narr:
             return llm_narr
 

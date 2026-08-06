@@ -123,6 +123,20 @@ class SemanticContextBuilder:
                 )
             lines.append("")
 
+        rels = loader.get_relationship_strings()
+        if rels:
+            lines.append("TABLE RELATIONSHIPS:")
+            for r in rels:
+                lines.append(f"  {r}")
+            lines.append("")
+
+        join_paths = loader.get_join_path_strings()
+        if join_paths:
+            lines.append("JOIN PATHS (multi-table):")
+            for jp in join_paths:
+                lines.append(f"  {jp}")
+            lines.append("")
+
         lines.append("═══════════════════════════════════════════════")
         return "\n".join(lines)
 
