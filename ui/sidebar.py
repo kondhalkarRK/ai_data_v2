@@ -20,12 +20,19 @@ except ImportError:
     _PACKS_AVAILABLE = False
 
 try:
-    from features.okf_knowledge.pdf_extractor import extract_pdf_to_concepts, pdf_extraction_available
-    from features.okf_knowledge.okf_store import write_bundle, list_bundles, clear_all_bundles
-    from features.okf_knowledge.okf_retriever import reindex_all, indexed_concept_count, clear_index
-    _OKF_AVAILABLE = True
+    from config.constants import OKF_ENABLED
 except ImportError:
-    _OKF_AVAILABLE = False
+    OKF_ENABLED = False
+
+# OKF imports disabled — wire back when OKF_ENABLED = True
+_OKF_AVAILABLE = False
+# try:
+#     from features.okf_knowledge.pdf_extractor import extract_pdf_to_concepts, pdf_extraction_available
+#     from features.okf_knowledge.okf_store import write_bundle, list_bundles, clear_all_bundles
+#     from features.okf_knowledge.okf_retriever import reindex_all, indexed_concept_count, clear_index
+#     _OKF_AVAILABLE = OKF_ENABLED
+# except ImportError:
+#     _OKF_AVAILABLE = False
 
 
 # ==========================================================
@@ -445,9 +452,9 @@ def render():
         # CHANGED: spacer between sections
 
         # =========================
-        # KNOWLEDGE BASE — OKF
+        # KNOWLEDGE BASE — OKF (disabled — OKF_ENABLED in config/constants.py)
         # =========================
-        if _OKF_AVAILABLE:
+        if False and _OKF_AVAILABLE:
             with st.container(border=True):
                 section_title("📚 KNOWLEDGE BASE (OKF)")
                 section_spacer()

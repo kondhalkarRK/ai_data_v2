@@ -1,5 +1,11 @@
 # features/okf_knowledge/__init__.py
-"""Open Knowledge Format (OKF) — business document RAG for narratives & policy Q&A."""
+"""
+Open Knowledge Format (OKF) — business document RAG.
+
+TEMPORARILY DISABLED AT APP LEVEL — set OKF_ENABLED = True in
+config/constants.py and uncomment sidebar OKF imports to re-wire.
+Module code is retained for future integration.
+"""
 
 __all__ = [
     "get_relevant_context",

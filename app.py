@@ -174,7 +174,13 @@ except Exception:
     pass
 
 # Auto-seed India PV SOPs into OKF when the knowledge index is empty
-if not st.session_state.get("_okf_autosseed_done"):
+# OKF disabled — re-enable via config.constants.OKF_ENABLED
+try:
+    from config.constants import OKF_ENABLED
+except ImportError:
+    OKF_ENABLED = False
+
+if OKF_ENABLED and not st.session_state.get("_okf_autosseed_done"):
     try:
         from features.okf_knowledge.okf_answer import ensure_okf_ready
         ensure_okf_ready()

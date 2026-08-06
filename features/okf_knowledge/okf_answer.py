@@ -1,5 +1,6 @@
 # features/okf_knowledge/okf_answer.py
 #
+# TEMPORARILY DISABLED AT APP LEVEL — OKF_ENABLED = False in config/constants.py
 # Knowledge-first answers from OKF SOPs + light data checks.
 # Used when users ask policy / demand / interpretation questions
 # (e.g. "is EV demand increasing?") instead of pure SQL listings.

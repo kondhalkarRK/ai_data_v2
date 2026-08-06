@@ -20,6 +20,11 @@ from core.llm_client import call_llm
 from ui.safe_display import safe_dataframe
 
 try:
+    from config.constants import OKF_ENABLED
+except ImportError:
+    OKF_ENABLED = False
+
+try:
     from core.incomplete_question import assess_question_completeness
 except Exception:
     def assess_question_completeness(question, df=None):
@@ -480,32 +485,33 @@ def render_ask_mode(working_df, tables, dfs):
             whatif_engine.generate_interactive_result(result, q, working_df, scenario)
             return
 
-        # Knowledge / SOP questions (e.g. EV demand) — answer with OKF + data
-        try:
-            from features.okf_knowledge.okf_answer import (
-                is_knowledge_question,
-                answer_knowledge_question,
-            )
-            if is_knowledge_question(q) and not _is_followup_or_drill(q):
-                status.update(label="📚 Business knowledge + data...")
-                okf_payload = answer_knowledge_question(q, working_df)
-                if okf_payload and isinstance(okf_payload.get("result_df"), pd.DataFrame):
-                    elapsed = round(time.time() - start, 2)
-                    status.update(label="✅ Done", state="complete", expanded=False)
-                    bundle = {
-                        "result_df": okf_payload["result_df"],
-                        "sql": okf_payload.get("sql") or "",
-                        "evidence": okf_payload.get("evidence"),
-                        "elapsed": elapsed,
-                        "question": q,
-                        "narration": okf_payload.get("narration"),
-                    }
-                    st.session_state["ask_last_bundle"] = bundle
-                    st.session_state["editable_sql"] = (okf_payload.get("sql") or "").strip()
-                    _render_ask_bundle(bundle, working_df)
-                    return
-        except Exception:
-            pass
+        # OKF knowledge path — disabled (OKF_ENABLED in config/constants.py)
+        if OKF_ENABLED:
+            try:
+                from features.okf_knowledge.okf_answer import (
+                    is_knowledge_question,
+                    answer_knowledge_question,
+                )
+                if is_knowledge_question(q) and not _is_followup_or_drill(q):
+                    status.update(label="📚 Business knowledge + data...")
+                    okf_payload = answer_knowledge_question(q, working_df)
+                    if okf_payload and isinstance(okf_payload.get("result_df"), pd.DataFrame):
+                        elapsed = round(time.time() - start, 2)
+                        status.update(label="✅ Done", state="complete", expanded=False)
+                        bundle = {
+                            "result_df": okf_payload["result_df"],
+                            "sql": okf_payload.get("sql") or "",
+                            "evidence": okf_payload.get("evidence"),
+                            "elapsed": elapsed,
+                            "question": q,
+                            "narration": okf_payload.get("narration"),
+                        }
+                        st.session_state["ask_last_bundle"] = bundle
+                        st.session_state["editable_sql"] = (okf_payload.get("sql") or "").strip()
+                        _render_ask_bundle(bundle, working_df)
+                        return
+            except Exception:
+                pass
 
         status.update(label="🧭 Resolving with semantic layer...")
         out = run_query(working_df, q, status=status)
@@ -1185,7 +1191,7 @@ def _conversational_reply(
         glossary_bits = ""
 
     okf_bits = ""
-    if use_okf:
+    if use_okf and OKF_ENABLED:
         try:
             from features.okf_knowledge.okf_answer import ensure_okf_ready
             from features.okf_knowledge.okf_retriever import get_relevant_context
@@ -1222,7 +1228,7 @@ Semantic terms available:
 {glossary_bits}
 
 Business knowledge (SOPs) — use when relevant and cite document IDs:
-{okf_bits or "(none indexed — suggest seeding SOPs from the sidebar)"}
+{okf_bits or "(OKF disabled — using semantic YAML + data only)"}
 
 Conversation history:
 {history}
@@ -1388,39 +1394,40 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         # Conversational (non-data) — before data path
         if not is_data_question(q, working_df):
             with _chat_working("chat"):
-                reply = _conversational_reply(q, working_df, use_okf=narration_on)
+                reply = _conversational_reply(q, working_df, use_okf=OKF_ENABLED and narration_on)
             append_chat_exchange(q, result_summary=None, was_data_query=False)
             _append_assistant(reply, "chat")
             st.rerun()
             return
 
-        # Knowledge / SOP questions (EV demand, COVID narrative, reporting policy)
-        try:
-            from features.okf_knowledge.okf_answer import (
-                is_knowledge_question,
-                answer_knowledge_question,
-            )
-            if narration_on and is_knowledge_question(q) and not _is_followup_or_drill(q):
-                with _chat_working("okf"):
-                    t0 = time.time()
-                    okf_payload = answer_knowledge_question(q, working_df)
-                    elapsed = round(time.time() - t0, 2)
-                if okf_payload:
-                    narr = okf_payload.get("narration") or {}
-                    append_chat_exchange(
-                        q,
-                        result_summary=okf_payload.get("result_summary"),
-                        was_data_query=True,
-                    )
-                    _append_assistant(
-                        narr.get("summary") or "Here's the business knowledge answer.",
-                        "query",
-                        {**okf_payload, "elapsed": elapsed},
-                    )
-                    st.rerun()
-                    return
-        except Exception:
-            pass
+        # OKF knowledge path — disabled (OKF_ENABLED in config/constants.py)
+        if OKF_ENABLED:
+            try:
+                from features.okf_knowledge.okf_answer import (
+                    is_knowledge_question,
+                    answer_knowledge_question,
+                )
+                if narration_on and is_knowledge_question(q) and not _is_followup_or_drill(q):
+                    with _chat_working("okf"):
+                        t0 = time.time()
+                        okf_payload = answer_knowledge_question(q, working_df)
+                        elapsed = round(time.time() - t0, 2)
+                    if okf_payload:
+                        narr = okf_payload.get("narration") or {}
+                        append_chat_exchange(
+                            q,
+                            result_summary=okf_payload.get("result_summary"),
+                            was_data_query=True,
+                        )
+                        _append_assistant(
+                            narr.get("summary") or "Here's the business knowledge answer.",
+                            "query",
+                            {**okf_payload, "elapsed": elapsed},
+                        )
+                        st.rerun()
+                        return
+            except Exception:
+                pass
 
         # What-if
         if whatif_engine is not None and whatif_engine.detect_whatif_query(q):
@@ -1480,8 +1487,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     except Exception:
         pass
 
-    force = _should_force_narration(q)
-    want_narr = narration_on or force
+    want_narr = narration_on  # Table = skip LLM narration; Narration/Both = generate
     narr = _safe_narration(df_result, q, evidence) if want_narr else None
     summary = (narr or {}).get("result_summary") or (
         f"{len(df_result)} rows returned" if isinstance(df_result, pd.DataFrame) else "Done"
@@ -1512,6 +1518,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             "narration": narr,
             "result_summary": summary,
             "force_narration": want_narr,
+            "answer_mode": st.session_state.get("chat_answer_mode", "Both"),
             "source_question": q,
             "glossary_matches": list(st.session_state.get("last_glossary_matches") or []),
             "elapsed": elapsed,
@@ -1543,7 +1550,7 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
     else:
         mode = (view_mode or "Both").strip()
     show_table = mode in ("Table", "Both")
-    show_narr = mode in ("Narration", "Both") or bool(data.get("force_narration"))
+    show_narr = mode in ("Narration", "Both")
     card_cls = {
         "chat": "assistant-card card-chat",
         "query": "assistant-card card-query",
@@ -1631,7 +1638,6 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
             if narr:
                 render_narration_card(narr)
             else:
-                # Fallback prose (no bullet formatting)
                 raw = str(msg.get("content", "")).replace("•", "").replace("- ", "")
                 paras = [html.escape(p.strip()) for p in raw.split("\n\n") if p.strip()]
                 if not paras:
@@ -1642,7 +1648,7 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
                     unsafe_allow_html=True,
                 )
 
-        if show_table:
+        elif show_table and not show_narr:
             if isinstance(rdf, pd.DataFrame) and not rdf.empty:
                 st.markdown(
                     f'<div class="chat-results-label">📋 Results ({len(rdf):,} rows)</div>',
@@ -1661,51 +1667,72 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
             elif isinstance(rdf, pd.DataFrame) and rdf.empty:
                 st.info("No rows returned for this question.")
 
-            if show_narr:
-                render_narration_card(data.get("narration"))
+        elif show_table and show_narr:
+            if isinstance(rdf, pd.DataFrame) and not rdf.empty:
+                st.markdown(
+                    f'<div class="chat-results-label">📋 Results ({len(rdf):,} rows)</div>',
+                    unsafe_allow_html=True,
+                )
+                key_base = f"chat_{html.escape(str(msg.get('timestamp','')))}_{abs(hash(src_q)) % 10_000}"
+                tab_t, tab_c = st.tabs(["📊 Table", "📈 Chart"])
+                with tab_t:
+                    show_n = min(10, len(rdf))
+                    safe_dataframe(rdf.head(show_n), use_container_width=True)
+                    if len(rdf) > 10:
+                        with st.expander(f"Show all {len(rdf)} rows"):
+                            safe_dataframe(rdf, use_container_width=True)
+                with tab_c:
+                    _render_chat_chart(rdf, src_q, key_base)
+            elif isinstance(rdf, pd.DataFrame) and rdf.empty:
+                st.info("No rows returned for this question.")
+            narr = data.get("narration")
+            if narr:
+                st.markdown('<div class="chat-results-label">Insight</div>', unsafe_allow_html=True)
+                render_narration_card(narr)
 
-        with st.expander("🔎 Details (trust, context, SQL)", expanded=False):
-            badge = get_execution_badge(evidence) if evidence else {"icon": "🧠", "label": "Semantic + AI"}
-            if (evidence or {}).get("modified"):
-                badge = {"icon": "✏️", "label": "Modified", "colour": "emerald"}
-            st.markdown(
-                f'<span class="{_badge_class(evidence)}">{badge.get("icon","")} '
-                f'{html.escape(badge.get("label",""))}</span>',
-                unsafe_allow_html=True,
-            )
-            banner = _modification_banner(evidence)
-            if banner:
-                st.markdown(banner, unsafe_allow_html=True)
+        if show_table or show_narr:
+            with st.expander("🔎 Details (trust, context, SQL)", expanded=False):
+                badge = get_execution_badge(evidence) if evidence else {"icon": "🧠", "label": "Semantic + AI"}
+                if (evidence or {}).get("modified"):
+                    badge = {"icon": "✏️", "label": "Modified", "colour": "emerald"}
+                st.markdown(
+                    f'<span class="{_badge_class(evidence)}">{badge.get("icon","")} '
+                    f'{html.escape(badge.get("label",""))}</span>',
+                    unsafe_allow_html=True,
+                )
+                banner = _modification_banner(evidence)
+                if banner:
+                    st.markdown(banner, unsafe_allow_html=True)
 
-            matches = data.get("glossary_matches") or []
-            if matches:
-                chips = []
-                for m in matches[:3]:
-                    label = html.escape(str(m.get("term_name") or ""))
-                    expr = m.get("sql_expression") or m.get("source_column") or ""
-                    expr_s = html.escape(" ".join(str(expr).split())[:40])
-                    chips.append(
-                        f"<span class='sem-term-badge'>{label}"
-                        + (f"<span class='sem-expr'>= {expr_s}</span>" if expr_s else "")
-                        + "</span>"
-                    )
-                st.markdown(" ".join(chips), unsafe_allow_html=True)
+                matches = data.get("glossary_matches") or []
+                if matches:
+                    chips = []
+                    for m in matches[:3]:
+                        label = html.escape(str(m.get("term_name") or ""))
+                        expr = m.get("sql_expression") or m.get("source_column") or ""
+                        expr_s = html.escape(" ".join(str(expr).split())[:40])
+                        chips.append(
+                            f"<span class='sem-term-badge'>{label}"
+                            + (f"<span class='sem-expr'>= {expr_s}</span>" if expr_s else "")
+                            + "</span>"
+                        )
+                    st.markdown(" ".join(chips), unsafe_allow_html=True)
 
-            if (evidence or {}).get("modified"):
-                anchor = get_sql_anchor() or {}
-                st.caption(f"Metric: {anchor.get('sql_anchor_metric') or '—'}")
-                filt = anchor.get("sql_anchor_filters") or []
-                st.caption(f"Filters: {'; '.join(filt) if filt else '—'}")
-                cols = anchor.get("sql_anchor_columns") or []
-                st.caption(f"Columns: {', '.join(map(str, cols)) if cols else '—'}")
+                if (evidence or {}).get("modified"):
+                    anchor = get_sql_anchor() or {}
+                    st.caption(f"Metric: {anchor.get('sql_anchor_metric') or '—'}")
+                    filt = anchor.get("sql_anchor_filters") or []
+                    st.caption(f"Filters: {'; '.join(filt) if filt else '—'}")
+                    cols = anchor.get("sql_anchor_columns") or []
+                    st.caption(f"Columns: {', '.join(map(str, cols)) if cols else '—'}")
 
-            render_trust_score_card(evidence, show_summary=False)
+                render_trust_score_card(evidence, show_summary=False)
 
-            sql = data.get("sql")
-            if sql and not str(sql).startswith("-- Answered from OKF"):
-                st.code(sql, language="sql")
-            elif sql:
-                st.caption(sql)
+                sql = data.get("sql")
+                if sql and not str(sql).startswith("-- Answered from OKF"):
+                    st.code(sql, language="sql")
+                elif sql:
+                    st.caption(sql)
 
     if msg.get("timestamp"):
         st.caption(msg["timestamp"])

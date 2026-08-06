@@ -50,6 +50,9 @@ OOB_PATTERNS = [
 EXECUTION_PATHS = ["deterministic", "fallback", "cache"]
 MAX_EVIDENCE_HISTORY = 20
 
+# OKF business-document RAG — disabled until re-wired (see features/okf_knowledge/)
+OKF_ENABLED = False
+
 # Registry
 METRIC_REGISTRY_PATH = "semantic/metric_registry.yaml"
 

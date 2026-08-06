@@ -588,19 +588,24 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
     except Exception:
         pass
 
-    # OKF business-document context (SOPs) — capped, optional
+    # OKF business-document context — disabled (OKF_ENABLED)
     okf_block = ""
     try:
-        from features.okf_knowledge.okf_retriever import get_relevant_context
-        okf_ctx = get_relevant_context(question, top_k=3, max_context_chars=900)
-        if okf_ctx:
-            okf_block = (
-                "BUSINESS KNOWLEDGE (SOPs — use for metric meaning / COVID / EV / "
-                "region interpretation; do NOT invent columns from documents):\n"
-                f"{okf_ctx}\n\n"
-            )
-    except Exception:
-        pass
+        from config.constants import OKF_ENABLED
+    except ImportError:
+        OKF_ENABLED = False
+    if OKF_ENABLED:
+        try:
+            from features.okf_knowledge.okf_retriever import get_relevant_context
+            okf_ctx = get_relevant_context(question, top_k=3, max_context_chars=900)
+            if okf_ctx:
+                okf_block = (
+                    "BUSINESS KNOWLEDGE (SOPs — use for metric meaning / COVID / EV / "
+                    "region interpretation; do NOT invent columns from documents):\n"
+                    f"{okf_ctx}\n\n"
+                )
+        except Exception:
+            pass
 
     prompt = f"""You are an expert DuckDB SQL generator.
 

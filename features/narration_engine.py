@@ -1,13 +1,21 @@
 """
 features/narration_engine.py
-Pure Python data-driven narration — no LLM calls.
-Produces 3–5 sentence leadership-ready insights.
+LLM-driven executive narration grounded in query result DataFrames.
+Falls back to rule-based summaries when the LLM is unavailable.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pandas as pd
+
+from core.llm_client import call_llm_narration
+
+try:
+    from config.constants import OKF_ENABLED
+except ImportError:
+    OKF_ENABLED = False
 
 
 class NarrationEngine:
@@ -72,6 +80,130 @@ class NarrationEngine:
     def _join_paras(self, parts: list[str]) -> str:
         return "\n\n".join(p.strip() for p in parts if p and str(p).strip())
 
+    def _build_data_context(self, result_df: pd.DataFrame, max_rows: int = 50) -> str:
+        """Rich tabular + numeric summary for LLM narration (high token, high signal)."""
+        lines = [
+            f"Shape: {len(result_df)} rows × {result_df.shape[1]} columns",
+            f"Columns: {', '.join(str(c) for c in result_df.columns)}",
+        ]
+        num_cols = result_df.select_dtypes(include="number").columns.tolist()
+        for col in num_cols[:8]:
+            s = pd.to_numeric(result_df[col], errors="coerce").dropna()
+            if s.empty:
+                continue
+            lines.append(
+                f"  {col}: min={s.min():,.2f}, max={s.max():,.2f}, "
+                f"sum={s.sum():,.2f}, mean={s.mean():,.2f}"
+            )
+        str_cols = result_df.select_dtypes(exclude="number").columns.tolist()
+        for col in str_cols[:3]:
+            top = result_df[col].astype(str).value_counts().head(5)
+            if not top.empty:
+                pairs = ", ".join(f"{k} ({v})" for k, v in top.items())
+                lines.append(f"  Top {col}: {pairs}")
+        sample = result_df.head(max_rows)
+        lines.append("\nRESULT TABLE (CSV):")
+        lines.append(sample.to_csv(index=False))
+        if len(result_df) > max_rows:
+            lines.append(f"\n... {len(result_df) - max_rows} additional rows not shown")
+        return "\n".join(lines)
+
+    def _parse_llm_narration(self, text: str, question: str) -> dict[str, Any] | None:
+        if not text or not str(text).strip():
+            return None
+        raw = str(text).strip()
+
+        def _section(label: str) -> str:
+            m = re.search(
+                rf"(?:^|\n){label}\s*:?\s*\n(.*?)(?=\n(?:HEADLINE|NARRATIVE|FINDINGS|RECOMMENDATION)\s*:|\Z)",
+                raw,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            return m.group(1).strip() if m else ""
+
+        headline = _section("HEADLINE") or raw.split("\n", 1)[0].strip()
+        narrative = _section("NARRATIVE") or raw
+        findings_raw = _section("FINDINGS")
+        recommendation = _section("RECOMMENDATION")
+
+        findings: list[str] = []
+        if findings_raw:
+            for line in findings_raw.splitlines():
+                line = line.strip().lstrip("-•*").strip()
+                if line:
+                    findings.append(line)
+
+        if not headline and not narrative:
+            return None
+
+        narrative = narrative.strip()
+        if headline and narrative.startswith(headline):
+            narrative = narrative[len(headline):].strip()
+
+        return {
+            "headline": headline[:200] or "Executive insight",
+            "narrative_text": narrative or headline,
+            "summary": narrative or headline,
+            "key_findings": findings[:6],
+            "recommendation": recommendation or "Drill into the top and bottom performers by region or month.",
+            "result_summary": headline[:120],
+            "data_points": [],
+            "word_count": len((narrative or headline).split()),
+            "knowledge_citations": [],
+            "narration_source": "llm",
+        }
+
+    def _generate_llm_narration(
+        self,
+        result_df: pd.DataFrame,
+        question: str,
+        evidence: dict | None = None,
+    ) -> dict[str, Any] | None:
+        try:
+            data_ctx = self._build_data_context(result_df)
+            sql_hint = ""
+            if evidence and evidence.get("execution_path"):
+                sql_hint = f"Query path: {evidence.get('execution_path')}"
+
+            prompt = f"""You are a senior automotive sales analyst briefing leadership.
+
+USER QUESTION:
+"{question}"
+
+{sql_hint}
+
+QUERY RESULT DATA:
+{data_ctx}
+
+Write an impactful executive narration grounded ONLY in the numbers above.
+Do not invent columns, brands, or figures not present in the data.
+
+Use this exact structure:
+
+HEADLINE:
+One sharp line with the main number or ranking (specific, not generic).
+
+NARRATIVE:
+3–5 short paragraphs covering:
+- Direct answer to the question with cited values
+- Concentration / spread (leader vs laggard, share %, trend direction)
+- Business implication (what this means for sales leadership)
+- Risk or opportunity the data exposes
+
+FINDINGS:
+- 3–5 bullet points, each with a concrete number from the table
+
+RECOMMENDATION:
+One specific follow-up question or action (e.g. drill by region, compare YoY)
+
+Rules: Be specific. Use ₹ for revenue when relevant. No fluff. No markdown fences."""
+
+            text = call_llm_narration(prompt)
+            parsed = self._parse_llm_narration(text or "", question)
+            return parsed
+        except Exception:
+            return None
+
     def generate_narration(
         self,
         result_df: pd.DataFrame,
@@ -84,7 +216,7 @@ class NarrationEngine:
         q_hint = self._q_hint(question)
 
         if result_df is None or result_df.empty:
-            base = {
+            return {
                 "headline": "No results",
                 "narrative_text": self._join_paras([
                     f'For "{q_hint}", the query returned no matching rows.',
@@ -98,10 +230,40 @@ class NarrationEngine:
                 "word_count": 40,
                 "knowledge_citations": [],
             }
-            return self._enrich_with_knowledge(base, question, knowledge_snippets)
+
+        llm_narr = self._generate_llm_narration(result_df, question, evidence)
+        if llm_narr:
+            return llm_narr
+
+        return self._generate_rule_based_narration(
+            result_df, question, intent=intent, evidence=evidence,
+            knowledge_snippets=knowledge_snippets,
+        )
+
+    def _generate_rule_based_narration(
+        self,
+        result_df: pd.DataFrame,
+        question: str,
+        intent: dict | None = None,
+        evidence: dict | None = None,
+        knowledge_snippets: list | None = None,
+    ) -> dict[str, Any]:
+        q_hint = self._q_hint(question)
+
+        if result_df is None or result_df.empty:
+            return {
+                "headline": "No results",
+                "narrative_text": "",
+                "key_findings": [],
+                "recommendation": "",
+                "result_summary": "No rows returned",
+                "summary": "No rows returned",
+                "word_count": 0,
+                "knowledge_citations": [],
+            }
 
         align_cols = {"actual_units", "target_units", "variance_pct", "status"}
-        if align_cols.issubset(set(result_df.columns)):
+        if OKF_ENABLED and align_cols.issubset(set(result_df.columns)):
             try:
                 from features.okf_knowledge.target_narration import generate_target_alignment_narration
                 payload = {
@@ -338,14 +500,17 @@ class NarrationEngine:
             "headline": headline,
             "narrative_text": narrative,
             "summary": headline,
-            "key_findings": [],  # prose carries the insight; avoid one-word bullet noise
+            "key_findings": [],
             "recommendation": recommendation,
             "result_summary": result_summary,
             "data_points": [{"label": metric, "rows": n}],
             "word_count": len(narrative.split()),
             "knowledge_citations": [],
+            "narration_source": "rule_based",
         }
-        return self._enrich_with_knowledge(base, question, knowledge_snippets)
+        if OKF_ENABLED:
+            return self._enrich_with_knowledge(base, question, knowledge_snippets)
+        return base
 
     def _enrich_with_knowledge(
         self,
@@ -353,7 +518,9 @@ class NarrationEngine:
         question: str,
         knowledge_snippets: list | None = None,
     ) -> dict[str, Any]:
-        """Merge OKF / SOP context into narrative (L3 contextual insights)."""
+        """Merge OKF / SOP context into narrative — only when OKF_ENABLED."""
+        if not OKF_ENABLED:
+            return narration
         snippets = knowledge_snippets
         if snippets is None:
             try:

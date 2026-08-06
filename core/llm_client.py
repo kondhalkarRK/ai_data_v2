@@ -12,6 +12,15 @@ def _get_llm():
 
 
 def call_llm(prompt: str) -> str | None:
+    return _invoke_llm(prompt, max_completion_tokens=600)
+
+
+def call_llm_narration(prompt: str) -> str | None:
+    """Higher token budget for executive narrations grounded in result data."""
+    return _invoke_llm(prompt, max_completion_tokens=1500)
+
+
+def _invoke_llm(prompt: str, *, max_completion_tokens: int) -> str | None:
     llm = _get_llm()
     if llm is None:
         reason = st.session_state.get("_llm_init_error") or "Unknown configuration issue"
@@ -26,10 +35,14 @@ def call_llm(prompt: str) -> str | None:
         st.error("🚫 LLM call limit reached.")
         return None
     try:
-        resp = llm.invoke(prompt)
-    except Exception as e:
-        st.error(f"⚠️ AI service call failed: {e}")
-        return None
+        bound = llm.bind(max_completion_tokens=max_completion_tokens)
+        resp = bound.invoke(prompt)
+    except Exception:
+        try:
+            resp = llm.invoke(prompt)
+        except Exception as e:
+            st.error(f"⚠️ AI service call failed: {e}")
+            return None
     text = getattr(resp, "content", str(resp))
     st.session_state.llm_calls   += 1
     st.session_state.total_tokens += int((len(prompt)+len(text))/4)
