@@ -45,7 +45,34 @@ _ANALYTICAL_ONLY = (
     "show ", "display ", "list ", "top ", "bottom ", "how many ",
     "total ", "compare ", " trend", " by make", " by region", " by month",
     " by colour", " by color", " by model", " by year", "group by",
+    "drill down", "drill into", "break down", "break that down",
+    "slice by", "split by", "zoom in",
 )
+
+_DRILL_FOLLOWUP_SIGNALS = (
+    "drill down", "drill into", "break down", "break that down",
+    "slice by", "split by", "zoom in", "same but", "same for",
+    "what about", "how about", "now for", "only for", "and for",
+    "filter to", "just for", "for tata", "for maruti",
+)
+
+
+def _is_data_drill_or_followup(question: str) -> bool:
+    """Drill-down / follow-up analytics must stay on SQL path, not OKF docs."""
+    q = (question or "").lower().strip()
+    if not q:
+        return False
+    if any(s in q for s in _DRILL_FOLLOWUP_SIGNALS):
+        return True
+    try:
+        from core.conversation_state import detect_followup, get_sql_anchor, should_use_anchor
+        if detect_followup(question):
+            return True
+        if get_sql_anchor() and should_use_anchor(question):
+            return True
+    except Exception:
+        pass
+    return False
 
 _POLICY_SIGNALS = (
     "target", "strategy", "handbook", "policy", "sop", "plan", "threshold",
@@ -156,6 +183,10 @@ def is_knowledge_question(question: str) -> bool:
 
     q = (question or "").lower().strip()
     if not q:
+        return False
+
+    # Follow-up drill-downs (e.g. "drill down for Tata by model") are data queries
+    if _is_data_drill_or_followup(question):
         return False
 
     if any(h in q for h in _KNOWLEDGE_HINTS):

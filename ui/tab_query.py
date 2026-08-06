@@ -486,7 +486,7 @@ def render_ask_mode(working_df, tables, dfs):
                 is_knowledge_question,
                 answer_knowledge_question,
             )
-            if is_knowledge_question(q):
+            if is_knowledge_question(q) and not _is_followup_or_drill(q):
                 status.update(label="📚 Business knowledge + data...")
                 okf_payload = answer_knowledge_question(q, working_df)
                 if okf_payload and isinstance(okf_payload.get("result_df"), pd.DataFrame):
@@ -1149,7 +1149,12 @@ def _render_chat_chart(rdf: pd.DataFrame, question: str, key_prefix: str):
 
 # ── Chat mode ────────────────────────────────────────────────────
 
-def _conversational_reply(question: str, working_df: pd.DataFrame | None = None) -> str:
+def _conversational_reply(
+    question: str,
+    working_df: pd.DataFrame | None = None,
+    *,
+    use_okf: bool = True,
+) -> str:
     history = ""
     try:
         history = build_chat_context_string(5)
@@ -1180,13 +1185,14 @@ def _conversational_reply(question: str, working_df: pd.DataFrame | None = None)
         glossary_bits = ""
 
     okf_bits = ""
-    try:
-        from features.okf_knowledge.okf_answer import ensure_okf_ready
-        from features.okf_knowledge.okf_retriever import get_relevant_context
-        ensure_okf_ready()
-        okf_bits = get_relevant_context(question, top_k=3, max_context_chars=900) or ""
-    except Exception:
-        okf_bits = ""
+    if use_okf:
+        try:
+            from features.okf_knowledge.okf_answer import ensure_okf_ready
+            from features.okf_knowledge.okf_retriever import get_relevant_context
+            ensure_okf_ready()
+            okf_bits = get_relevant_context(question, top_k=3, max_context_chars=900) or ""
+        except Exception:
+            okf_bits = ""
 
     hour = datetime.now().hour
     tod = "morning" if hour < 12 else ("afternoon" if hour < 17 else "evening")
@@ -1382,7 +1388,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         # Conversational (non-data) — before data path
         if not is_data_question(q, working_df):
             with _chat_working("chat"):
-                reply = _conversational_reply(q, working_df)
+                reply = _conversational_reply(q, working_df, use_okf=narration_on)
             append_chat_exchange(q, result_summary=None, was_data_query=False)
             _append_assistant(reply, "chat")
             st.rerun()
@@ -1394,7 +1400,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
                 is_knowledge_question,
                 answer_knowledge_question,
             )
-            if is_knowledge_question(q):
+            if narration_on and is_knowledge_question(q) and not _is_followup_or_drill(q):
                 with _chat_working("okf"):
                     t0 = time.time()
                     okf_payload = answer_knowledge_question(q, working_df)
@@ -1475,7 +1481,8 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         pass
 
     force = _should_force_narration(q)
-    narr = _safe_narration(df_result, q, evidence)
+    want_narr = narration_on or force
+    narr = _safe_narration(df_result, q, evidence) if want_narr else None
     summary = (narr or {}).get("result_summary") or (
         f"{len(df_result)} rows returned" if isinstance(df_result, pd.DataFrame) else "Done"
     )
@@ -1494,7 +1501,9 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     )
 
     _append_assistant(
-        (narr or {}).get("summary", "Here are the results."),
+        (narr or {}).get("summary", "Here are the results.")
+        if narr
+        else "Here are the results.",
         "query",
         {
             "result_df": df_result,
@@ -1502,7 +1511,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             "evidence": evidence,
             "narration": narr,
             "result_summary": summary,
-            "force_narration": force or narration_on,
+            "force_narration": want_narr,
             "source_question": q,
             "glossary_matches": list(st.session_state.get("last_glossary_matches") or []),
             "elapsed": elapsed,

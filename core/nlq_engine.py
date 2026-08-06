@@ -136,6 +136,81 @@ def _sort_instruction(question: str, subject: str | None) -> str:
     return f"Adjust ORDER BY / LIMIT per: {question}"
 
 
+def _get_semantic_builder():
+    if not _SEM_CTX_OK:
+        return None
+    try:
+        return get_context_builder()
+    except Exception:
+        return None
+
+
+def _compact_semantic_for_llm(question: str, df: pd.DataFrame) -> str:
+    """
+    Inject business_glossary.yaml + semantic_model.yaml context into any LLM SQL call.
+    Used for full NLQ, follow-up SQL edits, and SQL auto-fix retries.
+    """
+    builder = _get_semantic_builder()
+    if builder is None:
+        return ""
+    parts: list[str] = []
+    try:
+        hints = builder.build_glossary_sql_hints(question)
+        if hints:
+            parts.append(hints)
+    except Exception:
+        pass
+    try:
+        rules = builder.build_domain_rules_block()
+        if rules:
+            parts.append(rules)
+    except Exception:
+        pass
+    try:
+        resolutions = builder._search.resolve_query_terms(question)
+        resolved = builder.build_resolved_context(question, resolutions)
+        if resolved:
+            parts.append(resolved)
+    except Exception:
+        pass
+    try:
+        col_map = builder.build_physical_column_map(df)
+        if col_map:
+            parts.append(col_map)
+    except Exception:
+        pass
+    if not parts:
+        return ""
+    block = "\n\n".join(parts)
+    if len(block) > 2500:
+        return block[:2500] + "\n...[semantic context trimmed]"
+    return block
+
+
+def _persist_semantic_ui_state(question: str, df: pd.DataFrame, semantic_context: str = "") -> None:
+    """Keep sidebar / trust UI in sync whenever LLM SQL runs."""
+    builder = _get_semantic_builder()
+    if builder is None:
+        return
+    try:
+        ctx = semantic_context or _compact_semantic_for_llm(question, df)
+        st.session_state.last_semantic_context = ctx
+        st.session_state.last_glossary_hints = builder.build_glossary_sql_hints(question)
+        st.session_state.last_domain_rules = builder.build_domain_rules_block()
+        st.session_state.last_glossary_matches = (
+            builder._loader.get_glossary_hints_for_question(question)
+        )
+    except Exception:
+        pass
+
+
+def _wrap_prompt_with_semantic(question: str, df: pd.DataFrame, body: str) -> str:
+    sem = _compact_semantic_for_llm(question, df)
+    if not sem:
+        return body
+    return f"{sem}\n\n{body}"
+
+
 def build_modification_prompt(
     question: str,
     intent_type: str,
@@ -356,9 +431,14 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
 
                 if status is not None:
                     status.update(label=f"✏️ Modifying prior SQL ({followup_intent})...")
-                prompt = build_modification_prompt(
-                    question, followup_intent, followup_subject, anchor, df
+                prompt = _wrap_prompt_with_semantic(
+                    question,
+                    df,
+                    build_modification_prompt(
+                        question, followup_intent, followup_subject, anchor, df
+                    ),
                 )
+                _persist_semantic_ui_state(question, df, prompt)
                 sql_result = call_llm(prompt)
                 if sql_result:
                     sql_clean = sql_result.strip().strip("`").strip()
@@ -729,10 +809,15 @@ def run_query(working_df: pd.DataFrame, question: str, status=None):
         if err and not err.startswith("\U0001f512"):
             if status is not None:
                 status.update(label="🔁 Auto-fixing SQL & retrying...")
-            retry_prompt = f"""The following DuckDB SQL failed with error: {err}
+            retry_prompt = _wrap_prompt_with_semantic(
+                question,
+                working_df,
+                f"""The following DuckDB SQL failed with error: {err}
 SQL: {sql}
 Schema columns: {list(working_df.columns)}
-Fix and return ONLY corrected SQL:"""
+Fix and return ONLY corrected SQL:""",
+            )
+            _persist_semantic_ui_state(question, working_df)
             sql2 = call_llm(retry_prompt)
             if sql2:
                 sql2 = sql2.strip().strip("`").strip()
