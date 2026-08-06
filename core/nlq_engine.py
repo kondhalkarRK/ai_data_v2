@@ -680,39 +680,13 @@ def run_sql(sql: str, df: pd.DataFrame) -> tuple[pd.DataFrame | None, str | None
 
 def enrich_query(q: str) -> str:
     """
-    Legacy string-concat enrich — only when there is NO SQL anchor.
-    With an anchor, surgical modification prompts handle follow-ups;
-    concatenating prior+current confuses intent and breaks memory.
-    """
-    if not q:
-        return q
-    # Prefer SQL-anchor continuity over string stitching
-    try:
-        if _CONV_OK and should_use_anchor(q):
-            return q
-        if _CONV_OK and get_sql_anchor():
-            # Short relative follow-ups stay as-is; anchor path will classify
-            ql = q.strip().lower()
-            follow_cues = (
-                "same", "also", "only", "add ", "remove ", "what about",
-                "how about", "and for", "now for", "filter", "top ", "bottom ",
-            )
-            if any(c in ql for c in follow_cues) and len(ql.split()) <= 12:
-                return q
-    except Exception:
-        pass
+    Return the question unchanged.
 
-    if not st.session_state.get("last_plan"):
-        return q
-    triggers = [
-        "now", "only", "for", "same", "also", "filter",
-    ]
-    # Do NOT trigger on bare "top"/"show"/"highest" — those are often new questions
-    if any(w in q.lower() for w in triggers) and len(q.split()) <= 7:
-        prev = st.session_state.get("last_query", "")
-        if prev and prev.strip().lower() != q.strip().lower():
-            return prev + " — follow-up: " + q
-    return q
+    Legacy string-concat of prior+current questions was removed — it merged
+    unrelated asks (e.g. 'sales for 2023') with the previous turn. Follow-ups
+    are handled via SQL anchor + conversation context in nlq_to_sql().
+    """
+    return (q or "").strip()
 
 
 def _pack_return(result, sql, err, evidence=None):
@@ -745,7 +719,13 @@ def run_query(working_df: pd.DataFrame, question: str, status=None):
         if status is not None:
             status.update(label="🧠 Loading metadata & schema...")
 
-        q = enrich_query(question)
+        try:
+            from core.question_normaliser import is_standalone_analytical_question
+            if _CONV_OK and is_standalone_analytical_question(question):
+                clear_sql_anchor()
+        except Exception:
+            pass
+
         st.session_state["_original_question"] = question
         cache_key = f"nlq_{question.strip().lower()}"
         if cache_key in st.session_state.memory:

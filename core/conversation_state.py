@@ -218,7 +218,12 @@ def should_use_anchor(question: str) -> bool:
         return False
 
     try:
-        from core.question_normaliser import classify_followup_intent
+        from core.question_normaliser import (
+            classify_followup_intent,
+            is_standalone_analytical_question,
+        )
+        if is_standalone_analytical_question(question):
+            return False
         intent = classify_followup_intent(question, anchor)
         return intent != "new_question"
     except Exception:
@@ -299,18 +304,26 @@ def resolve_clarification(choice: str) -> str | None:
 
 def detect_followup(question: str) -> bool:
     """
-    Detect follow-up questions using ISANA-style rules:
-    - Short question (≤ MAX words) + trigger token → follow-up
-    - Explicit multi-word reference tokens always count
+    Detect follow-up questions — requires prior turn context.
+    Delegates token rules to question_normaliser when available.
     """
     if not question or not isinstance(question, str):
-        return False
-    q = question.strip().lower()
-    if not q:
         return False
 
     state = get_state()
     if not state.get("last_question") and not state.get("prior_metric"):
+        anchor = get_sql_anchor()
+        if not anchor:
+            return False
+
+    try:
+        from core.question_normaliser import detect_followup as qn_detect_followup
+        return qn_detect_followup(question)
+    except Exception:
+        pass
+
+    q = question.strip().lower()
+    if not q:
         return False
 
     words = q.split()

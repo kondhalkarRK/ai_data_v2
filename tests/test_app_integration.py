@@ -162,6 +162,8 @@ try:
     assert q and "units" in q.lower()
     ok("clarification resolve suggestion")
 
+    from core.conversation_state import set_sql_anchor
+    set_sql_anchor("SELECT SUM(order_qty) AS units FROM t GROUP BY region_name", "units by region")
     assert detect_followup("drill down by region")
     ok("drill-down follow-up detection")
 except Exception:
@@ -291,6 +293,7 @@ import subprocess
 for script, name in [
     (ROOT / "_test_features.py", "feature tests"),
     (ROOT / "tests" / "test_utils_upload.py", "upload utils"),
+    (ROOT / "tests" / "test_core_modules.py", "core module tests"),
 ]:
     if not script.is_file():
         skip(name, "file missing")

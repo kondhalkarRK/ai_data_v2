@@ -1840,6 +1840,47 @@ div[data-testid="stExpander"] details:hover summary{
 [data-testid="stSpinner"] > div{
   border-color:rgba(129,140,248,0.35) transparent transparent transparent !important;
 }
+
+/* ═══ Decision Room — landing, pins, share ═══ */
+.dr-landing{
+  text-align:center;padding:36px 20px 28px;
+  border-bottom:1px solid rgba(148,163,184,0.12);margin-bottom:12px;
+}
+.dr-landing-eyebrow{
+  font-size:11px;letter-spacing:0.14em;color:#818cf8;font-weight:700;margin-bottom:8px;
+}
+.dr-landing-title{
+  font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:6px;
+}
+.dr-landing-sub{
+  font-size:13px;color:#94a3b8;max-width:520px;margin:0 auto;line-height:1.5;
+}
+.dr-priority-grid{margin:8px 4px 16px;}
+.dr-priority-card{
+  background:rgba(15,23,42,0.55);border:1px solid rgba(148,163,184,0.16);
+  border-radius:14px;padding:14px 14px 10px;min-height:120px;
+}
+.dr-priority-icon{font-size:18px;margin-bottom:6px;}
+.dr-priority-title{font-size:13px;font-weight:650;color:#e2e8f0;line-height:1.35;margin-bottom:6px;}
+.dr-priority-summary{font-size:12px;color:#94a3b8;line-height:1.45;}
+.dr-pinned-label{
+  font-size:11px;font-weight:650;color:#a5b4fc;letter-spacing:0.06em;
+  margin:8px 4px 6px;text-transform:uppercase;
+}
+.dr-pin-card{
+  background:rgba(30,41,59,0.65);border:1px solid rgba(129,140,248,0.22);
+  border-radius:12px;padding:10px 12px;margin-bottom:6px;
+}
+.dr-pin-headline{font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.35;}
+.dr-pin-meta{font-size:10px;color:#64748b;margin-top:4px;}
+.dr-share-link{
+  display:block;text-align:center;padding:10px 12px;margin:8px 0;
+  background:rgba(99,102,241,0.15);border:1px solid rgba(129,140,248,0.35);
+  border-radius:10px;color:#c7d2fe !important;text-decoration:none !important;
+  font-size:13px;font-weight:600;
+}
+.dr-share-link:hover{background:rgba(99,102,241,0.28);}
+.dr-actions-row{margin:10px 0 4px;}
 """ + theme_css(theme) + r"""
 </style>
 

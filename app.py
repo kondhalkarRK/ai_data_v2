@@ -114,7 +114,7 @@ with _h1:
         """
         <div class="brand-title-stack">
           <div class="brand-eyebrow">🚀 AI DATA PLATFORM</div>
-          <div class="brand-tagline">Semantic AI Analytics Workspace — Ask business questions in natural language</div>
+          <div class="brand-tagline">Decision Intelligence Workspace — governed insights, evidence, and shareable briefs</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -146,7 +146,7 @@ with _h3:
 - Vague: *“show sales”*, *“performance”*, *“tell me about EV”*
 - Off-topic: recipes, weather, jokes unrelated to your data
 
-**Tip:** Chat remembers your last query — use follow-up phrases instead of re-asking from scratch.
+**Tip:** Decision Room remembers your last query — use follow-up phrases instead of re-asking from scratch.
                 """
             )
     with _theme_col:
@@ -215,7 +215,7 @@ if (
 # ─────────────────────────────────────────────────────────────────
 
 tab_join_ui, tab_preview_ui, tab_kpi_ui, tab_query_ui = st.tabs(
-    ["🔗 Join / Combine", "📄 Data Preview", "📊 KPI Summary", "⚡ AI Query"]
+    ["🔗 Join / Combine", "📄 Data Preview", "📊 KPI Summary", "🏛️ Decision Room"]
 )
 
 
@@ -242,7 +242,7 @@ def _render_tab_safely(tab_container, render_fn, label: str):
 _render_tab_safely(tab_join_ui,    tab_join.render,    "Join / Combine")
 _render_tab_safely(tab_preview_ui, tab_preview.render, "Data Preview")
 _render_tab_safely(tab_kpi_ui,     tab_kpi.render,     "KPI Summary")
-_render_tab_safely(tab_query_ui,   tab_query.render,   "AI Query")
+_render_tab_safely(tab_query_ui,   tab_query.render,   "Decision Room")
 
 st.markdown("---")
 st.markdown(

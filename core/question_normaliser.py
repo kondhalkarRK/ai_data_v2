@@ -36,6 +36,8 @@ _OOB_EXTRA = [
     r"\bpersonal\s+data\b",
     r"\bpassword\b",
     r"\bcredit\s+card\b",
+    r"\bwrite\s+me\s+\w+\s+code\b",
+    r"\bdelete\s+(the\s+)?database\b",
 ]
 
 _FOLLOWUP_EXTRA = [
@@ -48,15 +50,95 @@ _FOLLOWUP_EXTRA = [
 ]
 
 
+_FOLLOWUP_ONLY_CUES = (
+    "same but", "same for", "and for", "now for", "only for",
+    "what about", "how about", "just for", "filter to", "filter by",
+    "instead of", "instead show",
+)
+
+_STANDALONE_STARTERS = (
+    "show ", "show me ", "what is ", "what are ", "how many ",
+    "list ", "compare ", "total ", "give me ", "display ",
+    "get me ", "find ", "which ", "count ", "how much ",
+)
+
+
+def _has_prior_query_context() -> bool:
+    """True when a prior data query exists (anchor or conversation state)."""
+    try:
+        from core.conversation_state import get_sql_anchor, get_state
+        if get_sql_anchor():
+            return True
+        state = get_state()
+        return bool(state.get("last_question") or state.get("prior_metric"))
+    except Exception:
+        return False
+
+
+_FOLLOWUP_SHOW_PREFIXES = (
+    "show only", "show just", "show top", "show bottom",
+    "show me top", "show me bottom", "show me only", "show me just",
+)
+
+
+def is_standalone_analytical_question(question: str) -> bool:
+    """
+    True when the message is a full new analytics question — not a short follow-up.
+    Prevents SQL-anchor surgery and legacy query stitching from hijacking new asks.
+    """
+    if not question or not str(question).strip():
+        return False
+    q = question.strip().lower()
+    words = q.split()
+
+    if any(cue in q for cue in _FOLLOWUP_ONLY_CUES):
+        return False
+
+    if any(q.startswith(p) for p in _FOLLOWUP_SHOW_PREFIXES):
+        return False
+
+    # Short drill / refine utterances stay follow-ups when context exists
+    drill_cues = ("drill down", "drill into", "break down", "slice by", "split by", "zoom in")
+    if any(c in q for c in drill_cues) and len(words) <= 14:
+        return False
+
+    has_metric = any(
+        w in q for w in (
+            "revenue", "sales", "units", "orders", "volume", "total",
+            "sold", "amount", "count",
+        )
+    )
+    has_breakdown = any(w in q for w in (" by ", " per ", "group by", "breakdown", "compare"))
+    has_time = bool(re.search(r"\b20\d{2}\b", q)) or any(
+        w in q for w in ("month", "year", "quarter", "trend", "monthly", "yearly")
+    )
+
+    if any(q.startswith(s) for s in _STANDALONE_STARTERS):
+        if q.startswith("show ") and not q.startswith("show me "):
+            return bool(has_metric and (has_breakdown or has_time or len(words) >= 5))
+        return True
+
+    if has_metric and (has_breakdown or has_time) and len(words) >= 4:
+        return True
+    if len(words) > 9 and has_metric:
+        return True
+    return False
+
+
 def detect_followup(question: str) -> bool:
     """
     Follow-up signal detection.
-    Rules: short question (≤8 words) + token OR explicit reference tokens.
+    Rules: requires prior query context + (short question + token OR explicit phrase).
     """
     if not question or not isinstance(question, str):
         return False
+    if not _has_prior_query_context():
+        return False
     q = question.strip().lower()
     if not q:
+        return False
+
+    if is_standalone_analytical_question(question):
         return False
 
     tokens = list(FOLLOWUP_TRIGGER_TOKENS) + _FOLLOWUP_EXTRA
@@ -183,10 +265,16 @@ def classify_followup_intent(question: str, anchor: dict | None) -> str:
     if any(sig in q for sig in NEW_TOPIC_SIGNALS):
         return "new_question"
 
-    for p in ADDITIVE_PATTERNS:
-        if re.search(p, q, re.I):
-            return "additive"
+    # Full standalone analytics → fresh SQL (not anchor surgery)
+    if is_standalone_analytical_question(question):
+        return "new_question"
+
+    # Drill-down / re-slice → full NLQ with conversation context (not additive column edit)
     for p in DRILL_DOWN_PATTERNS:
+        if re.search(p, q, re.I):
+            return "new_question"
+
+    for p in ADDITIVE_PATTERNS:
         if re.search(p, q, re.I):
             return "additive"
     for p in SUBTRACTIVE_PATTERNS:
@@ -204,7 +292,7 @@ def classify_followup_intent(question: str, anchor: dict | None) -> str:
 
     # Short relative utterances while an anchor exists → treat as filter/refine
     words = q.split()
-    if len(words) <= 6 and not any(
+    if len(words) <= 5 and not any(
         q.startswith(p) for p in ("show me revenue", "show me units", "how many", "what is the")
     ):
         # Single make/year/region-like token after a prior query
@@ -223,7 +311,7 @@ def classify_followup_intent(question: str, anchor: dict | None) -> str:
         q.startswith(p) for p in ("show ", "what ", "how ", "which ", "list ", "compare ")
     ):
         return "new_question"
-    if any(q.startswith(p) for p in ("show me ", "how many ", "what is ", "compare ")):
+    if any(q.startswith(p) for p in ("show me ", "how many ", "what is ", "compare ", "show ", "list ", "total ")):
         return "new_question"
     return "new_question"
 

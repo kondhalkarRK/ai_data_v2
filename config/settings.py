@@ -154,3 +154,6 @@ def init_session_state() -> None:
             "fallback": 0,
             "cache": 0,
         }
+
+    if "pinned_decisions" not in st.session_state:
+        st.session_state.pinned_decisions = []

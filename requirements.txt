@@ -10,4 +10,6 @@ langchain-openai>=0.1
 openai>=1.0
 chromadb>=0.4
 sentence-transformers>=2.2
-pypdf>=4.0
+python-pptx>=0.6.21
+reportlab>=4.0
+matplotlib>=3.7

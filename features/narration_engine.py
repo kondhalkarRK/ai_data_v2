@@ -263,7 +263,7 @@ Rules: Be specific. Use ₹ for revenue when relevant. No fluff. No markdown fen
             }
 
         align_cols = {"actual_units", "target_units", "variance_pct", "status"}
-        if OKF_ENABLED and align_cols.issubset(set(result_df.columns)):
+        if align_cols.issubset(set(result_df.columns)):
             try:
                 from features.okf_knowledge.target_narration import generate_target_alignment_narration
                 payload = {

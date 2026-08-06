@@ -18,6 +18,12 @@ from core.sql_guardrails import sql_is_safe
 from core.chart_engine import auto_chart_type, build_chart
 from core.llm_client import call_llm
 from ui.safe_display import safe_dataframe
+from ui.decision_share import (
+    build_share_payload,
+    render_share_and_pin,
+    render_pinned_strip,
+    render_proactive_landing,
+)
 
 try:
     from config.constants import OKF_ENABLED
@@ -167,8 +173,25 @@ def _is_followup_or_drill(question: str) -> bool:
     q = (question or "").strip().lower()
     if not q:
         return False
+    try:
+        from core.question_normaliser import is_standalone_analytical_question
+        if is_standalone_analytical_question(question):
+            return False
+    except Exception:
+        pass
     if any(sig in q for sig in _DRILL_SIGNALS):
-        return True
+        try:
+            from core.conversation_state import get_sql_anchor
+            if get_sql_anchor():
+                return True
+        except Exception:
+            pass
+    try:
+        from core.conversation_state import detect_followup as conv_detect_followup
+        if conv_detect_followup(question):
+            return True
+    except Exception:
+        pass
     try:
         if detect_followup(question):
             return True
@@ -602,7 +625,19 @@ def _render_ask_bundle(bundle, working_df):
         st.markdown('<div class="chat-results-label">Insight</div>', unsafe_allow_html=True)
         render_narration_card(narr)
 
-    # Details collapsed (same pattern as Chat)
+    share_payload = build_share_payload(
+        question=question,
+        narration=narr,
+        result_df=result_df,
+        evidence=evidence,
+        elapsed=elapsed,
+        sql=sql,
+    )
+    st.markdown('<div class="dr-actions-row">', unsafe_allow_html=True)
+    render_share_and_pin(share_payload, key_prefix=f"ask_{abs(hash(question)) % 99999}")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Details collapsed (same pattern as Decision Room)
     with st.expander("🔎 Details (semantic, trust, SQL)", expanded=False):
         _render_semantic_layer_status(question)
         try:
@@ -1444,6 +1479,13 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             return
 
     # 7. Data query — semantic NLQ path
+    try:
+        from core.question_normaliser import is_standalone_analytical_question
+        if is_standalone_analytical_question(q):
+            clear_sql_anchor()
+    except Exception:
+        pass
+
     with _chat_working("semantic", heavy=True) as status:
         if status is not None:
             status.update(label=random.choice(_CHAT_STATUS["run"]))
@@ -1690,6 +1732,22 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
                 st.markdown('<div class="chat-results-label">Insight</div>', unsafe_allow_html=True)
                 render_narration_card(narr)
 
+        share_payload = build_share_payload(
+            question=src_q,
+            narration=data.get("narration"),
+            result_df=rdf if isinstance(rdf, pd.DataFrame) else None,
+            evidence=evidence,
+            elapsed=elapsed,
+            sql=data.get("sql"),
+        )
+        if share_payload.get("headline") or (
+            isinstance(rdf, pd.DataFrame) and not rdf.empty
+        ):
+            key_p = f"chat_{msg.get('timestamp', '')}_{abs(hash(src_q)) % 99999}"
+            st.markdown('<div class="dr-actions-row">', unsafe_allow_html=True)
+            render_share_and_pin(share_payload, key_prefix=key_p)
+            st.markdown("</div>", unsafe_allow_html=True)
+
         if show_table or show_narr:
             with st.expander("🔎 Details (trust, context, SQL)", expanded=False):
                 badge = get_execution_badge(evidence) if evidence else {"icon": "🧠", "label": "Semantic + AI"}
@@ -1750,27 +1808,20 @@ def render_chat_mode(working_df, tables, dfs):
         legacy = st.session_state.get("chat_narration_on", True)
         st.session_state.chat_answer_mode = "Both" if legacy else "Table"
 
+    def _queue_question(q: str) -> None:
+        st.session_state["_dr_pending_question"] = q
+
+    pending_q = st.session_state.pop("_dr_pending_question", None)
+
+    render_pinned_strip(on_ask=_queue_question)
+
     st.markdown('<div class="cgpt-chat-shell">', unsafe_allow_html=True)
     chat_box = st.container(height=580, border=False)
     with chat_box:
         st.markdown('<div class="cgpt-thread">', unsafe_allow_html=True)
         if not st.session_state.chat_messages:
-            st.markdown(
-                """
-                <div class="cgpt-welcome">
-                  <div class="cgpt-welcome-orb"></div>
-                  <div class="cgpt-welcome-title">How can I help with your data?</div>
-                  <div class="cgpt-welcome-sub">Ask about revenue, units, makes, regions, EV share — or try
-                  <span class="cgpt-chip">surprise me</span></div>
-                  <div class="cgpt-starter-hints">
-                    <span class="cgpt-hint">Show units by make for 2025</span>
-                    <span class="cgpt-hint">Monthly revenue trend</span>
-                    <span class="cgpt-hint">Drill down by region</span>
-                  </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            insights = _safe_insights(working_df, limit=3)
+            render_proactive_landing(working_df, insights, on_ask=_queue_question)
         else:
             view_mode = st.session_state.chat_answer_mode
             for msg in st.session_state.chat_messages:
@@ -1835,27 +1886,28 @@ def render_chat_mode(working_df, tables, dfs):
         )
     with top_row_r:
         st.markdown(
-            '<div class="cgpt-composer-hint">Enter to send · Follow-ups like '
-            '<em>same but for 2024</em> or <em>drill down by region</em> use prior context</div>',
+            '<div class="cgpt-composer-hint">Enter to send · Pin &amp; share briefs to Outlook, Teams, or PowerPoint</div>',
             unsafe_allow_html=True,
         )
     st.session_state.chat_narration_on = mode in ("Narration", "Both")
     question = st.chat_input(
-        "Message AI Data Concierge…",
+        "Ask or refine a decision…",
         key="chat_main_input",
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
     clr_l, clr_r = st.columns([6, 1])
     with clr_r:
-        if st.button("Clear chat", use_container_width=True, key="clear_chat_btn"):
+        if st.button("Clear room", use_container_width=True, key="clear_chat_btn"):
             st.session_state.chat_messages = []
             clear_state()
             clear_sql_anchor()
-            st.toast("Chat cleared", icon="🗑")
+            st.toast("Decision Room cleared", icon="🗑")
             st.rerun()
 
-    if question and question.strip():
+    if pending_q:
+        process_chat_message(pending_q, working_df)
+    elif question and question.strip():
         process_chat_message(question, working_df)
 
 
@@ -1870,15 +1922,14 @@ def render(working_df, tables, dfs):
     st.markdown(
         """
         <div style="margin-bottom:12px;">
-          <div class="tab-section-eyebrow">⚡ AI QUERY ENGINE</div>
-          <div class="tab-section-sub">Semantic-powered analytics — ask or chat</div>
+          <div class="tab-section-eyebrow">🏛️ DECISION ROOM</div>
+          <div class="tab-section-sub">Governed insights · evidence · pin &amp; share executive briefs</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # Native tabs — not the old radio mode selector
-    tab_q, tab_c = st.tabs(["⚡ Query", "💬 Chat"])
+    tab_q, tab_c = st.tabs(["⚡ Quick Query", "🏛️ Decision Room"])
     with tab_q:
         render_ask_mode(working_df, tables, dfs)
     with tab_c:
