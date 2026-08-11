@@ -334,6 +334,19 @@ div[class*="st-key-chat_answer_mode"] div[data-baseweb="select"] > div{
   border:1px solid rgba(15,23,42,0.14) !important;
   color:#334155 !important;
 }
+.dr-icon-actions{
+  max-width:88px !important;
+}
+.dr-icon-actions [data-testid="stHorizontalBlock"]{
+  max-width:88px !important;
+  gap:6px !important;
+}
+.dr-icon-actions [data-testid="column"]{
+  flex:0 0 34px !important;
+  width:34px !important;
+  min-width:34px !important;
+  max-width:34px !important;
+}
 
 [data-testid="stTabs"] [role="tablist"]{
   background:#f1f5f9 !important;
@@ -436,6 +449,205 @@ div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-ui_theme"]){
   border:1px solid rgba(15,23,42,0.08) !important;
 }
 .header-toolbar{color:#0f172a !important;}
+
+/* ── Light: remaining dark-grey panels (tabs, cards, inputs, expanders) ── */
+.stTabs [role="tablist"]{
+  background:#f1f5f9 !important;
+  border-bottom:1px solid rgba(15,23,42,0.08) !important;
+}
+.stTabs [role="tablist"] button{
+  color:#64748b !important;
+  background:transparent !important;
+  border:1px solid transparent !important;
+  box-shadow:none !important;
+  border-radius:8px !important;
+  padding:8px 14px !important;
+}
+.stTabs [role="tablist"] button[aria-selected="true"]{
+  color:#4338ca !important;
+  background:#ffffff !important;
+  border:1px solid rgba(79,70,229,0.18) !important;
+  border-bottom:2px solid #4f46e5 !important;
+  box-shadow:0 2px 8px rgba(15,23,42,0.04) !important;
+}
+.stTabs [role="tablist"] button:hover{
+  color:#4338ca !important;
+  background:rgba(79,70,229,0.06) !important;
+}
+
+.assistant-card,.card-chat,.card-query,.card-whatif,.card-surprise,
+.card-blocked,.card-oob,.card-clarification,.card-error{
+  background:#ffffff !important;
+  border-color:rgba(15,23,42,0.10) !important;
+  color:#1e293b !important;
+}
+.card-query{border-left-color:#6366f1 !important;}
+.card-whatif,.card-surprise{border-left-color:#d97706 !important;}
+.card-blocked,.card-error{border-left-color:#dc2626 !important;color:#991b1b !important;}
+.card-clarification{border-left-color:#6366f1 !important;}
+
+.trust-score-card,.trust-score-summary{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.10) !important;
+  color:#475569 !important;
+}
+.trust-title{color:#0f172a !important;}
+.trust-note{color:#64748b !important;}
+.trust-note.warn{color:#b45309 !important;}
+
+.cgpt-mode-bar{
+  background:linear-gradient(90deg,rgba(79,70,229,0.06),rgba(14,165,233,0.05)) !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+}
+.cgpt-mode-bar [data-testid="stRadio"] label{color:#334155 !important;}
+
+.chat-input-area,.chat-input-area-visible{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.12) !important;
+  box-shadow:0 4px 16px rgba(15,23,42,0.05) !important;
+}
+[data-testid="stChatInput"],
+[data-testid="stChatInput"] textarea{
+  background:#ffffff !important;
+  border-color:rgba(15,23,42,0.14) !important;
+  color:#0f172a !important;
+  caret-color:#4f46e5 !important;
+}
+[data-testid="stChatInput"] textarea::placeholder{color:#94a3b8 !important;}
+
+.narration-headline{color:#059669 !important;}
+.narration-body,.narration-recommendation{color:#334155 !important;}
+.finding-bullet{
+  background:rgba(79,70,229,0.06) !important;
+  border-left-color:#6366f1 !important;
+  color:#334155 !important;
+}
+.clarification-chip{
+  background:rgba(79,70,229,0.06) !important;
+  border-color:rgba(79,70,229,0.16) !important;
+  color:#3730a3 !important;
+}
+.clarification-suggestions-label{color:#64748b !important;}
+.surprise-header,.surprise-opp{color:#b45309 !important;}
+.surprise-highlight{
+  background:rgba(217,119,6,0.08) !important;
+  border-color:rgba(217,119,6,0.22) !important;
+  color:#92400e !important;
+}
+.surprise-rec-title{color:#64748b !important;}
+
+.kpi-chart-card,.kpi-card{
+  background:linear-gradient(145deg,#ffffff,#f8fafc) !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+}
+.kpi-section-title{
+  background:none !important;
+  -webkit-text-fill-color:#0f172a !important;
+  color:#0f172a !important;
+}
+.kpi-filter-panel-title,.kpi-filter-slot-label{color:#64748b !important;}
+
+.stat-card,.dq-stat-box{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+  box-shadow:0 4px 14px rgba(15,23,42,0.04) !important;
+}
+.dq-issue-row{
+  background:#f8fafc !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+  color:#334155 !important;
+}
+.dq-banner-ok{color:#047857 !important;background:rgba(5,150,105,0.08) !important;}
+.dq-banner-warn{color:#b45309 !important;background:rgba(217,119,6,0.08) !important;}
+.dq-banner-err{color:#b91c1c !important;background:rgba(220,38,38,0.08) !important;}
+
+.sem-term-badge.measure{color:#5b21b6 !important;background:rgba(79,70,229,0.08) !important;}
+.sem-term-badge.dimension{color:#1d4ed8 !important;background:rgba(59,130,246,0.08) !important;}
+.sem-term-badge.attribute{color:#047857 !important;background:rgba(5,150,105,0.08) !important;}
+.sem-term-badge.glossary{color:#b45309 !important;background:rgba(217,119,6,0.08) !important;}
+.sem-term-badge .sem-expr{color:#64748b !important;}
+.badge-semantic{color:#4338ca !important;background:rgba(79,70,229,0.08) !important;}
+
+[data-testid="stExpander"]{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.10) !important;
+}
+[data-testid="stExpander"] summary{color:#1e293b !important;}
+[data-testid="stExpander"] summary:hover{color:#4338ca !important;}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"]{
+  background:#f8fafc !important;
+  color:#334155 !important;
+}
+
+div[data-baseweb="select"] > div{
+  background:#ffffff !important;
+  border-color:rgba(15,23,42,0.14) !important;
+  color:#0f172a !important;
+}
+div[data-baseweb="popover"] ul,
+div[data-baseweb="menu"],
+ul[role="listbox"]{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.12) !important;
+}
+div[data-baseweb="popover"] li,
+ul[role="listbox"] li{color:#0f172a !important;}
+div[data-baseweb="popover"] li:hover,
+ul[role="listbox"] li:hover{background:rgba(79,70,229,0.08) !important;}
+
+div[data-testid="stFileUploader"],
+div[data-testid="stFileUploader"] section,
+div[data-testid="stFileUploader"] > div{
+  background:#ffffff !important;
+  border-color:rgba(15,23,42,0.12) !important;
+  color:#0f172a !important;
+}
+div[data-testid="stFileUploader"] button{
+  background:rgba(79,70,229,0.08) !important;
+  color:#3730a3 !important;
+  border-color:rgba(79,70,229,0.22) !important;
+}
+
+.header-toolbar [data-testid="stPopover"] button,
+.header-toolbar [data-testid="stPopover"] > button{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.14) !important;
+  color:#334155 !important;
+}
+.header-toolbar [data-testid="stPopover"] button:hover{
+  background:#f8fafc !important;
+  border-color:rgba(79,70,229,0.28) !important;
+}
+
+.cgpt-composer{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.12) !important;
+  box-shadow:0 4px 16px rgba(15,23,42,0.05) !important;
+}
+div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-chat_answer_mode"]){
+  background:transparent !important;
+}
+
+.mod-context-banner{color:#047857 !important;background:rgba(5,150,105,0.08) !important;}
+.okf-citation{color:#0369a1 !important;background:rgba(14,165,233,0.08) !important;}
+.badge-modified{color:#047857 !important;}
+.oob-card{background:#fffbeb !important;border-color:rgba(217,119,6,0.2) !important;color:#92400e !important;}
+
+/* Light mode: hero bar from ASK_ALIGN (dark gradient base) */
+div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-ui_theme"]){
+  background:linear-gradient(115deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96)) !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+}
+div[class*="st-key-ui_theme"] div[data-baseweb="select"] > div{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.16) !important;
+  color:#0f172a !important;
+}
+div[class*="st-key-chat_answer_mode"] div[data-baseweb="select"] > div{
+  background:#f8fafc !important;
+  border:1px solid rgba(15,23,42,0.14) !important;
+  color:#0f172a !important;
+}
 """
 
 AI_THEME_CSS = r"""

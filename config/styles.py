@@ -1883,9 +1883,14 @@ div[data-testid="stExpander"] details:hover summary{
 .dr-actions-row{margin:6px 0 2px;}
 .dr-icon-actions{
   display:flex;align-items:center;gap:6px;margin:4px 0 2px;
+  max-width:88px;
+}
+.dr-icon-actions [data-testid="stHorizontalBlock"]{
+  gap:6px !important;align-items:center !important;
+  flex-wrap:nowrap !important;width:auto !important;max-width:88px !important;
 }
 .dr-icon-actions [data-testid="column"]{
-  flex:0 0 auto !important;width:auto !important;min-width:0 !important;
+  flex:0 0 34px !important;width:34px !important;min-width:34px !important;max-width:34px !important;
 }
 .dr-icon-actions .stButton > button,
 .dr-icon-actions [data-testid="stPopover"] > button{

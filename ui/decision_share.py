@@ -64,6 +64,9 @@ def build_share_payload(
     evidence: dict | None = None,
     elapsed: float | None = None,
     sql: str | None = None,
+    chart_x: str | None = None,
+    chart_y: str | None = None,
+    chart_type: str | None = None,
 ) -> dict[str, Any]:
     """Normalize query/chat bundle into a shareable decision payload."""
     narr = narration or {}
@@ -91,6 +94,9 @@ def build_share_payload(
         "generated_at": _now_label(),
         "row_count": row_count,
         "col_count": col_count,
+        "chart_x": chart_x,
+        "chart_y": chart_y,
+        "chart_type": chart_type,
     }
 
 
@@ -145,34 +151,100 @@ def format_teams_message(payload: dict[str, Any]) -> str:
     )
 
 
-def _chart_png_bytes(result_df: pd.DataFrame | None, question: str = "") -> bytes | None:
+def _resolve_chart_axes(
+    result_df: pd.DataFrame,
+    question: str = "",
+    chart_x: str | None = None,
+    chart_y: str | None = None,
+    chart_type: str | None = None,
+) -> tuple[str, str, str]:
+    """Pick X/Y columns and chart type — mirrors Query tab chart defaults."""
+    cols = list(result_df.columns)
+    nums = result_df.select_dtypes(include="number").columns.tolist()
+    strs = result_df.select_dtypes(exclude="number").columns.tolist()
+    ct = (chart_type or "").strip().capitalize()
+    if ct not in ("Bar", "Line", "Pie", "Scatter", "Area"):
+        try:
+            from core.chart_engine import auto_chart_type
+            ct = auto_chart_type(result_df, question or "")
+        except Exception:
+            ct = "Bar"
+    x_col = chart_x if chart_x in cols else (strs[0] if strs else cols[0])
+    y_col = chart_y if chart_y in cols else (nums[0] if nums else cols[-1])
+    if x_col == y_col and len(cols) > 1:
+        y_col = nums[0] if nums and nums[0] != x_col else cols[-1]
+    return x_col, y_col, ct
+
+
+def _chart_png_bytes(
+    result_df: pd.DataFrame | None,
+    question: str = "",
+    *,
+    chart_x: str | None = None,
+    chart_y: str | None = None,
+    chart_type: str | None = None,
+) -> bytes | None:
     if not _MPL_OK or result_df is None or result_df.empty:
         return None
     try:
         nums = result_df.select_dtypes(include="number").columns.tolist()
-        strs = result_df.select_dtypes(exclude="number").columns.tolist()
         if not nums:
             return None
-        plot_df = result_df.head(12).copy()
-        if strs:
-            x_col = strs[0]
-            x_vals = plot_df[x_col].astype(str)
+        plot_df = result_df.head(20).copy()
+        x_col, y_col, ct = _resolve_chart_axes(
+            plot_df, question, chart_x, chart_y, chart_type,
+        )
+        if x_col not in plot_df.columns or y_col not in plot_df.columns:
+            return None
+        y_vals = pd.to_numeric(plot_df[y_col], errors="coerce")
+        if y_vals.isna().all():
+            return None
+        x_vals = plot_df[x_col].astype(str).tolist()
+        y_plot = y_vals.fillna(0).astype(float).tolist()
+
+        fig, ax = plt.subplots(figsize=(7.5, 3.4))
+        fig.patch.set_facecolor("white")
+        ax.set_facecolor("#fafafa")
+        title = str(question or "Chart")[:72]
+        color = "#6366f1"
+        if ct == "Line":
+            ax.plot(range(len(x_vals)), y_plot, color=color, marker="o", linewidth=2, markersize=4)
+            ax.set_xticks(range(len(x_vals)))
+            ax.set_xticklabels(x_vals, rotation=35, ha="right", fontsize=7)
+        elif ct == "Pie" and len(x_vals) <= 12:
+            ax.pie(y_plot, labels=x_vals, autopct="%1.0f%%", textprops={"fontsize": 7})
+        elif ct == "Area":
+            ax.fill_between(range(len(x_vals)), y_plot, alpha=0.35, color=color)
+            ax.plot(range(len(x_vals)), y_plot, color=color, linewidth=2)
+            ax.set_xticks(range(len(x_vals)))
+            ax.set_xticklabels(x_vals, rotation=35, ha="right", fontsize=7)
+        elif ct == "Scatter":
+            ax.scatter(range(len(x_vals)), y_plot, color=color, s=36)
+            ax.set_xticks(range(len(x_vals)))
+            ax.set_xticklabels(x_vals, rotation=35, ha="right", fontsize=7)
         else:
-            x_vals = [str(i + 1) for i in range(len(plot_df))]
-        y_col = nums[0]
-        fig, ax = plt.subplots(figsize=(7, 3.2))
-        ax.bar(x_vals, plot_df[y_col].astype(float), color="#6366f1")
-        ax.set_title(str(question or "Chart")[:60], fontsize=10)
-        ax.tick_params(axis="x", rotation=35, labelsize=7)
+            ax.bar(range(len(x_vals)), y_plot, color=color, width=0.65)
+            ax.set_xticks(range(len(x_vals)))
+            ax.set_xticklabels(x_vals, rotation=35, ha="right", fontsize=7)
+        ax.set_title(title, fontsize=10, color="#1e293b", pad=8)
         ax.tick_params(axis="y", labelsize=7)
+        ax.grid(axis="y", alpha=0.25, linestyle="--")
         fig.tight_layout()
         buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
+        fig.savefig(buf, format="png", dpi=130, bbox_inches="tight", facecolor="white")
         plt.close(fig)
         buf.seek(0)
         return buf.read()
     except Exception:
         return None
+
+
+def _chart_export_kwargs(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "chart_x": payload.get("chart_x"),
+        "chart_y": payload.get("chart_y"),
+        "chart_type": payload.get("chart_type"),
+    }
 
 
 def payload_headline(_df) -> str:
@@ -192,7 +264,10 @@ def build_html_brief(payload: dict[str, Any]) -> str:
     rec = html.escape(payload.get("recommendation") or "")
 
     chart_html = ""
-    png = _chart_png_bytes(payload.get("result_df"), payload.get("question", ""))
+    ck = _chart_export_kwargs(payload)
+    png = _chart_png_bytes(
+        payload.get("result_df"), payload.get("question", ""), **ck,
+    )
     if png:
         b64 = base64.b64encode(png).decode("ascii")
         chart_html = f'<h2>Chart</h2><img src="data:image/png;base64,{b64}" style="max-width:100%;height:auto;" alt="Chart"/>'
@@ -252,7 +327,6 @@ def build_pdf_bytes(payload: dict[str, Any]) -> bytes | None:
         from reportlab.lib.units import cm
         from reportlab.platypus import (
             Image as RLImage,
-            PageBreak,
             Paragraph,
             SimpleDocTemplate,
             Spacer,
@@ -286,30 +360,32 @@ def build_pdf_bytes(payload: dict[str, Any]) -> bytes | None:
                 body_style,
             ))
 
-        png = _chart_png_bytes(payload.get("result_df"), payload.get("question", ""))
+        ck = _chart_export_kwargs(payload)
+        png = _chart_png_bytes(
+            payload.get("result_df"), payload.get("question", ""), **ck,
+        )
         table_data = _table_rows_for_export(payload.get("result_df"))
 
-        if png or table_data:
-            story.append(PageBreak())
-            if png:
-                story.append(Paragraph("Chart", styles["Heading2"]))
-                story.append(Spacer(1, 0.2 * cm))
-                story.append(RLImage(io.BytesIO(png), width=16 * cm, height=7 * cm))
-                story.append(Spacer(1, 0.4 * cm))
-            if table_data:
-                story.append(Paragraph("Data table", styles["Heading2"]))
-                story.append(Spacer(1, 0.2 * cm))
-                tbl = Table(table_data, repeatRows=1)
-                tbl.setStyle(TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eef2ff")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ]))
-                story.append(tbl)
+        if png:
+            story.append(Spacer(1, 0.45 * cm))
+            story.append(Paragraph("Chart", styles["Heading2"]))
+            story.append(Spacer(1, 0.15 * cm))
+            story.append(RLImage(io.BytesIO(png), width=16 * cm, height=6.5 * cm))
+        if table_data:
+            story.append(Spacer(1, 0.35 * cm))
+            story.append(Paragraph("Data table", styles["Heading2"]))
+            story.append(Spacer(1, 0.15 * cm))
+            tbl = Table(table_data, repeatRows=1)
+            tbl.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eef2ff")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]))
+            story.append(tbl)
 
         story.append(Spacer(1, 0.5 * cm))
         story.append(Paragraph(html.escape(_evidence_line(payload.get("evidence"))[:120]), meta_style))
@@ -368,40 +444,45 @@ def build_pptx_bytes(payload: dict[str, Any]) -> bytes | None:
             p.font.bold = True
 
         rdf = payload.get("result_df")
-        png = _chart_png_bytes(rdf, payload.get("question", ""))
+        ck = _chart_export_kwargs(payload)
+        png = _chart_png_bytes(rdf, payload.get("question", ""), **ck)
         table_data = _table_rows_for_export(rdf)
 
-        # Slide 2 — chart
-        if png:
+        if png or table_data:
             slide2 = prs.slides.add_slide(prs.slide_layouts[6])
-            t2 = slide2.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.5))
-            t2.text_frame.text = "Chart"
-            t2.text_frame.paragraphs[0].font.size = Pt(18)
-            t2.text_frame.paragraphs[0].font.bold = True
-            slide2.shapes.add_picture(io.BytesIO(png), Inches(0.6), Inches(0.9), width=Inches(8.8))
-
-        # Slide 3 — table
-        if table_data:
-            slide3 = prs.slides.add_slide(prs.slide_layouts[6])
-            t3 = slide3.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.5))
-            t3.text_frame.text = "Data table"
-            t3.text_frame.paragraphs[0].font.size = Pt(18)
-            t3.text_frame.paragraphs[0].font.bold = True
-            nrows = len(table_data)
-            ncols = len(table_data[0]) if table_data else 1
-            tbl_shape = slide3.shapes.add_table(
-                nrows, ncols, Inches(0.4), Inches(0.85), Inches(9.2), Inches(0.35 * nrows + 0.3)
-            )
-            table = tbl_shape.table
-            for ri, row in enumerate(table_data):
-                for ci, val in enumerate(row):
-                    cell = table.cell(ri, ci)
-                    cell.text = str(val)
-                    if ri == 0:
-                        cell.text_frame.paragraphs[0].font.bold = True
-                        cell.text_frame.paragraphs[0].font.size = Pt(9)
-                    else:
-                        cell.text_frame.paragraphs[0].font.size = Pt(8)
+            y_off = 0.35
+            if png:
+                t2 = slide2.shapes.add_textbox(Inches(0.5), Inches(y_off), Inches(9), Inches(0.45))
+                t2.text_frame.text = "Chart"
+                t2.text_frame.paragraphs[0].font.size = Pt(16)
+                t2.text_frame.paragraphs[0].font.bold = True
+                slide2.shapes.add_picture(
+                    io.BytesIO(png), Inches(0.55), Inches(y_off + 0.55), width=Inches(8.9),
+                )
+                y_off = 4.15
+            if table_data:
+                t3 = slide2.shapes.add_textbox(Inches(0.5), Inches(y_off), Inches(9), Inches(0.45))
+                t3.text_frame.text = "Data table"
+                t3.text_frame.paragraphs[0].font.size = Pt(16)
+                t3.text_frame.paragraphs[0].font.bold = True
+                nrows = len(table_data)
+                ncols = len(table_data[0]) if table_data else 1
+                tbl_h = min(0.32 * nrows + 0.25, 2.8 if png else 5.5)
+                tbl_shape = slide2.shapes.add_table(
+                    nrows, ncols,
+                    Inches(0.45), Inches(y_off + 0.5),
+                    Inches(9.1), Inches(tbl_h),
+                )
+                table = tbl_shape.table
+                for ri, row in enumerate(table_data):
+                    for ci, val in enumerate(row):
+                        cell = table.cell(ri, ci)
+                        cell.text = str(val)
+                        if ri == 0:
+                            cell.text_frame.paragraphs[0].font.bold = True
+                            cell.text_frame.paragraphs[0].font.size = Pt(9)
+                        else:
+                            cell.text_frame.paragraphs[0].font.size = Pt(8)
 
         buf = io.BytesIO()
         prs.save(buf)
@@ -526,7 +607,7 @@ def render_share_and_pin(
         return
 
     st.markdown('<div class="dr-icon-actions">', unsafe_allow_html=True)
-    ic1, ic2, _ = st.columns([0.28, 0.28, 12], gap="small")
+    ic1, ic2 = st.columns([1, 1], gap="small")
     with ic1:
         if show_pin and st.button(
             "📌",

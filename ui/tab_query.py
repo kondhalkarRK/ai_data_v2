@@ -625,6 +625,12 @@ def _render_ask_bundle(bundle, working_df):
         st.markdown('<div class="chat-results-label">Insight</div>', unsafe_allow_html=True)
         render_narration_card(narr)
 
+    cols = list(result_df.columns)
+    nums = result_df.select_dtypes(include="number").columns.tolist()
+    strs = result_df.select_dtypes(exclude="number").columns.tolist()
+    ct = auto_chart_type(result_df, question)
+    share_x = strs[0] if strs else cols[0]
+    share_y = nums[0] if nums else cols[-1]
     share_payload = build_share_payload(
         question=question,
         narration=narr,
@@ -632,10 +638,11 @@ def _render_ask_bundle(bundle, working_df):
         evidence=evidence,
         elapsed=elapsed,
         sql=sql,
+        chart_x=share_x,
+        chart_y=share_y,
+        chart_type=ct,
     )
-    st.markdown('<div class="dr-icon-actions">', unsafe_allow_html=True)
     render_share_and_pin(share_payload, key_prefix=f"ask_{abs(hash(question)) % 99999}")
-    st.markdown("</div>", unsafe_allow_html=True)
 
     # Details collapsed (same pattern as Decision Room)
     with st.expander("🔎 Details (semantic, trust, SQL)", expanded=False):
@@ -1739,14 +1746,19 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
             evidence=evidence,
             elapsed=elapsed,
             sql=data.get("sql"),
+            chart_x=(rdf.select_dtypes(exclude="number").columns.tolist()[0]
+                     if isinstance(rdf, pd.DataFrame) and len(rdf.select_dtypes(exclude="number").columns)
+                     else (list(rdf.columns)[0] if isinstance(rdf, pd.DataFrame) and len(rdf.columns) else None)),
+            chart_y=(rdf.select_dtypes(include="number").columns.tolist()[0]
+                     if isinstance(rdf, pd.DataFrame) and len(rdf.select_dtypes(include="number").columns)
+                     else None),
+            chart_type=auto_chart_type(rdf, src_q) if isinstance(rdf, pd.DataFrame) else None,
         )
         if share_payload.get("headline") or (
             isinstance(rdf, pd.DataFrame) and not rdf.empty
         ):
             key_p = f"chat_{msg.get('timestamp', '')}_{abs(hash(src_q)) % 99999}"
-            st.markdown('<div class="dr-icon-actions">', unsafe_allow_html=True)
             render_share_and_pin(share_payload, key_prefix=key_p)
-            st.markdown("</div>", unsafe_allow_html=True)
 
         if show_table or show_narr:
             with st.expander("🔎 Details (trust, context, SQL)", expanded=False):
