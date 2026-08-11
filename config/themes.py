@@ -292,6 +292,150 @@ div[class*="st-key-chat_answer_mode"] div[data-baseweb="select"] > div{
   border:1px solid rgba(15,23,42,0.14) !important;
   color:#0f172a !important;
 }
+
+/* ── Light: tabs, sections, chat shell, decision room ── */
+.tab-section-eyebrow{color:#4338ca !important;}
+.tab-section-sub{color:#64748b !important;}
+.cgpt-chat-shell{
+  background:linear-gradient(180deg,#ffffff,#f8fafc) !important;
+  border:1px solid rgba(15,23,42,0.10) !important;
+  box-shadow:0 8px 24px rgba(15,23,42,0.06) !important;
+}
+.cgpt-composer{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.12) !important;
+  box-shadow:0 4px 16px rgba(15,23,42,0.05) !important;
+}
+.cgpt-composer-hint{color:#64748b !important;}
+.dr-landing-eyebrow{color:#4338ca !important;}
+.dr-landing-title{color:#0f172a !important;}
+.dr-landing-sub{color:#64748b !important;}
+.dr-priority-card{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.10) !important;
+}
+.dr-priority-title{color:#0f172a !important;}
+.dr-priority-summary{color:#64748b !important;}
+.dr-pinned-label{color:#4338ca !important;}
+.dr-pin-card{
+  background:#f8fafc !important;
+  border:1px solid rgba(79,70,229,0.18) !important;
+}
+.dr-pin-headline{color:#0f172a !important;}
+.dr-pin-meta{color:#64748b !important;}
+.dr-share-link{
+  background:rgba(79,70,229,0.08) !important;
+  border-color:rgba(79,70,229,0.22) !important;
+  color:#3730a3 !important;
+}
+.dr-icon-actions .stButton > button,
+.dr-icon-actions [data-testid="stPopover"] > button{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.14) !important;
+  color:#334155 !important;
+}
+
+[data-testid="stTabs"] [role="tablist"]{
+  background:#f1f5f9 !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+}
+[data-testid="stTabs"] [role="tabpanel"],
+[data-testid="stTabs"] > div > div{
+  background:transparent !important;
+}
+.stTabs [role="tablist"] button{
+  color:#64748b !important;
+  background:transparent !important;
+}
+.stTabs [role="tablist"] button[aria-selected="true"]{
+  color:#4338ca !important;
+  background:#ffffff !important;
+  border-bottom:2px solid #4f46e5 !important;
+}
+
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) [data-testid="stChatMessageContent"]{
+  background:linear-gradient(145deg,#eef2ff,#e0e7ff) !important;
+  color:#1e1b4b !important;
+  border:1px solid rgba(79,70,229,0.15) !important;
+}
+[data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])) [data-testid="stChatMessageContent"]{
+  background:#ffffff !important;
+  color:#0f172a !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+}
+
+.result-header-bar,.result-stat-pill{
+  color:#475569 !important;
+}
+.badge-semantic,.badge-cached,.badge-fallback,.badge-deterministic{
+  color:#334155 !important;
+}
+.card-query,.card-chat,.card-whatif,.card-surprise{
+  background:#ffffff !important;
+  border-color:rgba(15,23,42,0.08) !important;
+  color:#0f172a !important;
+}
+.surprise-header,.surprise-highlight,.surprise-rec-title{color:#0f172a !important;}
+.finding-bullet{color:#334155 !important;}
+
+[data-testid="stStatusWidget"],
+[data-testid="stAlert"],
+.stAlert{
+  background:#ffffff !important;
+  color:#0f172a !important;
+  border-color:rgba(15,23,42,0.10) !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]{
+  background:#ffffff !important;
+  border-color:rgba(15,23,42,0.10) !important;
+}
+section[data-testid="stMain"] > div > div > div > div{
+  color:#0f172a;
+}
+
+/* Popover / download menus */
+[data-testid="stPopoverBody"],
+div[data-baseweb="popover"]{
+  background:#ffffff !important;
+  color:#0f172a !important;
+  border:1px solid rgba(15,23,42,0.12) !important;
+}
+[data-testid="stPopoverBody"] p,
+[data-testid="stPopoverBody"] label,
+[data-testid="stPopoverBody"] span{color:#0f172a !important;}
+
+/* Plotly + code blocks */
+.js-plotly-plot .plotly,.stPlotlyChart{background:#ffffff !important;}
+div[data-testid="stCode"] pre,
+div[data-testid="stCode"] code{
+  background:#f1f5f9 !important;
+  color:#0f172a !important;
+}
+
+/* KPI / join / preview panels — kill dark grey panels */
+.kpi-filter-panel,.kpi-side-panel,.preview-hero,.dq-panel,
+[data-testid="stMain"] [data-testid="stVerticalBlock"] > div[style*="background"]{
+  background:transparent !important;
+}
+.stat-card,.dq-stat-box,.kpi-chart-card{
+  background:#ffffff !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+}
+.small-badge,.result-stat-pill{
+  background:rgba(79,70,229,0.06) !important;
+  color:#4338ca !important;
+  border:1px solid rgba(79,70,229,0.12) !important;
+}
+
+/* Override dark hero strip from ASK_ALIGN when light */
+div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-ui_theme"]):before{
+  background:linear-gradient(90deg,#4f46e5,#7c3aed,#059669,#4f46e5) !important;
+}
+div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-ui_theme"]){
+  background:linear-gradient(115deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96)) !important;
+  border:1px solid rgba(15,23,42,0.08) !important;
+}
+.header-toolbar{color:#0f172a !important;}
 """
 
 AI_THEME_CSS = r"""

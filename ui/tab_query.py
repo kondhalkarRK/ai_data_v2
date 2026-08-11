@@ -633,7 +633,7 @@ def _render_ask_bundle(bundle, working_df):
         elapsed=elapsed,
         sql=sql,
     )
-    st.markdown('<div class="dr-actions-row">', unsafe_allow_html=True)
+    st.markdown('<div class="dr-icon-actions">', unsafe_allow_html=True)
     render_share_and_pin(share_payload, key_prefix=f"ask_{abs(hash(question)) % 99999}")
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1744,7 +1744,7 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
             isinstance(rdf, pd.DataFrame) and not rdf.empty
         ):
             key_p = f"chat_{msg.get('timestamp', '')}_{abs(hash(src_q)) % 99999}"
-            st.markdown('<div class="dr-actions-row">', unsafe_allow_html=True)
+            st.markdown('<div class="dr-icon-actions">', unsafe_allow_html=True)
             render_share_and_pin(share_payload, key_prefix=key_p)
             st.markdown("</div>", unsafe_allow_html=True)
 

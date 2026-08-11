@@ -1880,7 +1880,23 @@ div[data-testid="stExpander"] details:hover summary{
   font-size:13px;font-weight:600;
 }
 .dr-share-link:hover{background:rgba(99,102,241,0.28);}
-.dr-actions-row{margin:10px 0 4px;}
+.dr-actions-row{margin:6px 0 2px;}
+.dr-icon-actions{
+  display:flex;align-items:center;gap:6px;margin:4px 0 2px;
+}
+.dr-icon-actions [data-testid="column"]{
+  flex:0 0 auto !important;width:auto !important;min-width:0 !important;
+}
+.dr-icon-actions .stButton > button,
+.dr-icon-actions [data-testid="stPopover"] > button{
+  width:34px !important;min-width:34px !important;max-width:34px !important;
+  height:34px !important;min-height:34px !important;
+  padding:0 !important;margin:0 !important;
+  font-size:15px !important;line-height:1 !important;
+  border-radius:8px !important;
+  display:inline-flex !important;align-items:center !important;justify-content:center !important;
+}
+.dr-icon-actions [data-testid="stPopover"]{margin:0 !important;}
 """ + theme_css(theme) + r"""
 </style>
 

@@ -26,7 +26,6 @@ except ImportError:
 try:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import cm
-    from reportlab.pdfgen import canvas as pdf_canvas
     _PDF_OK = True
 except ImportError:
     _PDF_OK = False
@@ -154,11 +153,15 @@ def _chart_png_bytes(result_df: pd.DataFrame | None, question: str = "") -> byte
         strs = result_df.select_dtypes(exclude="number").columns.tolist()
         if not nums:
             return None
-        x_col = strs[0] if strs else result_df.columns[0]
-        y_col = nums[0]
         plot_df = result_df.head(12).copy()
+        if strs:
+            x_col = strs[0]
+            x_vals = plot_df[x_col].astype(str)
+        else:
+            x_vals = [str(i + 1) for i in range(len(plot_df))]
+        y_col = nums[0]
         fig, ax = plt.subplots(figsize=(7, 3.2))
-        ax.bar(plot_df[x_col].astype(str), plot_df[y_col].astype(float), color="#6366f1")
+        ax.bar(x_vals, plot_df[y_col].astype(float), color="#6366f1")
         ax.set_title(str(question or "Chart")[:60], fontsize=10)
         ax.tick_params(axis="x", rotation=35, labelsize=7)
         ax.tick_params(axis="y", labelsize=7)
@@ -177,7 +180,9 @@ def payload_headline(_df) -> str:
 
 
 def build_html_brief(payload: dict[str, Any]) -> str:
-    """Print-friendly HTML brief (PDF fallback)."""
+    """Print-friendly HTML brief (PDF fallback) with chart + table."""
+    import base64
+
     paras = "".join(
         f"<p>{html.escape(p)}</p>" for p in (payload.get("paragraphs") or [])
     )
@@ -185,12 +190,34 @@ def build_html_brief(payload: dict[str, Any]) -> str:
         f"<li>{html.escape(f)}</li>" for f in (payload.get("findings") or [])
     )
     rec = html.escape(payload.get("recommendation") or "")
+
+    chart_html = ""
+    png = _chart_png_bytes(payload.get("result_df"), payload.get("question", ""))
+    if png:
+        b64 = base64.b64encode(png).decode("ascii")
+        chart_html = f'<h2>Chart</h2><img src="data:image/png;base64,{b64}" style="max-width:100%;height:auto;" alt="Chart"/>'
+
+    table_html = ""
+    table_data = _table_rows_for_export(payload.get("result_df"))
+    if table_data:
+        header = "".join(f"<th>{html.escape(c)}</th>" for c in table_data[0])
+        body_rows = ""
+        for row in table_data[1:]:
+            body_rows += "<tr>" + "".join(f"<td>{html.escape(c)}</td>" for c in row) + "</tr>"
+        table_html = (
+            "<h2>Data table</h2>"
+            f'<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:12px">'
+            f"<thead><tr>{header}</tr></thead><tbody>{body_rows}</tbody></table>"
+        )
+
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Decision Brief</title>
 <style>
 body{{font-family:Segoe UI,Arial,sans-serif;max-width:720px;margin:40px auto;padding:0 24px;color:#1e293b}}
-h1{{font-size:22px;color:#4338ca}} .meta{{color:#64748b;font-size:13px}}
+h1{{font-size:22px;color:#4338ca}} h2{{font-size:16px;color:#4338ca;margin-top:24px}}
+.meta{{color:#64748b;font-size:13px}}
 .rec{{background:#f1f5f9;padding:12px;border-radius:8px;margin-top:16px}}
+table th{{background:#eef2ff;text-align:left}}
 footer{{margin-top:32px;font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px}}
 </style></head><body>
 <h1>{html.escape(payload.get('headline', 'Decision Brief'))}</h1>
@@ -198,52 +225,96 @@ footer{{margin-top:32px;font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f
 {paras}
 {"<ul>" + findings + "</ul>" if findings else ""}
 {"<div class='rec'><strong>Recommendation:</strong> " + rec + "</div>" if rec else ""}
+{chart_html}
+{table_html}
 <footer>AI Data Platform · Decision Room · {_evidence_line(payload.get('evidence'))}</footer>
 </body></html>"""
+
+
+def _table_rows_for_export(result_df: pd.DataFrame | None, max_rows: int = 15, max_cols: int = 6) -> list[list[str]]:
+    if result_df is None or result_df.empty:
+        return []
+    df = result_df.head(max_rows).copy()
+    cols = list(df.columns[:max_cols])
+    rows = [cols]
+    for _, row in df.iterrows():
+        rows.append([str(row[c])[:28] for c in cols])
+    return rows
 
 
 def build_pdf_bytes(payload: dict[str, Any]) -> bytes | None:
     if not _PDF_OK:
         return None
     try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            Image as RLImage,
+            PageBreak,
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
+
         buf = io.BytesIO()
-        c = pdf_canvas.Canvas(buf, pagesize=A4)
-        w, h = A4
-        y = h - 2 * cm
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(2 * cm, y, (payload.get("headline") or "Decision Brief")[:70])
-        y -= 0.8 * cm
-        c.setFont("Helvetica", 9)
-        c.drawString(2 * cm, y, f"Question: {(payload.get('question') or '')[:90]}")
-        y -= 0.5 * cm
-        c.drawString(2 * cm, y, f"Generated: {payload.get('generated_at', '')}")
-        y -= 0.8 * cm
-        c.setFont("Helvetica", 10)
-        for para in (payload.get("paragraphs") or [])[:6]:
-            for line in _wrap_text(para, 90):
-                if y < 3 * cm:
-                    c.showPage()
-                    y = h - 2 * cm
-                    c.setFont("Helvetica", 10)
-                c.drawString(2 * cm, y, line)
-                y -= 0.45 * cm
-            y -= 0.25 * cm
+        doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.5 * cm, rightMargin=1.5 * cm,
+                                topMargin=1.5 * cm, bottomMargin=1.5 * cm)
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("Title", parent=styles["Heading1"], fontSize=16, spaceAfter=8)
+        body_style = ParagraphStyle("Body", parent=styles["Normal"], fontSize=10, leading=14)
+        meta_style = ParagraphStyle("Meta", parent=styles["Normal"], fontSize=9, textColor=colors.grey)
+
+        story = []
+        story.append(Paragraph(payload.get("headline") or "Decision Brief", title_style))
+        story.append(Paragraph(
+            f"Question: {html.escape(payload.get('question') or '')}<br/>"
+            f"Generated: {html.escape(payload.get('generated_at', ''))}",
+            meta_style,
+        ))
+        story.append(Spacer(1, 0.3 * cm))
+
+        for para in (payload.get("paragraphs") or [])[:4]:
+            story.append(Paragraph(html.escape(para), body_style))
+            story.append(Spacer(1, 0.15 * cm))
         if payload.get("recommendation"):
-            y -= 0.3 * cm
-            c.setFont("Helvetica-Bold", 10)
-            c.drawString(2 * cm, y, "Recommendation:")
-            y -= 0.45 * cm
-            c.setFont("Helvetica", 10)
-            for line in _wrap_text(payload["recommendation"], 90):
-                c.drawString(2 * cm, y, line)
-                y -= 0.45 * cm
+            story.append(Paragraph(
+                f"<b>Recommendation:</b> {html.escape(payload['recommendation'])}",
+                body_style,
+            ))
+
         png = _chart_png_bytes(payload.get("result_df"), payload.get("question", ""))
-        if png and y > 6 * cm:
-            from reportlab.lib.utils import ImageReader
-            c.drawImage(ImageReader(io.BytesIO(png)), 2 * cm, 2 * cm, width=14 * cm, height=6 * cm, preserveAspectRatio=True)
-        c.setFont("Helvetica", 8)
-        c.drawString(2 * cm, 1.2 * cm, _evidence_line(payload.get("evidence"))[:100])
-        c.save()
+        table_data = _table_rows_for_export(payload.get("result_df"))
+
+        if png or table_data:
+            story.append(PageBreak())
+            if png:
+                story.append(Paragraph("Chart", styles["Heading2"]))
+                story.append(Spacer(1, 0.2 * cm))
+                story.append(RLImage(io.BytesIO(png), width=16 * cm, height=7 * cm))
+                story.append(Spacer(1, 0.4 * cm))
+            if table_data:
+                story.append(Paragraph("Data table", styles["Heading2"]))
+                story.append(Spacer(1, 0.2 * cm))
+                tbl = Table(table_data, repeatRows=1)
+                tbl.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eef2ff")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ]))
+                story.append(tbl)
+
+        story.append(Spacer(1, 0.5 * cm))
+        story.append(Paragraph(html.escape(_evidence_line(payload.get("evidence"))[:120]), meta_style))
+
+        doc.build(story)
         buf.seek(0)
         return buf.read()
     except Exception:
@@ -269,37 +340,68 @@ def build_pptx_bytes(payload: dict[str, Any]) -> bytes | None:
     if not _PPT_OK:
         return None
     try:
-        prs = Presentation()
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.35), Inches(9), Inches(1))
-        tf = title_box.text_frame
-        tf.text = payload.get("headline") or "Decision Brief"
-        tf.paragraphs[0].font.size = Pt(24)
-        tf.paragraphs[0].font.bold = True
+        from pptx.util import Inches, Pt
 
-        sub = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9), Inches(0.5))
+        prs = Presentation()
+        # Slide 1 — brief
+        slide1 = prs.slides.add_slide(prs.slide_layouts[6])
+        tb = slide1.shapes.add_textbox(Inches(0.5), Inches(0.35), Inches(9), Inches(1))
+        tb.text_frame.text = payload.get("headline") or "Decision Brief"
+        tb.text_frame.paragraphs[0].font.size = Pt(24)
+        tb.text_frame.paragraphs[0].font.bold = True
+        sub = slide1.shapes.add_textbox(Inches(0.5), Inches(1.15), Inches(9), Inches(0.45))
         sub.text_frame.text = f"{payload.get('question', '')} · {payload.get('generated_at', '')}"
         sub.text_frame.paragraphs[0].font.size = Pt(11)
-
-        body = slide.shapes.add_textbox(Inches(0.5), Inches(1.85), Inches(5.2), Inches(4.5))
+        body = slide1.shapes.add_textbox(Inches(0.5), Inches(1.75), Inches(9), Inches(4.8))
         btf = body.text_frame
         btf.word_wrap = True
         first = True
-        for para in (payload.get("paragraphs") or [])[:4]:
+        for para in (payload.get("paragraphs") or [])[:3]:
             p = btf.paragraphs[0] if first else btf.add_paragraph()
             first = False
             p.text = para
             p.font.size = Pt(13)
-            p.level = 0
         if payload.get("recommendation"):
             p = btf.add_paragraph()
             p.text = f"Recommendation: {payload['recommendation']}"
             p.font.size = Pt(12)
             p.font.bold = True
 
-        png = _chart_png_bytes(payload.get("result_df"), payload.get("question", ""))
+        rdf = payload.get("result_df")
+        png = _chart_png_bytes(rdf, payload.get("question", ""))
+        table_data = _table_rows_for_export(rdf)
+
+        # Slide 2 — chart
         if png:
-            slide.shapes.add_picture(io.BytesIO(png), Inches(5.9), Inches(1.85), width=Inches(3.8))
+            slide2 = prs.slides.add_slide(prs.slide_layouts[6])
+            t2 = slide2.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.5))
+            t2.text_frame.text = "Chart"
+            t2.text_frame.paragraphs[0].font.size = Pt(18)
+            t2.text_frame.paragraphs[0].font.bold = True
+            slide2.shapes.add_picture(io.BytesIO(png), Inches(0.6), Inches(0.9), width=Inches(8.8))
+
+        # Slide 3 — table
+        if table_data:
+            slide3 = prs.slides.add_slide(prs.slide_layouts[6])
+            t3 = slide3.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.5))
+            t3.text_frame.text = "Data table"
+            t3.text_frame.paragraphs[0].font.size = Pt(18)
+            t3.text_frame.paragraphs[0].font.bold = True
+            nrows = len(table_data)
+            ncols = len(table_data[0]) if table_data else 1
+            tbl_shape = slide3.shapes.add_table(
+                nrows, ncols, Inches(0.4), Inches(0.85), Inches(9.2), Inches(0.35 * nrows + 0.3)
+            )
+            table = tbl_shape.table
+            for ri, row in enumerate(table_data):
+                for ci, val in enumerate(row):
+                    cell = table.cell(ri, ci)
+                    cell.text = str(val)
+                    if ri == 0:
+                        cell.text_frame.paragraphs[0].font.bold = True
+                        cell.text_frame.paragraphs[0].font.size = Pt(9)
+                    else:
+                        cell.text_frame.paragraphs[0].font.size = Pt(8)
 
         buf = io.BytesIO()
         prs.save(buf)
@@ -419,20 +521,24 @@ def render_share_and_pin(
     *,
     show_pin: bool = True,
 ) -> None:
-    """Unified Share popover + Pin button for query/chat results."""
+    """Compact icon-only Pin + Share for query/chat results."""
     if not payload.get("headline") and not payload.get("question"):
         return
 
-    col_pin, col_share = st.columns([1, 1.2])
-    with col_pin:
-        if show_pin and st.button("📌 Pin", key=f"{key_prefix}_pin", use_container_width=True):
+    st.markdown('<div class="dr-icon-actions">', unsafe_allow_html=True)
+    ic1, ic2, _ = st.columns([0.28, 0.28, 12], gap="small")
+    with ic1:
+        if show_pin and st.button(
+            "📌",
+            key=f"{key_prefix}_pin",
+            help="Pin to Decision Room",
+        ):
             pin_decision(payload)
             st.toast("Pinned to Decision Room", icon="📌")
             st.rerun()
-
-    with col_share:
-        with st.popover("📤 Share", use_container_width=True):
-            st.caption("Share this decision brief to email, Teams, or slides.")
+    with ic2:
+        with st.popover("📤", help="Share decision brief"):
+            st.caption("Share brief, chart, and table.")
             brief = format_executive_brief(payload)
             teams_msg = format_teams_message(payload)
 
@@ -442,7 +548,7 @@ def render_share_and_pin(
 
             copy_text = st.session_state.get(f"{key_prefix}_copy_text")
             if copy_text:
-                st.text_area("Copy to clipboard", value=copy_text, height=120, key=f"{key_prefix}_ta")
+                st.text_area("Copy to clipboard", value=copy_text, height=100, key=f"{key_prefix}_ta")
 
             subject = urllib.parse.quote(f"Decision Brief: {(payload.get('headline') or 'Insight')[:60]}")
             body = urllib.parse.quote(brief[:3500])
@@ -458,12 +564,12 @@ def render_share_and_pin(
 
             teams_text = st.session_state.get(f"{key_prefix}_teams_text")
             if teams_text:
-                st.text_area("Paste into Teams", value=teams_text, height=100, key=f"{key_prefix}_teams_ta")
+                st.text_area("Paste into Teams", value=teams_text, height=90, key=f"{key_prefix}_teams_ta")
 
             pdf_bytes = build_pdf_bytes(payload)
             if pdf_bytes:
                 st.download_button(
-                    "📄 Download PDF",
+                    "📄 Download PDF (brief + chart + table)",
                     data=pdf_bytes,
                     file_name="decision_brief.pdf",
                     mime="application/pdf",
@@ -483,7 +589,7 @@ def render_share_and_pin(
             ppt_bytes = build_pptx_bytes(payload)
             if ppt_bytes:
                 st.download_button(
-                    "📊 Download PowerPoint",
+                    "📊 Download PowerPoint (brief + chart + table)",
                     data=ppt_bytes,
                     file_name="decision_brief.pptx",
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -503,3 +609,4 @@ def render_share_and_pin(
                     key=f"{key_prefix}_csv",
                     use_container_width=True,
                 )
+    st.markdown("</div>", unsafe_allow_html=True)
