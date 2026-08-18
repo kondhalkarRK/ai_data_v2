@@ -644,7 +644,7 @@ def _render_ask_bundle(bundle, working_df):
     )
     render_share_and_pin(share_payload, key_prefix=f"ask_{abs(hash(question)) % 99999}")
 
-    # Details collapsed (same pattern as Decision Room)
+    # Details collapsed (same pattern as Chat Room)
     with st.expander("🔎 Details (semantic, trust, SQL)", expanded=False):
         _render_semantic_layer_status(question)
         try:
@@ -1903,18 +1903,18 @@ def render_chat_mode(working_df, tables, dfs):
         )
     st.session_state.chat_narration_on = mode in ("Narration", "Both")
     question = st.chat_input(
-        "Ask or refine a decision…",
+        "Ask a question about your data…",
         key="chat_main_input",
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
     clr_l, clr_r = st.columns([6, 1])
     with clr_r:
-        if st.button("Clear room", use_container_width=True, key="clear_chat_btn"):
+        if st.button("Clear chat", use_container_width=True, key="clear_chat_btn"):
             st.session_state.chat_messages = []
             clear_state()
             clear_sql_anchor()
-            st.toast("Decision Room cleared", icon="🗑")
+            st.toast("Chat Room cleared", icon="🗑")
             st.rerun()
 
     if pending_q:
@@ -1931,18 +1931,4 @@ def render(working_df, tables, dfs):
         st.warning("⚠️ No data available.")
         st.stop()
 
-    st.markdown(
-        """
-        <div style="margin-bottom:12px;">
-          <div class="tab-section-eyebrow">🏛️ DECISION ROOM</div>
-          <div class="tab-section-sub">Governed insights · evidence · pin &amp; share executive briefs</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    tab_q, tab_c = st.tabs(["⚡ Quick Query", "🏛️ Decision Room"])
-    with tab_q:
-        render_ask_mode(working_df, tables, dfs)
-    with tab_c:
-        render_chat_mode(working_df, tables, dfs)
+    render_chat_mode(working_df, tables, dfs)

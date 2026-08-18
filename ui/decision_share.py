@@ -53,7 +53,7 @@ def _evidence_line(evidence: dict | None) -> str:
     trust = ev.get("trust_score")
     if trust is not None:
         parts.append(f"Trust: {trust}/100")
-    return " · ".join(parts) if parts else "AI Data Platform — governed semantic analytics"
+    return " · ".join(parts) if parts else "ASK - DB — governed semantic analytics"
 
 
 def build_share_payload(
@@ -105,7 +105,7 @@ def format_executive_brief(payload: dict[str, Any], *, teams: bool = False) -> s
     q = payload.get("question") or "Analytics insight"
     lines = [
         "═" * 52,
-        "DECISION BRIEF — AI Data Platform",
+        "DECISION BRIEF — ASK - DB",
         f"Generated: {payload.get('generated_at', _now_label())}",
         "═" * 52,
         "",
@@ -131,7 +131,7 @@ def format_executive_brief(payload: dict[str, Any], *, teams: bool = False) -> s
         lines.append(f"Query time: {payload['elapsed']}s")
     lines.append(_evidence_line(payload.get("evidence")))
     lines.append("")
-    lines.append("— Shared from Decision Room · Capgemini AI Data Platform")
+    lines.append("— Shared from Chat Room · ASK - DB")
     if teams:
         lines.insert(0, "**Decision Brief** (paste into Microsoft Teams)")
     return "\n".join(lines).strip()
@@ -302,7 +302,7 @@ footer{{margin-top:32px;font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f
 {"<div class='rec'><strong>Recommendation:</strong> " + rec + "</div>" if rec else ""}
 {chart_html}
 {table_html}
-<footer>AI Data Platform · Decision Room · {_evidence_line(payload.get('evidence'))}</footer>
+<footer>ASK - DB · Chat Room · {_evidence_line(payload.get('evidence'))}</footer>
 </body></html>"""
 
 
@@ -520,7 +520,7 @@ def unpin_decision(pin_id: str) -> None:
 
 
 def render_pinned_strip(on_ask) -> None:
-    """Pinned decisions row — shown above Decision Room thread."""
+    """Pinned insights row — shown above Chat Room thread."""
     pins = st.session_state.get("pinned_decisions") or []
     if not pins:
         return
@@ -549,13 +549,13 @@ def render_pinned_strip(on_ask) -> None:
 
 
 def render_proactive_landing(working_df: pd.DataFrame, insights: list[dict], on_ask) -> None:
-    """Brief-style empty state for Decision Room."""
+    """Brief-style empty state for Chat Room."""
     st.markdown(
         """
         <div class="dr-landing">
-          <div class="dr-landing-eyebrow">🏛️ DECISION ROOM</div>
+          <div class="dr-landing-eyebrow">CHAT ROOM</div>
           <div class="dr-landing-title">Today's data priorities</div>
-          <div class="dr-landing-sub">Insights surfaced from your dataset — ask, refine, pin, or share decisions.</div>
+          <div class="dr-landing-sub">Insights from your dataset — ask, refine, pin, or share.</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -612,10 +612,10 @@ def render_share_and_pin(
         if show_pin and st.button(
             "📌",
             key=f"{key_prefix}_pin",
-            help="Pin to Decision Room",
+            help="Pin to Chat Room",
         ):
             pin_decision(payload)
-            st.toast("Pinned to Decision Room", icon="📌")
+            st.toast("Pinned to Chat Room", icon="📌")
             st.rerun()
     with ic2:
         with st.popover("📤", help="Share decision brief"):

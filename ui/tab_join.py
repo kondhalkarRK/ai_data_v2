@@ -13,7 +13,7 @@ from ui.safe_display import safe_dataframe
 
 def render(working_df, tables, dfs):
     if len(dfs) == 1:
-        st.info("Only one table loaded — no joining needed. Go to AI Query.")
+        st.info("Only one table loaded — no joining needed.")
         return
 
     semantic_used = st.session_state.get("semantic_join_used", None)

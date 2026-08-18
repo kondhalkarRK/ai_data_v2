@@ -876,10 +876,11 @@ div[data-testid="stDataFrame"] tbody td{
 }
 .brand-left{display:flex;flex-direction:column;gap:2px;}
 .brand-eyebrow{
-    color:#fbbf24;font-size:15px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;
+    color:#fbbf24;font-size:18px;font-weight:750;letter-spacing:0.4px;text-transform:none;
     text-shadow:0 0 10px rgba(251,191,36,.25);display:flex;align-items:center;gap:8px;
+    line-height:1.15;
 }
-.brand-tagline{font-size:11.5px;font-weight:500;color:#aebbd0;letter-spacing:.2px;}
+.brand-tagline{font-size:12.5px;font-weight:500;color:#aebbd0;letter-spacing:.1px;line-height:1.2;}
 .brand-pill{
     font-size:10.5px;font-weight:800;letter-spacing:1px;color:#dce7ff;
     background:linear-gradient(90deg, rgba(79,124,255,.18), rgba(124,58,237,.18));
@@ -890,17 +891,21 @@ div[data-testid="stDataFrame"] tbody td{
     border-color:rgba(124,158,255,.5);
     box-shadow:0 0 14px rgba(79,124,255,.25);
 }
-.brand-pill-inline{margin-top:8px;}
+.brand-title-stack{
+    display:flex;flex-direction:row;align-items:baseline;gap:12px;flex-wrap:wrap;
+    padding:0;position:relative;z-index:1;
+}
+.brand-pill-inline{margin-top:0;}
 .header-toolbar{
     display:flex;align-items:center;justify-content:flex-end;
-    gap:6px;margin-top:4px;min-height:38px;
+    gap:6px;margin-top:0;min-height:36px;
 }
 .header-toolbar [data-testid="column"]{
     display:flex !important;align-items:center !important;justify-content:flex-end !important;
 }
 .header-toolbar [data-testid="stPopover"] button,
 .header-toolbar [data-testid="stPopover"] > button{
-    min-width:36px !important;width:36px !important;height:36px !important;
+    min-width:32px !important;width:32px !important;height:32px !important;
     padding:0 !important;border-radius:50% !important;
     background:rgba(30,41,59,0.75) !important;
     border:1px solid rgba(148,163,184,0.28) !important;
@@ -914,7 +919,7 @@ div[data-testid="stDataFrame"] tbody td{
     box-shadow:0 0 12px rgba(99,102,241,0.2) !important;
 }
 .header-toolbar [data-testid="stSelectbox"] > div > div{
-    min-height:36px !important;
+    min-height:32px !important;
 }
 .join-status-card{
     background:var(--panel-2, #050a14);border:1px solid var(--border, rgba(255,255,255,0.10));
@@ -1841,7 +1846,7 @@ div[data-testid="stExpander"] details:hover summary{
   border-color:rgba(129,140,248,0.35) transparent transparent transparent !important;
 }
 
-/* ═══ Decision Room — landing, pins, share ═══ */
+/* ═══ Chat Room — landing, pins, share ═══ */
 .dr-landing{
   text-align:center;padding:36px 20px 28px;
   border-bottom:1px solid rgba(148,163,184,0.12);margin-bottom:12px;
@@ -1902,12 +1907,40 @@ div[data-testid="stExpander"] details:hover summary{
   display:inline-flex !important;align-items:center !important;justify-content:center !important;
 }
 .dr-icon-actions [data-testid="stPopover"]{margin:0 !important;}
+
+.app-footer{
+  text-align:center;color:#64748b;font-size:11px;padding:4px 0 8px;
+}
+.sb-join-line{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  min-height:32px;padding:2px 2px 2px 0;
+}
+.sb-join-label{
+  font-size:13px;font-weight:700;letter-spacing:0.2px;
+}
+.sb-join-meta{
+  font-size:11px;font-weight:650;
+}
+[data-testid="stSidebar"] div[class*="st-key-sidebar_join_settings"] button{
+  width:32px !important;min-width:32px !important;max-width:32px !important;
+  height:32px !important;min-height:32px !important;
+  padding:0 !important;margin:0 !important;
+  font-size:15px !important;line-height:1 !important;
+  text-transform:none !important;letter-spacing:0 !important;
+  border-radius:8px !important;
+}
+div[data-testid="stDialog"]{
+  padding:8px;
+}
+div[data-testid="stDialog"] > div{
+  border-radius:16px !important;
+}
 """ + theme_css(theme) + r"""
 </style>
 
 <div class="ai-loader-overlay">
   <div class="ai-loader">
-    <div class="ai-loader-title">AI DATA PLATFORM</div>
+    <div class="ai-loader-title">ASK - DB</div>
     <div class="ai-orb">
       <div class="ring ring1"></div>
       <div class="ring ring2"></div>
