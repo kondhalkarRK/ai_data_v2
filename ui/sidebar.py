@@ -159,7 +159,7 @@ def render():
         # =========================
         st.markdown(
             f"""
-            <div class="sidebar-brand-logo" style="margin:0 0 10px 0;padding:0 2px;">
+            <div class="sidebar-brand-logo" style="margin:0 0 10px 0;padding:0 2px;display:flex;justify-content:center;width:100%;">
               <img src="data:image/png;base64,{_LOGO_B64}" alt="ASK-DB"
                 style="display:block;width:148px;max-width:100%;height:auto;" />
             </div>
