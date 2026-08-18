@@ -1,10 +1,10 @@
-# app.py - AI Data Platform V10
+# app.py - ASK - DB
 import streamlit as st
 
 from config.settings   import init_session_state
 from config.styles     import apply_styles
 from core.join_engine  import get_working_df
-from ui import sidebar, tab_join, tab_preview, tab_kpi, tab_query
+from ui import sidebar, tab_preview, tab_kpi, tab_query
 
 # ── Semantic layer — use the real singleton getters ──────────────
 from semantic.semantic_loader          import get_semantic_loader
@@ -15,7 +15,7 @@ from semantic.semantic_context_builder import get_context_builder
 from features.rag_query_memory       import glossary_store
 from features.vector_schema_retrieval import schema_indexer
 
-st.set_page_config(layout="wide", page_title="AI Data Platform", page_icon="🚀")
+st.set_page_config(layout="wide", page_title="ASK - DB", page_icon="💬")
 
 init_session_state()
 apply_styles()
@@ -32,7 +32,7 @@ _boot_screen.markdown(
         <div class="ring ring2"></div>
         <div class="core"></div>
       </div>
-      <div class="boot-screen-title">Initializing AI Data Platform…</div>
+      <div class="boot-screen-title">Initializing ASK - DB…</div>
       <div class="boot-screen-sub">Loading semantic model &amp; embedding engine</div>
     </div>
     """,
@@ -106,27 +106,22 @@ except Exception:
 _boot_screen.empty()
 
 # ═══════════════════════════════════════════════════════════════
-# MAIN UI HEADER  (title + guide + theme)
+# MAIN UI HEADER  (compact brand + guide + theme)
 # ═══════════════════════════════════════════════════════════════
-_h1, _h2, _h3 = st.columns([5.4, 1.35, 1.55])
+_h1, _h2 = st.columns([7.2, 2.8])
 with _h1:
     st.markdown(
         """
         <div class="brand-title-stack">
-          <div class="brand-eyebrow">🚀 AI DATA PLATFORM</div>
-          <div class="brand-tagline">Decision Intelligence Workspace — governed insights, evidence, and shareable briefs</div>
+          <div class="brand-eyebrow">ASK - DB</div>
+          <div class="brand-tagline">Ask your database in plain English</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 with _h2:
-    st.markdown(
-        '<div class="brand-pill brand-pill-inline">⚡ GPT-4o · DuckDB</div>',
-        unsafe_allow_html=True,
-    )
-with _h3:
     st.markdown('<div class="header-toolbar">', unsafe_allow_html=True)
-    _guide_col, _theme_col = st.columns([0.38, 0.62], gap="small")
+    _guide_col, _theme_col = st.columns([0.32, 0.68], gap="small")
     with _guide_col:
         with st.popover("ℹ️", help="How to ask questions"):
             st.markdown("#### Ask better questions")
@@ -146,7 +141,7 @@ with _h3:
 - Vague: *“show sales”*, *“performance”*, *“tell me about EV”*
 - Off-topic: recipes, weather, jokes unrelated to your data
 
-**Tip:** Decision Room remembers your last query — use follow-up phrases instead of re-asking from scratch.
+**Tip:** Chat Room remembers your last query — use follow-up phrases instead of re-asking from scratch.
                 """
             )
     with _theme_col:
@@ -214,8 +209,8 @@ if (
         st.session_state.semantic_column_map   = ""
 # ─────────────────────────────────────────────────────────────────
 
-tab_join_ui, tab_preview_ui, tab_kpi_ui, tab_query_ui = st.tabs(
-    ["🔗 Join / Combine", "📄 Data Preview", "📊 KPI Summary", "🏛️ Decision Room"]
+tab_preview_ui, tab_kpi_ui, tab_query_ui = st.tabs(
+    ["📄 Data Preview", "📊 KPI Summary", "💬 Chat Room"]
 )
 
 
@@ -239,15 +234,14 @@ def _render_tab_safely(tab_container, render_fn, label: str):
             )
 
 
-_render_tab_safely(tab_join_ui,    tab_join.render,    "Join / Combine")
 _render_tab_safely(tab_preview_ui, tab_preview.render, "Data Preview")
 _render_tab_safely(tab_kpi_ui,     tab_kpi.render,     "KPI Summary")
-_render_tab_safely(tab_query_ui,   tab_query.render,   "Decision Room")
+_render_tab_safely(tab_query_ui,   tab_query.render,   "Chat Room")
 
 st.markdown("---")
 st.markdown(
-    "<div style='text-align:center;color:#555;font-size:11px;'>"
-    "🚀 Capgemini AI Data Platform &nbsp;|&nbsp; DuckDB · GPT-4o · Streamlit"
+    "<div class='app-footer'>"
+    "ASK - DB &nbsp;·&nbsp; DuckDB · GPT-4o · Streamlit"
     "</div>",
     unsafe_allow_html=True,
 )

@@ -2,6 +2,7 @@
 ui/sidebar.py
 """
 
+import inspect
 import streamlit as st
 
 from core.utils import load_files
@@ -74,8 +75,35 @@ def upload_dialog():
 
 
 # ==========================================================
-# Helpers
+# Join settings dialog
 # ==========================================================
+
+_join_dialog_kwargs = {}
+try:
+    if "width" in inspect.signature(st.dialog).parameters:
+        _join_dialog_kwargs["width"] = "large"
+except (TypeError, ValueError):
+    _join_dialog_kwargs = {}
+
+
+@st.dialog("Join settings", **_join_dialog_kwargs)
+def join_settings_dialog():
+    from core.join_engine import get_working_df
+    from ui.tab_join import render as render_join
+
+    dfs = st.session_state.get("dfs") or {}
+    if not dfs:
+        st.info("Upload CSV files first, then configure joins here.")
+        if st.button("Close", key="join_dialog_close_empty", use_container_width=True):
+            st.rerun()
+        return
+
+    tables = list(dfs.keys())
+    working_df = get_working_df()
+    render_join(working_df, tables, dfs)
+    st.divider()
+    if st.button("Close", key="join_dialog_close", use_container_width=True):
+        st.rerun()
 
 def section_title(title):
     st.markdown(
@@ -127,7 +155,7 @@ def render():
             <div class="sidebar-hero">
                 <div class="sidebar-hero-icon">🧠</div>
                 <div class="sidebar-hero-text">
-                    <div class="sidebar-hero-title">AI Command Center</div>
+                    <div class="sidebar-hero-title">ASK - DB</div>
                     <div class="sidebar-hero-sub">Workspace status &amp; controls</div>
                 </div>
             </div>
@@ -166,8 +194,41 @@ def render():
         st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
 
         # =========================
-        # SEMANTIC
+        # JOIN (settings pop-out)
         # =========================
+        with st.container(border=True):
+            dfs_loaded = st.session_state.get("dfs") or {}
+            semantic_used = st.session_state.get("semantic_join_used", None)
+            if len(dfs_loaded) <= 1:
+                join_status, join_color = "Not needed", "#6b7280"
+            elif semantic_used is True:
+                join_status, join_color = "Active", "#10b981"
+            elif semantic_used is False:
+                join_status, join_color = "Fallback", "#f59e0b"
+            else:
+                join_status, join_color = "Pending", "#f87171"
+
+            j1, j2 = st.columns([4.4, 0.8])
+            with j1:
+                st.markdown(
+                    f"""
+                    <div class="sb-join-line">
+                        <span class="sb-join-label">Join</span>
+                        <span class="sb-join-meta" style="color:{join_color}">{join_status}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with j2:
+                if st.button(
+                    "⚙️",
+                    key="sidebar_join_settings",
+                    help="Open join settings",
+                    use_container_width=True,
+                ):
+                    join_settings_dialog()
+
+        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown('<div class="sb-semantic-wrap">', unsafe_allow_html=True)
             section_title("🧬 SEMANTIC LAYER")
