@@ -209,13 +209,35 @@ button[kind="primary"],.stButton > button[kind="primary"]{
 [data-testid="stMetricLabel"]{color:#5b6575 !important;}
 .hero-title{color:#1b2430 !important;}
 
-/* Tabs — no grey grade */
+/* Tabs — no grey grade, no underline bar */
 .stTabs [role="tablist"],
-[data-testid="stTabs"] [role="tablist"]{
+[data-testid="stTabs"] [role="tablist"],
+[data-baseweb="tab-list"]{
   background:transparent !important;
-  border-bottom:1px solid rgba(27,36,48,0.08) !important;
-  padding:6px 4px 12px !important;
+  border:none !important;
+  border-bottom:none !important;
+  box-shadow:none !important;
+  padding:6px 4px 10px !important;
   gap:16px !important;
+}
+.stTabs [role="tablist"]::before,
+.stTabs [role="tablist"]::after,
+[data-baseweb="tab-list"]::before,
+[data-baseweb="tab-list"]::after,
+[data-baseweb="tab-border"],
+[data-baseweb="tab-highlight"],
+[data-testid="stTabs"] [data-baseweb="tab-border"],
+[data-testid="stTabs"] [data-baseweb="tab-highlight"]{
+  display:none !important;visibility:hidden !important;
+  background:transparent !important;height:0 !important;width:0 !important;
+  border:none !important;opacity:0 !important;
+}
+[data-testid="stTabs"],
+[data-testid="stTabs"] > div,
+[data-testid="stTabs"] > div > div,
+[data-testid="stTabs"] [role="tabpanel"]{
+  border:none !important;border-top:none !important;border-bottom:none !important;
+  box-shadow:none !important;
 }
 .stTabs [role="tablist"] button,
 [data-testid="stTabs"] button,
@@ -232,7 +254,8 @@ button[kind="primary"],.stButton > button[kind="primary"]{
 [data-testid="stTabs"] [aria-selected="true"]{
   color:#2563eb !important;
   background:#ffffff !important;
-  border-bottom:2px solid #2563eb !important;
+  border:none !important;
+  border-bottom:none !important;
   box-shadow:none !important;
   font-weight:700 !important;
 }
@@ -433,17 +456,27 @@ div[data-testid="stRadio"] label,div[role="radiogroup"] label{color:#1b2430 !imp
 }
 .sidebar-brand .sidebar-hero-title{color:#1b2430 !important;}
 .sidebar-brand .sidebar-hero-sub,
-.sidebar-tagline{color:#334155 !important;}
-.askdb-logo{filter:none !important;}
-[data-testid="stSidebar"] [data-testid="stImage"] img{
-  box-shadow:0 6px 18px rgba(27,36,48,0.10) !important;
+.sidebar-tagline{color:#5b6575 !important;}
+[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) [data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) [data-testid="stVerticalBlockBorderWrapper"]:hover{
+  background:transparent !important;border:none !important;box-shadow:none !important;
 }
 [data-testid="stSidebar"] [data-testid="stPopover"] > button,
-[data-testid="stSidebar"] [data-testid="stPopover"] button{
+[data-testid="stSidebar"] [data-testid="stPopover"] button,
+[data-testid="stSidebar"] [data-testid="stPopover"] [data-testid="baseButton-secondary"],
+[data-testid="stSidebar"] [data-testid="stPopover"] [data-testid="stBaseButton-secondary"]{
   color:#111827 !important;
-  background:#ffffff !important;
-  border:1px solid rgba(17,24,39,0.16) !important;
+  background:transparent !important;
+  background-color:transparent !important;
+  border:none !important;
   box-shadow:none !important;
+  outline:none !important;
+}
+[data-testid="stSidebar"] [data-testid="stPopover"] > button:hover,
+[data-testid="stSidebar"] [data-testid="stPopover"] button:hover{
+  background:transparent !important;
+  border:none !important;
+  color:#111827 !important;
 }
 [data-testid="stSidebar"] [data-testid="stExpander"]{
   background:#ffffff !important;
@@ -459,10 +492,25 @@ div[data-testid="stRadio"] label,div[role="radiogroup"] label{color:#1b2430 !imp
 [data-testid="stSidebar"] .sb-join-status-fallback{color:#c2410c !important;}
 [data-testid="stSidebar"] .sb-join-status-pending{color:#dc2626 !important;}
 [data-testid="stSidebar"] .sb-join-status-idle{color:#64748b !important;}
+[data-testid="stSidebar"] div[class*="st-key-sidebar_join_settings"]{
+  display:flex !important;align-items:center !important;justify-content:flex-end !important;
+  height:28px !important;margin:0 !important;
+}
 [data-testid="stSidebar"] div[class*="st-key-sidebar_join_settings"] button{
-  background:#ffffff !important;color:#1b2430 !important;
-  border:1px solid rgba(27,36,48,0.16) !important;
+  background:transparent !important;color:#1b2430 !important;
+  border:1px solid rgba(27,36,48,0.12) !important;
+  width:auto !important;max-width:100% !important;
+  height:28px !important;min-height:28px !important;
+  margin:0 !important;padding:0 10px !important;
   visibility:visible !important;opacity:1 !important;
+  display:inline-flex !important;align-items:center !important;justify-content:center !important;
+  gap:6px !important;text-transform:none !important;
+}
+[data-testid="stSidebar"] div[class*="st-key-sidebar_join_settings"] button p,
+[data-testid="stSidebar"] div[class*="st-key-sidebar_join_settings"] button span,
+[data-testid="stSidebar"] div[class*="st-key-sidebar_join_settings"] button div{
+  display:inline-flex !important;align-items:center !important;margin:0 !important;
+  line-height:1 !important;white-space:nowrap !important;color:#1b2430 !important;
 }
 
 details,[data-testid="stExpander"],
@@ -635,9 +683,26 @@ button[kind="primary"],.stButton > button[kind="primary"]{
   0%,100%{box-shadow:0 0 0 1px rgba(167,139,250,0.08), 0 16px 50px rgba(56,189,248,0.10)}
   50%{box-shadow:0 0 0 1px rgba(103,232,249,0.2), 0 18px 60px rgba(167,139,250,0.18)}
 }
+[data-testid="stSidebar"] [data-testid="stPopover"] button{
+  background:transparent !important;border:none !important;box-shadow:none !important;
+}
 """
 
 ASK_ALIGN_CSS = r"""
+/* Kill Streamlit's default tab underline (all themes) */
+.stTabs [role="tablist"],
+[data-testid="stTabs"] [role="tablist"],
+[data-baseweb="tab-list"]{
+  border-bottom:none !important;box-shadow:none !important;
+}
+[data-baseweb="tab-border"],
+[data-baseweb="tab-highlight"],
+[data-testid="stTabs"] [data-baseweb="tab-border"],
+[data-testid="stTabs"] [data-baseweb="tab-highlight"]{
+  display:none !important;height:0 !important;opacity:0 !important;
+}
+[data-testid="stTabs"] [role="tabpanel"]{border-top:none !important;}
+
 /* Query tab: keep Run + Clear on one baseline with the text input */
 div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-ask_run_btn"]){
   align-items:flex-end !important;

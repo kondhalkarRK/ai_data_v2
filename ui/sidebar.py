@@ -3,7 +3,6 @@ ui/sidebar.py
 """
 
 import inspect
-from pathlib import Path
 import streamlit as st
 
 from core.utils import load_files
@@ -149,17 +148,50 @@ def render():
     with st.sidebar:
 
         # =========================
-        # BRAND  (provided logo + tagline + icon utilities)
+        # BRAND  (compact sidebar mark)
         # =========================
-        logo_path = Path(__file__).resolve().parents[1] / "assets" / "ask_db_logo.png"
-        st.markdown('<div class="sidebar-brand">', unsafe_allow_html=True)
-        if logo_path.exists():
-            st.image(str(logo_path), use_container_width=True)
         st.markdown(
-            '<div class="sidebar-tagline">Ask. Explore. Discover</div>',
+            """
+            <div class="sidebar-brand">
+              <div class="sidebar-brand-row">
+                <svg class="askdb-mark" viewBox="0 0 40 36" width="30" height="27" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="askdbMarkG" x1="6" y1="18" x2="34" y2="18" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#22d3ee"/>
+                      <stop offset="48%" stop-color="#a855f7"/>
+                      <stop offset="100%" stop-color="#fb7185"/>
+                    </linearGradient>
+                  </defs>
+                  <path fill="none" stroke="url(#askdbMarkG)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+                    d="M19.15 7.6C12.2 7.3 7.4 11.8 7.4 18.1c0 6.1 4.5 10.9 11.75 11.1V7.6z"/>
+                  <path fill="none" stroke="url(#askdbMarkG)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+                    d="M20.85 7.6C27.8 7.3 32.6 11.8 32.6 18.1c0 6.1-4.5 10.9-11.75 11.1V7.6z"/>
+                  <path fill="none" stroke="url(#askdbMarkG)" stroke-width="1.15" stroke-linecap="round"
+                    d="M10.6 14.2h6.2M9.8 18.2h7M11.2 22.2h5.6"/>
+                  <path fill="none" stroke="url(#askdbMarkG)" stroke-width="1.15" stroke-linecap="round"
+                    d="M23.2 14.2h6.2M23.2 18.2h7M23.2 22.2h5.6"/>
+                  <circle cx="10.6" cy="14.2" r="1.05" fill="url(#askdbMarkG)"/>
+                  <circle cx="16.8" cy="14.2" r="1.05" fill="url(#askdbMarkG)"/>
+                  <circle cx="9.8" cy="18.2" r="1" fill="url(#askdbMarkG)"/>
+                  <circle cx="16.8" cy="18.2" r="1" fill="url(#askdbMarkG)"/>
+                  <circle cx="11.2" cy="22.2" r="1" fill="url(#askdbMarkG)"/>
+                  <circle cx="16.8" cy="22.2" r="1" fill="url(#askdbMarkG)"/>
+                  <circle cx="23.2" cy="14.2" r="1.05" fill="url(#askdbMarkG)"/>
+                  <circle cx="29.4" cy="14.2" r="1.05" fill="url(#askdbMarkG)"/>
+                  <circle cx="23.2" cy="18.2" r="1" fill="url(#askdbMarkG)"/>
+                  <circle cx="30.2" cy="18.2" r="1" fill="url(#askdbMarkG)"/>
+                  <circle cx="23.2" cy="22.2" r="1" fill="url(#askdbMarkG)"/>
+                  <circle cx="28.8" cy="22.2" r="1" fill="url(#askdbMarkG)"/>
+                </svg>
+                <div class="sidebar-brand-text">
+                  <div class="sidebar-hero-title">ASK-DB</div>
+                  <div class="sidebar-tagline">Ask. Explore. Discover</div>
+                </div>
+              </div>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown('<div class="sb-util-row">', unsafe_allow_html=True)
         _sp1, _note_col, _theme_col, _sp2 = st.columns([1.15, 0.85, 0.85, 1.15], gap="small")
@@ -236,15 +268,23 @@ def render():
             join_kind, join_status = "pending", "Pending"
 
         with st.expander("🔗 Join", expanded=False):
-            st.markdown(
-                f'<div class="sb-join-row">'
-                f'<span class="sb-join-kicker">Status</span>'
-                f'<span class="sb-join-status sb-join-status-{join_kind}">{join_status}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-            if st.button("⚙️ Join settings", key="sidebar_join_settings", use_container_width=True):
-                join_settings_dialog()
+            _join_col_kwargs = {"gap": "small"}
+            try:
+                if "vertical_alignment" in inspect.signature(st.columns).parameters:
+                    _join_col_kwargs["vertical_alignment"] = "center"
+            except (TypeError, ValueError):
+                pass
+            j_left, j_right = st.columns([1.05, 1.35], **_join_col_kwargs)
+            with j_left:
+                st.markdown(
+                    f'<div class="sb-join-row">'
+                    f'<span class="sb-join-kicker sb-join-status-{join_kind}">{join_status}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            with j_right:
+                if st.button("⚙️ Settings", key="sidebar_join_settings"):
+                    join_settings_dialog()
 
         with st.expander("🧬 Semantic layer", expanded=False):
             semantic_used = st.session_state.get("semantic_join_used", None)
