@@ -1,0 +1,38 @@
+%% ASK-DB — Layer view (matches Solution Framework slide)
+
+flowchart LR
+  subgraph IN["INPUT"]
+    NLQ["💬 Natural Language\nChat Room"]
+    UPL["📂 CSV Multi-table\nUpload"]
+    PACK["⚙️ Industry Pack\nYAML loader"]
+  end
+
+  subgraph SEM["SEMANTIC"]
+    AJ["🔗 Auto-Join\nEngine"]
+    SCH["📐 Schema\nAnalyser"]
+    LLM["🧠 LLM\nOrchestrator"]
+    GRD["🛡️ SQL\nGuardrails"]
+  end
+
+  subgraph EXE["EXECUTION"]
+    DB["⚡ DuckDB"]
+    RET["🔄 Retry &\nSelf-Heal"]
+    QC["🗄️ Query\nCache"]
+  end
+
+  subgraph OUT["PRESENTATION"]
+    PL["📊 Plotly\nCharts"]
+    KPI["🔢 KPI\nDashboard"]
+    DQ["🔬 DQ\nIntelligence"]
+    INS["💡 Chat Room\nTrust · Narration"]
+  end
+
+  NLQ --> AJ
+  UPL --> AJ
+  PACK --> AJ
+  AJ --> SCH --> LLM --> GRD --> DB
+  DB --> RET --> QC
+  QC --> PL --> KPI --> DQ --> INS
+
+  classDef layer fill:#1e293b,stroke:#64748b,color:#e2e8f0
+  class NLQ,UPL,PACK,AJ,SCH,LLM,GRD,DB,RET,QC,PL,KPI,DQ,INS layer

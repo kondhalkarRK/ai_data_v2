@@ -1,0 +1,40 @@
+%% ASK-DB — Query flow (Chat Room primary path)
+
+flowchart TD
+  Q["👤 User question\n(Chat Room)"] --> GUARD{"Off-topic /\nchit-chat?"}
+  GUARD -->|yes| OOB["Polite redirect"]
+  GUARD -->|no| WHATIF{"What-if\nscenario?"}
+  WHATIF -->|yes| WI["whatif_engine"]
+  WHATIF -->|no| CACHE{"Session cache /\nsaved question?"}
+  CACHE -->|hit| RUN1["Run cached SQL"]
+  CACHE -->|miss| FOLLOW{"Follow-up\nphrase?"}
+  FOLLOW -->|yes| ANCHOR["Edit SQL anchor\nconversation_state"]
+  FOLLOW -->|no| BUILD["Build semantic context\ncontext_builder + glossary"]
+  ANCHOR --> GEN
+  BUILD --> GEN["LLM generate SQL\nnlq_engine · GPT-4o"]
+  GEN --> GUARDSQL{"SQL\nguardrails OK?"}
+  GUARDSQL -->|no| FAIL["Error + retry"]
+  GUARDSQL -->|yes| EXEC["DuckDB execute\non working_df"]
+  EXEC --> ERR{"SQL\nerror?"}
+  ERR -->|yes| HEAL["Retry & self-heal\n2nd LLM call"]
+  HEAL --> EXEC
+  ERR -->|no| OUT["Results"]
+  RUN1 --> OUT
+  WI --> OUT
+  OUT --> UI["Table + Plotly chart"]
+  OUT --> TRUST["Trust / evidence badges"]
+  OUT --> NARR["Narration · analysis"]
+  OUT --> SAVE["Cache question + SQL"]
+  UI --> ANS["Answer in Chat Room"]
+  TRUST --> ANS
+  NARR --> ANS
+
+  classDef step fill:#1e40af,stroke:#93c5fd,color:#fff
+  classDef decision fill:#92400e,stroke:#fdba74,color:#fff
+  classDef endNode fill:#047857,stroke:#6ee7b7,color:#fff
+  classDef warn fill:#9a3412,stroke:#fdba74,color:#fff
+
+  class Q,BUILD,GEN,EXEC,HEAL,RUN1,WI,UI,TRUST,NARR,SAVE step
+  class GUARD,WHATIF,CACHE,FOLLOW,GUARDSQL,ERR decision
+  class ANS,OUT endNode
+  class OOB,FAIL warn

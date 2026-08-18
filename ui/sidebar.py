@@ -2,7 +2,10 @@
 ui/sidebar.py
 """
 
+import base64
 import inspect
+from pathlib import Path
+
 import streamlit as st
 
 from core.utils import load_files
@@ -34,6 +37,10 @@ _OKF_AVAILABLE = False
 #     _OKF_AVAILABLE = OKF_ENABLED
 # except ImportError:
 #     _OKF_AVAILABLE = False
+
+
+_LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "ask_db_logo.png"
+_LOGO_B64 = base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
 
 
 # ==========================================================
@@ -148,46 +155,13 @@ def render():
     with st.sidebar:
 
         # =========================
-        # BRAND  (compact sidebar mark)
+        # BRAND
         # =========================
         st.markdown(
-            """
-            <div class="sidebar-brand">
-              <div class="sidebar-brand-row">
-                <svg class="askdb-mark" viewBox="0 0 40 36" width="30" height="27" aria-hidden="true">
-                  <defs>
-                    <linearGradient id="askdbMarkG" x1="6" y1="18" x2="34" y2="18" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stop-color="#22d3ee"/>
-                      <stop offset="48%" stop-color="#a855f7"/>
-                      <stop offset="100%" stop-color="#fb7185"/>
-                    </linearGradient>
-                  </defs>
-                  <path fill="none" stroke="url(#askdbMarkG)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
-                    d="M19.15 7.6C12.2 7.3 7.4 11.8 7.4 18.1c0 6.1 4.5 10.9 11.75 11.1V7.6z"/>
-                  <path fill="none" stroke="url(#askdbMarkG)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
-                    d="M20.85 7.6C27.8 7.3 32.6 11.8 32.6 18.1c0 6.1-4.5 10.9-11.75 11.1V7.6z"/>
-                  <path fill="none" stroke="url(#askdbMarkG)" stroke-width="1.15" stroke-linecap="round"
-                    d="M10.6 14.2h6.2M9.8 18.2h7M11.2 22.2h5.6"/>
-                  <path fill="none" stroke="url(#askdbMarkG)" stroke-width="1.15" stroke-linecap="round"
-                    d="M23.2 14.2h6.2M23.2 18.2h7M23.2 22.2h5.6"/>
-                  <circle cx="10.6" cy="14.2" r="1.05" fill="url(#askdbMarkG)"/>
-                  <circle cx="16.8" cy="14.2" r="1.05" fill="url(#askdbMarkG)"/>
-                  <circle cx="9.8" cy="18.2" r="1" fill="url(#askdbMarkG)"/>
-                  <circle cx="16.8" cy="18.2" r="1" fill="url(#askdbMarkG)"/>
-                  <circle cx="11.2" cy="22.2" r="1" fill="url(#askdbMarkG)"/>
-                  <circle cx="16.8" cy="22.2" r="1" fill="url(#askdbMarkG)"/>
-                  <circle cx="23.2" cy="14.2" r="1.05" fill="url(#askdbMarkG)"/>
-                  <circle cx="29.4" cy="14.2" r="1.05" fill="url(#askdbMarkG)"/>
-                  <circle cx="23.2" cy="18.2" r="1" fill="url(#askdbMarkG)"/>
-                  <circle cx="30.2" cy="18.2" r="1" fill="url(#askdbMarkG)"/>
-                  <circle cx="23.2" cy="22.2" r="1" fill="url(#askdbMarkG)"/>
-                  <circle cx="28.8" cy="22.2" r="1" fill="url(#askdbMarkG)"/>
-                </svg>
-                <div class="sidebar-brand-text">
-                  <div class="sidebar-hero-title">ASK-DB</div>
-                  <div class="sidebar-tagline">Ask. Explore. Discover</div>
-                </div>
-              </div>
+            f"""
+            <div class="sidebar-brand-logo" style="margin:0 0 10px 0;padding:0 2px;">
+              <img src="data:image/png;base64,{_LOGO_B64}" alt="ASK-DB"
+                style="display:block;width:148px;max-width:100%;height:auto;" />
             </div>
             """,
             unsafe_allow_html=True,

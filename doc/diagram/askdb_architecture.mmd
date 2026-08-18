@@ -1,0 +1,128 @@
+%% ASK-DB — System Architecture (aligned with built app)
+%% Open in VS Code Mermaid preview, or doc/diagram/askdb_architecture.html
+
+flowchart TB
+  subgraph UI["🖥️ PRESENTATION LAYER — Streamlit"]
+    SB["Sidebar\nUpload · Join · Packs · Cache · Theme"]
+    TP["📄 Data Preview\nDQ panel + table view"]
+    TK["📊 KPI Summary\nauto metrics + Plotly"]
+    TC["💬 Chat Room\nNLQ · charts · trust · share"]
+  end
+
+  subgraph ORCH["⚙️ ORCHESTRATION"]
+    APP["app.py\nsession init · tab routing"]
+    JOIN_UI["Join settings dialog\ntab_join.py"]
+    ROUTER["Chat router\ntab_query.py"]
+  end
+
+  subgraph CORE["🧠 CORE ENGINES"]
+    UP["load_files()\ncore/utils.py"]
+    JE["Join Engine\nsemantic join → fuzzy fallback"]
+    NLQ["NLQ Engine\nsemantic-first LLM SQL"]
+    SQLG["SQL Guardrails\nDDL/DML block"]
+    DUCK["DuckDB runtime\nin-process on working_df"]
+    CHART["Chart Engine\nPlotly auto-select"]
+    KPIE["KPI Engine\nheuristic dashboards"]
+    DQE["Data Quality Engine\ncompleteness · outliers"]
+    ANAL["Analysis Engine\nLLM summary / facts"]
+    EVID["Evidence Builder\ntrust badges"]
+    CONV["Conversation State\nSQL anchor · follow-ups"]
+  end
+
+  subgraph SEM["📐 SEMANTIC LAYER — YAML"]
+    YAML["semantic_model.yaml\nbusiness_glossary.yaml\nmetric_registry.yaml"]
+    LOAD["Semantic Loader"]
+    VEC["Vector Search\nembeddings / TF-IDF"]
+    CTX["Context Builder\nglossary · rules · column map"]
+    PACK["Industry Packs\nautomotive · banking · …"]
+  end
+
+  subgraph FEAT["✨ FEATURE MODULES"]
+    CACHE["Question Cache\nsaved SQL + results"]
+    MEM["Query Memory RAG\nfew-shot ChromaDB"]
+    GLOSS["Glossary Store"]
+    SCHEMA["Schema Retrieval\nwide-table column pick"]
+    NARR["Narration Engine"]
+    WHAT["What-if Engine"]
+    PROA["Proactive Engine"]
+    OKF["OKF Knowledge\n(document RAG)\n⚠ disabled"]
+  end
+
+  subgraph EXT["☁️ EXTERNAL"]
+    LLM["Capgemini LLM\nGPT-4o · LangChain"]
+    EMB["Local Embeddings\nsentence-transformers"]
+  end
+
+  subgraph DATA["🗄️ DATA"]
+    CSV["Uploaded CSVs\nst.session_state.dfs"]
+    WORK["Working Dataset\njoined view as df"]
+    SAMPLE["sample_data/\ndemo star schema"]
+  end
+
+  SB --> UP
+  SB --> JOIN_UI
+  SB --> PACK
+  UP --> CSV
+  JOIN_UI --> JE
+  JE --> WORK
+  CSV --> JE
+
+  APP --> SB
+  APP --> TP
+  APP --> TK
+  APP --> TC
+  APP --> LOAD
+
+  PACK --> YAML
+  LOAD --> YAML
+  LOAD --> VEC
+  LOAD --> CTX
+  VEC --> EMB
+
+  TP --> DQE
+  TP --> WORK
+  TK --> KPIE
+  TK --> WORK
+  TC --> ROUTER
+
+  ROUTER --> CONV
+  ROUTER --> CACHE
+  ROUTER --> WHAT
+  ROUTER --> OKF
+  ROUTER --> NLQ
+
+  NLQ --> CTX
+  NLQ --> GLOSS
+  NLQ --> MEM
+  NLQ --> SCHEMA
+  NLQ --> LLM
+  NLQ --> SQLG
+  SQLG --> DUCK
+  DUCK --> WORK
+  NLQ --> EVID
+  NLQ --> CACHE
+
+  DUCK --> CHART
+  DUCK --> ANAL
+  ANAL --> LLM
+  DUCK --> NARR
+  DUCK --> PROA
+  TC --> CHART
+
+  SAMPLE -.-> CSV
+
+  classDef ui fill:#1d4ed8,stroke:#93c5fd,color:#fff
+  classDef core fill:#7c3aed,stroke:#c4b5fd,color:#fff
+  classDef sem fill:#0f766e,stroke:#5eead4,color:#fff
+  classDef data fill:#b45309,stroke:#fcd34d,color:#fff
+  classDef ext fill:#334155,stroke:#94a3b8,color:#fff
+  classDef feat fill:#be185d,stroke:#f9a8d4,color:#fff
+  classDef off fill:#475569,stroke:#64748b,color:#cbd5e1,stroke-dasharray:5 5
+
+  class SB,TP,TK,TC ui
+  class UP,JE,NLQ,SQLG,DUCK,CHART,KPIE,DQE,ANAL,EVID,CONV core
+  class YAML,LOAD,VEC,CTX,PACK sem
+  class CSV,WORK,SAMPLE data
+  class LLM,EMB ext
+  class CACHE,MEM,GLOSS,SCHEMA,NARR,WHAT,PROA feat
+  class OKF off
