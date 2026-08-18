@@ -265,16 +265,28 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
             f"</div>",
             unsafe_allow_html=True,
         )
+        _theme = str(st.session_state.get("ui_theme") or "dark").lower()
+        if _theme == "light":
+            _gauge_steps = [
+                {"range": [0, 50], "color": "#fee2e2"},
+                {"range": [50, 70], "color": "#ffedd5"},
+                {"range": [70, 100], "color": "#d1fae5"},
+            ]
+            _gauge_font = "#5b6575"
+        else:
+            _gauge_steps = [
+                {"range": [0, 50], "color": "#1c0505"},
+                {"range": [50, 70], "color": "#1c1204"},
+                {"range": [70, 100], "color": "#052e16"},
+            ]
+            _gauge_font = "#8b949e"
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number", value=score,
             gauge={
                 "axis": {"range": [0, 100], "tickwidth": 1},
                 "bar": {"color": score_color},
-                "steps": [
-                    {"range": [0, 50], "color": "#1c0505"},
-                    {"range": [50, 70], "color": "#1c1204"},
-                    {"range": [70, 100], "color": "#052e16"},
-                ],
+                "bgcolor": "rgba(0,0,0,0)",
+                "steps": _gauge_steps,
                 "threshold": {
                     "line": {"color": score_color, "width": 3},
                     "thickness": 0.8, "value": score,
@@ -284,7 +296,8 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
         ))
         fig_gauge.update_layout(
             height=150, margin=dict(l=10, r=10, t=10, b=10),
-            paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=_gauge_font),
         )
         st.plotly_chart(fig_gauge, use_container_width=True)
 

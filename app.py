@@ -105,57 +105,6 @@ except Exception:
 # ── Startup is done — clear the boot screen ───────────────────────
 _boot_screen.empty()
 
-# ═══════════════════════════════════════════════════════════════
-# MAIN UI HEADER  (compact brand + guide + theme)
-# ═══════════════════════════════════════════════════════════════
-_h1, _h2 = st.columns([7.2, 2.8])
-with _h1:
-    st.markdown(
-        """
-        <div class="brand-title-stack">
-          <div class="brand-eyebrow">ASK - DB</div>
-          <div class="brand-tagline">Ask your database in plain English</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-with _h2:
-    st.markdown('<div class="header-toolbar">', unsafe_allow_html=True)
-    _guide_col, _theme_col = st.columns([0.32, 0.68], gap="small")
-    with _guide_col:
-        with st.popover("ℹ️", help="How to ask questions"):
-            st.markdown("#### Ask better questions")
-            st.markdown(
-                """
-**Good questions (clear metric + slice + time):**
-- Show total **units sold by make** for **2025**
-- **Monthly revenue trend** by region in **2024**
-- **Top 10** salespeople by **revenue** in **Q3 2025**
-- Compare **EV unit share by year** between **2020 and 2025**
-
-**Follow-ups & drill-downs (uses prior context):**
-- *Same but for 2024* · *What about Ford?* · *Drill down by region*
-- *Break that down by month* · *Now show by colour*
-
-**Avoid (wastes LLM calls):**
-- Vague: *“show sales”*, *“performance”*, *“tell me about EV”*
-- Off-topic: recipes, weather, jokes unrelated to your data
-
-**Tip:** Chat Room remembers your last query — use follow-up phrases instead of re-asking from scratch.
-                """
-            )
-    with _theme_col:
-        _theme_labels = {"light": "☀️ Light", "dark": "🌙 Dark", "ai": "✨ AI"}
-        st.selectbox(
-            "Appearance",
-            options=list(_theme_labels.keys()),
-            format_func=lambda k: _theme_labels[k],
-            label_visibility="collapsed",
-            key="ui_theme",
-            help="Switch Light / Dark / AI appearance",
-        )
-    st.markdown("</div>", unsafe_allow_html=True)
-
 sidebar.render()
 if not st.session_state.dfs:
     st.info("👈 Upload one or more CSV files to get started.")

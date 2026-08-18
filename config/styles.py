@@ -532,6 +532,48 @@ section[data-testid="stSidebar"]{
 .sidebar-hero-title{font-size:13.5px;font-weight:800;color:#fff;letter-spacing:.3px;}
 .sidebar-hero-sub{font-size:10.5px;color:#b9c6e0;margin-top:1px;}
 
+.sidebar-brand{
+    display:flex;flex-direction:column;align-items:center;text-align:center;
+    padding:14px 10px 12px;margin-bottom:8px;border-radius:16px;
+    background:linear-gradient(165deg, rgba(79,124,255,0.18), rgba(124,58,237,0.10) 55%, rgba(16,185,129,0.08));
+    border:1px solid rgba(255,255,255,0.10);
+}
+.askdb-logo{
+    width:58px;height:58px;margin:0 auto 8px;
+    filter:drop-shadow(0 6px 14px rgba(99,102,241,0.35));
+}
+.askdb-logo svg{display:block;width:58px;height:58px;}
+.sidebar-brand .sidebar-hero-title{
+    font-size:18px;letter-spacing:0.6px;margin-top:2px;
+}
+.sidebar-brand .sidebar-hero-sub{
+    font-size:11px;margin-top:3px;max-width:220px;line-height:1.35;
+}
+
+.sb-join-card{
+    display:block;
+    padding:8px 10px;
+    margin:0 0 8px 0;
+    border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border:1px solid rgba(148,163,184,0.22);
+}
+.sb-join-row{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    min-height:34px;
+}
+.sb-join-kicker{
+    font-size:14px !important;font-weight:750 !important;letter-spacing:0.2px !important;
+    color:#f8fafc !important;
+}
+.sb-join-status{
+    font-size:12px !important;font-weight:700 !important;
+}
+.sb-join-status-active{color:#34d399 !important;}
+.sb-join-status-fallback{color:#fbbf24 !important;}
+.sb-join-status-pending{color:#f87171 !important;}
+.sb-join-status-idle{color:#94a3b8 !important;}
+
 .sidebar-title{font-size:16px;font-weight:800;color:#fff}
 .sidebar-subtitle{font-size:11px;color:var(--subtext);margin-top:2px}
 
@@ -564,6 +606,16 @@ section[data-testid="stSidebar"]{
     border-color:rgba(124,158,255,.28) !important;
 }
 
+[data-testid="stSidebar"] [data-testid="stExpander"]{
+    background:rgba(255,255,255,0.03) !important;
+    border:1px solid rgba(255,255,255,0.08) !important;
+    border-radius:10px !important;
+    margin-bottom:6px !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary{
+    font-size:12.5px !important;
+    font-weight:650 !important;
+}
 [data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] > div{
     padding:11px 13px 11px 13px !important;
     gap:0.45rem !important;
