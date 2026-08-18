@@ -49,10 +49,29 @@ html,body,#root,div[role="main"],.stApp,.block-container{
 
 /* Sidebar — invert the dark “force white text” rule */
 [data-testid="stSidebar"],
-[data-testid="stSidebar"] > div:first-child{
+[data-testid="stSidebar"] > div:first-child,
+section[data-testid="stSidebar"]{
   background:#ffffff !important;
-  border-right:1px solid rgba(27,36,48,.08) !important;
+  border:none !important;
+  border-right:none !important;
+  box-shadow:none !important;
+  outline:none !important;
   color:#1b2430 !important;
+}
+[data-testid="stSidebarContent"],
+[data-testid="stSidebarUserContent"]{
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+}
+[data-testid="stSidebar"] .block-container,
+section[data-testid="stSidebar"] .block-container{
+  padding:10px 12px 16px 12px !important;
+}
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"]{
+  background:#ffffff !important;
+  border:1px solid rgba(27,36,48,0.08) !important;
+  box-shadow:none !important;
 }
 [data-testid="stSidebar"] *{color:#1b2430 !important;}
 [data-testid="stSidebar"] .sb-join-kicker,
@@ -195,7 +214,8 @@ button[kind="primary"],.stButton > button[kind="primary"]{
 [data-testid="stTabs"] [role="tablist"]{
   background:transparent !important;
   border-bottom:1px solid rgba(27,36,48,0.08) !important;
-  padding:0 0 2px 0 !important;
+  padding:6px 4px 12px !important;
+  gap:16px !important;
 }
 .stTabs [role="tablist"] button,
 [data-testid="stTabs"] button,
@@ -407,12 +427,29 @@ div[data-testid="stRadio"] label,div[role="radiogroup"] label{color:#1b2430 !imp
 
 /* Brand / join / DQ / expanders — kill leftover dark fills */
 .sidebar-brand{
-  background:linear-gradient(165deg,#eef4ff,#f7f8fb 55%,#ecfdf5) !important;
-  border:1px solid rgba(27,36,48,0.08) !important;
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
 }
 .sidebar-brand .sidebar-hero-title{color:#1b2430 !important;}
-.sidebar-brand .sidebar-hero-sub{color:#5b6575 !important;}
+.sidebar-brand .sidebar-hero-sub,
+.sidebar-tagline{color:#334155 !important;}
 .askdb-logo{filter:none !important;}
+[data-testid="stSidebar"] [data-testid="stImage"] img{
+  box-shadow:0 6px 18px rgba(27,36,48,0.10) !important;
+}
+[data-testid="stSidebar"] [data-testid="stPopover"] > button,
+[data-testid="stSidebar"] [data-testid="stPopover"] button{
+  color:#111827 !important;
+  background:#ffffff !important;
+  border:1px solid rgba(17,24,39,0.16) !important;
+  box-shadow:none !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"]{
+  background:#ffffff !important;
+  border:1px solid rgba(27,36,48,0.08) !important;
+  box-shadow:none !important;
+}
 .sb-join-card{
   background:#ffffff !important;
   border:1px solid rgba(27,36,48,0.12) !important;

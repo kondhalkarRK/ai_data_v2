@@ -534,9 +534,33 @@ section[data-testid="stSidebar"]{
 
 .sidebar-brand{
     display:flex;flex-direction:column;align-items:center;text-align:center;
-    padding:14px 10px 12px;margin-bottom:8px;border-radius:16px;
-    background:linear-gradient(165deg, rgba(79,124,255,0.18), rgba(124,58,237,0.10) 55%, rgba(16,185,129,0.08));
-    border:1px solid rgba(255,255,255,0.10);
+    padding:4px 4px 2px;margin:0 0 2px 0;border-radius:16px;
+    background:transparent;border:none;
+}
+[data-testid="stSidebar"] [data-testid="stImage"]{
+    text-align:center;margin:0 auto 2px auto !important;
+}
+[data-testid="stSidebar"] [data-testid="stImage"] img{
+    border-radius:14px;display:block;margin:0 auto;max-width:220px;
+    box-shadow:0 8px 22px rgba(2,6,23,0.28);
+}
+.sidebar-tagline{
+    text-align:center;font-size:12.5px;font-weight:650;letter-spacing:0.08em;
+    color:#c7d2fe;margin:6px 0 10px 0;
+}
+.sb-util-row{margin:0 0 8px 0;}
+[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]){
+    align-items:center !important;justify-content:center !important;
+    gap:6px !important;margin:0 0 8px 0 !important;
+}
+[data-testid="stSidebar"] [data-testid="stPopover"] > button,
+[data-testid="stSidebar"] [data-testid="stPopover"] button{
+    width:34px !important;min-width:34px !important;max-width:34px !important;
+    height:34px !important;min-height:34px !important;
+    padding:0 !important;margin:0 auto !important;
+    border-radius:10px !important;font-size:16px !important;line-height:1 !important;
+    text-transform:none !important;letter-spacing:0 !important;
+    display:inline-flex !important;align-items:center !important;justify-content:center !important;
 }
 .askdb-logo{
     width:58px;height:58px;margin:0 auto 8px;
@@ -607,10 +631,10 @@ section[data-testid="stSidebar"]{
 }
 
 [data-testid="stSidebar"] [data-testid="stExpander"]{
-    background:rgba(255,255,255,0.03) !important;
-    border:1px solid rgba(255,255,255,0.08) !important;
+    background:transparent !important;
+    border:1px solid rgba(148,163,184,0.16) !important;
     border-radius:10px !important;
-    margin-bottom:6px !important;
+    margin:0 2px 8px 2px !important;
 }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary{
     font-size:12.5px !important;
@@ -656,29 +680,29 @@ section[data-testid="stSidebar"]{
 .status-card code{background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:6px;color:var(--text);}
 
 .stTabs [role="tablist"]{
-  background:rgba(15,23,42,0.6);
-  border-bottom:1px solid rgba(99,102,241,0.1);
-  padding:4px 8px;
-  gap:4px;
+  background:transparent;
+  border-bottom:1px solid rgba(99,102,241,0.12);
+  padding:6px 4px 10px;
+  gap:16px;
 }
 .stTabs [role="tablist"] button{
   background:transparent;
   border:1px solid transparent;
-  padding:10px 16px;
-  border-radius:8px;
-  margin-right:4px;
+  padding:10px 22px;
+  border-radius:10px;
+  margin-right:12px;
   color:#64748b;
-  font-weight:500;
-  font-size:13px;
+  font-weight:600;
+  font-size:13.5px;
   transition:all .15s ease;
 }
 .stTabs [role="tablist"] button[aria-selected="true"]{
   background:linear-gradient(135deg, rgba(124,58,237,0.9), rgba(99,102,241,0.85));
   color:#fff;
   font-weight:700;
-  border-radius:20px;
-  padding:6px 18px;
-  box-shadow:0 4px 15px rgba(124,58,237,0.35), 0 2px 6px rgba(124,58,237,0.2);
+  border-radius:12px;
+  padding:8px 22px;
+  box-shadow:0 4px 15px rgba(124,58,237,0.28);
   border:1px solid rgba(255,255,255,0.1);
 }
 .stTabs [role="tablist"] button:hover{

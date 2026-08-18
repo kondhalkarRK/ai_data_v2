@@ -3,6 +3,7 @@ ui/sidebar.py
 """
 
 import inspect
+from pathlib import Path
 import streamlit as st
 
 from core.utils import load_files
@@ -148,43 +149,22 @@ def render():
     with st.sidebar:
 
         # =========================
-        # BRAND  (logo above ASK - DB)
+        # BRAND  (provided logo + tagline + icon utilities)
         # =========================
+        logo_path = Path(__file__).resolve().parents[1] / "assets" / "ask_db_logo.png"
+        st.markdown('<div class="sidebar-brand">', unsafe_allow_html=True)
+        if logo_path.exists():
+            st.image(str(logo_path), use_container_width=True)
         st.markdown(
-            """
-            <div class="sidebar-brand">
-              <div class="askdb-logo" aria-hidden="true">
-                <svg viewBox="0 0 64 64" width="58" height="58">
-                  <defs>
-                    <linearGradient id="askdbG" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stop-color="#38bdf8"/>
-                      <stop offset="50%" stop-color="#6366f1"/>
-                      <stop offset="100%" stop-color="#34d399"/>
-                    </linearGradient>
-                  </defs>
-                  <ellipse cx="32" cy="24" rx="15" ry="5.5" fill="none" stroke="url(#askdbG)" stroke-width="2.2"/>
-                  <path d="M17 24 v14 c0 3.2 6.7 5.8 15 5.8s15-2.6 15-5.8 V24" fill="none" stroke="url(#askdbG)" stroke-width="2.2"/>
-                  <ellipse cx="32" cy="31" rx="15" ry="5.5" fill="none" stroke="url(#askdbG)" stroke-width="1.35" opacity=".55"/>
-                  <circle cx="13" cy="14" r="3.1" fill="#38bdf8"/>
-                  <circle cx="22" cy="8" r="2.2" fill="#818cf8"/>
-                  <circle cx="51" cy="15" r="2.6" fill="#a78bfa"/>
-                  <circle cx="48" cy="50" r="2.8" fill="#34d399"/>
-                  <path d="M13 14 L22 20 M22 8 L28 18 M51 15 L41 22 M48 50 L40 40" stroke="#818cf8" stroke-width="1.25" fill="none" opacity=".85"/>
-                  <rect x="25.5" y="43" width="3.4" height="9" rx="1" fill="#38bdf8"/>
-                  <rect x="30.5" y="38" width="3.4" height="14" rx="1" fill="#818cf8"/>
-                  <rect x="35.5" y="41" width="3.4" height="11" rx="1" fill="#34d399"/>
-                </svg>
-              </div>
-              <div class="sidebar-hero-title">ASK - DB</div>
-              <div class="sidebar-hero-sub">Ask your database in plain English</div>
-            </div>
-            """,
+            '<div class="sidebar-tagline">Ask. Explore. Discover</div>',
             unsafe_allow_html=True,
         )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        th_l, th_r = st.columns([0.38, 0.62], gap="small")
-        with th_l:
-            with st.popover("ℹ️", help="How to ask questions"):
+        st.markdown('<div class="sb-util-row">', unsafe_allow_html=True)
+        _sp1, _note_col, _theme_col, _sp2 = st.columns([1.15, 0.85, 0.85, 1.15], gap="small")
+        with _note_col:
+            with st.popover("📝", help="Notes — how to ask"):
                 st.markdown("#### Ask better questions")
                 st.markdown(
                     """
@@ -205,34 +185,35 @@ def render():
 **Tip:** Chat Room remembers your last query — use follow-up phrases instead of re-asking from scratch.
                     """
                 )
-        with th_r:
-            _theme_labels = {"light": "☀️ Light", "dark": "🌙 Dark", "ai": "✨ AI"}
-            st.selectbox(
-                "Appearance",
-                options=list(_theme_labels.keys()),
-                format_func=lambda k: _theme_labels[k],
-                label_visibility="collapsed",
-                key="ui_theme",
-                help="Switch Light / Dark / AI appearance",
-            )
+        with _theme_col:
+            with st.popover("🎨", help="Appearance"):
+                st.caption("Theme")
+                t1, t2, t3 = st.columns(3)
+                with t1:
+                    if st.button("☀️", key="theme_pick_light", help="Light", use_container_width=True):
+                        st.session_state.ui_theme = "light"
+                        st.rerun()
+                with t2:
+                    if st.button("🌙", key="theme_pick_dark", help="Dark", use_container_width=True):
+                        st.session_state.ui_theme = "dark"
+                        st.rerun()
+                with t3:
+                    if st.button("✨", key="theme_pick_ai", help="AI", use_container_width=True):
+                        st.session_state.ui_theme = "ai"
+                        st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
         section_spacer()
 
         # =========================
-        # FILES
+        # COLLAPSED NAV — click to open
         # =========================
-        with st.container(border=True):
+        with st.expander("📁 Upload files", expanded=False):
             st.markdown('<div class="sb-upload-wrap">', unsafe_allow_html=True)
-            section_title("📁 UPLOAD FILES HERE")
-            section_spacer()
-
             file_count = len(st.session_state.get("dfs", {}))
-
             c1, c2 = st.columns([3, 1])
-
             with c1:
                 status_row("Files Loaded", file_count, "#fcd34d")
-
             with c2:
                 if st.button(
                     "＋",
@@ -243,11 +224,6 @@ def render():
                     upload_dialog()
             st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
-
-        # =========================
-        # JOIN (settings pop-out)
-        # =========================
         dfs_loaded = st.session_state.get("dfs") or {}
         semantic_used = st.session_state.get("semantic_join_used", None)
         if len(dfs_loaded) <= 1:
@@ -259,33 +235,19 @@ def render():
         else:
             join_kind, join_status = "pending", "Pending"
 
-        st.markdown('<div class="sb-join-card">', unsafe_allow_html=True)
-        j1, j2 = st.columns([4.6, 1.1])
-        with j1:
+        with st.expander("🔗 Join", expanded=False):
             st.markdown(
                 f'<div class="sb-join-row">'
-                f'<span class="sb-join-kicker">Join</span>'
+                f'<span class="sb-join-kicker">Status</span>'
                 f'<span class="sb-join-status sb-join-status-{join_kind}">{join_status}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
-        with j2:
-            if st.button(
-                "⚙️",
-                key="sidebar_join_settings",
-                help="Open join settings",
-            ):
+            if st.button("⚙️ Join settings", key="sidebar_join_settings", use_container_width=True):
                 join_settings_dialog()
-        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
-        with st.container(border=True):
-            st.markdown('<div class="sb-semantic-wrap">', unsafe_allow_html=True)
-            section_title("🧬 SEMANTIC LAYER")
-            section_spacer()
-
+        with st.expander("🧬 Semantic layer", expanded=False):
             semantic_used = st.session_state.get("semantic_join_used", None)
-
             if semantic_used is True:
                 join_status = "ACTIVE"
                 join_color  = "#6ee7b7"
@@ -298,7 +260,6 @@ def render():
 
             model_status = "UNAVAILABLE"
             model_color  = "#fca5a5"
-
             if _SEMANTIC_AVAILABLE:
                 try:
                     get_semantic_loader()
@@ -307,46 +268,21 @@ def render():
                 except Exception:
                     model_status = "ERROR"
                     model_color  = "#fca5a5"
-
             status_row("Join",  join_status,  join_color)
             status_row("Model", model_status, model_color)
-            st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
-
-        # =========================
-        # USAGE
-        # =========================
-        with st.container(border=True):
-            st.markdown('<div class="sb-llm-wrap">', unsafe_allow_html=True)
-            section_title("⚡ LLM USAGE STATUS")
-            section_spacer()
-
+        with st.expander("⚡ LLM usage", expanded=False):
             calls  = st.session_state.get("llm_calls", 0)
             tokens = st.session_state.get("total_tokens", 0)
-
-            max_calls = max(
-                st.session_state.get("max_llm_calls", 1), 1
-            )
-
+            max_calls = max(st.session_state.get("max_llm_calls", 1), 1)
             status_row("Calls",  calls,          "#a5b4fc")
             status_row("Tokens", f"{tokens:,}",  "#a5b4fc")
-
-            section_spacer()
             st.progress(min(calls / max_calls, 1.0))
-            section_spacer()
-
             if st.button("RESET", use_container_width=True, key="sidebar_reset"):
                 st.session_state.llm_calls    = 0
                 st.session_state.total_tokens = 0
                 st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<hr class="sb-divider"/>', unsafe_allow_html=True)
-
-        # =========================
-        # COLLAPSED NAV  (below LLM — click to open)
-        # =========================
         with st.expander("💾 Saved questions", expanded=False):
             saved_count = cache_store.count_active()
             status_row("Saved", saved_count, "#a5b4fc")
