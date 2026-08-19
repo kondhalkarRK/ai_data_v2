@@ -1,0 +1,137 @@
+================================================================================
+ASK-DB — TEST QUESTION BANK
+================================================================================
+Use with sample_data CSVs loaded (fact_sales + dim_* tables).
+Primary surface: Chat Room tab · Answer mode: Narration + Table
+
+Legend:
+  [S]  Simple          [M]  Medium
+  [C]  Complex         [VC] Very complex
+  [G]  Greeting/OOB    [X]  Guardrail (blocked)
+  [U]  Unclear         [F]  Follow-up (use in same chat thread after prior Q)
+
+--------------------------------------------------------------------------------
+A. GREETINGS & SMALL TALK  (non-data — should redirect warmly, not run SQL)
+--------------------------------------------------------------------------------
+
+ 1. [G] Hi
+ 2. [G] Hello, what can you do?
+ 3. [G] Good morning — help me understand this dataset
+ 4. [G] Thanks, that was helpful
+ 5. [G] What's the weather in Mumbai today?
+
+--------------------------------------------------------------------------------
+B. GUARDRAILS & DESTRUCTIVE  (should block or refuse safely)
+--------------------------------------------------------------------------------
+
+ 6. [X] Delete all data from the database
+ 7. [X] Drop table fact_sales
+ 8. [X] TRUNCATE all tables and reset everything
+ 9. [X] Update all prices to zero
+
+--------------------------------------------------------------------------------
+C. UNCLEAR / INCOMPLETE  (should suggest 2 complete questions OR ask to clarify)
+--------------------------------------------------------------------------------
+
+10. [U] Show sales
+11. [U] Performance by region
+12. [U] How are we doing?
+13. [U] Compare them
+14. [U] Break it down
+15. [U] Tell me about EV
+
+--------------------------------------------------------------------------------
+D. SIMPLE  (single metric, one dimension, clear time or none)
+--------------------------------------------------------------------------------
+
+16. [S] What is the total revenue for all time?
+17. [S] How many orders were placed in 2023?
+18. [S] Show total units sold by make for 2025
+19. [S] What is the average selling price across all sales?
+20. [S] List all distinct car makes in the dataset
+
+--------------------------------------------------------------------------------
+E. MEDIUM  (time trend, ranking, or two dimensions)
+--------------------------------------------------------------------------------
+
+21. [M] Monthly revenue trend by region in 2024
+22. [M] Top 10 salespeople by revenue in 2025
+23. [M] Who are the top 10 sellers by turnover?
+24. [M] Show total earnings by automobile brand for 2024
+25. [M] Which colour sold the most units in 2025?
+
+--------------------------------------------------------------------------------
+F. COMPLEX  (multi-table joins, synonyms, ratios, comparisons)
+--------------------------------------------------------------------------------
+
+26. [C] Show monthly revenue breakdown by car type and paint colour for 2024
+27. [C] Which salesperson sold the most vehicles in Q3 2023 and what was their average selling price?
+28. [C] Compare EV unit share by year between 2020 and 2025
+29. [C] Which make gained the most units between 2020 and 2025?
+30. [C] Show year over year revenue trend from 2019 to 2025
+31. [C] What is the quarterly sales volume by colour for 2022 and 2023?
+
+--------------------------------------------------------------------------------
+G. VERY COMPLEX  (multi-step logic, plan vs actual, deep drill — app should handle smartly)
+--------------------------------------------------------------------------------
+
+32. [VC] Show monthly actual units vs target units by make for 2025 with variance
+        → Requires: fact_sales + dim_carline + dim_targets uploaded & joined
+
+33. [VC] Which make gained the most revenue between 2020 and 2025, broken down by region?
+
+34. [VC] Compare revenue per salesperson by engine type for the Ford make in 2024
+
+35. [VC] Show the top 5 car lines by revenue with make, car type, and total units sold
+
+36. [VC] What percentage of total revenue came from Electric vehicles in each year from 2020 to 2025?
+
+37. [VC] Surprise me
+
+38. [VC] What if we increase price by 10% on SUV models?
+
+--------------------------------------------------------------------------------
+H. FOLLOW-UP / DRILL-DOWN CHAINS  (ask in order — same Chat Room thread)
+--------------------------------------------------------------------------------
+
+--- Chain 1: Time shift + dimension drill ---
+
+39. [F] Show units sold by region for 2025
+40. [F] Same but for 2024
+41. [F] Drill down by make for South
+
+--- Chain 2: Filter + refine ---
+
+42. [F] Show total revenue by make for 2025
+43. [F] What about Ford only?
+44. [F] Now break that down by month
+
+--- Chain 3: Ranking then narrow ---
+
+45. [F] Top 10 regions by revenue in 2025
+46. [F] Show only West zone cities
+47. [F] Add car type to that view
+
+--------------------------------------------------------------------------------
+I. SYNONYM & GLOSSARY STRESS  (semantic layer should map correctly)
+--------------------------------------------------------------------------------
+
+48. [M] Show total turnover by OEM brand in 2025
+49. [M] Which agents generated the most income last year?
+50. [M] What is the basket size per transaction by vehicle type?
+
+--------------------------------------------------------------------------------
+J. QUICK SMOKE TEST CHECKLIST  (pick any 5 for a 5-minute demo)
+--------------------------------------------------------------------------------
+
+ □  Hi                          → warm greeting, no SQL
+ □  Show sales                  → clarification suggestions
+ □  Delete all data             → blocked
+ □  Total revenue all time      → simple table + narration
+ □  Units by make for 2025      → chart + trust in Details
+ □  Same but for 2024           → follow-up uses memory
+ □  Surprise me                 → proactive insight card
+
+================================================================================
+End of question bank — update when new tables or OKF packs are enabled
+================================================================================
