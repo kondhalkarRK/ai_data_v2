@@ -179,6 +179,7 @@ class NarrationEngine:
         result_df: pd.DataFrame,
         question: str,
         evidence: dict | None = None,
+        knowledge_snippets: list | None = None,
     ) -> dict[str, Any] | None:
         try:
             data_ctx = self._build_data_context(result_df)
@@ -186,13 +187,28 @@ class NarrationEngine:
             if evidence and evidence.get("execution_path"):
                 sql_hint = f"Query path: {evidence.get('execution_path')}"
 
-            prompt = f"""You are a concise sales analyst. Answer ONLY from the data below.
+            knowledge_lines = []
+            for snippet in (knowledge_snippets or [])[:3]:
+                source = snippet.get("source_doc") or "business document"
+                locator = snippet.get("source_locator") or (
+                    f"page {snippet.get('source_page', '')}"
+                )
+                body = (snippet.get("snippet") or "")[:420]
+                knowledge_lines.append(f"[{source}, {locator}] {body}")
+            knowledge_context = "\n".join(knowledge_lines) or "None retrieved."
+
+            prompt = f"""You are a concise insurance analytics executive.
+Use DATA only for numerical findings. Use BUSINESS KNOWLEDGE only for
+definitions, management commentary, operating context, or actions.
 
 QUESTION: "{question}"
 {sql_hint}
 
 DATA:
 {data_ctx}
+
+BUSINESS KNOWLEDGE:
+{knowledge_context}
 
 Format (keep brief — max ~120 words total):
 
@@ -201,10 +217,21 @@ NARRATIVE: 1–2 short paragraphs with specific values
 FINDINGS: 2–3 bullets with numbers
 RECOMMENDATION: one follow-up action
 
-No markdown fences. No invented figures."""
+No markdown fences. No invented figures. Never treat a document statement as a
+database result. Mention document context only when it is relevant."""
 
             text = call_llm_narration(prompt)
             parsed = self._parse_llm_narration(text or "", question)
+            if parsed and knowledge_snippets:
+                parsed["knowledge_citations"] = [
+                    {
+                        "source_doc": snippet.get("source_doc"),
+                        "source_page": snippet.get("source_page"),
+                        "source_locator": snippet.get("source_locator"),
+                        "title": snippet.get("title"),
+                    }
+                    for snippet in knowledge_snippets[:3]
+                ]
             return parsed
         except Exception:
             return None
@@ -238,7 +265,22 @@ No markdown fences. No invented figures."""
 
         llm_narr = None
         if NARRATION_USE_LLM or self._wants_llm_narration(question):
-            llm_narr = self._generate_llm_narration(result_df, question, evidence)
+            if knowledge_snippets is None and OKF_ENABLED:
+                try:
+                    from features.okf_knowledge.okf_retriever import (
+                        get_relevant_snippets,
+                    )
+                    knowledge_snippets = get_relevant_snippets(
+                        question, top_k=3, max_context_chars=1000
+                    )
+                except Exception:
+                    knowledge_snippets = []
+            llm_narr = self._generate_llm_narration(
+                result_df,
+                question,
+                evidence,
+                knowledge_snippets=knowledge_snippets,
+            )
         if llm_narr:
             return llm_narr
 
@@ -542,7 +584,7 @@ No markdown fences. No invented figures."""
         citations = []
         context_bits = []
         for s in snippets[:2]:
-            src = s.get("source_doc") or "SOP"
+            src = s.get("source_doc") or "Business document"
             title = s.get("title") or ""
             snip = (s.get("snippet") or "").replace("\n", " ")
             if len(snip) > 280:
@@ -551,6 +593,7 @@ No markdown fences. No invented figures."""
             citations.append({
                 "source_doc": src,
                 "source_page": s.get("source_page"),
+                "source_locator": s.get("source_locator"),
                 "title": title,
             })
 

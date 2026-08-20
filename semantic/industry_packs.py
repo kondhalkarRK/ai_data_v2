@@ -128,6 +128,28 @@ def activate_pack(pack_id: str) -> tuple[bool, str]:
     model_path    = os.path.join(pack_dir, "semantic_model.yaml")
     glossary_path = os.path.join(pack_dir, "business_glossary.yaml")
 
+    # The insurance PostgreSQL model has different physical tables and grains
+    # from the lightweight CSV demo pack.
+    try:
+        from config.settings import get_data_config
+
+        postgres_model = os.path.join(
+            pack_dir, "semantic_model_postgres.yaml"
+        )
+        postgres_glossary = os.path.join(
+            pack_dir, "business_glossary_postgres.yaml"
+        )
+        if (
+            pack_id == "insurance"
+            and get_data_config().get("backend") == "postgres"
+            and os.path.isfile(postgres_model)
+        ):
+            model_path = postgres_model
+            if os.path.isfile(postgres_glossary):
+                glossary_path = postgres_glossary
+    except Exception:
+        pass
+
     if not (os.path.isfile(model_path) and os.path.isfile(glossary_path)):
         return False, f"Pack '{pack_id}' not found or incomplete."
 

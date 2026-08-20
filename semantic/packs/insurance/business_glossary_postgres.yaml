@@ -1,0 +1,102 @@
+version: "2.0"
+domain: "Insurance"
+
+terms:
+  Gross Written Premium:
+    definition: "Premium booked for policies written during the period."
+    synonyms: [GWP, written premium, premium booked]
+    maps_to_measure: gross_written_premium
+    sql_expression: "SUM(insurance.fact_policy_monthly.written_premium)"
+    category: Financial
+
+  Earned Premium:
+    definition: "The portion of written premium recognized for coverage already provided."
+    synonyms: [premium earned, recognized premium]
+    maps_to_measure: earned_premium
+    sql_expression: "SUM(insurance.fact_policy_monthly.earned_premium)"
+    category: Financial
+
+  Claims Incurred:
+    definition: "Paid claims plus outstanding reserves."
+    synonyms: [incurred loss, incurred claims, total loss]
+    maps_to_measure: claims_incurred
+    sql_expression: "SUM(insurance.fact_claims.incurred_amount)"
+    category: Claims
+
+  Claims Paid:
+    definition: "Claim amounts actually paid during the selected scope."
+    synonyms: [claim payout, paid loss, total payout]
+    maps_to_measure: claims_paid
+    sql_expression: "SUM(insurance.fact_claims.paid_amount)"
+    category: Claims
+
+  Loss Ratio:
+    definition: "Incurred claims divided by earned premium at a compatible period and business grain."
+    synonyms: [claims ratio, loss to premium ratio]
+    maps_to_measure: loss_ratio
+    calculation_rules:
+      - "Use incurred_amount, not reported_amount."
+      - "Use earned_premium from fact_policy_monthly."
+      - "Aggregate claims and premium separately before joining by compatible month and dimensions."
+    category: Risk
+
+  Claim Frequency:
+    definition: "Distinct claim count divided by exposure units."
+    synonyms: [claims per exposure, frequency rate]
+    maps_to_measure: claim_frequency
+    category: Risk
+
+  Average Claim Severity:
+    definition: "Incurred claim amount divided by distinct claim count."
+    synonyms: [severity, average loss, average claim cost]
+    maps_to_measure: average_claim_severity
+    category: Claims
+
+  Approval Rate:
+    definition: "Approved claims divided by all filed claims in the selected scope."
+    synonyms: [claim approval rate, approved percentage]
+    maps_to_measure: approval_rate
+    category: Operations
+
+  Renewal Rate:
+    definition: "Renewed policies divided by policies due for renewal."
+    synonyms: [persistency, retention rate, policy retention]
+    maps_to_measure: renewal_rate
+    category: Customer
+
+  Settlement Time:
+    definition: "Days from claim report date to settlement date for settled claims."
+    synonyms: [claim cycle time, turnaround time, TAT]
+    category: Operations
+
+  Reserve:
+    definition: "Estimated remaining liability for reported claims not yet fully paid."
+    synonyms: [outstanding reserve, case reserve]
+    category: Claims
+
+  Line of Business:
+    definition: "Insurance product grouping such as Motor, Health, or Property."
+    synonyms: [LOB, product line, insurance line]
+    maps_to_dimension: Product
+    category: Product
+
+domain_rules:
+  - "SQL is the source of truth for numerical results."
+  - "Documents provide management commentary, definitions, and actions, not database facts."
+  - "Never sum premium from claim rows."
+  - "Use incurred claims divided by earned premium for loss ratio."
+  - "Use NULLIF to protect ratio denominators."
+
+sql_patterns:
+  monthly_claim_trend:
+    description: "Claims grouped by reported month"
+    trigger_words: [monthly claims, claims trend, by month]
+    pattern: "SELECT date_trunc('month', reported_date)::date AS month, SUM(incurred_amount) AS claims_incurred FROM insurance.fact_claims GROUP BY 1 ORDER BY 1"
+  premium_by_product:
+    description: "Written and earned premium by product"
+    trigger_words: [premium by product, GWP by line, earned premium]
+    pattern: "Aggregate insurance.fact_policy_monthly then join insurance.dim_product on product_id"
+  loss_ratio:
+    description: "Separately aggregate monthly claims and premium before calculating loss ratio"
+    trigger_words: [loss ratio, claims ratio]
+    pattern: "Claims CTE by month/product plus premium CTE by month/product; incurred / NULLIF(earned, 0)"

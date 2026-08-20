@@ -89,6 +89,9 @@ def reindex_all() -> int:
                     "source_page": str(concept["source_page"]),
                     "doc_code": concept.get("doc_code") or "",
                     "doc_type": concept.get("doc_type") or "sop",
+                    "source_locator": concept.get("source_locator") or (
+                        f"page {concept['source_page']}"
+                    ),
                 }],
             )
             indexed += 1
@@ -138,19 +141,21 @@ def get_relevant_snippets(
 
     docs = (results or {}).get("documents", [[]])[0]
     metas = (results or {}).get("metadatas", [[]])[0]
+    distances = (results or {}).get("distances", [[]])[0]
     if not docs:
         return []
 
     out: list[dict] = []
     used = 0
-    for doc, meta in zip(docs, metas):
+    for index, (doc, meta) in enumerate(zip(docs, metas)):
         snippet = (doc or "").strip()[:_SNIPPET_CHARS_DEFAULT]
         if not snippet:
             continue
         title = (meta or {}).get("title", "")
         source = (meta or {}).get("source_doc", "")
         page = (meta or {}).get("source_page", "")
-        entry = f"- ({source}, p.{page} — {title}): {snippet}"
+        locator = (meta or {}).get("source_locator") or f"page {page}"
+        entry = f"- ({source}, {locator} — {title}): {snippet}"
         if used + len(entry) > max_context_chars:
             break
         out.append({
@@ -161,6 +166,8 @@ def get_relevant_snippets(
             "entry": entry,
             "doc_code": (meta or {}).get("doc_code", ""),
             "doc_type": (meta or {}).get("doc_type", "sop"),
+            "source_locator": locator,
+            "distance": distances[index] if index < len(distances) else None,
         })
         used += len(entry)
     return out

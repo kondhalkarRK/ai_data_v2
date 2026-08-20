@@ -29,6 +29,11 @@ FOLLOWUP_TRIGGER_TOKENS = [
 ]
 MAX_FOLLOWUP_QUESTION_WORDS = 8
 
+# Structured query execution
+MAX_QUERY_ROWS = 1000
+MAX_QUERY_TIMEOUT_SECONDS = 30
+MAX_RESULT_DISPLAY_ROWS = 500
+
 # OOB Guard — destructive + lifestyle / off-domain chat
 OOB_PATTERNS = [
     r"\bwrite\s+(me\s+)?code\b",
@@ -50,8 +55,8 @@ OOB_PATTERNS = [
 EXECUTION_PATHS = ["deterministic", "fallback", "cache"]
 MAX_EVIDENCE_HISTORY = 20
 
-# OKF business-document RAG — disabled until re-wired (see features/okf_knowledge/)
-OKF_ENABLED = False
+# OKF business-document RAG — local embeddings + Chroma, no ingestion LLM cost
+OKF_ENABLED = True
 
 # Narration — rule-based default for speed/cost; LLM only when user asks explain/why
 NARRATION_USE_LLM = False

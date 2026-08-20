@@ -4,10 +4,10 @@ Semantic-first NLQ: glossary + semantic context enrich LLM SQL generation.
 Deterministic sql_compiler / intent_resolver are NOT the primary path.
 """
 import re
-import duckdb
 import pandas as pd
 import streamlit as st
 
+from core.data_backend.factory import get_backend, postgres_mode_enabled
 from core.llm_client import call_llm
 from core.sql_guardrails import sql_is_safe
 from core.schema_builder import build_rich_schema
@@ -681,22 +681,16 @@ SQL:"""
     return sql_result
 
 
-def run_sql(sql: str, df: pd.DataFrame) -> tuple[pd.DataFrame | None, str | None]:
-    safe, reason = sql_is_safe(sql)
-    if not safe:
-        return None, f"\U0001f512 Blocked: {reason}"
+def run_sql(
+    sql: str,
+    df: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame | None, str | None]:
+    """Execute SQL through the active backend with common formatting."""
     try:
-        con = duckdb.connect()
-        con.register("df", df)
-        try:
-            extra = st.session_state.get("dfs") or {}
-            for tname, tdf in extra.items():
-                if isinstance(tdf, pd.DataFrame) and not tdf.empty:
-                    con.register(str(tname), tdf)
-        except Exception:
-            pass
-        result = con.execute(sql.strip()).df()
-        con.close()
+        backend = get_backend(df, st.session_state.get("dfs") or {})
+        result, error = backend.execute_sql(sql)
+        if result is None or error:
+            return result, error
         result = format_result_dates(result)
         return result, None
     except Exception as e:
@@ -718,11 +712,159 @@ def _pack_return(result, sql, err, evidence=None):
     return result, sql, err, evidence
 
 
-def run_query(working_df: pd.DataFrame, question: str, status=None):
+def _clean_generated_sql(value: str | None) -> str:
+    sql = (value or "").strip().strip("`").strip()
+    if sql.lower().startswith("sql"):
+        sql = sql[3:].strip()
+    return sql
+
+
+def _postgres_prompt(question: str, schema: str) -> str:
+    semantic_parts: list[str] = []
+    builder = _get_semantic_builder()
+    if builder is not None:
+        for method_name, args in (
+            ("build_base_context", ()),
+            ("build_glossary_sql_hints", (question,)),
+            ("build_domain_rules_block", ()),
+        ):
+            try:
+                value = getattr(builder, method_name)(*args)
+                if value:
+                    semantic_parts.append(str(value))
+            except Exception:
+                pass
+
+    anchor_block = ""
+    if _CONV_OK:
+        try:
+            anchor = get_sql_anchor()
+            if anchor and should_use_anchor(question):
+                anchor_block = (
+                    "\nPRIOR SUCCESSFUL SQL (modify it for the follow-up while "
+                    f"preserving applicable filters):\n{anchor.get('sql_anchor', '')}\n"
+                )
+        except Exception:
+            pass
+
+    semantic_context = "\n\n".join(semantic_parts)[:5000]
+    return f"""You are an expert PostgreSQL analytics SQL generator.
+
+{semantic_context}
+
+PHYSICAL POSTGRESQL SCHEMA:
+{schema}
+{anchor_block}
+RULES:
+1. Return one read-only SELECT query or read-only WITH...SELECT query.
+2. Use only qualified tables and columns present in the physical schema.
+3. Use PostgreSQL syntax: date_trunc, extract, to_char, FILTER, and NULLIF.
+4. Never use DuckDB functions such as strftime and never query a table named df.
+5. Insurance numbers come from SQL. Premium must come from policy-month/premium
+   facts, not duplicated claim rows.
+6. Protect ratios with NULLIF(denominator, 0).
+7. Use meaningful aliases and LIMIT detail/ranking results to at most 500 rows.
+8. Do not emit INSERT, UPDATE, DELETE, DDL, COPY, procedures, or multiple statements.
+9. Return only SQL without markdown fences or explanation.
+
+QUESTION: {question}
+
+SQL:"""
+
+
+def _run_postgres_query(question: str, status=None):
+    backend = get_backend()
+    healthy, message = backend.health_check()
+    if not healthy:
+        return _pack_return(None, "", message, None)
+
+    if _CACHE_OK and detect_oob(question):
+        return _pack_return(
+            None,
+            "",
+            "out_of_scope: Question is outside the scope of this dataset analytics tool",
+            None,
+        )
+
+    fingerprint = backend.get_dataset_fingerprint()
+    cache_key = f"nlq_postgres_{fingerprint}_{question.strip().lower()}"
+    cached = st.session_state.memory.get(cache_key)
+    if cached:
+        result, sql, err = cached
+        evidence = (
+            build_evidence(sql or "", result, "cache", question)
+            if _EVIDENCE_OK else None
+        )
+        if evidence is not None:
+            evidence["backend"] = "postgres"
+        return _pack_return(result, sql, err, evidence)
+
+    schema = backend.describe_schema()
+    if not schema:
+        return _pack_return(
+            None, "", "PostgreSQL schema could not be discovered.", None
+        )
+
+    if status is not None:
+        status.update(label="✨ Generating PostgreSQL SQL with AI...")
+    sql = _clean_generated_sql(call_llm(_postgres_prompt(question, schema)))
+    if not sql:
+        return _pack_return(None, "", "LLM did not return SQL.", None)
+
+    if status is not None:
+        status.update(label="⚙️ Executing query in PostgreSQL...")
+    result, err = run_sql(sql, None)
+
+    if err and not err.startswith("\U0001f512"):
+        if status is not None:
+            status.update(label="🔁 Correcting PostgreSQL SQL...")
+        retry_prompt = (
+            _postgres_prompt(question, schema)
+            + f"\nThe previous SQL failed with: {err}\n"
+            + f"PREVIOUS SQL:\n{sql}\nReturn only corrected PostgreSQL SQL:"
+        )
+        corrected = _clean_generated_sql(call_llm(retry_prompt))
+        if corrected:
+            sql = corrected
+            result, err = run_sql(sql, None)
+
+    evidence = None
+    if result is not None and not err:
+        st.session_state.memory[cache_key] = (result, sql, None)
+        if _EVIDENCE_OK:
+            evidence = build_evidence(sql, result, "semantic", question)
+            evidence["backend"] = "postgres"
+            evidence["dataset_fingerprint"] = fingerprint
+            evidence["resolution_source"] = "semantic_llm"
+        if _CONV_OK:
+            try:
+                update_state(
+                    {"intent_type": "semantic_sql"},
+                    {"sql": sql, "metric_name": None},
+                    question,
+                )
+                set_sql_anchor(sql, question, None)
+            except Exception:
+                pass
+        update_history(
+            question,
+            {"sql": sql, "evidence": evidence, "execution_path": "semantic"},
+        )
+    elif _EVIDENCE_OK:
+        evidence = build_evidence(sql, None, "semantic", question)
+        evidence["backend"] = "postgres"
+
+    return _pack_return(result, sql, err, evidence)
+
+
+def run_query(working_df: pd.DataFrame | None, question: str, status=None):
     """
     Semantic-first query path:
       OOB → caches → nlq_to_sql (semantic enriched) → run_sql → evidence
     """
+    if postgres_mode_enabled():
+        return _run_postgres_query(question, status=status)
+
     if working_df is None or working_df.empty:
         return _pack_return(None, "", "No data loaded.", None)
 

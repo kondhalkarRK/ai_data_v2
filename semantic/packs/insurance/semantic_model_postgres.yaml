@@ -1,0 +1,196 @@
+version: "2.0"
+domain: "Insurance"
+description: "PostgreSQL insurance analytics model with separate claim and premium grains"
+
+tables:
+  fact_claims:
+    type: fact
+    physical_name: insurance.fact_claims
+    display_name: "Claims"
+    grain: "One row per claim"
+    primary_key: claim_id
+    columns:
+      claim_id: {display_name: "Claim ID", type: integer, role: key}
+      claim_number: {display_name: "Claim Number", type: string, role: attribute}
+      policy_id: {display_name: "Policy ID", type: integer, role: foreign_key, references: dim_policy.policy_id}
+      product_id: {display_name: "Product ID", type: integer, role: foreign_key, references: dim_product.product_id}
+      region_id: {display_name: "Region ID", type: integer, role: foreign_key, references: dim_region.region_id}
+      loss_date: {display_name: "Loss Date", type: date, role: date}
+      reported_date: {display_name: "Reported Date", type: date, role: date}
+      settlement_date: {display_name: "Settlement Date", type: date, role: date}
+      claim_status: {display_name: "Claim Status", type: string, role: dimension}
+      claim_type: {display_name: "Claim Type", type: string, role: dimension}
+      reported_amount: {display_name: "Reported Amount", type: decimal, role: measure}
+      approved_amount: {display_name: "Approved Amount", type: decimal, role: measure}
+      paid_amount: {display_name: "Paid Amount", type: decimal, role: measure}
+      reserve_amount: {display_name: "Reserve Amount", type: decimal, role: measure}
+      incurred_amount: {display_name: "Incurred Amount", type: decimal, role: measure}
+      approved_flag: {display_name: "Approved", type: boolean, role: dimension}
+      repudiated_flag: {display_name: "Repudiated", type: boolean, role: dimension}
+      fraud_suspected_flag: {display_name: "Fraud Suspected", type: boolean, role: dimension}
+
+  fact_policy_monthly:
+    type: fact
+    physical_name: insurance.fact_policy_monthly
+    display_name: "Policy Monthly Premium and Exposure"
+    grain: "One row per policy per accounting month"
+    primary_key: policy_month_id
+    columns:
+      policy_month_id: {display_name: "Policy Month ID", type: integer, role: key}
+      policy_id: {display_name: "Policy ID", type: integer, role: foreign_key, references: dim_policy.policy_id}
+      product_id: {display_name: "Product ID", type: integer, role: foreign_key, references: dim_product.product_id}
+      agent_id: {display_name: "Agent ID", type: integer, role: foreign_key, references: dim_agent.agent_id}
+      region_id: {display_name: "Region ID", type: integer, role: foreign_key, references: dim_region.region_id}
+      accounting_month: {display_name: "Accounting Month", type: date, role: date}
+      written_premium: {display_name: "Written Premium", type: decimal, role: measure}
+      earned_premium: {display_name: "Earned Premium", type: decimal, role: measure}
+      exposure_units: {display_name: "Exposure Units", type: decimal, role: measure}
+      active_policy_flag: {display_name: "Active Policy", type: boolean, role: dimension}
+      due_for_renewal_flag: {display_name: "Due for Renewal", type: boolean, role: dimension}
+      renewed_flag: {display_name: "Renewed", type: boolean, role: dimension}
+
+  dim_policy:
+    type: dimension
+    physical_name: insurance.dim_policy
+    display_name: "Policy"
+    primary_key: policy_id
+    columns:
+      policy_id: {display_name: "Policy ID", type: integer, role: key}
+      policy_number: {display_name: "Policy Number", type: string, role: attribute}
+      product_id: {display_name: "Product ID", type: integer, role: foreign_key, references: dim_product.product_id}
+      agent_id: {display_name: "Agent ID", type: integer, role: foreign_key, references: dim_agent.agent_id}
+      region_id: {display_name: "Region ID", type: integer, role: foreign_key, references: dim_region.region_id}
+      inception_date: {display_name: "Inception Date", type: date, role: date}
+      expiry_date: {display_name: "Expiry Date", type: date, role: date}
+      policy_status: {display_name: "Policy Status", type: string, role: attribute}
+      coverage_tier: {display_name: "Coverage Tier", type: string, role: attribute}
+      sum_insured: {display_name: "Sum Insured", type: decimal, role: measure}
+
+  dim_product:
+    type: dimension
+    physical_name: insurance.dim_product
+    display_name: "Product"
+    primary_key: product_id
+    columns:
+      product_id: {display_name: "Product ID", type: integer, role: key}
+      product_code: {display_name: "Product Code", type: string, role: attribute}
+      product_name: {display_name: "Product Name", type: string, role: attribute}
+      line_of_business: {display_name: "Line of Business", type: string, role: attribute}
+      product_family: {display_name: "Product Family", type: string, role: attribute}
+      coverage_type: {display_name: "Coverage Type", type: string, role: attribute}
+
+  dim_agent:
+    type: dimension
+    physical_name: insurance.dim_agent
+    display_name: "Agent"
+    primary_key: agent_id
+    columns:
+      agent_id: {display_name: "Agent ID", type: integer, role: key}
+      agent_code: {display_name: "Agent Code", type: string, role: attribute}
+      agent_name: {display_name: "Agent Name", type: string, role: attribute}
+      channel_name: {display_name: "Channel", type: string, role: attribute}
+      branch_name: {display_name: "Branch", type: string, role: attribute}
+      active_flag: {display_name: "Active", type: boolean, role: attribute}
+
+  dim_region:
+    type: dimension
+    physical_name: insurance.dim_region
+    display_name: "Region"
+    primary_key: region_id
+    columns:
+      region_id: {display_name: "Region ID", type: integer, role: key}
+      region_code: {display_name: "Region Code", type: string, role: attribute}
+      region_name: {display_name: "Region", type: string, role: attribute}
+      state_name: {display_name: "State", type: string, role: attribute}
+      country_name: {display_name: "Country", type: string, role: attribute}
+
+relationships:
+  - {name: claims_to_policy, from_table: fact_claims, from_column: policy_id, to_table: dim_policy, to_column: policy_id, type: many_to_one}
+  - {name: claims_to_product, from_table: fact_claims, from_column: product_id, to_table: dim_product, to_column: product_id, type: many_to_one}
+  - {name: claims_to_region, from_table: fact_claims, from_column: region_id, to_table: dim_region, to_column: region_id, type: many_to_one}
+  - {name: premium_to_policy, from_table: fact_policy_monthly, from_column: policy_id, to_table: dim_policy, to_column: policy_id, type: many_to_one}
+  - {name: premium_to_product, from_table: fact_policy_monthly, from_column: product_id, to_table: dim_product, to_column: product_id, type: many_to_one}
+  - {name: premium_to_agent, from_table: fact_policy_monthly, from_column: agent_id, to_table: dim_agent, to_column: agent_id, type: many_to_one}
+  - {name: premium_to_region, from_table: fact_policy_monthly, from_column: region_id, to_table: dim_region, to_column: region_id, type: many_to_one}
+
+measures:
+  gross_written_premium:
+    display_name: "Gross Written Premium"
+    expression: "SUM(written_premium)"
+    source_table: fact_policy_monthly
+    source_column: written_premium
+    aggregation: sum
+    format: currency
+    synonyms: [GWP, written premium, premium booked]
+  earned_premium:
+    display_name: "Earned Premium"
+    expression: "SUM(earned_premium)"
+    source_table: fact_policy_monthly
+    source_column: earned_premium
+    aggregation: sum
+    format: currency
+  claims_incurred:
+    display_name: "Claims Incurred"
+    expression: "SUM(incurred_amount)"
+    source_table: fact_claims
+    source_column: incurred_amount
+    aggregation: sum
+    format: currency
+  claims_paid:
+    display_name: "Claims Paid"
+    expression: "SUM(paid_amount)"
+    source_table: fact_claims
+    source_column: paid_amount
+    aggregation: sum
+    format: currency
+  claim_count:
+    display_name: "Claim Count"
+    expression: "COUNT(DISTINCT claim_id)"
+    source_table: fact_claims
+    source_column: claim_id
+    aggregation: count_distinct
+    format: integer
+  loss_ratio:
+    display_name: "Loss Ratio"
+    description: "Incurred claims divided by earned premium at a compatible period grain"
+    expression: "SUM(incurred_amount) / NULLIF(SUM(earned_premium), 0)"
+    aggregation: ratio
+    format: percent
+  average_claim_severity:
+    display_name: "Average Claim Severity"
+    expression: "SUM(incurred_amount) / NULLIF(COUNT(DISTINCT claim_id), 0)"
+    source_table: fact_claims
+    aggregation: ratio
+    format: currency
+  claim_frequency:
+    display_name: "Claim Frequency"
+    expression: "COUNT(DISTINCT claim_id) / NULLIF(SUM(exposure_units), 0)"
+    aggregation: ratio
+    format: decimal
+  approval_rate:
+    display_name: "Approval Rate"
+    expression: "AVG(approved_flag::int)"
+    source_table: fact_claims
+    aggregation: ratio
+    format: percent
+  renewal_rate:
+    display_name: "Renewal Rate"
+    expression: "COUNT(*) FILTER (WHERE renewed_flag) / NULLIF(COUNT(*) FILTER (WHERE due_for_renewal_flag), 0)"
+    source_table: fact_policy_monthly
+    aggregation: ratio
+    format: percent
+
+dimensions:
+  Reported Date: {display_name: "Reported Date", source_table: fact_claims, source_column: reported_date, type: date, synonyms: [claim date, reported month, period]}
+  Accounting Month: {display_name: "Accounting Month", source_table: fact_policy_monthly, source_column: accounting_month, type: date, synonyms: [premium month, month, period]}
+  Product: {display_name: "Product", source_table: dim_product, attributes: [product_name, line_of_business, product_family, coverage_type], synonyms: [LOB, insurance product, line]}
+  Region: {display_name: "Region", source_table: dim_region, attributes: [region_name, state_name, country_name], synonyms: [territory, geography, state]}
+  Agent: {display_name: "Agent", source_table: dim_agent, attributes: [agent_name, channel_name, branch_name], synonyms: [broker, channel, intermediary]}
+  Policy: {display_name: "Policy", source_table: dim_policy, attributes: [policy_number, policy_status, coverage_tier], synonyms: [coverage, contract]}
+
+domain_rules:
+  - "Premium must be aggregated from fact_policy_monthly, never from fact_claims."
+  - "Loss ratio is incurred claims divided by earned premium at a compatible month/product/region grain."
+  - "Protect every ratio with NULLIF on the denominator."
+  - "Use reported_date for claims reporting and accounting_month for premium reporting."
+  - "Use PostgreSQL syntax when the physical table names are schema-qualified."

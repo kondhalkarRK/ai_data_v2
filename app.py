@@ -1,8 +1,10 @@
 # app.py - ASK - DB
 import streamlit as st
+import pandas as pd
 
-from config.settings   import init_session_state
+from config.settings   import get_data_config, init_session_state
 from config.styles     import apply_styles
+from core.data_backend.factory import get_backend, postgres_mode_enabled
 from core.join_engine  import get_working_df
 from ui import sidebar, tab_preview, tab_kpi, tab_query
 
@@ -19,6 +21,20 @@ st.set_page_config(layout="wide", page_title="ASK - DB", page_icon="💬")
 
 init_session_state()
 apply_styles()
+
+# PostgreSQL insurance deployments start with the configured semantic pack
+# before any semantic singleton is built.
+if postgres_mode_enabled():
+    try:
+        from semantic.industry_packs import activate_pack, get_active_pack_id
+
+        _configured_pack = get_data_config().get("industry_pack") or "insurance"
+        if get_active_pack_id() != _configured_pack:
+            _pack_ok, _pack_message = activate_pack(_configured_pack)
+            if not _pack_ok:
+                st.warning(f"Industry pack not activated: {_pack_message}")
+    except Exception as _pack_error:
+        st.warning(f"Industry pack initialization failed: {_pack_error}")
 
 # ── Immediate boot screen — avoids any blank-screen moment while the
 # semantic model / embedding engine (the slowest part of startup)
@@ -106,9 +122,21 @@ except Exception:
 _boot_screen.empty()
 
 sidebar.render()
-if not st.session_state.dfs:
+_postgres_mode = postgres_mode_enabled()
+if not _postgres_mode and not st.session_state.dfs:
     st.info("👈 Upload one or more CSV files to get started.")
     st.stop()
+
+if _postgres_mode:
+    _backend = get_backend()
+    _db_ok, _db_message = _backend.health_check()
+    if not _db_ok:
+        st.error(f"PostgreSQL connection is not ready: {_db_message}")
+        st.info(
+            "Check DATA_BACKEND and the [postgres] values in "
+            ".streamlit/secrets.toml, then restart the app."
+        )
+        st.stop()
 
 glossary_store.seed_glossary_once()
 try:
@@ -132,8 +160,12 @@ if OKF_ENABLED and not st.session_state.get("_okf_autosseed_done"):
         pass
     st.session_state["_okf_autosseed_done"] = True
 
-tables     = list(st.session_state.dfs.keys())
-working_df = get_working_df()
+if _postgres_mode:
+    tables = _backend.list_tables()
+    working_df = pd.DataFrame()
+else:
+    tables = list(st.session_state.dfs.keys())
+    working_df = get_working_df()
 
 if working_df is not None and len(working_df.columns) > 25:
     schema_indexer.index_schema_columns(working_df, "df")
@@ -190,7 +222,8 @@ _render_tab_safely(tab_query_ui,   tab_query.render,   "Chat Room")
 st.markdown("---")
 st.markdown(
     "<div class='app-footer'>"
-    "ASK - DB &nbsp;·&nbsp; DuckDB · GPT-4o · Streamlit"
+    f"ASK - DB &nbsp;·&nbsp; {'PostgreSQL' if _postgres_mode else 'DuckDB'} "
+    "· AI Data Copilot · Streamlit"
     "</div>",
     unsafe_allow_html=True,
 )

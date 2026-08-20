@@ -42,6 +42,100 @@ def _secret(name: str, default=None):
     return default
 
 
+def _section_secret(section: str, name: str, env_name: str, default=None):
+    """Read a nested Streamlit secret, then fall back to an environment key."""
+    try:
+        value = st.secrets[section][name]
+        if value not in (None, ""):
+            return value
+    except Exception:
+        pass
+    return _secret(env_name, default)
+
+
+def _as_int(value, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def get_data_config() -> dict:
+    """Return backend configuration without exposing credentials to the UI."""
+    backend = str(_secret("DATA_BACKEND", "csv_duckdb")).strip().lower()
+    if backend not in {"csv_duckdb", "postgres"}:
+        logger.warning("Unknown DATA_BACKEND=%s; using csv_duckdb.", backend)
+        backend = "csv_duckdb"
+
+    return {
+        "backend": backend,
+        "industry_pack": str(
+            _secret("INDUSTRY_PACK", "insurance" if backend == "postgres" else "automotive")
+        ).strip().lower(),
+        "postgres": {
+            "host": _section_secret("postgres", "host", "POSTGRES_HOST", "localhost"),
+            "port": _as_int(
+                _section_secret("postgres", "port", "POSTGRES_PORT", 5432),
+                5432,
+            ),
+            "database": _section_secret(
+                "postgres", "database", "POSTGRES_DATABASE", "askdb_dev"
+            ),
+            "user": _section_secret(
+                "postgres", "user", "POSTGRES_USER", "askdb_app"
+            ),
+            "password": _section_secret(
+                "postgres", "password", "POSTGRES_PASSWORD"
+            ),
+            "schema": _section_secret(
+                "postgres", "schema", "POSTGRES_SCHEMA", "insurance"
+            ),
+            "sslmode": _section_secret(
+                "postgres", "sslmode", "POSTGRES_SSLMODE", "prefer"
+            ),
+            "connect_timeout_seconds": _as_int(
+                _section_secret(
+                    "postgres",
+                    "connect_timeout_seconds",
+                    "POSTGRES_CONNECT_TIMEOUT_SECONDS",
+                    10,
+                ),
+                10,
+            ),
+            "statement_timeout_seconds": _as_int(
+                _section_secret(
+                    "postgres",
+                    "statement_timeout_seconds",
+                    "POSTGRES_STATEMENT_TIMEOUT_SECONDS",
+                    30,
+                ),
+                30,
+            ),
+            "max_result_rows": _as_int(
+                _section_secret(
+                    "postgres",
+                    "max_result_rows",
+                    "POSTGRES_MAX_RESULT_ROWS",
+                    1000,
+                ),
+                1000,
+            ),
+            "pool_min_size": _as_int(
+                _section_secret(
+                    "postgres", "pool_min_size", "POSTGRES_POOL_MIN_SIZE", 1
+                ),
+                1,
+            ),
+            "pool_max_size": _as_int(
+                _section_secret(
+                    "postgres", "pool_max_size", "POSTGRES_POOL_MAX_SIZE", 5
+                ),
+                5,
+            ),
+        },
+    }
+
+
 def get_llm_config() -> dict:
     """Read LLM settings at call time (Streamlit Cloud secrets load correctly)."""
     return {
@@ -121,12 +215,19 @@ DEFAULTS = {
     "max_llm_calls": 60,
     "auto_join_base": None,
     "ui_theme": "dark",  # light | dark | ai
+    "data_backend": "csv_duckdb",
 }
 
 def init_session_state() -> None:
     for k, v in DEFAULTS.items():
         if k not in st.session_state:
             st.session_state[k] = v
+
+    # Secrets/environment select the startup backend. A future UI selector may
+    # override this per session without changing the configured default.
+    if not st.session_state.get("_data_backend_configured"):
+        st.session_state.data_backend = get_data_config()["backend"]
+        st.session_state["_data_backend_configured"] = True
 
     # Conversation state
     if "conversation_state" not in st.session_state:

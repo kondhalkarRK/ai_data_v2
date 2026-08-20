@@ -31,9 +31,25 @@ def list_packaged_sop_files() -> list[Path]:
     root = business_knowledge_dir()
     if not root.is_dir():
         return []
+    active_pack = "automotive"
+    try:
+        from semantic.industry_packs import get_active_pack_id
+
+        active_pack = get_active_pack_id()
+    except Exception:
+        pass
+
+    search_root = root
+    prefixes = ("IND-PV-",)
+    if active_pack == "insurance":
+        insurance_root = root / "insurance"
+        search_root = insurance_root if insurance_root.is_dir() else root
+        prefixes = ("INS-",)
+
     files: list[Path] = []
-    for pattern in ("IND-PV-*.md", "IND-PV-*.pdf"):
-        files.extend(sorted(root.rglob(pattern)))
+    for prefix in prefixes:
+        for extension in ("md", "pdf", "pptx", "docx"):
+            files.extend(sorted(search_root.rglob(f"{prefix}*.{extension}")))
     # De-dupe same path
     seen: set[str] = set()
     unique: list[Path] = []
@@ -92,6 +108,22 @@ def bootstrap_business_knowledge(force: bool = False) -> dict:
                 if not pdf_extraction_available():
                     continue
                 concepts = extract_pdf_to_concepts(path.read_bytes(), path.name)
+            elif path.suffix.lower() == ".pptx":
+                from features.okf_knowledge.pptx_extractor import (
+                    extract_pptx_file,
+                    pptx_extraction_available,
+                )
+                if not pptx_extraction_available():
+                    continue
+                concepts = extract_pptx_file(path)
+            elif path.suffix.lower() == ".docx":
+                from features.okf_knowledge.docx_extractor import (
+                    docx_extraction_available,
+                    extract_docx_file,
+                )
+                if not docx_extraction_available():
+                    continue
+                concepts = extract_docx_file(path)
             else:
                 continue
             if not concepts:

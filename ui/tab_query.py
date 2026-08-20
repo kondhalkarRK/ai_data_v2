@@ -14,6 +14,7 @@ import pandas as pd
 import streamlit as st
 
 from core.nlq_engine import run_query, run_sql
+from core.data_backend.factory import postgres_mode_enabled
 from core.sql_guardrails import sql_is_safe
 from core.chart_engine import auto_chart_type, build_chart
 from core.llm_client import call_llm
@@ -381,7 +382,13 @@ def render_narration_card(narration: dict | None):
             src = html.escape(str(c.get("source_doc") or "SOP"))
             title = html.escape(str(c.get("title") or ""))
             page = html.escape(str(c.get("source_page") or ""))
-            bits.append(f"{src}" + (f" §{page}" if page else "") + (f" — {title}" if title else ""))
+            locator = html.escape(str(c.get("source_locator") or ""))
+            location = locator or (f"page {page}" if page else "")
+            bits.append(
+                f"{src}"
+                + (f" · {location}" if location else "")
+                + (f" — {title}" if title else "")
+            )
         st.markdown(
             '<div class="okf-citation">📎 Knowledge: '
             + " · ".join(bits)
@@ -1927,7 +1934,10 @@ def render_chat_mode(working_df, tables, dfs):
 # ── Entry ────────────────────────────────────────────────────────
 
 def render(working_df, tables, dfs):
-    if working_df is None or working_df.empty:
+    if (
+        not postgres_mode_enabled()
+        and (working_df is None or working_df.empty)
+    ):
         st.warning("⚠️ No data available.")
         st.stop()
 

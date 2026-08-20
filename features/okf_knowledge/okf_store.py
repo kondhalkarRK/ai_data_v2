@@ -57,6 +57,8 @@ def write_bundle(concepts: list[dict]) -> str:
             frontmatter["doc_type"] = concept["doc_type"]
         if concept.get("owner"):
             frontmatter["owner"] = concept["owner"]
+        if concept.get("source_locator"):
+            frontmatter["source_locator"] = concept["source_locator"]
         fm_yaml = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True)
 
         file_path = os.path.join(out_dir, f"{concept['concept_id']}.md")
@@ -144,6 +146,10 @@ def read_all_concepts() -> list[dict]:
                     "doc_code":    fm.get("doc_code", ""),
                     "doc_type":    fm.get("doc_type", "sop"),
                     "owner":       fm.get("owner", ""),
+                    "source_locator": fm.get(
+                        "source_locator",
+                        f"page {fm.get('source_page', '')}",
+                    ),
                 })
             except Exception:
                 continue

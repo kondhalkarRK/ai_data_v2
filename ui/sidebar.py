@@ -8,6 +8,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from core.data_backend.factory import get_backend, postgres_mode_enabled
 from core.utils import load_files
 from features.question_cache import cache_store
 
@@ -28,15 +29,14 @@ try:
 except ImportError:
     OKF_ENABLED = False
 
-# OKF imports disabled — wire back when OKF_ENABLED = True
-_OKF_AVAILABLE = False
-# try:
-#     from features.okf_knowledge.pdf_extractor import extract_pdf_to_concepts, pdf_extraction_available
-#     from features.okf_knowledge.okf_store import write_bundle, list_bundles, clear_all_bundles
-#     from features.okf_knowledge.okf_retriever import reindex_all, indexed_concept_count, clear_index
-#     _OKF_AVAILABLE = OKF_ENABLED
-# except ImportError:
-#     _OKF_AVAILABLE = False
+try:
+    from features.okf_knowledge.okf_bootstrap import bootstrap_business_knowledge
+    from features.okf_knowledge.okf_store import list_bundles
+    from features.okf_knowledge.okf_retriever import indexed_concept_count
+
+    _OKF_AVAILABLE = OKF_ENABLED
+except ImportError:
+    _OKF_AVAILABLE = False
 
 
 _LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "ask_db_logo.png"
@@ -214,21 +214,34 @@ def render():
         # =========================
         # COLLAPSED NAV — click to open
         # =========================
-        with st.expander("📁 Upload files", expanded=False):
-            st.markdown('<div class="sb-upload-wrap">', unsafe_allow_html=True)
-            file_count = len(st.session_state.get("dfs", {}))
-            c1, c2 = st.columns([3, 1])
-            with c1:
-                status_row("Files Loaded", file_count, "#fcd34d")
-            with c2:
-                if st.button(
-                    "＋",
-                    use_container_width=True,
-                    help="Add Files",
-                    key="sidebar_upload_plus",
-                ):
-                    upload_dialog()
-            st.markdown("</div>", unsafe_allow_html=True)
+        _postgres_mode = postgres_mode_enabled()
+        if _postgres_mode:
+            with st.expander("🗄️ PostgreSQL", expanded=False):
+                backend = get_backend()
+                healthy, message = backend.health_check()
+                status_row(
+                    "Status",
+                    "CONNECTED" if healthy else "OFFLINE",
+                    "#6ee7b7" if healthy else "#fca5a5",
+                )
+                status_row("Tables", len(backend.list_tables()) if healthy else 0)
+                st.caption(message)
+        else:
+            with st.expander("📁 Upload files", expanded=False):
+                st.markdown('<div class="sb-upload-wrap">', unsafe_allow_html=True)
+                file_count = len(st.session_state.get("dfs", {}))
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    status_row("Files Loaded", file_count, "#fcd34d")
+                with c2:
+                    if st.button(
+                        "＋",
+                        use_container_width=True,
+                        help="Add Files",
+                        key="sidebar_upload_plus",
+                    ):
+                        upload_dialog()
+                st.markdown("</div>", unsafe_allow_html=True)
 
         dfs_loaded = st.session_state.get("dfs") or {}
         semantic_used = st.session_state.get("semantic_join_used", None)
@@ -242,27 +255,37 @@ def render():
             join_kind, join_status = "pending", "Pending"
 
         with st.expander("🔗 Join", expanded=False):
-            _join_col_kwargs = {"gap": "small"}
-            try:
-                if "vertical_alignment" in inspect.signature(st.columns).parameters:
-                    _join_col_kwargs["vertical_alignment"] = "center"
-            except (TypeError, ValueError):
-                pass
-            j_left, j_right = st.columns([1.05, 1.35], **_join_col_kwargs)
-            with j_left:
-                st.markdown(
-                    f'<div class="sb-join-row">'
-                    f'<span class="sb-join-kicker sb-join-status-{join_kind}">{join_status}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True,
+            if _postgres_mode:
+                status_row("Mode", "Database relationships", "#6ee7b7")
+                st.caption(
+                    "PostgreSQL joins are generated from governed semantic "
+                    "relationships and database views."
                 )
-            with j_right:
-                if st.button("⚙️ Settings", key="sidebar_join_settings"):
-                    join_settings_dialog()
+            else:
+                _join_col_kwargs = {"gap": "small"}
+                try:
+                    if "vertical_alignment" in inspect.signature(st.columns).parameters:
+                        _join_col_kwargs["vertical_alignment"] = "center"
+                except (TypeError, ValueError):
+                    pass
+                j_left, j_right = st.columns([1.05, 1.35], **_join_col_kwargs)
+                with j_left:
+                    st.markdown(
+                        f'<div class="sb-join-row">'
+                        f'<span class="sb-join-kicker sb-join-status-{join_kind}">{join_status}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                with j_right:
+                    if st.button("⚙️ Settings", key="sidebar_join_settings"):
+                        join_settings_dialog()
 
         with st.expander("🧬 Semantic layer", expanded=False):
             semantic_used = st.session_state.get("semantic_join_used", None)
-            if semantic_used is True:
+            if _postgres_mode:
+                join_status = "DATABASE"
+                join_color = "#6ee7b7"
+            elif semantic_used is True:
                 join_status = "ACTIVE"
                 join_color  = "#6ee7b7"
             elif semantic_used is False:
@@ -452,12 +475,13 @@ def render():
                         ):
                             ok, msg = activate_pack(chosen_id)
                             if ok:
+                                st.session_state.pop("_okf_autosseed_done", None)
                                 st.success(msg)
                             else:
                                 st.error(msg)
                             st.rerun()
 
-        if False and _OKF_AVAILABLE:
+        if _OKF_AVAILABLE:
             with st.expander("📚 Knowledge base", expanded=False):
                 bundles = list_bundles()
                 doc_count = len(bundles)
@@ -471,6 +495,18 @@ def render():
                     "Business documents (handbooks, targets, strategy, SOPs) in "
                     "doc/business_knowledge/ — separate from business_glossary.yaml."
                 )
+                if st.button(
+                    "INDEX ACTIVE PACK",
+                    use_container_width=True,
+                    key="sidebar_index_active_knowledge",
+                ):
+                    with st.spinner("Extracting and indexing business documents..."):
+                        summary = bootstrap_business_knowledge(force=True)
+                    st.success(
+                        f"Indexed {summary.get('indexed', 0)} concepts from "
+                        f"{summary.get('docs', 0)} documents."
+                    )
+                    st.rerun()
         else:
             with st.expander("📚 Knowledge base", expanded=False):
                 st.caption("OKF modules unavailable — check features/okf_knowledge.")
