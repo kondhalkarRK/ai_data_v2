@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASK-DB — Data Flow Diagram (DFD)</title>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      flowchart: { curve: "basis", htmlLabels: true, padding: 16 },
+      themeVariables: {
+        fontFamily: "Segoe UI, system-ui, sans-serif",
+        fontSize: "14px",
+      },
+    });
+  </script>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(56,189,248,.08), transparent 45%),
+        radial-gradient(ellipse at 80% 0%, rgba(168,85,247,.08), transparent 40%),
+        var(--bg);
+      color: var(--text);
+      padding: 28px 24px 48px;
+      line-height: 1.55;
+    }
+    header { max-width: 1100px; margin-bottom: 24px; }
+    h1 { font-size: 1.75rem; margin: 0 0 6px; }
+    .eyebrow {
+      font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--accent); font-weight: 700; margin-bottom: 8px;
+    }
+    .subtitle { color: var(--muted); margin: 0; max-width: 900px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+    button, a.btn {
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      color: #fff; border: 0; border-radius: 10px;
+      padding: 10px 16px; font-size: 14px; font-weight: 600;
+      cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    a.btn.secondary, button.secondary {
+      background: #1f2937; border: 1px solid #374151;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid #1f2937;
+      border-radius: 14px;
+      padding: 22px 18px;
+      overflow-x: auto;
+      box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    }
+    .card p { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+    .mermaid { display: flex; justify-content: center; min-height: 120px; }
+    .stack { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .pill {
+      font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 999px;
+      background: rgba(56,189,248,.1); border: 1px solid rgba(56,189,248,.25); color: #bae6fd;
+    }
+    footer { margin-top: 28px; font-size: 12px; color: #64748b; }
+    @media print {
+      body { background: #fff; color: #111; }
+      .actions { display: none; }
+      .card { box-shadow: none; border: 1px solid #ccc; background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Capgemini · AI Data Copilot</div>
+    <h1>ASK-DB — Data Flow Diagram (DFD)</h1>
+    <p class="subtitle">
+      End-to-end path from a user question to SQL execution (DuckDB or PostgreSQL),
+      RAG retrieval from CFO decks / SOPs, and cited narration in Chat.
+    </p>
+    <div class="actions">
+      <button onclick="window.print()">Print / Save as PDF</button>
+      <a class="btn secondary" href="askdb_dfd.mmd" download>Download .mmd</a>
+      <a class="btn secondary" href="askdb_full_architecture.html">Open Full Architecture</a>
+      <a class="btn secondary" href="askdb_architecture.html">Open earlier architecture set</a>
+    </div>
+    <div class="stack">
+      <span class="pill">Question → Router</span>
+      <span class="pill">SQL / Knowledge / Hybrid</span>
+      <span class="pill">Guardrails</span>
+      <span class="pill">Backend branch</span>
+      <span class="pill">Cited narration</span>
+    </div>
+  </header>
+
+  <div class="card">
+    <p>Source: <code>askdb_dfd.mmd</code></p>
+    <pre class="mermaid">
+flowchart TB
+  U["User question"]
+
+  U --> R{"Router\nSQL / Knowledge / Hybrid"}
+
+  R -->|data / KPI| SEM["Semantic layer\ninsurance or automotive"]
+  R -->|SOP / CFO deck| RAG["OKF Retriever\nChroma + MiniLM"]
+  R -->|why + numbers| SEM
+
+  SEM --> GEN["NLQ to SQL\nDuckDB or PostgreSQL dialect"]
+  GEN --> LLM["Capgemini LLM"]
+  LLM --> GEN
+  GEN --> G["SQL Guardrails\nSELECT only"]
+
+  G --> BE{"DATA_BACKEND"}
+
+  BE -->|csv_duckdb| D1["DuckDB\non working_df"]
+  BE -->|postgres| D2["PostgreSQL 17\naskdb_dev.insurance"]
+
+  D1 --> RES["Result DataFrame\nsmall aggregates"]
+  D2 --> RES
+
+  RES --> RAG
+  RAG --> DOCS["Business knowledge\nCFO Q1/Q2 PPTX · SOP · MD"]
+  DOCS --> RAG
+
+  RES --> NAR["Narration Engine\nnumbers from SQL\nguidance from docs"]
+  RAG --> NAR
+  NAR --> UI["Chat UI\nchart · table · slide citations"]
+
+  subgraph CSV["CSV path details"]
+    C1[Upload CSV] --> C2[Join] --> C3[working_df RAM] --> C4[DuckDB]
+  end
+
+  subgraph PG["PostgreSQL path details"]
+    P1[Pool + read-only user] --> P2[Server scan 1M rows]
+    P2 --> P3[Return max 1000 rows]
+    P3 --> P4[No full table in Streamlit]
+  end
+
+  D1 -.-> CSV
+  D2 -.-> PG
+    </pre>
+  </div>
+
+  <footer>
+    ASK-DB · Data flow diagram · Open this file in a browser (internet needed for Mermaid CDN).
+  </footer>
+</body>
+</html>

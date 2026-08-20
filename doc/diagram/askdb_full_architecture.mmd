@@ -1,0 +1,125 @@
+%% ASK-DB — Full System Architecture (CSV/DuckDB + PostgreSQL + RAG)
+%% Open in VS Code Mermaid preview or doc/diagram/askdb_architecture.html
+
+flowchart TB
+  subgraph USER["👤 USER"]
+    BU["Business user / Leadership"]
+  end
+
+  subgraph UI["🖥️ PRESENTATION — Streamlit"]
+    SB["Sidebar\nUpload · Join · Pack · PG status\nKnowledge index · LLM usage"]
+    TP["📄 Data Preview\nCSV head(100) OR PG LIMIT 100"]
+    TK["📊 KPI Summary\nauto / insurance_kpi_engine"]
+    TC["💬 Chat Room\nNLQ · charts · citations · share"]
+  end
+
+  subgraph ORCH["⚙️ ORCHESTRATION"]
+    APP["app.py\nsession · pack · backend gate"]
+    FACT["DataBackend factory\ncsv_duckdb | postgres"]
+    ROUTER["Chat router\ntab_query.py"]
+  end
+
+  subgraph CORE["🧠 CORE ENGINES"]
+    JE["Join Engine\nCSV only"]
+    NLQ["NLQ Engine\ndialect-aware SQL"]
+    SQLG["SQL Guardrails\nSELECT-only"]
+    KPIE["KPI Engine\nautomotive"]
+    IKPI["Insurance KPI Engine\nPostgreSQL SQL"]
+    CHART["Chart Engine"]
+    NARR["Narration Engine\n+ RAG enrich"]
+    EVID["Evidence Builder"]
+    CONV["Conversation State\nSQL anchor"]
+  end
+
+  subgraph SEM["📐 SEMANTIC LAYER"]
+    PACK["Industry Packs\nautomotive · insurance"]
+    YAML["semantic_model.yaml\nbusiness_glossary.yaml"]
+    CTX["Context Builder"]
+  end
+
+  subgraph BE["🗄️ STRUCTURED DATA BACKENDS"]
+    CSVB["CsvDuckDbBackend\nPandas + DuckDB"]
+    PGB["PostgresBackend\npool · timeout · LIMIT"]
+  end
+
+  subgraph STORE["💾 DATA STORES"]
+    CSV["Uploaded CSVs\nsession dfs"]
+    WORK["working_df"]
+    PG[(PostgreSQL 17\naskdb_dev.insurance)]
+    FACTS["fact_claims\nfact_policy_monthly"]
+    DIMS["dim_policy · product\nagent · region"]
+  end
+
+  subgraph RAG["📚 UNSTRUCTURED RAG — OKF"]
+    DOCS["doc/business_knowledge/\nPDF · MD · PPTX · DOCX"]
+    CFO["INS-CFO Q1 + Q2 decks\nsynthetic quarterly results"]
+    EXT["Extractors\npdf · md · pptx · docx"]
+    BUND["OKF bundles\nrag_storage/okf_bundles"]
+    CHROMA[(ChromaDB\nokf_knowledge)]
+    RET["OKF Retriever\nlocal MiniLM embeddings"]
+  end
+
+  subgraph EXT_SVC["☁️ EXTERNAL"]
+    LLM["Capgemini LLM\nSQL + optional narration"]
+    EMB["sentence-transformers\nall-MiniLM-L6-v2"]
+  end
+
+  BU --> UI
+  SB --> APP
+  APP --> FACT
+  APP --> PACK
+  PACK --> YAML
+  YAML --> CTX
+
+  FACT -->|csv mode| CSVB
+  FACT -->|postgres mode| PGB
+  CSV --> CSVB
+  CSVB --> WORK
+  JE --> WORK
+  PGB --> PG
+  PG --> FACTS
+  PG --> DIMS
+
+  TC --> ROUTER
+  ROUTER --> NLQ
+  ROUTER --> RET
+  NLQ --> CTX
+  NLQ --> SQLG
+  NLQ --> LLM
+  SQLG --> FACT
+  FACT --> EVID
+  CONV --> NLQ
+
+  CSVB --> CHART
+  PGB --> CHART
+  CSVB --> NARR
+  PGB --> NARR
+  RET --> NARR
+  RET --> EMB
+
+  DOCS --> CFO
+  CFO --> EXT
+  DOCS --> EXT
+  EXT --> BUND
+  BUND --> CHROMA
+  CHROMA --> RET
+
+  TK --> KPIE
+  TK --> IKPI
+  IKPI --> PGB
+
+  classDef ui fill:#1d4ed8,stroke:#93c5fd,color:#fff
+  classDef core fill:#7c3aed,stroke:#c4b5fd,color:#fff
+  classDef sem fill:#0f766e,stroke:#5eead4,color:#fff
+  classDef data fill:#b45309,stroke:#fcd34d,color:#fff
+  classDef rag fill:#be185d,stroke:#f9a8d4,color:#fff
+  classDef ext fill:#334155,stroke:#94a3b8,color:#fff
+  classDef be fill:#0369a1,stroke:#7dd3fc,color:#fff
+
+  class SB,TP,TK,TC ui
+  class JE,NLQ,SQLG,KPIE,IKPI,CHART,NARR,EVID,CONV core
+  class PACK,YAML,CTX sem
+  class CSV,WORK,PG,FACTS,DIMS data
+  class DOCS,CFO,EXT,BUND,CHROMA,RET rag
+  class LLM,EMB ext
+  class CSVB,PGB,FACT be

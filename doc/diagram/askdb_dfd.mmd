@@ -1,0 +1,45 @@
+%% ASK-DB — Data Flow Diagram (DFD)
+%% Open with Mermaid preview
+
+flowchart TB
+  U["👤 User question"]
+
+  U --> R{"Router\nSQL / Knowledge / Hybrid"}
+
+  R -->|data / KPI| SEM["Semantic layer\ninsurance or automotive"]
+  R -->|SOP / CFO deck| RAG["OKF Retriever\nChroma + MiniLM"]
+  R -->|why + numbers| SEM
+
+  SEM --> GEN["NLQ → SQL\nDuckDB or PostgreSQL dialect"]
+  GEN --> LLM["Capgemini LLM"]
+  LLM --> GEN
+  GEN --> G["SQL Guardrails\nSELECT only"]
+
+  G --> BE{"DATA_BACKEND"}
+
+  BE -->|csv_duckdb| D1["DuckDB\non working_df"]
+  BE -->|postgres| D2["PostgreSQL 17\naskdb_dev.insurance"]
+
+  D1 --> RES["Result DataFrame\nsmall aggregates"]
+  D2 --> RES
+
+  RES --> RAG
+  RAG --> DOCS["Business knowledge\nCFO Q1/Q2 PPTX · SOP · MD"]
+  DOCS --> RAG
+
+  RES --> NAR["Narration Engine\nnumbers from SQL\nguidance from docs"]
+  RAG --> NAR
+  NAR --> UI["Chat UI\nchart · table · slide citations"]
+
+  subgraph CSV["CSV path details"]
+    C1[Upload CSV] --> C2[Join] --> C3[working_df RAM] --> C4[DuckDB]
+  end
+
+  subgraph PG["PostgreSQL path details"]
+    P1[Pool + read-only user] --> P2[Server scan 1M rows]
+    P2 --> P3[Return ≤ 1000 rows]
+    P3 --> P4[No full table in Streamlit]
+  end
+
+  D1 -.-> CSV
+  D2 -.-> PG

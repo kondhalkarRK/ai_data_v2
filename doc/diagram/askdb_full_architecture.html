@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASK-DB — Full System Architecture</title>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      flowchart: { curve: "basis", htmlLabels: true, padding: 16 },
+      themeVariables: {
+        fontFamily: "Segoe UI, system-ui, sans-serif",
+        fontSize: "13px",
+      },
+    });
+  </script>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(56,189,248,.08), transparent 45%),
+        radial-gradient(ellipse at 80% 0%, rgba(168,85,247,.08), transparent 40%),
+        var(--bg);
+      color: var(--text);
+      padding: 28px 24px 48px;
+      line-height: 1.55;
+    }
+    header { max-width: 1100px; margin-bottom: 24px; }
+    h1 { font-size: 1.75rem; margin: 0 0 6px; }
+    .eyebrow {
+      font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--accent); font-weight: 700; margin-bottom: 8px;
+    }
+    .subtitle { color: var(--muted); margin: 0; max-width: 900px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+    button, a.btn {
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      color: #fff; border: 0; border-radius: 10px;
+      padding: 10px 16px; font-size: 14px; font-weight: 600;
+      cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    a.btn.secondary, button.secondary {
+      background: #1f2937; border: 1px solid #374151;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid #1f2937;
+      border-radius: 14px;
+      padding: 22px 18px;
+      overflow-x: auto;
+      box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    }
+    .card p { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+    .mermaid { display: flex; justify-content: center; min-height: 120px; }
+    .stack { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .pill {
+      font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 999px;
+      background: rgba(56,189,248,.1); border: 1px solid rgba(56,189,248,.25); color: #bae6fd;
+    }
+    footer { margin-top: 28px; font-size: 12px; color: #64748b; }
+    @media print {
+      body { background: #fff; color: #111; }
+      .actions { display: none; }
+      .card { box-shadow: none; border: 1px solid #ccc; background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Capgemini · AI Data Copilot</div>
+    <h1>ASK-DB — Full System Architecture</h1>
+    <p class="subtitle">
+      Dual backend (CSV/DuckDB + PostgreSQL), insurance semantic pack, OKF document RAG
+      including synthetic CFO quarterly PowerPoint decks, dialect-aware NLQ, and cited narration.
+    </p>
+    <div class="actions">
+      <button onclick="window.print()">Print / Save as PDF</button>
+      <a class="btn secondary" href="askdb_full_architecture.mmd" download>Download .mmd</a>
+      <a class="btn secondary" href="askdb_dfd.html">Open Data Flow (DFD)</a>
+      <a class="btn secondary" href="askdb_architecture.html">Open earlier architecture set</a>
+    </div>
+    <div class="stack">
+      <span class="pill">Streamlit</span>
+      <span class="pill">DuckDB</span>
+      <span class="pill">PostgreSQL 17</span>
+      <span class="pill">Chroma + MiniLM</span>
+      <span class="pill">Capgemini LLM</span>
+      <span class="pill">Insurance pack</span>
+    </div>
+  </header>
+
+  <div class="card">
+    <p>Source: <code>askdb_full_architecture.mmd</code></p>
+    <pre class="mermaid">
+flowchart TB
+  subgraph USER["USER"]
+    BU["Business user / Leadership"]
+  end
+
+  subgraph UI["PRESENTATION — Streamlit"]
+    SB["Sidebar\nUpload · Join · Pack · PG status\nKnowledge index · LLM usage"]
+    TP["Data Preview\nCSV head(100) OR PG LIMIT 100"]
+    TK["KPI Summary\nauto / insurance_kpi_engine"]
+    TC["Chat Room\nNLQ · charts · citations · share"]
+  end
+
+  subgraph ORCH["ORCHESTRATION"]
+    APP["app.py\nsession · pack · backend gate"]
+    FACT["DataBackend factory\ncsv_duckdb | postgres"]
+    ROUTER["Chat router\ntab_query.py"]
+  end
+
+  subgraph CORE["CORE ENGINES"]
+    JE["Join Engine\nCSV only"]
+    NLQ["NLQ Engine\ndialect-aware SQL"]
+    SQLG["SQL Guardrails\nSELECT-only"]
+    KPIE["KPI Engine\nautomotive"]
+    IKPI["Insurance KPI Engine\nPostgreSQL SQL"]
+    CHART["Chart Engine"]
+    NARR["Narration Engine\n+ RAG enrich"]
+    EVID["Evidence Builder"]
+    CONV["Conversation State\nSQL anchor"]
+  end
+
+  subgraph SEM["SEMANTIC LAYER"]
+    PACK["Industry Packs\nautomotive · insurance"]
+    YAML["semantic_model.yaml\nbusiness_glossary.yaml"]
+    CTX["Context Builder"]
+  end
+
+  subgraph BE["STRUCTURED DATA BACKENDS"]
+    CSVB["CsvDuckDbBackend\nPandas + DuckDB"]
+    PGB["PostgresBackend\npool · timeout · LIMIT"]
+  end
+
+  subgraph STORE["DATA STORES"]
+    CSV["Uploaded CSVs\nsession dfs"]
+    WORK["working_df"]
+    PG[(PostgreSQL 17\naskdb_dev.insurance)]
+    FACTS["fact_claims\nfact_policy_monthly"]
+    DIMS["dim_policy · product\nagent · region"]
+  end
+
+  subgraph RAG["UNSTRUCTURED RAG — OKF"]
+    DOCS["doc/business_knowledge/\nPDF · MD · PPTX · DOCX"]
+    CFO["INS-CFO Q1 + Q2 decks\nsynthetic quarterly results"]
+    EXTR["Extractors\npdf · md · pptx · docx"]
+    BUND["OKF bundles\nrag_storage/okf_bundles"]
+    CHROMA[(ChromaDB\nokf_knowledge)]
+    RET["OKF Retriever\nlocal MiniLM embeddings"]
+  end
+
+  subgraph EXT_SVC["EXTERNAL"]
+    LLM["Capgemini LLM\nSQL + optional narration"]
+    EMB["sentence-transformers\nall-MiniLM-L6-v2"]
+  end
+
+  BU --> UI
+  SB --> APP
+  APP --> FACT
+  APP --> PACK
+  PACK --> YAML
+  YAML --> CTX
+
+  FACT -->|csv mode| CSVB
+  FACT -->|postgres mode| PGB
+  CSV --> CSVB
+  CSVB --> WORK
+  JE --> WORK
+  PGB --> PG
+  PG --> FACTS
+  PG --> DIMS
+
+  TC --> ROUTER
+  ROUTER --> NLQ
+  ROUTER --> RET
+  NLQ --> CTX
+  NLQ --> SQLG
+  NLQ --> LLM
+  SQLG --> FACT
+  FACT --> EVID
+  CONV --> NLQ
+
+  CSVB --> CHART
+  PGB --> CHART
+  CSVB --> NARR
+  PGB --> NARR
+  RET --> NARR
+  RET --> EMB
+
+  DOCS --> CFO
+  CFO --> EXTR
+  DOCS --> EXTR
+  EXTR --> BUND
+  BUND --> CHROMA
+  CHROMA --> RET
+
+  TK --> KPIE
+  TK --> IKPI
+  IKPI --> PGB
+
+  classDef ui fill:#1d4ed8,stroke:#93c5fd,color:#fff
+  classDef core fill:#7c3aed,stroke:#c4b5fd,color:#fff
+  classDef sem fill:#0f766e,stroke:#5eead4,color:#fff
+  classDef data fill:#b45309,stroke:#fcd34d,color:#fff
+  classDef rag fill:#be185d,stroke:#f9a8d4,color:#fff
+  classDef ext fill:#334155,stroke:#94a3b8,color:#fff
+  classDef be fill:#0369a1,stroke:#7dd3fc,color:#fff
+
+  class SB,TP,TK,TC ui
+  class JE,NLQ,SQLG,KPIE,IKPI,CHART,NARR,EVID,CONV core
+  class PACK,YAML,CTX sem
+  class CSV,WORK,PG,FACTS,DIMS data
+  class DOCS,CFO,EXTR,BUND,CHROMA,RET rag
+  class LLM,EMB ext
+  class CSVB,PGB,FACT be
+    </pre>
+  </div>
+
+  <footer>
+    ASK-DB · Full architecture · Open this file in a browser (internet needed for Mermaid CDN).
+  </footer>
+</body>
+</html>
