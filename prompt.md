@@ -1,3 +1,84 @@
+bedrock
+anthropic.claude-haiku-4-5-20251001-v1:0
+Yes
+Yes
+TEXT, IMAGE
+TEXT
+Yes
+Free Studio
+-
+bedrock
+anthropic.claude-sonnet-5
+Yes
+Yes
+TEXT, IMAGE
+TEXT
+Yes
+Free Studio
+-
+bedrock
+anthropic.claude-opus-5
+Yes
+Yes
+TEXT, IMAGE
+TEXT
+Yes
+Free Studio
+-openai
+openai.gpt-3.5-turbo
+Yes
+No
+TEXT
+TEXT
+Yes
+Free Studio
+2026-10-14
+openai
+openai.gpt-4o
+Yes
+No
+TEXT, IMAGE
+TEXT
+Yes
+Free Studio
+2027-05-17
+openai
+openai.gpt-5
+Yes
+No
+TEXT, IMAGE
+TEXT
+Yes
+Free Studio
+2027-02-06
+openai
+openai.gpt-5-mini
+Yes
+No
+TEXT, IMAGE
+TEXT
+Yes
+Free Studio
+2027-02-06
+openai
+openai.gpt-5-nano
+Yes
+No
+TEXT, IMAGE
+TEXT
+Yes
+Free Studio
+2027-02-06
+openai
+openai.gpt-5.1
+Yes
+No
+TEXT, IMAGE
+TEXT
+Yes
+Free Studio
+2027-05-15
+
 \copy insurance.dim_product FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/dim_product.csv' CSV HEADER
 \copy insurance.dim_agent FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/dim_agent.csv' CSV HEADER
 \copy insurance.dim_region FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/dim_region.csv' CSV HEADER
