@@ -6,10 +6,12 @@ import re
 # ─────────────────────────────────────────────────────────────────
 # SQL GUARDRAILS
 # ─────────────────────────────────────────────────────────────────
+# Only the start of the statement (not every line). MULTILINE false-positives
+# on identifiers such as created_at or on CTE bodies.
 _BLOCKED = re.compile(
     r'^\s*(drop|delete|truncate|update|insert|alter|create|replace|merge|call|exec|'
     r'copy|attach|detach|export|import|pragma|vacuum|analyze|grant|revoke|set|reset)\b',
-    re.IGNORECASE | re.MULTILINE,
+    re.IGNORECASE,
 )
 _CHAINED = re.compile(
     r';\s*\S',

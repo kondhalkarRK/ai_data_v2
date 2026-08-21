@@ -138,13 +138,48 @@ def get_data_config() -> dict:
 
 def get_llm_config() -> dict:
     """Read LLM settings at call time (Streamlit Cloud secrets load correctly)."""
+    from config.llm_catalog import (
+        DEFAULT_FAMILY,
+        DEFAULT_TEMPERATURE,
+        DEFAULT_TIER,
+        get_profile,
+    )
+
+    family = DEFAULT_FAMILY
+    tier = DEFAULT_TIER
+    temperature = DEFAULT_TEMPERATURE
+    model_id = None
+    try:
+        family = str(st.session_state.get("llm_family") or DEFAULT_FAMILY)
+        tier = str(st.session_state.get("llm_tier") or DEFAULT_TIER)
+        temperature = float(st.session_state.get("llm_temperature") or DEFAULT_TEMPERATURE)
+        model_id = st.session_state.get("llm_model_id")
+    except Exception:
+        pass
+
+    profile = get_profile(family, tier, model_id)
+    secret_model = _secret("CAPGEMINI_LLM_MODEL")
+    model = profile["model"]
+    # Keep secrets model when user has not opened LLM settings yet.
+    try:
+        if not st.session_state.get("_llm_profile_chosen") and secret_model:
+            model = str(secret_model)
+    except Exception:
+        if secret_model:
+            model = str(secret_model)
+
     return {
         "base_url": _secret(
             "CAPGEMINI_LLM_BASE_URL",
             "https://openai.generative.engine.capgemini.com/v1",
         ),
         "api_key": _secret("CAPGEMINI_LLM_API_KEY"),
-        "model": _secret("CAPGEMINI_LLM_MODEL", "openai.gpt-5.1"),
+        "model": model,
+        "family": family,
+        "tier": tier,
+        "temperature": max(0.0, min(1.5, temperature)),
+        "usd_per_1m": profile["usd_per_1m"],
+        "label": profile["label"],
     }
 
 
@@ -155,7 +190,7 @@ LLM_MODEL = None
 
 
 @st.cache_resource(show_spinner=False)
-def init_llm() -> object | None:
+def init_llm(model: str, temperature: float) -> object | None:
     """
     Initialize and cache the LLM client for the Streamlit session.
     Returns None if the LLM package is unavailable or initialization fails,
@@ -166,7 +201,7 @@ def init_llm() -> object | None:
     cfg = get_llm_config()
     LLM_BASE_URL = cfg["base_url"]
     LLM_API_KEY = cfg["api_key"]
-    LLM_MODEL = cfg["model"]
+    LLM_MODEL = model or cfg["model"]
 
     if not _LLM_AVAILABLE:
         logger.warning("langchain_openai is not installed; LLM features disabled.")
@@ -190,7 +225,7 @@ def init_llm() -> object | None:
             api_key=LLM_API_KEY,
             default_headers={"x-api-key": LLM_API_KEY},
             model=LLM_MODEL,
-            temperature=0,
+            temperature=float(temperature),
             max_completion_tokens=600,
             timeout=55,
             max_retries=1,
@@ -198,7 +233,7 @@ def init_llm() -> object | None:
         st.session_state.pop("_llm_init_error", None)
         return llm
     except Exception as e:
-        logger.error(f"Failed to initialize LLM client: {e}", exc_info=True)
+        logger.exception("Failed to initialize LLM client")
         st.session_state["_llm_init_error"] = f"LLM init failed: {e}"
         return None
 
@@ -213,6 +248,11 @@ DEFAULTS = {
     "last_query": "", "last_plan": None,
     "llm_calls": 0, "total_tokens": 0,
     "max_llm_calls": 60,
+    "llm_family": "gpt",
+    "llm_tier": "high",
+    "llm_model_id": "openai.gpt-5.1",
+    "llm_temperature": 0.2,
+    "llm_est_usd": 0.0,
     "auto_join_base": None,
     "ui_theme": "dark",  # light | dark | ai
     "data_backend": "csv_duckdb",

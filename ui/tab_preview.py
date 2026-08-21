@@ -25,16 +25,21 @@ def _render_postgres_preview():
     st.markdown(
         f"""<div class="stat-row">
       <div class="stat-card"><div class="sv">{claim_rows:,}</div><div class="sl">Claims loaded</div></div>
-      <div class="stat-card"><div class="sv">{total_loaded:,}</div><div class="sl">All table rows</div></div>
+      <div class="stat-card"><div class="sv">{total_loaded:,}</div><div class="sl">Physical table rows</div></div>
       <div class="stat-card"><div class="sv">{len(tables)}</div><div class="sl">Tables / views</div></div>
     </div>""",
         unsafe_allow_html=True,
     )
 
-    with st.expander("🔬 Data Quality Intelligence ▼", expanded=True):
+    with st.expander("Data quality (inventory + rolling 12 months)", expanded=True):
         from core.postgres_dq_engine import render_postgres_data_quality
 
-        render_postgres_data_quality()
+        try:
+            render_postgres_data_quality()
+        except Exception as exc:
+            st.error("Data quality could not be computed.")
+            with st.expander("Technical details"):
+                st.code(str(exc))
 
     if not tables:
         st.info("No readable tables or views were found in the configured schema.")
@@ -49,7 +54,9 @@ def _render_postgres_preview():
     )
     preview_limit = 100
     preview = backend.get_preview(selected, limit=preview_limit)
-    full_n = int(counts.get(selected) or len(preview))
+    full_n = int(counts.get(selected) or 0)
+    if selected not in counts:
+        full_n = int(backend.count_relation(selected))
     st.markdown(f"#### 📋 {selected}")
     st.markdown(
         f"""<div class="stat-row">

@@ -8,7 +8,8 @@ from config.settings import init_llm, get_llm_config
 
 def _get_llm():
     """Lazy init so Streamlit Cloud secrets are read after app boot."""
-    return init_llm()
+    cfg = get_llm_config()
+    return init_llm(str(cfg.get("model") or ""), float(cfg.get("temperature") or 0))
 
 
 def call_llm(prompt: str) -> str | None:
@@ -50,4 +51,13 @@ def _invoke_llm(prompt: str, *, max_completion_tokens: int) -> str | None:
     text = getattr(resp, "content", str(resp))
     st.session_state.llm_calls   += 1
     st.session_state.total_tokens += int((len(prompt)+len(text))/4)
+    try:
+        from config.llm_catalog import estimate_usd
+        cfg = get_llm_config()
+        st.session_state.llm_est_usd = float(st.session_state.get("llm_est_usd") or 0) + estimate_usd(
+            int((len(prompt) + len(text)) / 4),
+            float(cfg.get("usd_per_1m") or 0),
+        )
+    except Exception:
+        pass
     return text

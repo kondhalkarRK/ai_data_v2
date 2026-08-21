@@ -112,6 +112,11 @@ relationships:
   - {name: premium_to_product, from_table: fact_policy_monthly, from_column: product_id, to_table: dim_product, to_column: product_id, type: many_to_one}
   - {name: premium_to_agent, from_table: fact_policy_monthly, from_column: agent_id, to_table: dim_agent, to_column: agent_id, type: many_to_one}
   - {name: premium_to_region, from_table: fact_policy_monthly, from_column: region_id, to_table: dim_region, to_column: region_id, type: many_to_one}
+  - {name: policy_to_product, from_table: dim_policy, from_column: product_id, to_table: dim_product, to_column: product_id, type: many_to_one}
+  - {name: policy_to_agent, from_table: dim_policy, from_column: agent_id, to_table: dim_agent, to_column: agent_id, type: many_to_one}
+  - {name: policy_to_region, from_table: dim_policy, from_column: region_id, to_table: dim_region, to_column: region_id, type: many_to_one}
+  - {name: expense_to_product, from_table: fact_operating_expense_monthly, from_column: product_id, to_table: dim_product, to_column: product_id, type: many_to_one}
+  - {name: expense_to_region, from_table: fact_operating_expense_monthly, from_column: region_id, to_table: dim_region, to_column: region_id, type: many_to_one}
 
 measures:
   gross_written_premium:

@@ -65,7 +65,7 @@ class CsvDuckDbBackend(DataBackend):
             if con is not None:
                 con.close()
 
-    def table_row_counts(self) -> dict[str, int]:
+    def table_row_counts(self, include_views: bool = False) -> dict[str, int]:
         counts: dict[str, int] = {}
         if self._df is not None and not self._df.empty:
             counts["df"] = int(len(self._df))

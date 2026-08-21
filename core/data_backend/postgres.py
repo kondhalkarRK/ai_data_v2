@@ -133,26 +133,35 @@ class PostgresBackend(DataBackend):
                 return cur.fetchall()
 
     def list_tables(self) -> list[str]:
+        return [name for name, _kind in self.list_relations()]
+
+    def list_relations(self) -> list[tuple[str, str]]:
+        """Return (name, BASE TABLE|VIEW|MATERIALIZED VIEW) in the configured schema."""
+        if not self._config.get("password"):
+            return []
         try:
             with self._get_pool().connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT table_name
+                        SELECT table_name, table_type
                         FROM information_schema.tables
                         WHERE table_schema = %s
                           AND table_type IN ('BASE TABLE', 'VIEW')
-                        UNION
-                        SELECT matviewname
+                        UNION ALL
+                        SELECT matviewname, 'MATERIALIZED VIEW'
                         FROM pg_catalog.pg_matviews
                         WHERE schemaname = %s
                         ORDER BY 1
                         """,
                         (self._schema, self._schema),
                     )
-                    return [str(row[0]) for row in cur.fetchall()]
+                    return [(str(row[0]), str(row[1])) for row in cur.fetchall()]
         except Exception:
             return []
+
+    def list_base_tables(self) -> list[str]:
+        return [name for name, kind in self.list_relations() if kind == "BASE TABLE"]
 
     def describe_schema(self) -> str:
         try:
@@ -167,15 +176,30 @@ class PostgresBackend(DataBackend):
         except Exception:
             return ""
 
-    def table_row_counts(self) -> dict[str, int]:
+    def count_relation(self, name: str) -> int:
+        allowed = {rel for rel, _kind in self.list_relations()}
+        if name not in allowed:
+            return 0
+        with self._get_pool().connection() as conn:
+            with conn.cursor() as cur:
+                query = pg_sql.SQL("SELECT COUNT(*) FROM {}.{}").format(
+                    pg_sql.Identifier(self._schema),
+                    pg_sql.Identifier(name),
+                )
+                cur.execute(query)
+                return int(cur.fetchone()[0])
+
+    def table_row_counts(self, include_views: bool = False) -> dict[str, int]:
         counts: dict[str, int] = {}
         if not self._config.get("password"):
             return counts
         try:
-            tables = self.list_tables()
+            relations = self.list_relations()
             with self._get_pool().connection() as conn:
                 with conn.cursor() as cur:
-                    for table in tables:
+                    for table, kind in relations:
+                        if not include_views and kind != "BASE TABLE":
+                            continue
                         query = pg_sql.SQL("SELECT COUNT(*) FROM {}.{}").format(
                             pg_sql.Identifier(self._schema),
                             pg_sql.Identifier(table),

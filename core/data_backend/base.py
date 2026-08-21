@@ -44,7 +44,7 @@ class DataBackend(ABC):
     def get_dataset_fingerprint(self) -> str:
         raise NotImplementedError
 
-    def table_row_counts(self) -> dict[str, int]:
+    def table_row_counts(self, include_views: bool = False) -> dict[str, int]:
         """Exact row counts keyed by table name. Default: empty."""
         return {}
 

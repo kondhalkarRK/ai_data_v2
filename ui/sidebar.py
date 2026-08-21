@@ -97,18 +97,42 @@ except (TypeError, ValueError):
 @st.dialog("Join settings", **_join_dialog_kwargs)
 def join_settings_dialog():
     from core.join_engine import get_working_df
-    from core.data_backend.factory import get_backend, postgres_mode_enabled
+    from core.data_backend.factory import postgres_mode_enabled
+    from core.semantic_joins import load_semantic_joins
     from ui.tab_join import render as render_join
 
     if postgres_mode_enabled():
-        backend = get_backend()
-        fks = backend.list_foreign_keys()
-        st.markdown("PostgreSQL join map")
-        if fks:
-            st.dataframe(pd.DataFrame(fks), use_container_width=True, hide_index=True)
+        payload = load_semantic_joins()
+        st.markdown("### Semantic join map")
+        st.caption("Source: active `semantic/semantic_model.yaml` (insurance PostgreSQL pack).")
+        if not payload.get("ok"):
+            st.error(payload.get("error") or "Could not load semantic joins.")
         else:
-            st.caption("No foreign keys found in the insurance schema.")
-        st.caption("ASK-DB uses `insurance.v_claims_enriched` plus these keys at query time.")
+            st.caption(
+                f"{payload['count']} relationships · "
+                f"{len(payload.get('facts') or [])} facts · "
+                f"{len(payload.get('dims') or [])} dimensions"
+            )
+            if payload.get("coverage"):
+                st.markdown("#### Dimension coverage")
+                st.dataframe(
+                    pd.DataFrame(payload["coverage"]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            if payload.get("rows"):
+                st.markdown("#### Join details")
+                st.dataframe(
+                    pd.DataFrame(payload["rows"]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                st.caption(
+                    "`dim_agent` joins `fact_policy_monthly` directly and reaches "
+                    "`fact_claims` through `dim_policy` (policy_id → agent_id)."
+                )
+            else:
+                st.warning("No relationships found in semantic_model.yaml.")
         if st.button("Close", key="join_dialog_close_pg", use_container_width=True):
             st.rerun()
         return
@@ -125,6 +149,95 @@ def join_settings_dialog():
     render_join(working_df, tables, dfs)
     st.divider()
     if st.button("Close", key="join_dialog_close", use_container_width=True):
+        st.rerun()
+
+
+@st.dialog("LLM settings", **_join_dialog_kwargs)
+def llm_settings_dialog():
+    from config.llm_catalog import (
+        CG_ENDPOINTS,
+        DEFAULT_FAMILY,
+        DEFAULT_TEMPERATURE,
+        DEFAULT_TIER,
+        get_profile,
+        models_for_family,
+        tokens_per_dollar,
+    )
+
+    family = st.session_state.get("llm_family") or DEFAULT_FAMILY
+    tier = st.session_state.get("llm_tier") or DEFAULT_TIER
+    temperature = float(st.session_state.get("llm_temperature") or DEFAULT_TEMPERATURE)
+    current_model = st.session_state.get("llm_model_id")
+
+    st.caption(
+        "Capgemini Studio routes only. Pick GPT or Claude, then the exact endpoint."
+    )
+    family = st.radio(
+        "Provider",
+        ["gpt", "claude"],
+        index=0 if family == "gpt" else 1,
+        format_func=lambda v: "OpenAI (openai.*)" if v == "gpt" else "Bedrock Claude (anthropic.*)",
+        horizontal=True,
+        key="llm_settings_family",
+    )
+    family_models = models_for_family(family)
+    ids = [item["id"] for item in family_models]
+    default_profile = get_profile(family, tier)
+    if current_model not in ids:
+        current_model = default_profile["model"]
+    chosen_id = st.selectbox(
+        "Capgemini endpoint",
+        ids,
+        index=ids.index(current_model) if current_model in ids else 0,
+        format_func=lambda mid: next(
+            f"{m['label']} · {m['id']}" for m in family_models if m["id"] == mid
+        ),
+        key="llm_settings_model_id",
+    )
+    profile = get_profile(family, tier, chosen_id)
+    per_dollar = tokens_per_dollar(profile["usd_per_1m"])
+    st.markdown(f"**{profile['label']}**")
+    st.caption(f"Request model id: `{profile['model']}`")
+    st.caption(
+        f"Indicative price: ${profile['usd_per_1m']:.2f} per 1M tokens · "
+        f"$1 ≈ {per_dollar:,} tokens"
+    )
+
+    st.markdown("#### Studio catalog")
+    rows = []
+    for item in CG_ENDPOINTS:
+        rows.append(
+            {
+                "Provider": "OpenAI" if item["family"] == "gpt" else "Bedrock",
+                "Size": item["tier"].title(),
+                "Label": item["label"],
+                "Model id": item["id"],
+                "$ / 1M tokens": f"${item['usd_per_1m']:.2f}",
+                "$1 buys": f"{tokens_per_dollar(item['usd_per_1m']):,} tokens",
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    temperature = st.slider(
+        "Temperature",
+        min_value=0.0,
+        max_value=1.2,
+        value=min(max(temperature, 0.0), 1.2),
+        step=0.1,
+        help="Lower is more factual SQL/KPI wording. Higher is more varied narration.",
+        key="llm_settings_temperature",
+    )
+    st.caption("0.0–0.2 recommended for SQL. 0.4–0.7 can improve narrative tone.")
+
+    if st.button("Apply", type="primary", use_container_width=True, key="llm_settings_apply"):
+        st.session_state.llm_family = family
+        st.session_state.llm_tier = profile["tier"]
+        st.session_state.llm_model_id = profile["model"]
+        st.session_state.llm_temperature = float(temperature)
+        st.session_state._llm_profile_chosen = True
+        st.toast(f"Using {profile['model']} · temp {temperature:.1f}", icon="⚡")
+        st.rerun()
+    if st.button("Close", key="llm_settings_close", use_container_width=True):
         st.rerun()
 
 def section_title(title):
@@ -234,12 +347,10 @@ def render():
         _pg_healthy = False
         _pg_message = ""
         _pg_counts: dict = {}
-        _pg_fks: list = []
         if _pg_backend is not None:
             _pg_healthy, _pg_message = _pg_backend.health_check()
             if _pg_healthy:
                 _pg_counts = _pg_backend.table_row_counts()
-                _pg_fks = _pg_backend.list_foreign_keys()
 
         if _postgres_mode:
             with st.expander("🗄️ PostgreSQL", expanded=True):
@@ -250,10 +361,11 @@ def render():
                 )
                 fact_claims = int(_pg_counts.get("fact_claims") or 0)
                 total_loaded = int(sum(_pg_counts.values())) if _pg_counts else 0
-                status_row("Tables", len(_pg_backend.list_tables()) if _pg_healthy else 0)
+                status_row("Tables", len(_pg_backend.list_base_tables()) if _pg_healthy else 0)
                 status_row("Claims loaded", f"{fact_claims:,}", "#6ee7b7")
-                status_row("All table rows", f"{total_loaded:,}", "#a5b4fc")
+                status_row("Physical table rows", f"{total_loaded:,}", "#a5b4fc")
                 st.caption(_pg_message)
+                st.caption("Views such as v_claims_enriched are joins, not extra loaded records.")
                 if _pg_counts:
                     with st.expander("Row counts by table", expanded=False):
                         for name, n in sorted(_pg_counts.items()):
@@ -286,40 +398,16 @@ def render():
         else:
             join_kind, join_status = "pending", "Pending"
 
-        with st.expander("🔗 Join", expanded=_postgres_mode):
+        with st.expander("🔗 Join", expanded=False):
             if _postgres_mode:
-                status_row("Mode", "Database relationships", "#6ee7b7")
-                fks = _pg_fks
-                rels = []
-                try:
-                    loader = st.session_state.get("semantic_loader")
-                    if loader is not None:
-                        rels = loader.get_relationships() or []
-                except Exception:
-                    rels = []
-                edges = fks or [
-                    {
-                        "from_table": r.get("from_table"),
-                        "from_column": r.get("from_column"),
-                        "to_table": r.get("to_table"),
-                        "to_column": r.get("to_column"),
-                    }
-                    for r in rels
-                ]
-                if edges:
-                    st.caption("Join map (fact → dimension)")
-                    for edge in edges:
-                        st.markdown(
-                            f"`{edge.get('from_table')}.{edge.get('from_column')}` → "
-                            f"`{edge.get('to_table')}.{edge.get('to_column')}`"
-                        )
-                    if st.button("⚙️ Join details", key="sidebar_join_settings_pg"):
-                        join_settings_dialog()
-                else:
-                    st.caption(
-                        "PostgreSQL joins come from foreign keys and the "
-                        "insurance semantic model (`v_claims_enriched`)."
-                    )
+                from core.semantic_joins import load_semantic_joins
+
+                payload = load_semantic_joins()
+                join_count = int(payload.get("count") or 0)
+                status_row("Mode", "Semantic model", "#6ee7b7")
+                status_row("Joins", join_count, "#a5b4fc")
+                if st.button("⚙️ Settings", key="sidebar_join_settings_pg", use_container_width=True):
+                    join_settings_dialog()
             else:
                 _join_col_kwargs = {"gap": "small"}
                 try:
@@ -368,15 +456,30 @@ def render():
             status_row("Model", model_status, model_color)
 
         with st.expander("⚡ LLM usage", expanded=False):
-            calls  = st.session_state.get("llm_calls", 0)
+            from config.llm_catalog import tokens_per_dollar, estimate_usd
+            from config.settings import get_llm_config
+
+            cfg = get_llm_config()
+            calls = st.session_state.get("llm_calls", 0)
             tokens = st.session_state.get("total_tokens", 0)
             max_calls = max(st.session_state.get("max_llm_calls", 1), 1)
-            status_row("Calls",  calls,          "#a5b4fc")
-            status_row("Tokens", f"{tokens:,}",  "#a5b4fc")
+            usd_per_1m = float(cfg.get("usd_per_1m") or 0)
+            est = float(st.session_state.get("llm_est_usd") or estimate_usd(tokens, usd_per_1m))
+            status_row("Model", cfg.get("label") or "GPT · High", "#a5b4fc")
+            status_row("Calls", calls, "#a5b4fc")
+            status_row("Tokens", f"{tokens:,}", "#a5b4fc")
+            status_row("Est. cost", f"${est:.4f}", "#6ee7b7")
+            st.caption(
+                f"$1 ≈ {tokens_per_dollar(usd_per_1m):,} tokens · "
+                f"temp {float(cfg.get('temperature') or 0):.1f}"
+            )
             st.progress(min(calls / max_calls, 1.0))
+            if st.button("⚙️ Settings", use_container_width=True, key="sidebar_llm_settings"):
+                llm_settings_dialog()
             if st.button("RESET", use_container_width=True, key="sidebar_reset"):
-                st.session_state.llm_calls    = 0
+                st.session_state.llm_calls = 0
                 st.session_state.total_tokens = 0
+                st.session_state.llm_est_usd = 0.0
                 st.rerun()
 
         with st.expander("💾 Saved questions", expanded=False):
@@ -396,110 +499,6 @@ def render():
                 removed = cache_store.clear_all()
                 st.success(f"Cleared {removed} saved question(s)")
                 st.rerun()
-
-        with st.expander("💬 Conversation", expanded=False):
-            try:
-                from core.conversation_state import get_state, clear_state
-                conv = get_state()
-            except Exception:
-                conv = st.session_state.get("conversation_state") or {}
-
-                def clear_state():
-                    st.session_state.conversation_state = {
-                        "active_intent": None,
-                        "last_resolved": {},
-                        "prior_metric": None,
-                        "prior_dimensions": [],
-                        "prior_filters": {},
-                        "prior_time_grain": None,
-                        "turn_count": 0,
-                        "last_question": None,
-                        "is_followup": False,
-                        "inherited_context": {},
-                    }
-
-            if conv.get("turn_count", 0) > 0:
-                st.markdown(
-                    f"""
-                    <div class='conv-state-panel'>
-                      <div class='query-stat-row'>
-                        <span style='color:#94a3b8;'>Active Metric</span>
-                        <span style='color:#a5b4fc;font-weight:600;'>
-                          {conv.get('prior_metric') or '—'}
-                        </span>
-                      </div>
-                      <div class='query-stat-row'>
-                        <span style='color:#94a3b8;'>Turn Count</span>
-                        <span style='color:#6ee7b7;font-weight:600;'>
-                          {conv.get('turn_count', 0)}
-                        </span>
-                      </div>
-                      <div class='query-stat-row'>
-                        <span style='color:#94a3b8;'>Last Intent</span>
-                        <span style='color:#fcd34d;font-weight:600;'>
-                          {conv.get('active_intent') or '—'}
-                        </span>
-                      </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                if st.button(
-                    "🔄 Clear Conversation",
-                    use_container_width=True,
-                    key="sidebar_clear_conv",
-                ):
-                    clear_state()
-                    st.session_state.chat_messages = []
-                    st.toast("Conversation cleared", icon="🔄")
-                    st.rerun()
-            else:
-                st.caption("No active conversation. Ask a question to start.")
-
-        with st.expander("📊 Session stats", expanded=False):
-            stats = st.session_state.get(
-                "query_stats",
-                {"deterministic": 0, "fallback": 0, "cache": 0},
-            )
-            evidence_list = st.session_state.get("execution_evidence") or []
-            if evidence_list:
-                counts = {"deterministic": 0, "fallback": 0, "cache": 0}
-                for ev in evidence_list:
-                    p = (ev or {}).get("execution_path")
-                    if p in counts:
-                        counts[p] += 1
-                stats = counts
-
-            total = sum(int(stats.get(k, 0) or 0) for k in ("deterministic", "fallback", "cache"))
-            if total > 0:
-                st.markdown(
-                    f"""
-                    <div class='conv-state-panel'>
-                      <div class='query-stat-row'>
-                        <span>✅ Deterministic</span>
-                        <span style='color:#6ee7b7;font-weight:700;'>{stats.get('deterministic',0)}</span>
-                      </div>
-                      <div class='query-stat-row'>
-                        <span>⚠️ AI Generated</span>
-                        <span style='color:#fcd34d;font-weight:700;'>{stats.get('fallback',0)}</span>
-                      </div>
-                      <div class='query-stat-row'>
-                        <span>🔒 Cached</span>
-                        <span style='color:#93c5fd;font-weight:700;'>{stats.get('cache',0)}</span>
-                      </div>
-                      <div class='query-stat-row' style='border:none;padding-top:6px;'>
-                        <span style='color:#64748b;'>Total queries</span>
-                        <span style='font-weight:700;'>{total}</span>
-                      </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                det_pct = round(stats.get("deterministic", 0) / total * 100) if total else 0
-                st.markdown(f"**Determinism Rate: {det_pct}%**")
-                st.progress(det_pct / 100)
-            else:
-                st.caption("No queries yet this session.")
 
         if _PACKS_AVAILABLE:
             with st.expander("🌐 Industry pack", expanded=False):

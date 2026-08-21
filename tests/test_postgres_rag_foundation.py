@@ -52,6 +52,20 @@ def test_sql_guardrails_block_postgres_escape_paths():
     assert sql_is_safe("COPY insurance.fact_claims TO '/tmp/x.csv'")[0] is False
     assert sql_is_safe("SELECT pg_sleep(5)")[0] is False
     assert sql_is_safe("SELECT 1; SELECT 2")[0] is False
+    gap_sql = """
+        WITH months AS (
+            SELECT date_trunc('month', reported_date)::date AS m
+            FROM insurance.fact_claims
+            GROUP BY 1
+        )
+        SELECT generate_series(
+            (SELECT MIN(m) FROM months),
+            (SELECT MAX(m) FROM months),
+            interval '1 month'
+        )::date AS m
+    """
+    assert sql_is_safe(gap_sql)[0] is True
+    assert sql_is_safe("SET search_path TO insurance")[0] is False
 
 
 def test_two_cfo_decks_extract_as_slide_citations():
@@ -66,6 +80,48 @@ def test_two_cfo_decks_extract_as_slide_citations():
         combined = " ".join(item["body"] for item in concepts)
         assert "SYNTHETIC DEMO DATA" in combined
         assert "Loss ratio" in combined
+
+
+def test_cg_studio_catalog_includes_listed_endpoints():
+    from config.llm_catalog import CG_ENDPOINTS, get_profile
+
+    ids = {item["id"] for item in CG_ENDPOINTS}
+    assert "openai.gpt-5.1" in ids
+    assert "openai.gpt-5-mini" in ids
+    assert "openai.gpt-5-nano" in ids
+    assert "openai.gpt-5" in ids
+    assert "openai.gpt-4o" in ids
+    assert "openai.gpt-3.5-turbo" in ids
+    assert "anthropic.claude-haiku-4-5-20251001-v1:0" in ids
+    assert "anthropic.claude-sonnet-5" in ids
+    assert "anthropic.claude-opus-5" in ids
+    haiku = get_profile("claude", "small")
+    assert haiku["model"] == "anthropic.claude-haiku-4-5-20251001-v1:0"
+    from datetime import date
+
+    from config.llm_catalog import estimate_usd, tokens_per_dollar
+    from core.insurance_kpi_engine import fy_april_march_bounds
+
+    start, end = fy_april_march_bounds(date(2026, 6, 30), previous=False)
+    assert start == date(2026, 4, 1)
+    assert end == date(2026, 6, 30)
+    prev_start, prev_end = fy_april_march_bounds(date(2026, 6, 30), previous=True)
+    assert prev_start == date(2025, 4, 1)
+    assert prev_end == date(2026, 3, 31)
+    assert tokens_per_dollar(10.0) == 100_000
+    assert round(estimate_usd(100_000, 10.0), 2) == 1.0
+
+
+def test_insurance_semantic_joins_connect_each_dimension():
+    from core.semantic_joins import load_semantic_joins
+
+    payload = load_semantic_joins()
+    assert payload["ok"] is True
+    assert payload["count"] >= 10
+    coverage = {row["Dimension"]: row for row in payload["coverage"]}
+    for dim in ("dim_product", "dim_region", "dim_agent", "dim_policy"):
+        assert dim in coverage
+        assert coverage[dim]["Connected"] == "Yes"
 
 
 def test_postgres_insurance_semantics_use_separate_premium_grain():
