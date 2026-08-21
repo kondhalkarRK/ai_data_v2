@@ -1,0 +1,11 @@
+product_id,product_code,product_name,line_of_business,product_family,coverage_type,active_flag
+1,MOT-COMP,Motor Comprehensive,Motor,Private Car,Comprehensive,True
+2,MOT-OD,Motor Own Damage,Motor,Private Car,Own Damage,True
+3,MOT-TP,Motor Third Party,Motor,Private Car,Third Party,True
+4,MOT-CV,Commercial Vehicle Package,Motor,Commercial,Package,True
+5,HLT-IND,Health Individual,Health,Retail Health,Individual,True
+6,HLT-FAM,Health Family Floater,Health,Retail Health,Family,True
+7,HLT-GRP,Group Health,Health,Group Health,Group,True
+8,PRP-FIR,Property Fire,Property,Commercial Property,Fire,True
+9,PRP-PKG,Property Package,Property,SME Property,Package,True
+10,PRP-BUR,Property Burglary,Property,SME Property,Burglary,True
