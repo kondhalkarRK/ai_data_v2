@@ -5,15 +5,27 @@
 
 from __future__ import annotations
 
+import os
 import re
 import numpy as np
 from typing import Optional
 
+_USE_HF_EMBEDDINGS = os.getenv("ASKDB_USE_HF_EMBEDDINGS", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
 # ── Try to import sentence-transformers ─────────────────────────
-# Falls back to TF-IDF cosine similarity if not available
+# Falls back to TF-IDF cosine similarity if not available.
+# Default is OFF to avoid external model downloads during app startup.
 try:
-    from sentence_transformers import SentenceTransformer
-    _ST_AVAILABLE = True
+    if _USE_HF_EMBEDDINGS:
+        from sentence_transformers import SentenceTransformer
+        _ST_AVAILABLE = True
+    else:
+        _ST_AVAILABLE = False
 except ImportError:
     _ST_AVAILABLE = False
 
