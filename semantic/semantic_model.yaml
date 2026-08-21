@@ -1,788 +1,196 @@
-# semantic_model.yaml
-# Enterprise Semantic Layer — Automotive Sales Domain
-# Capgemini AI Data Platform V10
+version: "2.0"
+domain: "Insurance"
+description: "PostgreSQL insurance analytics model with separate claim and premium grains"
 
-version: "1.0"
-domain: "Automotive Sales"
-description: >
-  India passenger-vehicle sales analytics (2019–2026). Reflects COVID volume dip (2020),
-  recovery and boom (2021–2025), rising EV share, and market leadership of Maruti, Tata,
-  and Mahindra across metro and regional India.
-
-# ══════════════════════════════════════════
-# TABLES
-# ══════════════════════════════════════════
 tables:
-
-  fact_sales:
+  fact_claims:
     type: fact
-    physical_name: fact_sales
-    display_name: "Sales Transactions"
-    grain: "One row per sales order"
-    description: "Core fact table containing all sales transactions"
-    primary_key: order_id
+    physical_name: insurance.fact_claims
+    display_name: "Claims"
+    grain: "One row per claim"
+    primary_key: claim_id
     columns:
-      order_id:
-        display_name: "Order ID"
-        type: integer
-        role: key
-      carline_id:
-        display_name: "Car Line ID"
-        type: integer
-        role: foreign_key
-        references: dim_carline.carline_id
-      colour_id:
-        display_name: "Colour ID"
-        type: integer
-        role: foreign_key
-        references: dim_color.colour_id
-      sales_person_id:
-        display_name: "Salesperson ID"
-        type: integer
-        role: foreign_key
-        references: dim_salesman.sales_person_id
-      region_id:
-        display_name: "Region ID"
-        type: integer
-        role: foreign_key
-        references: dim_region.region_id
-      sales_date:
-        display_name: "Sales Date"
-        type: date
-        role: date
-      order_qty:
-        display_name: "Order Quantity"
-        type: integer
-        role: measure
-      price_per_unit:
-        display_name: "Price Per Unit"
-        type: decimal
-        role: measure
-      total_sales:
-        display_name: "Total Sales Value"
-        type: decimal
-        role: measure
+      claim_id: {display_name: "Claim ID", type: integer, role: key}
+      claim_number: {display_name: "Claim Number", type: string, role: attribute}
+      policy_id: {display_name: "Policy ID", type: integer, role: foreign_key, references: dim_policy.policy_id}
+      product_id: {display_name: "Product ID", type: integer, role: foreign_key, references: dim_product.product_id}
+      region_id: {display_name: "Region ID", type: integer, role: foreign_key, references: dim_region.region_id}
+      loss_date: {display_name: "Loss Date", type: date, role: date}
+      reported_date: {display_name: "Reported Date", type: date, role: date}
+      settlement_date: {display_name: "Settlement Date", type: date, role: date}
+      claim_status: {display_name: "Claim Status", type: string, role: dimension}
+      claim_type: {display_name: "Claim Type", type: string, role: dimension}
+      reported_amount: {display_name: "Reported Amount", type: decimal, role: measure}
+      approved_amount: {display_name: "Approved Amount", type: decimal, role: measure}
+      paid_amount: {display_name: "Paid Amount", type: decimal, role: measure}
+      reserve_amount: {display_name: "Reserve Amount", type: decimal, role: measure}
+      incurred_amount: {display_name: "Incurred Amount", type: decimal, role: measure}
+      approved_flag: {display_name: "Approved", type: boolean, role: dimension}
+      repudiated_flag: {display_name: "Repudiated", type: boolean, role: dimension}
+      fraud_suspected_flag: {display_name: "Fraud Suspected", type: boolean, role: dimension}
 
-  dim_carline:
-    type: dimension
-    physical_name: dim_carline
-    display_name: "Vehicle / Car Line"
-    description: "Vehicle catalogue dimension"
-    primary_key: carline_id
+  fact_policy_monthly:
+    type: fact
+    physical_name: insurance.fact_policy_monthly
+    display_name: "Policy Monthly Premium and Exposure"
+    grain: "One row per policy per accounting month"
+    primary_key: policy_month_id
     columns:
-      carline_id:
-        display_name: "Car Line ID"
-        type: integer
-        role: key
-      carline_name:
-        display_name: "Car Line Name"
-        type: string
-        role: attribute
-      model:
-        display_name: "Model"
-        type: string
-        role: attribute
-      make:
-        display_name: "Make / Brand"
-        type: string
-        role: attribute
-      car_type:
-        display_name: "Car Type"
-        type: string
-        role: attribute
-      engine_capacity:
-        display_name: "Engine Capacity"
-        type: decimal
-        role: attribute
-      engine_type:
-        display_name: "Engine Type"
-        type: string
-        role: attribute
+      policy_month_id: {display_name: "Policy Month ID", type: integer, role: key}
+      policy_id: {display_name: "Policy ID", type: integer, role: foreign_key, references: dim_policy.policy_id}
+      product_id: {display_name: "Product ID", type: integer, role: foreign_key, references: dim_product.product_id}
+      agent_id: {display_name: "Agent ID", type: integer, role: foreign_key, references: dim_agent.agent_id}
+      region_id: {display_name: "Region ID", type: integer, role: foreign_key, references: dim_region.region_id}
+      accounting_month: {display_name: "Accounting Month", type: date, role: date}
+      written_premium: {display_name: "Written Premium", type: decimal, role: measure}
+      earned_premium: {display_name: "Earned Premium", type: decimal, role: measure}
+      exposure_units: {display_name: "Exposure Units", type: decimal, role: measure}
+      active_policy_flag: {display_name: "Active Policy", type: boolean, role: dimension}
+      due_for_renewal_flag: {display_name: "Due for Renewal", type: boolean, role: dimension}
+      renewed_flag: {display_name: "Renewed", type: boolean, role: dimension}
 
-  dim_color:
+  dim_policy:
     type: dimension
-    physical_name: dim_color
-    display_name: "Colour / Paint"
-    description: "Vehicle colour and paint dimension"
-    primary_key: colour_id
+    physical_name: insurance.dim_policy
+    display_name: "Policy"
+    primary_key: policy_id
     columns:
-      colour_id:
-        display_name: "Colour ID"
-        type: integer
-        role: key
-      colour_name:
-        display_name: "Colour Name"
-        type: string
-        role: attribute
-      RCG_combination:
-        display_name: "RCG Combination"
-        type: string
-        role: attribute
-      patent_number:
-        display_name: "Patent Number"
-        type: string
-        role: attribute
+      policy_id: {display_name: "Policy ID", type: integer, role: key}
+      policy_number: {display_name: "Policy Number", type: string, role: attribute}
+      product_id: {display_name: "Product ID", type: integer, role: foreign_key, references: dim_product.product_id}
+      agent_id: {display_name: "Agent ID", type: integer, role: foreign_key, references: dim_agent.agent_id}
+      region_id: {display_name: "Region ID", type: integer, role: foreign_key, references: dim_region.region_id}
+      inception_date: {display_name: "Inception Date", type: date, role: date}
+      expiry_date: {display_name: "Expiry Date", type: date, role: date}
+      policy_status: {display_name: "Policy Status", type: string, role: attribute}
+      coverage_tier: {display_name: "Coverage Tier", type: string, role: attribute}
+      sum_insured: {display_name: "Sum Insured", type: decimal, role: measure}
 
-  dim_salesman:
+  dim_product:
     type: dimension
-    physical_name: dim_salesman
-    display_name: "Salesperson"
-    description: "Sales team member dimension"
-    primary_key: sales_person_id
+    physical_name: insurance.dim_product
+    display_name: "Product"
+    primary_key: product_id
     columns:
-      sales_person_id:
-        display_name: "Salesperson ID"
-        type: integer
-        role: key
-      first_name:
-        display_name: "First Name"
-        type: string
-        role: attribute
-      last_name:
-        display_name: "Last Name"
-        type: string
-        role: attribute
-      email:
-        display_name: "Email"
-        type: string
-        role: attribute
-      corp_id:
-        display_name: "Corporate ID"
-        type: string
-        role: attribute
-      active:
-        display_name: "Active Status"
-        type: boolean
-        role: attribute
+      product_id: {display_name: "Product ID", type: integer, role: key}
+      product_code: {display_name: "Product Code", type: string, role: attribute}
+      product_name: {display_name: "Product Name", type: string, role: attribute}
+      line_of_business: {display_name: "Line of Business", type: string, role: attribute}
+      product_family: {display_name: "Product Family", type: string, role: attribute}
+      coverage_type: {display_name: "Coverage Type", type: string, role: attribute}
+
+  dim_agent:
+    type: dimension
+    physical_name: insurance.dim_agent
+    display_name: "Agent"
+    primary_key: agent_id
+    columns:
+      agent_id: {display_name: "Agent ID", type: integer, role: key}
+      agent_code: {display_name: "Agent Code", type: string, role: attribute}
+      agent_name: {display_name: "Agent Name", type: string, role: attribute}
+      channel_name: {display_name: "Channel", type: string, role: attribute}
+      branch_name: {display_name: "Branch", type: string, role: attribute}
+      active_flag: {display_name: "Active", type: boolean, role: attribute}
 
   dim_region:
     type: dimension
-    physical_name: dim_region
-    display_name: "Region / Geography"
-    description: "Sales region and city geography dimension"
+    physical_name: insurance.dim_region
+    display_name: "Region"
     primary_key: region_id
     columns:
-      region_id:
-        display_name: "Region ID"
-        type: integer
-        role: key
-      region_name:
-        display_name: "Region Name"
-        type: string
-        role: attribute
-      city:
-        display_name: "City"
-        type: string
-        role: attribute
-      state_code:
-        display_name: "State Code"
-        type: string
-        role: attribute
-      country:
-        display_name: "Country"
-        type: string
-        role: attribute
+      region_id: {display_name: "Region ID", type: integer, role: key}
+      region_code: {display_name: "Region Code", type: string, role: attribute}
+      region_name: {display_name: "Region", type: string, role: attribute}
+      state_name: {display_name: "State", type: string, role: attribute}
+      country_name: {display_name: "Country", type: string, role: attribute}
 
-  dim_targets:
-    type: dimension
-    physical_name: dim_targets
-    display_name: "Sales Targets by Make"
-    grain: "One row per make per month"
-    description: >
-      Monthly unit and revenue targets by vehicle make from Jan 2024 through Dec 2025.
-      Use with fact_sales via make and sales month for plan vs actual analysis.
-    primary_key: target_id
-    columns:
-      target_id:
-        display_name: "Target ID"
-        type: integer
-        role: key
-      year_month:
-        display_name: "Target Month"
-        type: string
-        role: attribute
-        description: "YYYY-MM format, e.g. 2024-06"
-      make:
-        display_name: "Make / Brand"
-        type: string
-        role: attribute
-        references: dim_carline.make
-      target_units:
-        display_name: "Target Units"
-        type: integer
-        role: measure
-      target_revenue:
-        display_name: "Target Revenue"
-        type: decimal
-        role: measure
-      grain:
-        display_name: "Target Grain"
-        type: string
-        role: attribute
-
-  dim_dealer:
-    type: dimension
-    physical_name: dim_dealer
-    display_name: "Dealer Network"
-    grain: "One row per authorized dealer outlet"
-    description: >
-      Dealer master — each dealer maps to a city and sales region (region_id).
-    primary_key: dealer_id
-    columns:
-      dealer_id:
-        display_name: "Dealer ID"
-        type: integer
-        role: key
-      dealer_code:
-        display_name: "Dealer Code"
-        type: string
-        role: attribute
-      dealer_name:
-        display_name: "Dealer Name"
-        type: string
-        role: attribute
-      city:
-        display_name: "City"
-        type: string
-        role: attribute
-        references: dim_region.city
-      region_id:
-        display_name: "Region ID"
-        type: integer
-        role: foreign_key
-        references: dim_region.region_id
-      region_name:
-        display_name: "Region Name"
-        type: string
-        role: attribute
-      state_code:
-        display_name: "State Code"
-        type: string
-        role: attribute
-      country:
-        display_name: "Country"
-        type: string
-        role: attribute
-      dealer_grade:
-        display_name: "Dealer Grade"
-        type: string
-        role: attribute
-      active:
-        display_name: "Active"
-        type: boolean
-        role: attribute
-
-# ══════════════════════════════════════════
-# RELATIONSHIPS
-# ══════════════════════════════════════════
 relationships:
-  - name: sales_to_carline
-    from_table: fact_sales
-    from_column: carline_id
-    to_table: dim_carline
-    to_column: carline_id
-    type: many_to_one
-    display_name: "Sales to Vehicle"
+  - {name: claims_to_policy, from_table: fact_claims, from_column: policy_id, to_table: dim_policy, to_column: policy_id, type: many_to_one}
+  - {name: claims_to_product, from_table: fact_claims, from_column: product_id, to_table: dim_product, to_column: product_id, type: many_to_one}
+  - {name: claims_to_region, from_table: fact_claims, from_column: region_id, to_table: dim_region, to_column: region_id, type: many_to_one}
+  - {name: premium_to_policy, from_table: fact_policy_monthly, from_column: policy_id, to_table: dim_policy, to_column: policy_id, type: many_to_one}
+  - {name: premium_to_product, from_table: fact_policy_monthly, from_column: product_id, to_table: dim_product, to_column: product_id, type: many_to_one}
+  - {name: premium_to_agent, from_table: fact_policy_monthly, from_column: agent_id, to_table: dim_agent, to_column: agent_id, type: many_to_one}
+  - {name: premium_to_region, from_table: fact_policy_monthly, from_column: region_id, to_table: dim_region, to_column: region_id, type: many_to_one}
 
-  - name: sales_to_colour
-    from_table: fact_sales
-    from_column: colour_id
-    to_table: dim_color
-    to_column: colour_id
-    type: many_to_one
-    display_name: "Sales to Colour"
-
-  - name: sales_to_salesman
-    from_table: fact_sales
-    from_column: sales_person_id
-    to_table: dim_salesman
-    to_column: sales_person_id
-    type: many_to_one
-    display_name: "Sales to Salesperson"
-
-  - name: sales_to_region
-    from_table: fact_sales
-    from_column: region_id
-    to_table: dim_region
-    to_column: region_id
-    type: many_to_one
-    display_name: "Sales to Region"
-
-  - name: carline_to_targets
-    from_table: dim_carline
-    from_column: make
-    to_table: dim_targets
-    to_column: make
-    type: many_to_one
-    auto_join: false
-    display_name: "Vehicle Make → Monthly Targets"
-    join_condition: >
-      dim_carline.make = dim_targets.make
-      AND strftime('%Y-%m', fact_sales.sales_date) = dim_targets.year_month
-    path: [fact_sales, dim_carline, dim_targets]
-
-  - name: region_to_dealer
-    from_table: dim_region
-    from_column: region_id
-    to_table: dim_dealer
-    to_column: region_id
-    type: one_to_many
-    auto_join: false
-    display_name: "Region → Dealers"
-    path: [dim_region, dim_dealer]
-
-  - name: city_to_dealer
-    from_table: dim_region
-    from_column: city
-    to_table: dim_dealer
-    to_column: city
-    type: one_to_many
-    auto_join: false
-    display_name: "City → Dealers"
-    path: [dim_region, dim_dealer]
-
-join_paths:
-  target_vs_actual:
-    description: "Compare actual sales to monthly make targets (2024–2025)"
-    tables: [fact_sales, dim_carline, dim_targets]
-    join_sql: >
-      fact_sales fs
-      JOIN dim_carline dc ON fs.carline_id = dc.carline_id
-      JOIN dim_targets dt ON dc.make = dt.make
-        AND strftime('%Y-%m', fs.sales_date) = dt.year_month
-  dealer_network:
-    description: "Dealer outlets mapped to city and region"
-    tables: [dim_dealer, dim_region]
-    join_sql: >
-      dim_dealer dd
-      JOIN dim_region dr ON dd.region_id = dr.region_id
-  sales_with_dealer_geo:
-    description: "Sales attributed to dealer cities via region"
-    tables: [fact_sales, dim_region, dim_dealer]
-    join_sql: >
-      fact_sales fs
-      JOIN dim_region dr ON fs.region_id = dr.region_id
-      JOIN dim_dealer dd ON dd.region_id = dr.region_id
-
-# ══════════════════════════════════════════
-# MEASURES
-# ══════════════════════════════════════════
 measures:
-
-  revenue:
-    display_name: "Revenue"
-    description: "Total sales revenue generated"
-    expression: "SUM(total_sales)"
-    format: "currency"
+  gross_written_premium:
+    display_name: "Gross Written Premium"
+    expression: "SUM(written_premium)"
+    source_table: fact_policy_monthly
+    source_column: written_premium
     aggregation: sum
-    source_table: fact_sales
-    source_column: total_sales
-    synonyms:
-      - sales
-      - turnover
-      - income
-      - total revenue
-      - total sales
-      - gross sales
-      - total income
-      - sales value
-      - sales amount
-      - revenue generated
-      - money made
-      - earnings
-
-  orders:
-    display_name: "Orders"
-    description: "Total number of orders placed"
-    expression: "COUNT(order_id)"
-    format: "integer"
-    aggregation: count
-    source_table: fact_sales
-    source_column: order_id
-    synonyms:
-      - order count
-      - number of orders
-      - total orders
-      - transactions
-      - purchases
-      - deals
-      - bookings
-      - sales count
-
-  units_sold:
-    display_name: "Units Sold"
-    description: "Total quantity of vehicles sold"
-    expression: "SUM(order_qty)"
-    format: "integer"
+    format: currency
+    synonyms: [GWP, written premium, premium booked]
+  earned_premium:
+    display_name: "Earned Premium"
+    expression: "SUM(earned_premium)"
+    source_table: fact_policy_monthly
+    source_column: earned_premium
     aggregation: sum
-    source_table: fact_sales
-    source_column: order_qty
-    synonyms:
-      - quantity sold
-      - volume
-      - units
-      - vehicles sold
-      - cars sold
-      - order quantity
-      - qty sold
-      - total units
-      - sales volume
-      - number sold
-      - top selling
-      - best selling
-      - most sold
-      - top seller
-      - best seller
-      - top selling car
-      - best selling car
-      - top selling model
-      - most popular
-
-  average_selling_price:
-    display_name: "Average Selling Price"
-    description: "Average price per unit sold"
-    expression: "SUM(total_sales) / NULLIF(SUM(order_qty), 0)"
-    format: "currency"
-    aggregation: ratio
-    source_table: fact_sales
-    synonyms:
-      - avg price
-      - average price
-      - mean price
-      - price per unit
-      - asp
-      - average unit price
-      - avg selling price
-
-  active_salespeople:
-    display_name: "Active Salespeople"
-    description: "Count of distinct active salespeople"
-    expression: "COUNT(DISTINCT sales_person_id)"
-    format: "integer"
+    format: currency
+  claims_incurred:
+    display_name: "Claims Incurred"
+    expression: "SUM(incurred_amount)"
+    source_table: fact_claims
+    source_column: incurred_amount
+    aggregation: sum
+    format: currency
+  claims_paid:
+    display_name: "Claims Paid"
+    expression: "SUM(paid_amount)"
+    source_table: fact_claims
+    source_column: paid_amount
+    aggregation: sum
+    format: currency
+  claim_count:
+    display_name: "Claim Count"
+    expression: "COUNT(DISTINCT claim_id)"
+    source_table: fact_claims
+    source_column: claim_id
     aggregation: count_distinct
-    source_table: fact_sales
-    source_column: sales_person_id
-    synonyms:
-      - active reps
-      - active agents
-      - headcount
-      - sales team size
-      - number of salespeople
-      - distinct salespeople
-
-  revenue_per_salesperson:
-    display_name: "Revenue Per Salesperson"
-    description: "Average revenue generated per salesperson"
-    expression: "SUM(total_sales) / NULLIF(COUNT(DISTINCT sales_person_id), 0)"
-    format: "currency"
+    format: integer
+  loss_ratio:
+    display_name: "Loss Ratio"
+    description: "Incurred claims divided by earned premium at a compatible period grain"
+    expression: "SUM(incurred_amount) / NULLIF(SUM(earned_premium), 0)"
     aggregation: ratio
-    source_table: fact_sales
-    synonyms:
-      - revenue per rep
-      - revenue per agent
-      - sales per person
-      - per head revenue
-      - productivity
-      - sales productivity
-
-  revenue_per_order:
-    display_name: "Revenue Per Order"
-    description: "Average revenue value per order"
-    expression: "SUM(total_sales) / NULLIF(COUNT(order_id), 0)"
-    format: "currency"
+    format: percent
+  average_claim_severity:
+    display_name: "Average Claim Severity"
+    expression: "SUM(incurred_amount) / NULLIF(COUNT(DISTINCT claim_id), 0)"
+    source_table: fact_claims
     aggregation: ratio
-    source_table: fact_sales
-    synonyms:
-      - average order value
-      - avg order value
-      - aov
-      - order value
-      - basket size
-      - value per transaction
-
-  target_units:
-    display_name: "Target Units"
-    description: "Planned unit volume by make and month from dim_targets"
-    expression: "SUM(target_units)"
-    format: "integer"
-    aggregation: sum
-    source_table: dim_targets
-    source_column: target_units
-    synonyms:
-      - target volume
-      - plan units
-      - planned units
-      - budget units
-      - target qty
-      - sales target units
-
-  target_revenue:
-    display_name: "Target Revenue"
-    description: "Planned revenue by make and month from dim_targets"
-    expression: "SUM(target_revenue)"
-    format: "currency"
-    aggregation: sum
-    source_table: dim_targets
-    source_column: target_revenue
-    synonyms:
-      - target sales
-      - plan revenue
-      - budget revenue
-      - revenue target
-      - sales target value
-
-  variance_units:
-    display_name: "Unit Variance vs Target"
-    description: "Actual units minus target units (requires join to dim_targets)"
-    expression: "SUM(order_qty) - SUM(target_units)"
-    format: "integer"
+    format: currency
+  claim_frequency:
+    display_name: "Claim Frequency"
+    expression: "COUNT(DISTINCT claim_id) / NULLIF(SUM(exposure_units), 0)"
     aggregation: ratio
-    source_table: fact_sales
-    synonyms:
-      - gap to target
-      - variance units
-      - vs target units
-      - target gap
+    format: decimal
+  approval_rate:
+    display_name: "Approval Rate"
+    expression: "AVG(approved_flag::int)"
+    source_table: fact_claims
+    aggregation: ratio
+    format: percent
+  renewal_rate:
+    display_name: "Renewal Rate"
+    expression: "COUNT(*) FILTER (WHERE renewed_flag) / NULLIF(COUNT(*) FILTER (WHERE due_for_renewal_flag), 0)"
+    source_table: fact_policy_monthly
+    aggregation: ratio
+    format: percent
 
-# ══════════════════════════════════════════
-# DIMENSIONS
-# ══════════════════════════════════════════
 dimensions:
+  Reported Date: {display_name: "Reported Date", source_table: fact_claims, source_column: reported_date, type: date, synonyms: [claim date, reported month, period]}
+  Accounting Month: {display_name: "Accounting Month", source_table: fact_policy_monthly, source_column: accounting_month, type: date, synonyms: [premium month, month, period]}
+  Product: {display_name: "Product", source_table: dim_product, attributes: [product_name, line_of_business, product_family, coverage_type], synonyms: [LOB, insurance product, line]}
+  Region: {display_name: "Region", source_table: dim_region, attributes: [region_name, state_name, country_name], synonyms: [territory, geography, state]}
+  Agent: {display_name: "Agent", source_table: dim_agent, attributes: [agent_name, channel_name, branch_name], synonyms: [broker, channel, intermediary]}
+  Policy: {display_name: "Policy", source_table: dim_policy, attributes: [policy_number, policy_status, coverage_tier], synonyms: [coverage, contract]}
 
-  Date:
-    display_name: "Date"
-    source_table: fact_sales
-    source_column: sales_date
-    type: date
-    synonyms:
-      - time
-      - period
-      - when
-      - month
-      - year
-      - quarter
-      - day
-      - sales date
-      - order date
-      - transaction date
-
-  Salesperson:
-    display_name: "Salesperson"
-    source_table: dim_salesman
-    attributes:
-      - first_name
-      - last_name
-      - email
-      - corp_id
-      - active
-    display_expression: "first_name || ' ' || last_name"
-    synonyms:
-      - sales rep
-      - rep
-      - seller
-      - agent
-      - sales agent
-      - sales person
-      - employee
-      - staff
-      - associate
-      - consultant
-      - account manager
-
-  Car:
-    display_name: "Vehicle"
-    source_table: dim_carline
-    attributes:
-      - carline_name
-      - model
-      - make
-      - car_type
-      - engine_capacity
-      - engine_type
-    synonyms:
-      - vehicle
-      - automobile
-      - car
-      - model
-      - carline
-      - car line
-      - product
-      - make
-      - brand
-      - ev car
-      - electric car
-      - electric vehicle
-
-  Colour:
-    display_name: "Colour"
-    source_table: dim_color
-    attributes:
-      - colour_name
-      - RCG_combination
-      - patent_number
-    synonyms:
-      - color
-      - paint
-      - finish
-      - colour name
-      - color name
-      - vehicle color
-      - paint color
-
-  Region:
-    display_name: "Region"
-    source_table: dim_region
-    attributes:
-      - region_name
-      - city
-      - state_code
-      - country
-    synonyms:
-      - geography
-      - area
-      - territory
-      - zone
-      - city
-      - state
-      - location
-      - market
-      - region name
-
-  Dealer:
-    display_name: "Dealer"
-    source_table: dim_dealer
-    attributes:
-      - dealer_name
-      - dealer_code
-      - city
-      - region_name
-      - state_code
-      - dealer_grade
-      - active
-    synonyms:
-      - dealer
-      - dealership
-      - outlet
-      - dealer network
-      - authorized dealer
-      - dealer name
-      - showrooms
-
-  TargetPlan:
-    display_name: "Target Plan"
-    source_table: dim_targets
-    attributes:
-      - year_month
-      - make
-      - grain
-    synonyms:
-      - target
-      - plan
-      - budget
-      - target month
-      - sales plan
-      - monthly target
-
-# ══════════════════════════════════════════
-# HIERARCHIES
-# ══════════════════════════════════════════
-hierarchies:
-
-  Date_Hierarchy:
-    display_name: "Date Hierarchy"
-    dimension: Date
-    levels:
-      - name: Year
-        expression: "strftime('%Y', sales_date)"
-      - name: Quarter
-        expression: >
-          CASE WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 1 AND 3
-            THEN 'Q1-' || strftime('%Y', sales_date)
-          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 4 AND 6
-            THEN 'Q2-' || strftime('%Y', sales_date)
-          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 7 AND 9
-            THEN 'Q3-' || strftime('%Y', sales_date)
-          ELSE 'Q4-' || strftime('%Y', sales_date) END
-      - name: Month
-        expression: "strftime('%Y-%m', sales_date)"
-      - name: Day
-        expression: "sales_date"
-
-  Vehicle_Hierarchy:
-    display_name: "Vehicle Hierarchy"
-    dimension: Car
-    levels:
-      - name: Make
-        column: make
-      - name: Car Type
-        column: car_type
-      - name: Model
-        column: model
-      - name: Car Line
-        column: carline_name
-
-  Region_Hierarchy:
-    display_name: "Region Hierarchy"
-    dimension: Region
-    levels:
-      - name: Country
-        column: country
-      - name: Region
-        column: region_name
-      - name: State
-        column: state_code
-      - name: City
-        column: city
-
-# ══════════════════════════════════════════
-# DRILL PATHS
-# ══════════════════════════════════════════
-drill_paths:
-
-  - name: "Time Drill"
-    path: [Year, Quarter, Month, Day]
-
-  - name: "Vehicle Drill"
-    path: [Make, Car Type, Model, Car Line]
-
-  - name: "Region Drill"
-    path: [Country, Region, State, City]
-
-  - name: "Dealer Drill"
-    path: [Region, City, Dealer Name]
-
-  - name: "Target Drill"
-    path: [Make, Target Month]
-
-# ══════════════════════════════════════════
-# BUSINESS ENTITIES
-# ══════════════════════════════════════════
-business_entities:
-
-  - name: "Sales Transaction"
-    table: fact_sales
-    description: "A single vehicle sale event"
-
-  - name: "Vehicle"
-    table: dim_carline
-    description: "A vehicle product in the catalogue"
-
-  - name: "Salesperson"
-    table: dim_salesman
-    description: "A member of the sales team"
-
-  - name: "Colour Variant"
-    table: dim_color
-    description: "A colour option for a vehicle"
-
-  - name: "Region"
-    table: dim_region
-    description: "A geographic sales region / city"
-
-  - name: "Sales Target"
-    table: dim_targets
-    description: "Monthly unit/revenue plan by make (2024–2025)"
-
-  - name: "Dealer"
-    table: dim_dealer
-    description: "Authorized dealer outlet mapped to city and region"
+domain_rules:
+  - "Premium must be aggregated from fact_policy_monthly, never from fact_claims."
+  - "Loss ratio is incurred claims divided by earned premium at a compatible month/product/region grain."
+  - "Protect every ratio with NULLIF on the denominator."
+  - "Use reported_date for claims reporting and accounting_month for premium reporting."
+  - "Use PostgreSQL syntax when the physical table names are schema-qualified."

@@ -1,758 +1,102 @@
-# business_glossary.yaml
-# Enhanced Business Glossary — Automotive Sales Domain
-# Capgemini AI Data Platform V10 — Master Prompt
-
-version: "1.0"
-domain: "Automotive Sales"
+version: "2.0"
+domain: "Insurance"
 
 terms:
-
-  Revenue:
-    definition: >
-      Total monetary value of all completed
-      sales transactions. Calculated as the
-      sum of total_sales column across all
-      orders. Represents top-line income.
-    sql_expression: "SUM(total_sales)"
-    aggregation: "SUM"
-    source_column: "total_sales"
-    format: "currency"
-    display_label: "Revenue"
-    synonyms:
-      - sales
-      - turnover
-      - income
-      - total revenue
-      - gross sales
-      - earnings
-      - money made
-      - sales value
-      - total sales
-      - revenue generated
-      - top line
-      - sales amount
-    calculation_rules:
-      - Always use SUM aggregation
-      - Never average revenue unless explicitly asked for average
-      - Include all order statuses unless filtered
-      - Use total_sales column only not price_per_unit
-    related_terms:
-      - Units Sold
-      - Average Selling Price
-      - Revenue Per Order
-      - Revenue Per Salesperson
-    example_questions:
-      - "Show revenue by colour"
-      - "Total revenue for 2023"
-      - "Revenue by salesperson"
-      - "Which make generates most revenue"
-      - "Monthly revenue trend"
-    disambiguation:
-      - "If user says 'sales' without specifying count vs value, assume revenue (SUM total_sales) not order count"
-      - "'sales performance' means revenue"
-      - "'sales figures' means revenue"
-      - "'top selling' / 'best selling' / 'most sold' means Units Sold (SUM order_qty) — NOT revenue"
-      - "'highest revenue' / 'most revenue' / 'top by revenue' means Revenue"
+  Gross Written Premium:
+    definition: "Premium booked for policies written during the period."
+    synonyms: [GWP, written premium, premium booked]
+    maps_to_measure: gross_written_premium
+    sql_expression: "SUM(insurance.fact_policy_monthly.written_premium)"
     category: Financial
-    maps_to_measure: revenue
 
-  Units Sold:
-    definition: >
-      Total count of vehicle units sold across all transactions.
-      Uses order quantity, not order count.
-    sql_expression: "SUM(order_qty)"
-    aggregation: "SUM"
-    source_column: "order_qty"
-    format: "integer"
-    display_label: "Units Sold"
-    synonyms:
-      - volume
-      - quantity sold
-      - cars sold
-      - vehicles sold
-      - units
-      - qty
-      - sales volume
-      - number sold
-      - total units
-      - how many sold
-      - top selling
-      - best selling
-      - most sold
-      - top seller
-      - best seller
-      - top selling car
-      - best selling car
-      - top selling model
-      - most popular car
-    calculation_rules:
-      - Use order_qty not order count
-      - SUM not COUNT for quantity
-      - "top selling / best selling / most sold ALWAYS means SUM(order_qty) never revenue"
-    related_terms:
-      - Revenue
-      - Orders
-      - Average Selling Price
-    example_questions:
-      - "How many units sold by colour"
-      - "Units sold per salesperson"
-      - "Total vehicles sold in 2023"
-      - "Top selling car"
-      - "Best selling model by volume"
-    disambiguation:
-      - "Different from Orders - one order can have multiple units"
-      - "Use when user asks how many vehicles/cars/units"
-      - "top selling / best selling / most sold = Units Sold SUM(order_qty), NOT Revenue"
-    category: Sales Volume
-    maps_to_measure: units_sold
-
-  Orders:
-    definition: >
-      Total number of distinct sales orders placed.
-      One order can contain multiple vehicle units.
-    sql_expression: "COUNT(order_id)"
-    aggregation: "COUNT"
-    source_column: "order_id"
-    format: "integer"
-    display_label: "Orders"
-    synonyms:
-      - order count
-      - number of orders
-      - transactions
-      - deals
-      - bookings
-      - purchases
-      - total orders
-      - sales count
-    calculation_rules:
-      - Use COUNT(order_id) not SUM(order_qty)
-      - Distinct from Units Sold
-    related_terms:
-      - Units Sold
-      - Revenue Per Order
-    example_questions:
-      - "How many orders by colour"
-      - "Order count by salesperson"
-      - "Total orders in 2023"
-    disambiguation:
-      - Different from Units Sold
-      - One order can have multiple units
-      - "Use when user asks 'how many orders' not 'how many units'"
-    category: Sales Activity
-    maps_to_measure: orders
-
-  Average Selling Price:
-    definition: >
-      Revenue divided by units sold — average price achieved per vehicle.
-      Weighted average by quantity, not simple average of price column.
-    sql_expression: "SUM(total_sales) / NULLIF(SUM(order_qty), 0)"
-    aggregation: "ratio"
-    source_column: null
-    format: "currency"
-    display_label: "Average Selling Price"
-    synonyms:
-      - avg price
-      - average price
-      - mean price
-      - price per unit
-      - ASP
-      - average unit price
-      - avg selling price
-      - typical price
-      - price achieved
-    calculation_rules:
-      - Always derived — never direct column
-      - Must use NULLIF to avoid divide by zero
-      - Weighted average by quantity not simple average of price column
-    related_terms:
-      - Revenue
-      - Units Sold
-    example_questions:
-      - "Average selling price by make"
-      - "ASP by colour"
-      - "What is the average price"
-    disambiguation:
-      - Do not use AVG(price_per_unit) unless explicitly asked for unweighted average
-    category: Pricing
-    maps_to_measure: average_selling_price
-
-  Salesperson:
-    definition: >
-      An individual member of the sales team responsible for closing vehicle sales.
-    display_expression: "first_name || ' ' || last_name"
-    source_columns:
-      - first_name
-      - last_name
-    format: "text"
-    display_label: "Salesperson"
-    synonyms:
-      - sales rep
-      - rep
-      - seller
-      - agent
-      - sales agent
-      - sales person
-      - employee
-      - staff
-      - associate
-      - consultant
-      - account manager
-      - who sold
-      - which rep
-    calculation_rules:
-      - Always concatenate first + last name
-      - Never show ID alone
-      - Use AS salesperson_name alias
-    related_terms:
-      - Revenue Per Salesperson
-      - Active Salespeople
-    example_questions:
-      - "Top 10 salespeople by revenue"
-      - "Revenue by salesperson"
-      - "Who sold the most units"
-    disambiguation:
-      - Prefer name label over sales_person_id
-    category: People
-    maps_to_dimension: Salesperson
-
-  Vehicle / Car:
-    definition: >
-      A car or automobile product available in the sales catalogue.
-    source_columns:
-      - carline_name
-      - model
-      - make
-      - car_type
-    display_label: "Vehicle"
-    synonyms:
-      - car
-      - automobile
-      - model
-      - carline
-      - car line
-      - product
-      - make
-      - brand
-      - vehicle type
-    dimension_columns:
-      make: manufacturer brand
-      model: specific vehicle model
-      car_type: SUV Sedan Hatchback etc
-      carline_name: full carline name
-    calculation_rules:
-      - Prefer make/model/car_type labels over IDs
-    related_terms:
-      - Colour
-      - Make
-      - Model
-    example_questions:
-      - "Revenue by make"
-      - "Units sold by car type"
-      - "Top models by revenue"
-    category: Product
-    maps_to_dimension: Car
-
-  Colour:
-    definition: >
-      The exterior paint colour or finish of a vehicle.
-    source_column: "colour_name"
-    display_label: "Colour"
-    synonyms:
-      - color
-      - paint
-      - finish
-      - colour name
-      - color name
-      - vehicle color
-      - paint color
-      - shade
-      - hue
-    calculation_rules:
-      - Use colour_name column
-      - Case insensitive matching
-    related_terms:
-      - Vehicle / Car
-      - Revenue
-    example_questions:
-      - "Show revenue by colour"
-      - "Units sold by color"
-      - "Which colour sells most"
-    category: Product Attribute
-    maps_to_dimension: Colour
-
-  Date / Time dimensions:
-    definition: >
-      Time dimension for sales analytics based on sales_date.
-    source_column: "sales_date"
-    display_label: "Date"
-    synonyms:
-      - time
-      - period
-      - when
-      - date
-      - sales date
-      - order date
-      - transaction date
-      - month
-      - year
-      - quarter
-    time_grains:
-      day: "strftime('%Y-%m-%d', sales_date)"
-      month: "strftime('%Y-%m', sales_date) AS month"
-      quarter: >
-        CASE
-          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 1 AND 3
-            THEN 'Q1-' || strftime('%Y', sales_date)
-          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 4 AND 6
-            THEN 'Q2-' || strftime('%Y', sales_date)
-          WHEN CAST(strftime('%m', sales_date) AS INTEGER) BETWEEN 7 AND 9
-            THEN 'Q3-' || strftime('%Y', sales_date)
-          ELSE 'Q4-' || strftime('%Y', sales_date)
-        END AS quarter
-      year: "strftime('%Y', sales_date) AS year"
-    calculation_rules:
-      - "Quarter labels must be Q1-YYYY, Q2-YYYY, Q3-YYYY, Q4-YYYY — never decimals"
-      - "Use CASE WHEN month bands for quarter — never floating /3 division"
-      - "Month grouping always alias as 'month'"
-      - "Year grouping always alias as 'year'"
-      - "Quarter grouping always alias as 'quarter'"
-      - For trend queries always ORDER BY time dim
-    related_terms:
-      - Revenue
-      - Sales Trend
-    example_questions:
-      - "Monthly revenue trend"
-      - "Revenue by quarter"
-      - "Sales by year"
-    category: Time
-
-  Revenue Per Salesperson:
-    definition: >
-      Average revenue generated per distinct salesperson.
-    sql_expression: >
-      SUM(total_sales) /
-      NULLIF(COUNT(DISTINCT sales_person_id), 0)
-    aggregation: "ratio"
-    format: "currency"
-    display_label: "Revenue Per Salesperson"
-    synonyms:
-      - revenue per rep
-      - productivity
-      - sales per person
-      - per head revenue
-      - revenue per agent
-      - sales productivity
-    calculation_rules:
-      - Use COUNT DISTINCT sales_person_id in denominator
-      - Always NULLIF to avoid divide by zero
-    related_terms:
-      - Revenue
-      - Salesperson
-      - Active Salespeople
-    example_questions:
-      - "Revenue per salesperson"
-      - "Sales productivity by region"
-    category: Performance
-    maps_to_measure: revenue_per_salesperson
-
-  Revenue Per Order:
-    definition: >
-      Average revenue value per order (basket size / AOV).
-    sql_expression: >
-      SUM(total_sales) /
-      NULLIF(COUNT(order_id), 0)
-    aggregation: "ratio"
-    format: "currency"
-    display_label: "Revenue Per Order"
-    synonyms:
-      - average order value
-      - AOV
-      - order value
-      - basket size
-      - value per transaction
-      - avg order
-    calculation_rules:
-      - Use COUNT(order_id) not SUM(order_qty)
-      - Always NULLIF to avoid divide by zero
-    related_terms:
-      - Revenue
-      - Orders
-    example_questions:
-      - "Average order value by make"
-      - "Basket size by colour"
+  Earned Premium:
+    definition: "The portion of written premium recognized for coverage already provided."
+    synonyms: [premium earned, recognized premium]
+    maps_to_measure: earned_premium
+    sql_expression: "SUM(insurance.fact_policy_monthly.earned_premium)"
     category: Financial
-    maps_to_measure: revenue_per_order
 
-  Active Salespeople:
-    definition: >
-      Count of distinct active salespeople in the dataset.
-    sql_expression: "COUNT(DISTINCT sales_person_id)"
-    aggregation: "COUNT_DISTINCT"
-    source_column: "sales_person_id"
-    format: "integer"
-    display_label: "Active Salespeople"
-    synonyms:
-      - active reps
-      - headcount
-      - sales team size
-      - number of salespeople
-      - distinct salespeople
-      - how many reps
+  Claims Incurred:
+    definition: "Paid claims plus outstanding reserves."
+    synonyms: [incurred loss, incurred claims, total loss]
+    maps_to_measure: claims_incurred
+    sql_expression: "SUM(insurance.fact_claims.incurred_amount)"
+    category: Claims
+
+  Claims Paid:
+    definition: "Claim amounts actually paid during the selected scope."
+    synonyms: [claim payout, paid loss, total payout]
+    maps_to_measure: claims_paid
+    sql_expression: "SUM(insurance.fact_claims.paid_amount)"
+    category: Claims
+
+  Loss Ratio:
+    definition: "Incurred claims divided by earned premium at a compatible period and business grain."
+    synonyms: [claims ratio, loss to premium ratio]
+    maps_to_measure: loss_ratio
     calculation_rules:
-      - Use COUNT DISTINCT sales_person_id
-    related_terms:
-      - Salesperson
-      - Revenue Per Salesperson
-    example_questions:
-      - "How many active salespeople"
-      - "Sales team size"
-    category: People
-    maps_to_measure: active_salespeople
+      - "Use incurred_amount, not reported_amount."
+      - "Use earned_premium from fact_policy_monthly."
+      - "Aggregate claims and premium separately before joining by compatible month and dimensions."
+    category: Risk
 
-  Make:
-    definition: "The manufacturer or brand of a vehicle (e.g. Ford, Toyota)"
-    source_column: "make"
-    synonyms:
-      - brand
-      - manufacturer
-      - marque
-      - automaker
+  Claim Frequency:
+    definition: "Distinct claim count divided by exposure units."
+    synonyms: [claims per exposure, frequency rate]
+    maps_to_measure: claim_frequency
+    category: Risk
+
+  Average Claim Severity:
+    definition: "Incurred claim amount divided by distinct claim count."
+    synonyms: [severity, average loss, average claim cost]
+    maps_to_measure: average_claim_severity
+    category: Claims
+
+  Approval Rate:
+    definition: "Approved claims divided by all filed claims in the selected scope."
+    synonyms: [claim approval rate, approved percentage]
+    maps_to_measure: approval_rate
+    category: Operations
+
+  Renewal Rate:
+    definition: "Renewed policies divided by policies due for renewal."
+    synonyms: [persistency, retention rate, policy retention]
+    maps_to_measure: renewal_rate
+    category: Customer
+
+  Settlement Time:
+    definition: "Days from claim report date to settlement date for settled claims."
+    synonyms: [claim cycle time, turnaround time, TAT]
+    category: Operations
+
+  Reserve:
+    definition: "Estimated remaining liability for reported claims not yet fully paid."
+    synonyms: [outstanding reserve, case reserve]
+    category: Claims
+
+  Line of Business:
+    definition: "Insurance product grouping such as Motor, Health, or Property."
+    synonyms: [LOB, product line, insurance line]
+    maps_to_dimension: Product
     category: Product
-    maps_to_attribute: dim_carline.make
-
-  Model:
-    definition: "The specific vehicle model name within a make"
-    source_column: "model"
-    synonyms:
-      - car model
-      - vehicle model
-      - product name
-      - variant
-    category: Product
-    maps_to_attribute: dim_carline.model
-
-  Car Type:
-    definition: "Body style / segment (SUV, Compact SUV, Sedan, Hatchback, MPV)"
-    source_column: "car_type"
-    synonyms:
-      - body type
-      - vehicle type
-      - segment
-      - body style
-      - category
-      - class
-      - compact suv
-      - compact SUV
-    category: Product
-    maps_to_attribute: dim_carline.car_type
-
-  Electric Vehicle:
-    definition: >
-      Battery-electric passenger vehicles. Always filter engine_type = 'Electric'.
-      EV share of demand uses units (SUM(order_qty)), not order count (IND-PV-SOP-003).
-    sql_expression: "engine_type = 'Electric'"
-    source_column: "engine_type"
-    display_label: "EV / Electric"
-    synonyms:
-      - ev
-      - evs
-      - EV
-      - EVs
-      - electric
-      - electric vehicle
-      - electric vehicles
-      - electric car
-      - electric cars
-      - ev car
-      - ev cars
-      - battery electric
-      - bev
-      - BEVs
-      - powertrain electric
-      - electric vechile
-      - electric vehical
-      - electrified car
-    calculation_rules:
-      - "Filter with engine_type = 'Electric' (exact value in dataset)"
-      - "Do not treat Hybrid as Electric unless user says electrified"
-      - "EV share = SUM(order_qty WHERE Electric) / SUM(order_qty)"
-    related_terms:
-      - Units Sold
-      - Engine Type
-      - Car Type
-    example_questions:
-      - "EV cars by make"
-      - "Electric vehicle units by year"
-      - "Show revenue for electric cars"
-      - "Top EV models by units"
-    category: Product
-    maps_to_attribute: dim_carline.engine_type
-
-  Engine Type:
-    definition: "Powertrain classification — Petrol, Diesel, Hybrid, or Electric"
-    source_column: "engine_type"
-    display_label: "Engine Type / Powertrain"
-    synonyms:
-      - powertrain
-      - fuel type
-      - propulsion
-      - drivetrain type
-    category: Product
-    maps_to_attribute: dim_carline.engine_type
-
-  Region:
-    definition: >
-      Geographic sales territory covering region name, city,
-      state and country. Use for location and territory analytics.
-    source_column: "region_name"
-    display_label: "Region"
-    synonyms:
-      - geography
-      - area
-      - territory
-      - zone
-      - location
-      - market
-      - region name
-      - city
-      - state
-    calculation_rules:
-      - Use region_name for grouping by territory
-      - Use city for city-level breakdown
-      - Join via region_id to dim_region
-    related_terms:
-      - Revenue
-      - Units Sold
-    example_questions:
-      - "Revenue by region"
-      - "Top cities by sales"
-      - "Units sold in South region"
-      - "Which region has highest revenue"
-    category: Geography
-    maps_to_dimension: Region
-
-  Target Units:
-    definition: >
-      Planned monthly vehicle unit volume by make from dim_targets (Jan 2024–Dec 2025).
-      Compare to actuals via SUM(order_qty) from fact_sales joined on make and month.
-    sql_expression: "SUM(target_units)"
-    aggregation: "SUM"
-    source_column: "target_units"
-    source_table: "dim_targets"
-    format: "integer"
-    display_label: "Target Units"
-    synonyms:
-      - target volume
-      - plan units
-      - planned units
-      - budget units
-      - sales target
-      - unit target
-      - monthly target units
-    calculation_rules:
-      - Join dim_targets on make = dim_carline.make AND strftime('%Y-%m', sales_date) = year_month
-      - Use dim_targets table for plan; fact_sales for actual
-      - Filter year_month between 2024-01 and 2025-12 for target file coverage
-    related_terms:
-      - Units Sold
-      - Target Revenue
-      - Target vs Actual
-    example_questions:
-      - "Tata target vs actual for 2024"
-      - "Monthly target units by make"
-      - "Are we hitting target for Maruti in Q3 2025"
-      - "Gap to target by make"
-    category: Planning
-    maps_to_measure: target_units
-
-  Target Revenue:
-    definition: >
-      Planned monthly revenue by make from dim_targets. Pair with SUM(total_sales) for plan vs actual revenue.
-    sql_expression: "SUM(target_revenue)"
-    aggregation: "SUM"
-    source_column: "target_revenue"
-    source_table: "dim_targets"
-    format: "currency"
-    display_label: "Target Revenue"
-    synonyms:
-      - plan revenue
-      - budget revenue
-      - revenue target
-      - sales target value
-      - target sales
-    calculation_rules:
-      - Same join as Target Units — make + year_month
-    related_terms:
-      - Revenue
-      - Target Units
-    example_questions:
-      - "Revenue target vs actual for Hyundai 2025"
-      - "Target revenue by make for last month"
-    category: Planning
-    maps_to_measure: target_revenue
-
-  Target vs Actual:
-    definition: >
-      Compare planned performance (dim_targets) to actual sales (fact_sales) by make and month.
-      Variance = actual units minus target units; variance_pct = (actual - target) / target * 100.
-    sql_expression: >
-      SUM(order_qty) - SUM(target_units)
-    format: "integer"
-    display_label: "Variance vs Target"
-    synonyms:
-      - vs target
-      - against target
-      - plan vs actual
-      - target alignment
-      - gap to target
-      - behind plan
-      - ahead of plan
-      - on track
-    calculation_rules:
-      - JOIN fact_sales → dim_carline ON carline_id → dim_targets ON make AND strftime('%Y-%m', sales_date) = year_month
-      - Group by make and/or year_month as requested
-      - Behind plan when actual < target; ahead when actual > target
-    example_questions:
-      - "Which makes are behind target in 2025"
-      - "Tata actual vs target by month"
-      - "Show target vs actual units by make for 2024"
-    category: Planning
-
-  Dealer:
-    definition: >
-      Authorized sales outlet from dim_dealer. Each dealer maps to a city and region_id (same city as dim_region).
-      Join dealers to sales geography via region_id or city — not via fact_sales directly unless dealer_id exists.
-    source_table: "dim_dealer"
-    source_column: "dealer_name"
-    display_label: "Dealer"
-    synonyms:
-      - dealer
-      - dealership
-      - outlet
-      - dealer network
-      - authorized dealer
-      - showroom
-      - dealers in city
-    calculation_rules:
-      - Join dim_dealer.region_id = dim_region.region_id OR dim_dealer.city = dim_region.city
-      - Count dealers with COUNT(dealer_id); filter active = true when asked for active dealers
-      - For sales by dealer city, join fact_sales → dim_region → dim_dealer on city or region_id
-    related_terms:
-      - Region
-      - City
-    example_questions:
-      - "How many dealers in Mumbai"
-      - "List dealers by city"
-      - "Dealers in South region"
-      - "Grade A dealers in Bengaluru"
-    category: Network
-    maps_to_dimension: Dealer
-
-sql_patterns:
-  top_n_query:
-    description: "When user asks for top/best/highest N"
-    pattern: >
-      SELECT [dimensions], [measure]
-      FROM df
-      GROUP BY [dimensions]
-      ORDER BY [measure] DESC
-      LIMIT [n]
-    default_limit: 10
-    trigger_words:
-      - top
-      - best
-      - highest
-      - most
-      - leading
-      - greatest
-      - maximum
-
-  bottom_n_query:
-    description: "When user asks for bottom/worst/lowest N"
-    pattern: >
-      ORDER BY [measure] ASC LIMIT [n]
-    default_limit: 10
-    trigger_words:
-      - bottom
-      - worst
-      - lowest
-      - least
-      - minimum
-      - poorest
-      - weakest
-
-  time_series_query:
-    description: "When user asks for trend over time"
-    pattern: >
-      GROUP BY time_grain
-      ORDER BY time_grain ASC
-    trigger_words:
-      - trend
-      - over time
-      - by month
-      - by quarter
-      - by year
-      - monthly
-      - quarterly
-      - yearly
-      - time series
-      - how has changed
-      - growth
-
-  comparison_query:
-    description: >
-      Year-over-year or between-years comparison (gained / lost / changed most).
-      NEVER filter both years into one total — always pivot years into separate columns.
-    pattern: >
-      SELECT [dimension],
-        SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = [year1] THEN order_qty ELSE 0 END) AS units_[year1],
-        SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = [year2] THEN order_qty ELSE 0 END) AS units_[year2],
-        (SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = [year2] THEN order_qty ELSE 0 END)
-         - SUM(CASE WHEN CAST(strftime('%Y', sales_date) AS INTEGER) = [year1] THEN order_qty ELSE 0 END)) AS units_gained
-      FROM df
-      WHERE CAST(strftime('%Y', sales_date) AS INTEGER) IN ([year1], [year2])
-      GROUP BY [dimension]
-      ORDER BY units_gained DESC
-      LIMIT 10
-    trigger_words:
-      - compare
-      - vs
-      - versus
-      - between
-      - difference
-      - against
-      - gained
-      - lost
-      - growth
-      - changed
 
 domain_rules:
-  always_rules:
-    - Never return more than 500 rows
-    - Always concatenate first_name and last_name as salesperson_name
-    - Always use meaningful column aliases
-    - "For month grouping use strftime('%Y-%m') never DATE_TRUNC which returns timestamps"
-    - "For quarter labels use CASE WHEN month bands → Q1-YYYY … Q4-YYYY — never float /3"
-    - "Dataset is India PV sales 2019–2026; COVID 2020 dip and rising EV share are expected patterns"
-    - "top selling / best selling / most sold / top car / most popular → SUM(order_qty) ordered DESC — never SUM(total_sales)"
-    - "gained/lost/changed most between YEAR1 and YEAR2 → pivot both years + diff column (units_YEAR1, units_YEAR2, units_gained); never collapse into one total"
-    - "EV / electric vehicle / electric car / ev car → WHERE engine_type = 'Electric'"
-    - "target / plan / budget / vs target → use dim_targets; join on make AND strftime('%Y-%m', sales_date) = year_month"
-    - "dealer / dealership / outlet → use dim_dealer; join to dim_region on region_id or city"
-    - "dim_targets and dim_dealer are registered DuckDB tables alongside df; use multi-table SQL when needed"
-  never_rules:
-    - Never use price_per_unit for revenue
-    - Never average total_sales directly
-    - Never show raw IDs without labels
-    - Never use ORDER BY on unaggregated columns when GROUP BY is present
-    - Never produce decimal quarter labels like Q1.333
-    - Never rank top selling cars by revenue
-    - Never answer between-year gain questions with only 2 columns (entity + one total)
-  default_behaviours:
-    - "No LIMIT specified: add LIMIT 500"
-    - "Top/bottom without N: use 10"
-    - "Trend without grain: use monthly"
-    - "Date filter without year: use all years"
-    - "Units sold means SUM(order_qty) not COUNT(*)"
-    - "Top selling car/model/make means units volume unless user says revenue"
-    - "Which make/model gained most between years defaults dimension to make unless user names model/car type"
+  - "SQL is the source of truth for numerical results."
+  - "Documents provide management commentary, definitions, and actions, not database facts."
+  - "Never sum premium from claim rows."
+  - "Use incurred claims divided by earned premium for loss ratio."
+  - "Use NULLIF to protect ratio denominators."
+
+sql_patterns:
+  monthly_claim_trend:
+    description: "Claims grouped by reported month"
+    trigger_words: [monthly claims, claims trend, by month]
+    pattern: "SELECT date_trunc('month', reported_date)::date AS month, SUM(incurred_amount) AS claims_incurred FROM insurance.fact_claims GROUP BY 1 ORDER BY 1"
+  premium_by_product:
+    description: "Written and earned premium by product"
+    trigger_words: [premium by product, GWP by line, earned premium]
+    pattern: "Aggregate insurance.fact_policy_monthly then join insurance.dim_product on product_id"
+  loss_ratio:
+    description: "Separately aggregate monthly claims and premium before calculating loss ratio"
+    trigger_words: [loss ratio, claims ratio]
+    pattern: "Claims CTE by month/product plus premium CTE by month/product; incurred / NULLIF(earned, 0)"
