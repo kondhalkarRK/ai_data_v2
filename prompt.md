@@ -1,3 +1,11 @@
+\copy insurance.dim_product FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/dim_product.csv' CSV HEADER
+\copy insurance.dim_agent FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/dim_agent.csv' CSV HEADER
+\copy insurance.dim_region FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/dim_region.csv' CSV HEADER
+\copy insurance.dim_policy FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/dim_policy.csv' CSV HEADER
+\copy insurance.fact_policy_monthly FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/fact_policy_monthly.csv' CSV HEADER
+\copy insurance.fact_claims FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/fact_claims.csv' CSV HEADER
+\copy insurance.fact_operating_expense_monthly FROM 'E:/ai_data_rag/ai_data_v2/sample_data/insurance/fact_operating_expense_monthly.csv' CSV HEADER
+
 Great question — this is a classic LLM non-determinism problem. Let me break down the root causes and suggest a proper framework.
 
 Why The Response Changes Today vs 4 Days Later
