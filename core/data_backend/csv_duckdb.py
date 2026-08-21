@@ -51,12 +51,28 @@ class CsvDuckDbBackend(DataBackend):
         con = None
         try:
             con = self._connection()
-            return con.execute(sql.strip()).df(), None
+            result = con.execute(sql.strip()).df()
+            max_rows = 1000
+            truncated = len(result) > max_rows
+            if truncated:
+                result = result.head(max_rows).copy()
+            result.attrs["askdb_truncated"] = truncated
+            result.attrs["askdb_max_rows"] = max_rows
+            return result, None
         except Exception as exc:
             return None, str(exc)
         finally:
             if con is not None:
                 con.close()
+
+    def table_row_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        if self._df is not None and not self._df.empty:
+            counts["df"] = int(len(self._df))
+        for name, frame in self._extra_tables.items():
+            if isinstance(frame, pd.DataFrame) and not frame.empty:
+                counts[str(name)] = int(len(frame))
+        return counts
 
     def list_tables(self) -> list[str]:
         names = ["df"] if self._df is not None and not self._df.empty else []

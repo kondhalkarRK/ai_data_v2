@@ -26,6 +26,27 @@ from ui.decision_share import (
     render_proactive_landing,
 )
 
+RESULT_DISPLAY_LIMIT = 100
+
+
+def _render_limited_dataframe(rdf: pd.DataFrame) -> None:
+    """Always cap on-screen tables so large query results cannot freeze the UI."""
+    if rdf is None or rdf.empty:
+        st.info("No rows returned for this question.")
+        return
+    truncated = bool(getattr(rdf, "attrs", {}).get("askdb_truncated"))
+    max_rows = int(getattr(rdf, "attrs", {}).get("askdb_max_rows") or len(rdf))
+    shown = min(10, len(rdf))
+    safe_dataframe(rdf.head(shown), use_container_width=True)
+    extra = min(len(rdf), RESULT_DISPLAY_LIMIT)
+    if extra > shown:
+        with st.expander(f"Show more ({extra:,} of {len(rdf):,} rows, display cap {RESULT_DISPLAY_LIMIT})"):
+            safe_dataframe(rdf.head(RESULT_DISPLAY_LIMIT), use_container_width=True)
+    if truncated:
+        st.caption(f"Query result capped at {max_rows:,} rows by the data backend.")
+    elif len(rdf) > RESULT_DISPLAY_LIMIT:
+        st.caption(f"Display limited to {RESULT_DISPLAY_LIMIT:,} rows.")
+
 try:
     from config.constants import OKF_ENABLED
 except ImportError:
@@ -1713,13 +1734,9 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
                 key_base = f"chat_{html.escape(str(msg.get('timestamp','')))}_{abs(hash(src_q)) % 10_000}"
                 tab_t, tab_c = st.tabs(["📊 Table", "📈 Chart"])
                 with tab_t:
-                    show_n = min(10, len(rdf))
-                    safe_dataframe(rdf.head(show_n), use_container_width=True)
-                    if len(rdf) > 10:
-                        with st.expander(f"Show all {len(rdf)} rows"):
-                            safe_dataframe(rdf, use_container_width=True)
+                    _render_limited_dataframe(rdf)
                 with tab_c:
-                    _render_chat_chart(rdf, src_q, key_base)
+                    _render_chat_chart(rdf.head(RESULT_DISPLAY_LIMIT), src_q, key_base)
             elif isinstance(rdf, pd.DataFrame) and rdf.empty:
                 st.info("No rows returned for this question.")
 
@@ -1732,13 +1749,9 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
                 key_base = f"chat_{html.escape(str(msg.get('timestamp','')))}_{abs(hash(src_q)) % 10_000}"
                 tab_t, tab_c = st.tabs(["📊 Table", "📈 Chart"])
                 with tab_t:
-                    show_n = min(10, len(rdf))
-                    safe_dataframe(rdf.head(show_n), use_container_width=True)
-                    if len(rdf) > 10:
-                        with st.expander(f"Show all {len(rdf)} rows"):
-                            safe_dataframe(rdf, use_container_width=True)
+                    _render_limited_dataframe(rdf)
                 with tab_c:
-                    _render_chat_chart(rdf, src_q, key_base)
+                    _render_chat_chart(rdf.head(RESULT_DISPLAY_LIMIT), src_q, key_base)
             elif isinstance(rdf, pd.DataFrame) and rdf.empty:
                 st.info("No rows returned for this question.")
             narr = data.get("narration")

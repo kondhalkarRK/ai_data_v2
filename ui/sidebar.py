@@ -6,6 +6,7 @@ import base64
 import inspect
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 from core.data_backend.factory import get_backend, postgres_mode_enabled
@@ -96,7 +97,21 @@ except (TypeError, ValueError):
 @st.dialog("Join settings", **_join_dialog_kwargs)
 def join_settings_dialog():
     from core.join_engine import get_working_df
+    from core.data_backend.factory import get_backend, postgres_mode_enabled
     from ui.tab_join import render as render_join
+
+    if postgres_mode_enabled():
+        backend = get_backend()
+        fks = backend.list_foreign_keys()
+        st.markdown("PostgreSQL join map")
+        if fks:
+            st.dataframe(pd.DataFrame(fks), use_container_width=True, hide_index=True)
+        else:
+            st.caption("No foreign keys found in the insurance schema.")
+        st.caption("ASK-DB uses `insurance.v_claims_enriched` plus these keys at query time.")
+        if st.button("Close", key="join_dialog_close_pg", use_container_width=True):
+            st.rerun()
+        return
 
     dfs = st.session_state.get("dfs") or {}
     if not dfs:
@@ -215,17 +230,34 @@ def render():
         # COLLAPSED NAV — click to open
         # =========================
         _postgres_mode = postgres_mode_enabled()
+        _pg_backend = get_backend() if _postgres_mode else None
+        _pg_healthy = False
+        _pg_message = ""
+        _pg_counts: dict = {}
+        _pg_fks: list = []
+        if _pg_backend is not None:
+            _pg_healthy, _pg_message = _pg_backend.health_check()
+            if _pg_healthy:
+                _pg_counts = _pg_backend.table_row_counts()
+                _pg_fks = _pg_backend.list_foreign_keys()
+
         if _postgres_mode:
-            with st.expander("🗄️ PostgreSQL", expanded=False):
-                backend = get_backend()
-                healthy, message = backend.health_check()
+            with st.expander("🗄️ PostgreSQL", expanded=True):
                 status_row(
                     "Status",
-                    "CONNECTED" if healthy else "OFFLINE",
-                    "#6ee7b7" if healthy else "#fca5a5",
+                    "CONNECTED" if _pg_healthy else "OFFLINE",
+                    "#6ee7b7" if _pg_healthy else "#fca5a5",
                 )
-                status_row("Tables", len(backend.list_tables()) if healthy else 0)
-                st.caption(message)
+                fact_claims = int(_pg_counts.get("fact_claims") or 0)
+                total_loaded = int(sum(_pg_counts.values())) if _pg_counts else 0
+                status_row("Tables", len(_pg_backend.list_tables()) if _pg_healthy else 0)
+                status_row("Claims loaded", f"{fact_claims:,}", "#6ee7b7")
+                status_row("All table rows", f"{total_loaded:,}", "#a5b4fc")
+                st.caption(_pg_message)
+                if _pg_counts:
+                    with st.expander("Row counts by table", expanded=False):
+                        for name, n in sorted(_pg_counts.items()):
+                            status_row(name, f"{n:,}")
         else:
             with st.expander("📁 Upload files", expanded=False):
                 st.markdown('<div class="sb-upload-wrap">', unsafe_allow_html=True)
@@ -254,13 +286,40 @@ def render():
         else:
             join_kind, join_status = "pending", "Pending"
 
-        with st.expander("🔗 Join", expanded=False):
+        with st.expander("🔗 Join", expanded=_postgres_mode):
             if _postgres_mode:
                 status_row("Mode", "Database relationships", "#6ee7b7")
-                st.caption(
-                    "PostgreSQL joins are generated from governed semantic "
-                    "relationships and database views."
-                )
+                fks = _pg_fks
+                rels = []
+                try:
+                    loader = st.session_state.get("semantic_loader")
+                    if loader is not None:
+                        rels = loader.get_relationships() or []
+                except Exception:
+                    rels = []
+                edges = fks or [
+                    {
+                        "from_table": r.get("from_table"),
+                        "from_column": r.get("from_column"),
+                        "to_table": r.get("to_table"),
+                        "to_column": r.get("to_column"),
+                    }
+                    for r in rels
+                ]
+                if edges:
+                    st.caption("Join map (fact → dimension)")
+                    for edge in edges:
+                        st.markdown(
+                            f"`{edge.get('from_table')}.{edge.get('from_column')}` → "
+                            f"`{edge.get('to_table')}.{edge.get('to_column')}`"
+                        )
+                    if st.button("⚙️ Join details", key="sidebar_join_settings_pg"):
+                        join_settings_dialog()
+                else:
+                    st.caption(
+                        "PostgreSQL joins come from foreign keys and the "
+                        "insurance semantic model (`v_claims_enriched`)."
+                    )
             else:
                 _join_col_kwargs = {"gap": "small"}
                 try:

@@ -27,11 +27,23 @@ def test_csv_backend_preserves_duckdb_query_path():
     assert backend.backend_id == "csv_duckdb"
 
 
-def test_postgres_backend_requires_password_before_connection():
+def test_csv_backend_caps_result_rows():
+    frame = pd.DataFrame({"n": list(range(1200))})
+    backend = CsvDuckDbBackend(frame)
+    result, error = backend.execute_sql("SELECT n FROM df")
+    assert error is None
+    assert result is not None
+    assert len(result) == 1000
+    assert result.attrs.get("askdb_truncated") is True
+
+
+def test_postgres_backend_exposes_catalog_helpers():
     backend = PostgresBackend({"password": None, "schema": "insurance"})
-    healthy, message = backend.health_check()
-    assert healthy is False
-    assert "password" in message.lower()
+    assert backend.table_row_counts() == {}
+    assert backend.list_foreign_keys() == []
+    status = backend.public_status()
+    assert status["healthy"] is False
+    assert "row_counts" in status
 
 
 def test_sql_guardrails_block_postgres_escape_paths():

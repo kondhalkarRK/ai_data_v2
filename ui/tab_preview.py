@@ -18,21 +18,42 @@ def _render_postgres_preview():
         return
 
     tables = backend.list_tables()
+    counts = backend.table_row_counts()
+    total_loaded = int(sum(counts.values())) if counts else 0
+    claim_rows = int(counts.get("fact_claims") or 0)
     st.caption(f"PostgreSQL · {message}")
+    st.markdown(
+        f"""<div class="stat-row">
+      <div class="stat-card"><div class="sv">{claim_rows:,}</div><div class="sl">Claims loaded</div></div>
+      <div class="stat-card"><div class="sv">{total_loaded:,}</div><div class="sl">All table rows</div></div>
+      <div class="stat-card"><div class="sv">{len(tables)}</div><div class="sl">Tables / views</div></div>
+    </div>""",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("🔬 Data Quality Intelligence ▼", expanded=True):
+        from core.postgres_dq_engine import render_postgres_data_quality
+
+        render_postgres_data_quality()
+
     if not tables:
         st.info("No readable tables or views were found in the configured schema.")
         return
 
+    st.markdown("---")
+    st.markdown("#### 🗂️ Individual Table View")
     selected = st.selectbox(
         "Select PostgreSQL table or view",
         tables,
         key="postgres_preview_table",
     )
-    preview = backend.get_preview(selected, limit=100)
+    preview_limit = 100
+    preview = backend.get_preview(selected, limit=preview_limit)
+    full_n = int(counts.get(selected) or len(preview))
     st.markdown(f"#### 📋 {selected}")
     st.markdown(
         f"""<div class="stat-row">
-      <div class="stat-card"><div class="sv">{len(preview):,}</div><div class="sl">Preview Rows</div></div>
+      <div class="stat-card"><div class="sv">{full_n:,}</div><div class="sl">Loaded rows</div></div>
       <div class="stat-card"><div class="sv">{preview.shape[1]}</div><div class="sl">Columns</div></div>
       <div class="stat-card"><div class="sv">{preview.select_dtypes(include='number').shape[1]}</div><div class="sl">Numeric Cols</div></div>
     </div>""",
@@ -40,8 +61,8 @@ def _render_postgres_preview():
     )
     safe_dataframe(preview, use_container_width=True)
     st.caption(
-        "Bounded server-side preview (LIMIT 100). ASK-DB does not load the full "
-        "PostgreSQL table into Streamlit."
+        f"Showing first {min(preview_limit, len(preview)):,} of {full_n:,} rows "
+        "(server-side LIMIT). ASK-DB does not load the full PostgreSQL table into Streamlit."
     )
 
     with st.expander("📌 Column Details"):

@@ -167,6 +167,61 @@ class PostgresBackend(DataBackend):
         except Exception:
             return ""
 
+    def table_row_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        if not self._config.get("password"):
+            return counts
+        try:
+            tables = self.list_tables()
+            with self._get_pool().connection() as conn:
+                with conn.cursor() as cur:
+                    for table in tables:
+                        query = pg_sql.SQL("SELECT COUNT(*) FROM {}.{}").format(
+                            pg_sql.Identifier(self._schema),
+                            pg_sql.Identifier(table),
+                        )
+                        cur.execute(query)
+                        counts[table] = int(cur.fetchone()[0])
+        except Exception:
+            return counts
+        return counts
+
+    def list_foreign_keys(self) -> list[dict[str, str]]:
+        if not self._config.get("password"):
+            return []
+        query = """
+            SELECT
+                tc.table_name AS from_table,
+                kcu.column_name AS from_column,
+                ccu.table_name AS to_table,
+                ccu.column_name AS to_column
+            FROM information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu
+              ON tc.constraint_name = kcu.constraint_name
+             AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage AS ccu
+              ON ccu.constraint_name = tc.constraint_name
+             AND ccu.table_schema = tc.table_schema
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              AND tc.table_schema = %s
+            ORDER BY from_table, from_column
+        """
+        try:
+            with self._get_pool().connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(query, (self._schema,))
+                    return [
+                        {
+                            "from_table": str(row[0]),
+                            "from_column": str(row[1]),
+                            "to_table": str(row[2]),
+                            "to_column": str(row[3]),
+                        }
+                        for row in cur.fetchall()
+                    ]
+        except Exception:
+            return []
+
     def get_preview(self, table: str | None = None, limit: int = 100) -> pd.DataFrame:
         tables = self.list_tables()
         selected = table or (tables[0] if tables else None)

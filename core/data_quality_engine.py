@@ -218,9 +218,22 @@ def compute_data_quality(df: pd.DataFrame) -> dict:
 def render_data_quality(df: pd.DataFrame, table_name: str):
     with st.spinner("Running data quality checks…"):
         dq = compute_data_quality(df)
+    render_data_quality_report(dq, df)
 
+
+def render_data_quality_report(dq: dict, df: pd.DataFrame | None = None):
     st.markdown("### 🔬 Data Quality Intelligence")
-    st.caption("Automated data health checks — zero AI involvement. Pure statistical analysis.")
+    source = dq.get("computed_in") or "pandas"
+    if source == "postgresql":
+        st.caption(
+            "Automated data health checks — computed in PostgreSQL. "
+            "ASK-DB does not load the full table into Streamlit."
+        )
+    else:
+        st.caption("Automated data health checks — zero AI involvement. Pure statistical analysis.")
+
+    if df is None:
+        df = pd.DataFrame()
 
     score = dq["health_score"]
     if score >= 90:
@@ -237,15 +250,28 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
     dup_color = "#6ee7b7" if dq["duplicate_count"] == 0 else "#fca5a5"
     out_color = "#6ee7b7" if len(dq["outliers"]) == 0 else "#fcd34d"
 
-    n_num = int(df.select_dtypes(include="number").shape[1])
-    n_txt = int(df.select_dtypes(include=["object", "string", "category"]).shape[1])
-    n_date = int(df.select_dtypes(include=["datetime", "datetimetz"]).shape[1])
+    n_num = int(dq.get("n_num") if dq.get("n_num") is not None else df.select_dtypes(include="number").shape[1])
+    n_txt = int(
+        dq.get("n_txt")
+        if dq.get("n_txt") is not None
+        else df.select_dtypes(include=["object", "string", "category"]).shape[1]
+    )
+    n_date = int(
+        dq.get("n_date")
+        if dq.get("n_date") is not None
+        else df.select_dtypes(include=["datetime", "datetimetz"]).shape[1]
+    )
+    n_bool = int(
+        dq.get("n_bool")
+        if dq.get("n_bool") is not None
+        else df.select_dtypes(include="bool").shape[1]
+    )
     # also count parsed-looking date cols
-    for c in df.columns:
-        if n_date == 0 and any(x in str(c).lower() for x in ("date", "time", "year", "month")):
-            n_date += 1
-            break
-    n_bool = int(df.select_dtypes(include="bool").shape[1])
+    if n_date == 0:
+        for c in df.columns:
+            if any(x in str(c).lower() for x in ("date", "time", "year", "month")):
+                n_date += 1
+                break
     completeness = round(100.0 - float(null_pct), 1)
 
     glow = (
@@ -392,62 +418,74 @@ def render_data_quality(df: pd.DataFrame, table_name: str):
 
         # Column Health Report
         with st.expander("📋 Column Health Report", expanded=False):
-            rows = []
-            for col in list(df.columns)[:15]:
-                s = df[col]
-                total = max(len(s), 1)
-                comp = round(100.0 * float(s.notna().sum()) / total, 1)
-                if pd.api.types.is_numeric_dtype(s):
-                    icon = "🔢"
-                elif pd.api.types.is_datetime64_any_dtype(s):
-                    icon = "📅"
-                else:
-                    icon = "📝"
-                if comp >= 100:
-                    status = "✅ Complete"
-                elif comp >= 95:
-                    status = "🟡 Minor gaps"
-                elif comp >= 80:
-                    status = "🟠 Gaps"
-                else:
-                    status = "🔴 Sparse"
-                rows.append({
-                    "Column": col,
-                    "Type": f"{icon} {s.dtype}",
-                    "Completeness %": comp,
-                    "Unique": int(s.nunique()),
-                    "Status": status,
-                })
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            if dq.get("column_health"):
+                st.dataframe(pd.DataFrame(dq["column_health"]), use_container_width=True, hide_index=True)
+            else:
+                rows = []
+                for col in list(df.columns)[:15]:
+                    s = df[col]
+                    total = max(len(s), 1)
+                    comp = round(100.0 * float(s.notna().sum()) / total, 1)
+                    if pd.api.types.is_numeric_dtype(s):
+                        icon = "🔢"
+                    elif pd.api.types.is_datetime64_any_dtype(s):
+                        icon = "📅"
+                    else:
+                        icon = "📝"
+                    if comp >= 100:
+                        status = "✅ Complete"
+                    elif comp >= 95:
+                        status = "🟡 Minor gaps"
+                    elif comp >= 80:
+                        status = "🟠 Gaps"
+                    else:
+                        status = "🔴 Sparse"
+                    rows.append({
+                        "Column": col,
+                        "Type": f"{icon} {s.dtype}",
+                        "Completeness %": comp,
+                        "Unique": int(s.nunique()),
+                        "Status": status,
+                    })
+                if rows:
+                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
         # Numeric profiles
-        num_cols = df.select_dtypes(include="number").columns.tolist()[:8]
-        if num_cols:
+        if dq.get("numeric_profiles"):
             with st.expander("📊 Numeric Column Profiles", expanded=False):
-                profiles = []
-                for col in num_cols:
-                    s = pd.to_numeric(df[col], errors="coerce").dropna()
-                    if s.empty:
-                        continue
-                    mean_v = float(s.mean())
-                    med_v = float(s.median())
-                    skew_flag = "🔴 skewed" if abs(mean_v - med_v) > (abs(med_v) * 0.25 + 1e-9) else "🟢 normal"
-                    profiles.append({
-                        "Column": col,
-                        "Min": round(float(s.min()), 2),
-                        "Max": round(float(s.max()), 2),
-                        "Mean": round(mean_v, 2),
-                        "Std Dev": round(float(s.std()), 2) if len(s) > 1 else 0,
-                        "Shape": skew_flag,
-                    })
-                if profiles:
-                    st.dataframe(pd.DataFrame(profiles), use_container_width=True, hide_index=True)
+                st.dataframe(
+                    pd.DataFrame(dq["numeric_profiles"]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+        else:
+            num_cols = df.select_dtypes(include="number").columns.tolist()[:8]
+            if num_cols:
+                with st.expander("📊 Numeric Column Profiles", expanded=False):
+                    profiles = []
+                    for col in num_cols:
+                        s = pd.to_numeric(df[col], errors="coerce").dropna()
+                        if s.empty:
+                            continue
+                        mean_v = float(s.mean())
+                        med_v = float(s.median())
+                        skew_flag = "🔴 skewed" if abs(mean_v - med_v) > (abs(med_v) * 0.25 + 1e-9) else "🟢 normal"
+                        profiles.append({
+                            "Column": col,
+                            "Min": round(float(s.min()), 2),
+                            "Max": round(float(s.max()), 2),
+                            "Mean": round(mean_v, 2),
+                            "Std Dev": round(float(s.std()), 2) if len(s) > 1 else 0,
+                            "Shape": skew_flag,
+                        })
+                    if profiles:
+                        st.dataframe(pd.DataFrame(profiles), use_container_width=True, hide_index=True)
 
         # Top values
         cat_cols = [
             c for c in df.columns
             if (df[c].dtype == object or str(df[c].dtype).startswith("string"))
-            and df[c].nunique() <= max(50, int(len(df) * 0.5))
+            and df[c].nunique() <= max(50, int(max(len(df), 1) * 0.5))
         ][:5]
         if cat_cols:
             with st.expander("🏷️ Top Values by Column", expanded=False):

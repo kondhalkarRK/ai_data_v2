@@ -1,13 +1,14 @@
-"""Governed PostgreSQL KPI summary for the insurance pilot."""
+"""Governed PostgreSQL KPI summary and dashboard for the insurance pilot."""
 from __future__ import annotations
 
 from decimal import Decimal
 
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 from core.data_backend.factory import get_backend
-
+from core.kpi_engine import _fmt_currency, _fmt_number
 
 _KPI_SQL = """
 WITH bounds AS (
@@ -53,6 +54,62 @@ CROSS JOIN premium p
 CROSS JOIN bounds b
 """
 
+_MONTHLY_SQL = """
+WITH premium AS (
+    SELECT accounting_month,
+           SUM(earned_premium) AS earned_premium
+    FROM insurance.fact_policy_monthly
+    GROUP BY 1
+),
+claims AS (
+    SELECT date_trunc('month', reported_date)::date AS accounting_month,
+           SUM(incurred_amount) AS claims_incurred,
+           COUNT(*) AS claim_count
+    FROM insurance.fact_claims
+    GROUP BY 1
+)
+SELECT COALESCE(p.accounting_month, c.accounting_month) AS accounting_month,
+       COALESCE(p.earned_premium, 0) AS earned_premium,
+       COALESCE(c.claims_incurred, 0) AS claims_incurred,
+       COALESCE(c.claim_count, 0) AS claim_count,
+       COALESCE(c.claims_incurred, 0) / NULLIF(COALESCE(p.earned_premium, 0), 0) AS loss_ratio
+FROM premium p
+FULL OUTER JOIN claims c
+  ON p.accounting_month = c.accounting_month
+ORDER BY 1
+LIMIT 36
+"""
+
+_LOB_SQL = """
+SELECT pr.line_of_business,
+       SUM(c.incurred_amount) AS claims_incurred,
+       COUNT(*) AS claim_count
+FROM insurance.fact_claims c
+JOIN insurance.dim_product pr ON pr.product_id = c.product_id
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 20
+"""
+
+_REGION_SQL = """
+SELECT COALESCE(r.region_name, 'Unknown') AS region_name,
+       SUM(c.incurred_amount) AS claims_incurred,
+       COUNT(*) AS claim_count
+FROM insurance.fact_claims c
+LEFT JOIN insurance.dim_region r ON r.region_id = c.region_id
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 20
+"""
+
+_STATUS_SQL = """
+SELECT claim_status, COUNT(*) AS claim_count
+FROM insurance.fact_claims
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 20
+"""
+
 
 def _number(value, *, money: bool = False, percent: bool = False) -> str:
     if value is None or pd.isna(value):
@@ -61,13 +118,18 @@ def _number(value, *, money: bool = False, percent: bool = False) -> str:
     if percent:
         return f"{numeric * 100:.1f}%"
     if money:
-        abs_value = abs(numeric)
-        if abs_value >= 1_000_000_000:
-            return f"₹{numeric / 1_000_000_000:.2f}B"
-        if abs_value >= 1_000_000:
-            return f"₹{numeric / 1_000_000:.2f}M"
-        return f"₹{numeric:,.0f}"
-    return f"{numeric:,.1f}"
+        return _fmt_currency(numeric)
+    return _fmt_number(numeric)
+
+
+def _chart_layout(fig):
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=40, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=320,
+    )
+    return fig
 
 
 def render_insurance_kpi_tab() -> None:
@@ -84,7 +146,7 @@ def render_insurance_kpi_tab() -> None:
     st.markdown("### Insurance Executive KPI Summary")
     st.caption(
         f"Rolling 12 months · data through {str(row['data_through'])[:10]} · "
-        "computed in PostgreSQL"
+        "computed in PostgreSQL · chart series limited to 36 months / 20 groups"
     )
 
     cards = [
@@ -109,3 +171,77 @@ def render_insurance_kpi_tab() -> None:
         "Loss ratio uses incurred claims ÷ earned premium. Premium is sourced "
         "from policy-month grain, never duplicated across claim rows."
     )
+
+    monthly, monthly_err = backend.execute_sql(_MONTHLY_SQL)
+    lob, lob_err = backend.execute_sql(_LOB_SQL)
+    region, region_err = backend.execute_sql(_REGION_SQL)
+    status, status_err = backend.execute_sql(_STATUS_SQL)
+
+    st.markdown("---")
+    st.markdown("#### Insurance KPI dashboard")
+
+    left, right = st.columns(2)
+    with left:
+        if monthly is not None and not monthly.empty and not monthly_err:
+            plot = monthly.copy()
+            plot["accounting_month"] = pd.to_datetime(plot["accounting_month"])
+            plot["loss_ratio_pct"] = pd.to_numeric(plot["loss_ratio"], errors="coerce") * 100
+            fig = px.line(
+                plot,
+                x="accounting_month",
+                y="loss_ratio_pct",
+                markers=True,
+                title="Monthly loss ratio (%)",
+            )
+            fig.update_layout(xaxis_title="Month", yaxis_title="Loss ratio (%)")
+            st.plotly_chart(_chart_layout(fig), use_container_width=True)
+        else:
+            st.info("Monthly loss ratio is not available yet.")
+
+    with right:
+        if monthly is not None and not monthly.empty and not monthly_err:
+            plot = monthly.copy()
+            plot["accounting_month"] = pd.to_datetime(plot["accounting_month"])
+            fig = px.bar(
+                plot,
+                x="accounting_month",
+                y="claims_incurred",
+                title="Monthly claims incurred",
+            )
+            fig.update_layout(xaxis_title="Month", yaxis_title="Incurred (INR)")
+            st.plotly_chart(_chart_layout(fig), use_container_width=True)
+
+    bottom_left, bottom_right = st.columns(2)
+    with bottom_left:
+        if lob is not None and not lob.empty and not lob_err:
+            fig = px.pie(
+                lob,
+                names="line_of_business",
+                values="claims_incurred",
+                hole=0.35,
+                title="Incurred by line of business",
+            )
+            st.plotly_chart(_chart_layout(fig), use_container_width=True)
+            st.dataframe(lob, use_container_width=True, hide_index=True)
+        else:
+            st.info("LOB mix is not available yet.")
+
+    with bottom_right:
+        if region is not None and not region.empty and not region_err:
+            fig = px.bar(
+                region,
+                x="region_name",
+                y="claims_incurred",
+                title="Incurred by region",
+            )
+            fig.update_layout(xaxis_title="Region", yaxis_title="Incurred (INR)")
+            st.plotly_chart(_chart_layout(fig), use_container_width=True)
+        if status is not None and not status.empty and not status_err:
+            fig = px.bar(
+                status,
+                x="claim_status",
+                y="claim_count",
+                title="Claims by status",
+            )
+            fig.update_layout(xaxis_title="Status", yaxis_title="Claim count")
+            st.plotly_chart(_chart_layout(fig), use_container_width=True)

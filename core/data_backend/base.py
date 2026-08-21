@@ -44,13 +44,25 @@ class DataBackend(ABC):
     def get_dataset_fingerprint(self) -> str:
         raise NotImplementedError
 
+    def table_row_counts(self) -> dict[str, int]:
+        """Exact row counts keyed by table name. Default: empty."""
+        return {}
+
+    def list_foreign_keys(self) -> list[dict[str, str]]:
+        """Physical FK edges for join display. Default: none."""
+        return []
+
     def public_status(self) -> dict[str, Any]:
         """Safe connection metadata for UI display; never include credentials."""
         healthy, message = self.health_check()
+        tables = self.list_tables() if healthy else []
+        counts = self.table_row_counts() if healthy else {}
         return {
             "backend": self.backend_id,
             "dialect": self.sql_dialect,
             "healthy": healthy,
             "message": message,
-            "tables": self.list_tables() if healthy else [],
+            "tables": tables,
+            "row_counts": counts,
+            "total_rows": int(sum(counts.values())) if counts else 0,
         }
