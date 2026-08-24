@@ -31,6 +31,53 @@ def _render_postgres_preview():
         unsafe_allow_html=True,
     )
 
+    st.markdown("#### Joined claims view")
+    st.caption(
+        "All semantic joins active (claims LEFT JOIN policy, product, region, agent). "
+        "Server-side LIMIT 100 — full warehouse stays in PostgreSQL."
+    )
+    joined_sql = """
+        SELECT
+            c.*,
+            p.policy_number,
+            p.policy_status,
+            p.coverage_tier,
+            p.sum_insured,
+            pr.product_code,
+            pr.product_name,
+            pr.line_of_business,
+            pr.product_family,
+            pr.coverage_type,
+            r.region_code,
+            r.region_name,
+            r.state_name,
+            a.agent_code,
+            a.agent_name,
+            a.channel_name,
+            a.branch_name
+        FROM insurance.fact_claims c
+        LEFT JOIN insurance.dim_policy p ON p.policy_id = c.policy_id
+        LEFT JOIN insurance.dim_product pr ON pr.product_id = c.product_id
+        LEFT JOIN insurance.dim_region r ON r.region_id = c.region_id
+        LEFT JOIN insurance.dim_agent a ON a.agent_id = p.agent_id
+        ORDER BY c.reported_date DESC NULLS LAST, c.claim_id DESC
+        LIMIT 100
+    """
+    with st.spinner("ASK-DB is preparing the joined preview…"):
+        joined, joined_err = backend.execute_sql(joined_sql)
+    if joined_err or joined is None:
+        st.warning(f"Joined preview unavailable: {joined_err or 'No rows'}")
+    else:
+        st.markdown(
+            f"""<div class="stat-row">
+          <div class="stat-card"><div class="sv">{len(joined):,}</div><div class="sl">Rows shown</div></div>
+          <div class="stat-card"><div class="sv">{joined.shape[1]}</div><div class="sl">Columns (joined)</div></div>
+          <div class="stat-card"><div class="sv">{claim_rows:,}</div><div class="sl">Claim grain in DB</div></div>
+        </div>""",
+            unsafe_allow_html=True,
+        )
+        safe_dataframe(joined, use_container_width=True)
+
     with st.expander("Data quality (inventory + rolling 12 months)", expanded=True):
         from core.postgres_dq_engine import render_postgres_data_quality
 
@@ -46,7 +93,7 @@ def _render_postgres_preview():
         return
 
     st.markdown("---")
-    st.markdown("#### 🗂️ Individual Table View")
+    st.markdown("#### Individual table view")
     selected = st.selectbox(
         "Select PostgreSQL table or view",
         tables,

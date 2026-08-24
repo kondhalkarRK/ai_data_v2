@@ -1,7 +1,7 @@
 """Governed PostgreSQL KPI summary and dashboard for the insurance pilot."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 import pandas as pd
@@ -35,10 +35,29 @@ def fy_april_march_bounds(as_of: date, *, previous: bool = False) -> tuple[date,
 
 
 def rolling_bounds(as_of: date, months: int = 12) -> tuple[date, date]:
-    start = (as_of.replace(day=1) - timedelta(days=months * 31)).replace(day=1)
-    # Approximate month subtract via pandas for correctness
     start = (pd.Timestamp(as_of) - pd.DateOffset(months=months)).date()
     return start, as_of
+
+
+def calendar_ytd_bounds(as_of: date) -> tuple[date, date]:
+    """Calendar year-to-date: 1 Jan of as_of year → as_of."""
+    return date(as_of.year, 1, 1), as_of
+
+
+def calendar_year_bounds(year: int, as_of: date) -> tuple[date, date]:
+    """Calendar year Jan–Dec, capped at as_of for the current year."""
+    start = date(int(year), 1, 1)
+    end = date(int(year), 12, 31)
+    if year == as_of.year:
+        end = min(end, as_of)
+    elif year > as_of.year:
+        end = as_of
+    return start, end
+
+
+def _ytd_label(as_of: date) -> str:
+    yy = as_of.year % 100
+    return f"Current year YTD (Jan'{yy:02d}–{as_of.strftime('%b')}'{yy:02d})"
 
 
 def _number(value, *, money: bool = False, percent: bool = False) -> str:
@@ -69,36 +88,47 @@ def _distinct_values(backend, sql: str) -> list[str]:
     return [str(v) for v in frame.iloc[:, 0].dropna().tolist()]
 
 
-def _claims_where(start: date, end: date, lob: str, region: str) -> str:
-    clauses = [
-        f"c.reported_date >= {_sql_date(start)}",
-        f"c.reported_date <= {_sql_date(end)}",
-    ]
+def _claims_where(
+    start: date | None, end: date | None, lob: str, region: str
+) -> str:
+    clauses: list[str] = []
+    if start is not None:
+        clauses.append(f"c.reported_date >= {_sql_date(start)}")
+    if end is not None:
+        clauses.append(f"c.reported_date <= {_sql_date(end)}")
     if lob and lob != _ALL:
         clauses.append(f"pr.line_of_business = {_sql_text(lob)}")
     if region and region != _ALL:
         clauses.append(f"r.region_name = {_sql_text(region)}")
-    return " AND ".join(clauses)
+    return " AND ".join(clauses) if clauses else "TRUE"
 
 
-def _premium_where(start: date, end: date, lob: str, region: str) -> str:
-    clauses = [
-        f"pm.accounting_month >= date_trunc('month', {_sql_date(start)})::date",
-        f"pm.accounting_month <= date_trunc('month', {_sql_date(end)})::date",
-    ]
+def _premium_where(
+    start: date | None, end: date | None, lob: str, region: str
+) -> str:
+    clauses: list[str] = []
+    if start is not None:
+        clauses.append(
+            f"pm.accounting_month >= date_trunc('month', {_sql_date(start)})::date"
+        )
+    if end is not None:
+        clauses.append(
+            f"pm.accounting_month <= date_trunc('month', {_sql_date(end)})::date"
+        )
     if lob and lob != _ALL:
         clauses.append(f"pr.line_of_business = {_sql_text(lob)}")
     if region and region != _ALL:
         clauses.append(f"r.region_name = {_sql_text(region)}")
-    return " AND ".join(clauses)
+    return " AND ".join(clauses) if clauses else "TRUE"
 
 
-def _kpi_sql(start: date, end: date, lob: str, region: str) -> str:
+def _kpi_sql(start: date | None, end: date | None, lob: str, region: str) -> str:
     cw = _claims_where(start, end, lob, region)
     pw = _premium_where(start, end, lob, region)
+    through = _sql_date(end) if end is not None else "CURRENT_DATE"
     return f"""
 SELECT
-    {_sql_date(end)} AS data_through,
+    {through} AS data_through,
     p.written_premium,
     p.earned_premium,
     c.claims_incurred,
@@ -136,7 +166,9 @@ CROSS JOIN (
 """
 
 
-def _monthly_sql(start: date, end: date, lob: str, region: str) -> str:
+def _monthly_sql(
+    start: date | None, end: date | None, lob: str, region: str
+) -> str:
     cw = _claims_where(start, end, lob, region)
     pw = _premium_where(start, end, lob, region)
     return f"""
@@ -168,11 +200,11 @@ FROM premium p
 FULL OUTER JOIN claims c
   ON p.accounting_month = c.accounting_month
 ORDER BY 1
-LIMIT 36
+LIMIT 60
 """
 
 
-def _lob_sql(start: date, end: date, lob: str, region: str) -> str:
+def _lob_sql(start: date | None, end: date | None, lob: str, region: str) -> str:
     cw = _claims_where(start, end, lob, region)
     return f"""
 SELECT pr.line_of_business,
@@ -188,7 +220,7 @@ LIMIT 20
 """
 
 
-def _region_sql(start: date, end: date, lob: str, region: str) -> str:
+def _region_sql(start: date | None, end: date | None, lob: str, region: str) -> str:
     cw = _claims_where(start, end, lob, region)
     return f"""
 SELECT COALESCE(r.region_name, 'Unknown') AS region_name,
@@ -204,7 +236,7 @@ LIMIT 20
 """
 
 
-def _status_sql(start: date, end: date, lob: str, region: str) -> str:
+def _status_sql(start: date | None, end: date | None, lob: str, region: str) -> str:
     cw = _claims_where(start, end, lob, region)
     return f"""
 SELECT c.claim_status, COUNT(*) AS claim_count
@@ -236,6 +268,37 @@ def render_insurance_kpi_tab() -> None:
         return
 
     as_of = pd.to_datetime(bounds_df.iloc[0]["max_date"]).date()
+    ytd_default = _ytd_label(as_of)
+    year_vals = _distinct_values(
+        backend,
+        """
+        SELECT DISTINCT EXTRACT(YEAR FROM reported_date)::int AS y
+        FROM insurance.fact_claims
+        WHERE reported_date IS NOT NULL
+        ORDER BY 1 DESC
+        LIMIT 12
+        """,
+    )
+    calendar_years = sorted(
+        {int(float(y)) for y in year_vals if str(y).replace(".", "", 1).isdigit()},
+        reverse=True,
+    )
+    window_options = [
+        ytd_default,
+        "Rolling 12 months",
+        "Full history (all records)",
+    ]
+    for year in calendar_years:
+        if year == as_of.year:
+            continue
+        window_options.append(f"Calendar year {year} (Jan–Dec)")
+    window_options.extend(
+        [
+            "FY Apr–Mar (current)",
+            "FY Apr–Mar (previous)",
+        ]
+    )
+
     lobs = [_ALL] + _distinct_values(
         backend,
         "SELECT DISTINCT line_of_business FROM insurance.dim_product ORDER BY 1 LIMIT 20",
@@ -245,6 +308,15 @@ def render_insurance_kpi_tab() -> None:
         "SELECT DISTINCT region_name FROM insurance.dim_region ORDER BY 1 LIMIT 20",
     )
 
+    if "ins_kpi_window" not in st.session_state:
+        st.session_state.ins_kpi_window = ytd_default
+    elif st.session_state.ins_kpi_window not in window_options:
+        # Refresh YTD label when as_of month changes (same key pattern)
+        if str(st.session_state.ins_kpi_window).startswith("Current year YTD"):
+            st.session_state.ins_kpi_window = ytd_default
+        else:
+            st.session_state.ins_kpi_window = ytd_default
+
     main_col, filter_col = st.columns([4, 1])
     with filter_col:
         st.markdown(
@@ -253,30 +325,38 @@ def render_insurance_kpi_tab() -> None:
         )
         window = st.selectbox(
             "Time window",
-            [
-                "Rolling 12 months",
-                "FY Apr–Mar (current)",
-                "FY Apr–Mar (previous)",
-            ],
+            window_options,
             key="ins_kpi_window",
         )
         lob = st.selectbox("Line of business", lobs, key="ins_kpi_lob")
         region = st.selectbox("Region", regions, key="ins_kpi_region")
         if st.button("Clear filters", key="ins_kpi_clear", use_container_width=True):
-            st.session_state.ins_kpi_window = "Rolling 12 months"
+            st.session_state.ins_kpi_window = ytd_default
             st.session_state.ins_kpi_lob = _ALL
             st.session_state.ins_kpi_region = _ALL
             st.rerun()
 
-    if window == "FY Apr–Mar (current)":
+    start: date | None
+    end: date | None
+    if window == "Full history (all records)":
+        start, end = None, None
+        window_label = "Full history (all records)"
+    elif window == "Rolling 12 months":
+        start, end = rolling_bounds(as_of, 12)
+        window_label = "Rolling 12 months"
+    elif window == "FY Apr–Mar (current)":
         start, end = fy_april_march_bounds(as_of, previous=False)
         window_label = f"FY {start.year}–{end.year} (Apr–Mar)"
     elif window == "FY Apr–Mar (previous)":
         start, end = fy_april_march_bounds(as_of, previous=True)
         window_label = f"FY {start.year}–{start.year + 1} (Apr–Mar)"
+    elif window.startswith("Calendar year "):
+        year = int(window.split()[2])
+        start, end = calendar_year_bounds(year, as_of)
+        window_label = f"Calendar year {year} (Jan–Dec)"
     else:
-        start, end = rolling_bounds(as_of, 12)
-        window_label = "Rolling 12 months"
+        start, end = calendar_ytd_bounds(as_of)
+        window_label = ytd_default
 
     result, error = backend.execute_sql(_kpi_sql(start, end, lob, region))
     if error or result is None or result.empty:
@@ -289,8 +369,12 @@ def render_insurance_kpi_tab() -> None:
     row = result.iloc[0]
     with main_col:
         st.markdown("### Insurance Executive KPI Summary")
+        if start is None and end is None:
+            range_txt = "all loaded dates"
+        else:
+            range_txt = f"{start.isoformat()} to {end.isoformat()}"
         st.caption(
-            f"{window_label} · {start.isoformat()} to {end.isoformat()} · "
+            f"{window_label} · {range_txt} · "
             f"LOB={lob} · Region={region} · computed in PostgreSQL"
         )
 

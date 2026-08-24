@@ -27,26 +27,216 @@ from ui.decision_share import (
 )
 
 RESULT_DISPLAY_LIMIT = 100
+CHAT_PREVIEW_ROWS = 8
 
 
-def _render_limited_dataframe(rdf: pd.DataFrame) -> None:
+def _render_limited_dataframe(rdf: pd.DataFrame, *, preview_rows: int | None = None) -> None:
     """Always cap on-screen tables so large query results cannot freeze the UI."""
     if rdf is None or rdf.empty:
         st.info("No rows returned for this question.")
         return
     truncated = bool(getattr(rdf, "attrs", {}).get("askdb_truncated"))
     max_rows = int(getattr(rdf, "attrs", {}).get("askdb_max_rows") or len(rdf))
-    shown = min(10, len(rdf))
+    shown = min(preview_rows if preview_rows is not None else CHAT_PREVIEW_ROWS, len(rdf))
     safe_dataframe(rdf.head(shown), use_container_width=True)
-    extra = min(len(rdf), RESULT_DISPLAY_LIMIT)
-    if extra > shown:
-        with st.expander(f"Show more ({extra:,} of {len(rdf):,} rows, display cap {RESULT_DISPLAY_LIMIT})"):
-            safe_dataframe(rdf.head(RESULT_DISPLAY_LIMIT), use_container_width=True)
+    if len(rdf) > shown:
+        st.caption(
+            f"Showing {shown:,} of {min(len(rdf), RESULT_DISPLAY_LIMIT):,} rows "
+            f"(expand for more · display cap {RESULT_DISPLAY_LIMIT:,})."
+        )
     if truncated:
         st.caption(f"Query result capped at {max_rows:,} rows by the data backend.")
     elif len(rdf) > RESULT_DISPLAY_LIMIT:
         st.caption(f"Display limited to {RESULT_DISPLAY_LIMIT:,} rows.")
 
+
+def _chat_msg_ref(msg: dict) -> str:
+    stamp = str(msg.get("timestamp") or "")
+    body = str(msg.get("content") or "")[:48]
+    return f"c{abs(hash(stamp + body)) % 10_000_000}"
+
+
+def _chat_block_header(title: str, *, button_key: str, kind: str, ref: str) -> None:
+    left, right = st.columns([0.9, 0.1])
+    with left:
+        st.markdown(
+            f'<div class="chat-block-title">{html.escape(title)}</div>',
+            unsafe_allow_html=True,
+        )
+    with right:
+        if st.button(
+            "⛶",
+            key=button_key,
+            help=f"Expand {title}",
+            use_container_width=True,
+        ):
+            st.session_state["_chat_expand"] = {"kind": kind, "ref": ref}
+            st.rerun()
+
+
+def _render_chat_chart(
+    rdf: pd.DataFrame,
+    question: str,
+    key_prefix: str,
+    *,
+    show_controls: bool = False,
+) -> None:
+    """Auto chart; optional X/Y controls for expanded view."""
+    try:
+        cols = list(rdf.columns)
+        if len(cols) < 1:
+            st.info("Chart not available")
+            return
+        nums = rdf.select_dtypes(include="number").columns.tolist()
+        strs = rdf.select_dtypes(exclude="number").columns.tolist()
+        ct = auto_chart_type(rdf, question or "")
+        options = ["Bar", "Line", "Pie", "Scatter", "Area"]
+        idx = options.index(ct) if ct in options else 0
+        x_default = strs[0] if strs else cols[0]
+        y_default = nums[0] if nums else cols[-1]
+        if show_controls:
+            chart_type = st.selectbox(
+                "Chart type", options, index=idx, key=f"{key_prefix}_ctype",
+            )
+            x = st.selectbox(
+                "X axis",
+                cols,
+                index=cols.index(x_default) if x_default in cols else 0,
+                key=f"{key_prefix}_x",
+            )
+            y = st.selectbox(
+                "Y axis",
+                cols,
+                index=cols.index(y_default) if y_default in cols else len(cols) - 1,
+                key=f"{key_prefix}_y",
+            )
+        else:
+            chart_type = options[idx]
+            x = x_default
+            y = y_default
+        build_chart(rdf, chart_type, x, y)
+    except Exception:
+        st.info("Chart not available for this result")
+
+
+def _run_chat_expand_dialog() -> None:
+    """One large expand dialog for table / chart / narration."""
+    payload = st.session_state.get("_chat_expand")
+    if not payload:
+        return
+    kind = payload.get("kind")
+    ref = payload.get("ref")
+    titles = {"table": "Results table", "chart": "Chart", "narration": "Insight"}
+    title = titles.get(kind, "Expand")
+
+    @st.dialog(title, width="large")
+    def _dialog() -> None:
+        if kind == "table":
+            df = st.session_state.get(f"_chat_payload_df_{ref}")
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                safe_dataframe(
+                    df.head(RESULT_DISPLAY_LIMIT),
+                    use_container_width=True,
+                )
+                st.caption(
+                    f"{min(len(df), RESULT_DISPLAY_LIMIT):,} rows · "
+                    f"{df.shape[1]} columns"
+                )
+            else:
+                st.info("No table for this answer.")
+        elif kind == "chart":
+            df = st.session_state.get(f"_chat_payload_df_{ref}")
+            q = st.session_state.get(f"_chat_payload_q_{ref}") or ""
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                _render_chat_chart(
+                    df.head(RESULT_DISPLAY_LIMIT),
+                    q,
+                    f"dlg_{ref}",
+                    show_controls=True,
+                )
+            else:
+                st.info("No chart for this answer.")
+        elif kind == "narration":
+            narr = st.session_state.get(f"_chat_payload_narr_{ref}")
+            if narr:
+                render_narration_card(narr)
+            else:
+                st.info("No insight text for this answer.")
+        if st.button("Close", key=f"chat_dlg_close_{ref}", use_container_width=True):
+            st.session_state.pop("_chat_expand", None)
+            st.rerun()
+
+    _dialog()
+
+
+def _render_query_answer_blocks(
+    msg: dict,
+    *,
+    show_narr: bool,
+    show_table: bool,
+    rdf: pd.DataFrame | None,
+    narr: dict | None,
+    src_q: str,
+) -> None:
+    """Clean Insight / Table / Chart blocks with corner expand."""
+    ref = _chat_msg_ref(msg)
+    if isinstance(rdf, pd.DataFrame) and not rdf.empty:
+        st.session_state[f"_chat_payload_df_{ref}"] = rdf
+    if narr:
+        st.session_state[f"_chat_payload_narr_{ref}"] = narr
+    st.session_state[f"_chat_payload_q_{ref}"] = src_q
+
+    if show_narr:
+        st.markdown('<div class="chat-block">', unsafe_allow_html=True)
+        _chat_block_header(
+            "Insight",
+            button_key=f"exp_narr_{ref}",
+            kind="narration",
+            ref=ref,
+        )
+        if narr:
+            render_narration_card(narr)
+        else:
+            raw = str(msg.get("content", "")).replace("•", "").replace("- ", "")
+            paras = [html.escape(p.strip()) for p in raw.split("\n\n") if p.strip()]
+            if not paras and raw.strip():
+                paras = [html.escape(raw.strip())]
+            body = "".join(f"<p class='narration-para'>{p}</p>" for p in paras)
+            st.markdown(
+                f'<div class="narration-card"><div class="narration-body">{body}</div></div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    if show_table and isinstance(rdf, pd.DataFrame):
+        if rdf.empty:
+            st.info("No rows returned for this question.")
+        else:
+            st.markdown('<div class="chat-block">', unsafe_allow_html=True)
+            _chat_block_header(
+                f"Table · {len(rdf):,} rows",
+                button_key=f"exp_tbl_{ref}",
+                kind="table",
+                ref=ref,
+            )
+            _render_limited_dataframe(rdf, preview_rows=CHAT_PREVIEW_ROWS)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            st.markdown('<div class="chat-block">', unsafe_allow_html=True)
+            _chat_block_header(
+                "Chart",
+                button_key=f"exp_cht_{ref}",
+                kind="chart",
+                ref=ref,
+            )
+            _render_chat_chart(
+                rdf.head(RESULT_DISPLAY_LIMIT),
+                src_q,
+                f"chat_{ref}",
+                show_controls=False,
+            )
+            st.caption("Tap ⛶ to change chart type and axes.")
+            st.markdown("</div>", unsafe_allow_html=True)
 try:
     from config.constants import OKF_ENABLED
 except ImportError:
@@ -156,9 +346,9 @@ _CHAT_STATUS = {
         "🔗 Matching business glossary…",
     ],
     "run": [
-        "⚡ Running analytics…",
-        "🦆 DuckDB is crunching…",
-        "📊 Aggregating your data…",
+        "ASK-DB is querying your data…",
+        "Running analytics…",
+        "Aggregating results…",
     ],
     "build": [
         "✨ Crafting your answer…",
@@ -1191,38 +1381,6 @@ def _clarification_prompt(question: str, suggestions: list[str] | None = None) -
     )
 
 
-def _render_chat_chart(rdf: pd.DataFrame, question: str, key_prefix: str):
-    """Chart controls in chat — mirrors Query tab Chart panel."""
-    try:
-        cols = list(rdf.columns)
-        if len(cols) < 1:
-            st.info("Chart not available")
-            return
-        nums = rdf.select_dtypes(include="number").columns.tolist()
-        strs = rdf.select_dtypes(exclude="number").columns.tolist()
-        ct = auto_chart_type(rdf, question or "")
-        options = ["Bar", "Line", "Pie", "Scatter", "Area"]
-        idx = options.index(ct) if ct in options else 0
-        chart_type = st.selectbox(
-            "Chart Type", options, index=idx, key=f"{key_prefix}_ctype",
-        )
-        x_default = strs[0] if strs else cols[0]
-        y_default = nums[0] if nums else cols[-1]
-        x = st.selectbox(
-            "X", cols,
-            index=cols.index(x_default) if x_default in cols else 0,
-            key=f"{key_prefix}_x",
-        )
-        y = st.selectbox(
-            "Y", cols,
-            index=cols.index(y_default) if y_default in cols else len(cols) - 1,
-            key=f"{key_prefix}_y",
-        )
-        build_chart(rdf, chart_type, x, y)
-    except Exception:
-        st.info("Chart not available for this result")
-
-
 # ── Chat mode ────────────────────────────────────────────────────
 
 def _conversational_reply(
@@ -1332,7 +1490,9 @@ def _should_force_narration(question: str) -> bool:
 
 
 def _chat_scroll_to_bottom():
-    """Scroll the chat message panel to the latest message."""
+    """Scroll the chat message panel to the latest message (only when flagged)."""
+    if not st.session_state.pop("_chat_needs_scroll", False):
+        return
     try:
         import streamlit.components.v1 as components
         components.html(
@@ -1371,6 +1531,7 @@ def _append_assistant(content, message_type, data=None):
         "data": data or {},
         "timestamp": datetime.now().strftime("%H:%M"),
     })
+    st.session_state["_chat_needs_scroll"] = True
 
 
 def process_chat_message(question: str, working_df: pd.DataFrame):
@@ -1386,6 +1547,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         "message_type": "chat",
         "data": {},
     })
+    st.session_state["_chat_needs_scroll"] = True
 
     mode = st.session_state.get("chat_answer_mode")
     if mode in ("Narration", "Table", "Both"):
@@ -1703,65 +1865,26 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
         elapsed = data.get("elapsed")
         rdf = data.get("result_df")
         src_q = data.get("source_question") or msg.get("content") or ""
+        narr = data.get("narration")
 
         if elapsed is not None:
             st.markdown(
-                f'<span class="badge-semantic">⏱ {html.escape(str(elapsed))}s</span>',
+                f'<div class="chat-turn-meta">{html.escape(str(elapsed))}s</div>',
                 unsafe_allow_html=True,
             )
 
-        if show_narr and not show_table:
-            narr = data.get("narration")
-            if narr:
-                render_narration_card(narr)
-            else:
-                raw = str(msg.get("content", "")).replace("•", "").replace("- ", "")
-                paras = [html.escape(p.strip()) for p in raw.split("\n\n") if p.strip()]
-                if not paras:
-                    paras = [html.escape(raw.strip())] if raw.strip() else []
-                body = "".join(f"<p class='narration-para'>{p}</p>" for p in paras)
-                st.markdown(
-                    f'<div class="narration-card"><div class="narration-body">{body}</div></div>',
-                    unsafe_allow_html=True,
-                )
-
-        elif show_table and not show_narr:
-            if isinstance(rdf, pd.DataFrame) and not rdf.empty:
-                st.markdown(
-                    f'<div class="chat-results-label">📋 Results ({len(rdf):,} rows)</div>',
-                    unsafe_allow_html=True,
-                )
-                key_base = f"chat_{html.escape(str(msg.get('timestamp','')))}_{abs(hash(src_q)) % 10_000}"
-                tab_t, tab_c = st.tabs(["📊 Table", "📈 Chart"])
-                with tab_t:
-                    _render_limited_dataframe(rdf)
-                with tab_c:
-                    _render_chat_chart(rdf.head(RESULT_DISPLAY_LIMIT), src_q, key_base)
-            elif isinstance(rdf, pd.DataFrame) and rdf.empty:
-                st.info("No rows returned for this question.")
-
-        elif show_table and show_narr:
-            if isinstance(rdf, pd.DataFrame) and not rdf.empty:
-                st.markdown(
-                    f'<div class="chat-results-label">📋 Results ({len(rdf):,} rows)</div>',
-                    unsafe_allow_html=True,
-                )
-                key_base = f"chat_{html.escape(str(msg.get('timestamp','')))}_{abs(hash(src_q)) % 10_000}"
-                tab_t, tab_c = st.tabs(["📊 Table", "📈 Chart"])
-                with tab_t:
-                    _render_limited_dataframe(rdf)
-                with tab_c:
-                    _render_chat_chart(rdf.head(RESULT_DISPLAY_LIMIT), src_q, key_base)
-            elif isinstance(rdf, pd.DataFrame) and rdf.empty:
-                st.info("No rows returned for this question.")
-            narr = data.get("narration")
-            if narr:
-                st.markdown('<div class="chat-results-label">Insight</div>', unsafe_allow_html=True)
-                render_narration_card(narr)
+        _render_query_answer_blocks(
+            msg,
+            show_narr=show_narr,
+            show_table=show_table,
+            rdf=rdf if isinstance(rdf, pd.DataFrame) else None,
+            narr=narr,
+            src_q=src_q,
+        )
 
         share_payload = build_share_payload(
             question=src_q,
-            narration=data.get("narration"),
+            narration=narr,
             result_df=rdf if isinstance(rdf, pd.DataFrame) else None,
             evidence=evidence,
             elapsed=elapsed,
@@ -1781,7 +1904,7 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
             render_share_and_pin(share_payload, key_prefix=key_p)
 
         if show_table or show_narr:
-            with st.expander("🔎 Details (trust, context, SQL)", expanded=False):
+            with st.expander("Details · trust, context, SQL", expanded=False):
                 badge = get_execution_badge(evidence) if evidence else {"icon": "🧠", "label": "Semantic + AI"}
                 if (evidence or {}).get("modified"):
                     badge = {"icon": "✏️", "label": "Modified", "colour": "emerald"}
@@ -1824,8 +1947,7 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
                 elif sql:
                     st.caption(sql)
 
-    if msg.get("timestamp"):
-        st.caption(msg["timestamp"])
+    # Keep timestamps off query cards — blocks already read cleanly.
 
 
 def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
@@ -1840,6 +1962,8 @@ def render_chat_mode(working_df, tables, dfs):
         legacy = st.session_state.get("chat_narration_on", True)
         st.session_state.chat_answer_mode = "Both" if legacy else "Table"
 
+    _run_chat_expand_dialog()
+
     def _queue_question(q: str) -> None:
         st.session_state["_dr_pending_question"] = q
 
@@ -1848,7 +1972,7 @@ def render_chat_mode(working_df, tables, dfs):
     render_pinned_strip(on_ask=_queue_question)
 
     st.markdown('<div class="cgpt-chat-shell">', unsafe_allow_html=True)
-    chat_box = st.container(height=580, border=False)
+    chat_box = st.container(height=680, border=False)
     with chat_box:
         st.markdown('<div class="cgpt-thread">', unsafe_allow_html=True)
         if not st.session_state.chat_messages:
@@ -1860,8 +1984,6 @@ def render_chat_mode(working_df, tables, dfs):
                 if msg.get("role") == "user":
                     with st.chat_message("user"):
                         st.markdown(str(msg.get("content", "")))
-                        if msg.get("timestamp"):
-                            st.caption(msg["timestamp"])
                 else:
                     with st.chat_message("assistant"):
                         _render_assistant_content(msg, working_df, view_mode)
@@ -1898,15 +2020,15 @@ def render_chat_mode(working_df, tables, dfs):
 
     # Composer — pinned input bar (ChatGPT / Cursor style)
     _mode_labels = {
-        "Both": "Narration + Table",
-        "Narration": "Narration",
-        "Table": "Table",
+        "Both": "Insight + Table",
+        "Narration": "Insight only",
+        "Table": "Table + Chart",
     }
     if st.session_state.chat_answer_mode not in _mode_labels:
         st.session_state.chat_answer_mode = "Both"
 
     st.markdown('<div class="cgpt-composer">', unsafe_allow_html=True)
-    top_row_l, top_row_r = st.columns([1.35, 4.65])
+    top_row_l, top_row_r = st.columns([1.2, 4.8])
     with top_row_l:
         mode = st.selectbox(
             "Answer mode",
@@ -1914,11 +2036,11 @@ def render_chat_mode(working_df, tables, dfs):
             format_func=lambda k: _mode_labels[k],
             label_visibility="collapsed",
             key="chat_answer_mode",
-            help="Narration = insight text · Table = table + chart · Narration + Table = both",
+            help="Insight = narration · Table + Chart = data views · Insight + Table = both",
         )
     with top_row_r:
         st.markdown(
-            '<div class="cgpt-composer-hint">Enter to send · Pin &amp; share briefs to Outlook, Teams, or PowerPoint</div>',
+            '<div class="cgpt-composer-hint">Enter to send · ⛶ expands Insight, Table, or Chart</div>',
             unsafe_allow_html=True,
         )
     st.session_state.chat_narration_on = mode in ("Narration", "Both")

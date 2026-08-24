@@ -100,7 +100,11 @@ def test_cg_studio_catalog_includes_listed_endpoints():
     from datetime import date
 
     from config.llm_catalog import estimate_usd, tokens_per_dollar
-    from core.insurance_kpi_engine import fy_april_march_bounds
+    from core.insurance_kpi_engine import (
+        calendar_year_bounds,
+        calendar_ytd_bounds,
+        fy_april_march_bounds,
+    )
 
     start, end = fy_april_march_bounds(date(2026, 6, 30), previous=False)
     assert start == date(2026, 4, 1)
@@ -108,6 +112,10 @@ def test_cg_studio_catalog_includes_listed_endpoints():
     prev_start, prev_end = fy_april_march_bounds(date(2026, 6, 30), previous=True)
     assert prev_start == date(2025, 4, 1)
     assert prev_end == date(2026, 3, 31)
+    ytd_s, ytd_e = calendar_ytd_bounds(date(2026, 6, 30))
+    assert ytd_s == date(2026, 1, 1) and ytd_e == date(2026, 6, 30)
+    cy_s, cy_e = calendar_year_bounds(2025, date(2026, 6, 30))
+    assert cy_s == date(2025, 1, 1) and cy_e == date(2025, 12, 31)
     assert tokens_per_dollar(10.0) == 100_000
     assert round(estimate_usd(100_000, 10.0), 2) == 1.0
 

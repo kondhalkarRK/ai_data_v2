@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASK-DB — End-to-end question flow</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #161b22;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --line: #30363d;
+      --accent: #2f81f7;
+      --ok: #3fb950;
+      --warn: #d29922;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 28px 24px 48px;
+      line-height: 1.5;
+    }
+    header { max-width: 1100px; margin: 0 auto 20px; }
+    h1 { font-size: 1.6rem; margin: 0 0 8px; font-weight: 650; }
+    .sub { color: var(--muted); margin: 0; max-width: 820px; }
+    .actions { margin: 16px 0 0; display: flex; gap: 10px; flex-wrap: wrap; }
+    a.btn, button {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    a.btn.secondary { background: #21262d; border: 1px solid var(--line); }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+    .card h2 { margin: 0 0 10px; font-size: 1.05rem; }
+    .card p { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 650;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      margin-right: 6px;
+    }
+    .tag.ok { color: var(--ok); border-color: rgba(63,185,80,.35); }
+    .tag.warn { color: var(--warn); border-color: rgba(210,153,34,.35); }
+    footer { max-width: 1100px; margin: 18px auto 0; color: var(--muted); font-size: 12px; }
+    svg text { font-family: "Segoe UI", system-ui, sans-serif; }
+    @media print {
+      body { background: #fff; color: #111; }
+      .card { border-color: #ccc; background: #fff; }
+      .actions { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ASK-DB end-to-end architecture</h1>
+    <p class="sub">
+      User question → Streamlit → NLQ / semantic layer → PostgreSQL SQL → bounded result → answer.
+      Warehouse rows (1.5M+) never load into the browser. Insurance pilot path shown.
+    </p>
+    <div class="actions">
+      <a class="btn" href="askdb_e2e_query_flow.svg" download>Download SVG</a>
+      <a class="btn secondary" href="askdb_full_architecture.html">Full system diagram</a>
+      <button type="button" onclick="window.print()">Print / PDF</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>Query path (SVG)</h2>
+      <p>Same diagram is embedded below and available as a standalone <code>askdb_e2e_query_flow.svg</code>.</p>
+      <object data="askdb_e2e_query_flow.svg" type="image/svg+xml" width="100%" height="520">
+        <!-- Inline fallback if object fails -->
+        <img src="askdb_e2e_query_flow.svg" alt="ASK-DB end-to-end query flow" width="100%" />
+      </object>
+    </div>
+
+    <div class="card">
+      <h2>Inline SVG (self-contained)</h2>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 480" width="100%" role="img" aria-label="ASK-DB end-to-end query flow">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#8b949e" />
+          </marker>
+        </defs>
+        <rect width="1040" height="480" fill="#161b22" rx="12" />
+
+        <!-- Row 1 -->
+        <rect x="40" y="40" width="160" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+        <text x="120" y="66" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">User</text>
+        <text x="120" y="86" text-anchor="middle" fill="#8b949e" font-size="11">Chat question</text>
+
+        <line x1="200" y1="72" x2="250" y2="72" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+        <rect x="250" y="40" width="180" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+        <text x="340" y="66" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Streamlit UI</text>
+        <text x="340" y="86" text-anchor="middle" fill="#8b949e" font-size="11">ASK-DB session</text>
+
+        <line x1="430" y1="72" x2="480" y2="72" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+        <rect x="480" y="40" width="200" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+        <text x="580" y="66" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">NLQ engine</text>
+        <text x="580" y="86" text-anchor="middle" fill="#8b949e" font-size="11">run_query / guardrails</text>
+
+        <line x1="680" y1="72" x2="730" y2="72" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+        <rect x="730" y="40" width="250" height="64" rx="8" fill="#0d1117" stroke="#2f81f7" />
+        <text x="855" y="66" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">LLM + semantic YAML</text>
+        <text x="855" y="86" text-anchor="middle" fill="#8b949e" font-size="11">Generate PostgreSQL SELECT</text>
+
+        <!-- Row 2 -->
+        <line x1="855" y1="104" x2="855" y2="150" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+        <rect x="730" y="150" width="250" height="72" rx="8" fill="#0d1117" stroke="#30363d" />
+        <text x="855" y="178" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">PostgresBackend</text>
+        <text x="855" y="198" text-anchor="middle" fill="#8b949e" font-size="11">LIMIT 1000 · 30s timeout</text>
+        <text x="855" y="214" text-anchor="middle" fill="#8b949e" font-size="11">read-only SELECT / WITH</text>
+
+        <line x1="730" y1="186" x2="560" y2="186" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+        <rect x="310" y="150" width="250" height="72" rx="8" fill="#0d1117" stroke="#3fb950" />
+        <text x="435" y="178" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">PostgreSQL warehouse</text>
+        <text x="435" y="198" text-anchor="middle" fill="#8b949e" font-size="11">1.5M claims stay here</text>
+        <text x="435" y="214" text-anchor="middle" fill="#8b949e" font-size="11">indexes on reported_date</text>
+
+        <!-- Return path -->
+        <line x1="435" y1="222" x2="435" y2="280" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+        <line x1="435" y1="280" x2="120" y2="280" stroke="#8b949e" stroke-width="1.5" />
+        <line x1="120" y1="280" x2="120" y2="120" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+        <rect x="40" y="300" width="280" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+        <text x="180" y="326" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Tiny result only</text>
+        <text x="180" y="346" text-anchor="middle" fill="#8b949e" font-size="11">aggregates / ≤1000 rows → UI 100</text>
+
+        <rect x="360" y="300" width="280" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+        <text x="500" y="326" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Answer + chart</text>
+        <text x="500" y="346" text-anchor="middle" fill="#8b949e" font-size="11">evidence · optional RAG (OKF)</text>
+
+        <rect x="680" y="300" width="300" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+        <text x="830" y="326" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Parallel surfaces</text>
+        <text x="830" y="346" text-anchor="middle" fill="#8b949e" font-size="11">KPI aggregates · DQ COUNT + 12m</text>
+
+        <text x="40" y="420" fill="#8b949e" font-size="12">Spinner label (common): “ASK-DB is querying your data…” — not DuckDB/Postgres-specific.</text>
+        <text x="40" y="444" fill="#8b949e" font-size="12">CSV+DuckDB path exists for automotive upload demos; insurance DATA_BACKEND=postgres uses this flow.</text>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h2>Step-by-step when a user asks a question</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Where</th>
+            <th>What happens</th>
+            <th>What leaves the warehouse</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Streamlit Chat</td>
+            <td>User types a question; spinner shows a common ASK-DB status.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>NLQ engine</td>
+            <td>OOB check, cache, semantic context from YAML + schema.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>LLM</td>
+            <td>Writes one PostgreSQL <code>SELECT</code> / <code>WITH</code>.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>sql_guardrails</td>
+            <td>Blocks DML/DDL; read-only only.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>PostgresBackend</td>
+            <td>Wraps SQL with <code>LIMIT 1001</code>, 30s statement timeout.</td>
+            <td>None yet</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>PostgreSQL</td>
+            <td>Executes aggregates / joins on indexed tables (1.5M+).</td>
+            <td>≤ 1,000 rows to app</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>Streamlit</td>
+            <td>Shows table/chart (display cap 100), narrative, evidence.</td>
+            <td>Already small</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Other tabs (same rule)</h2>
+      <p>
+        <span class="tag ok">KPI</span> Windowed SQL aggregates (YTD / calendar year / rolling 12m / full history).<br />
+        <span class="tag ok">Preview</span> Joined claims view <code>LIMIT 100</code> + inventory counts.<br />
+        <span class="tag ok">DQ</span> Exact row/col inventory; quality tests on rolling 12 months.<br />
+        <span class="tag warn">Risk</span> Unfiltered <code>SELECT *</code> may hit timeout — UI does not freeze.
+      </p>
+    </div>
+  </div>
+
+  <footer>
+    ASK-DB · insurance PostgreSQL pilot · diagram for leadership / demo · files in <code>doc/diagram/</code>
+  </footer>
+</body>
+</html>

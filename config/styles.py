@@ -1876,6 +1876,50 @@ div[data-testid="stExpander"] details:hover summary{
   font-size:11px;color:#94a3b8;margin:10px 0 6px;font-weight:600;
   letter-spacing:0.04em;text-transform:uppercase;
 }
+.chat-block{
+  margin: 10px 0 12px;
+  padding: 10px 12px 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+.chat-block-title{
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding-top: 4px;
+}
+.chat-turn-meta{
+  display: inline-block;
+  font-size: 11px;
+  color: #64748b;
+  margin: 0 0 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.10);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+.cgpt-thread [data-testid="stChatMessage"]{
+  margin-bottom: 14px !important;
+  padding-bottom: 6px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+.cgpt-chat-shell [data-testid="stVerticalBlockBorderWrapper"]{
+  border: none !important;
+  background: transparent !important;
+}
+.cgpt-chat-shell button[kind="secondary"],
+.cgpt-chat-shell .stButton > button{
+  min-height: 32px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  padding: 0 8px !important;
+}
+.narration-card{
+  margin-top: 4px;
+}
 
 /* ── Native Streamlit chat (ChatGPT / Claude alignment) ── */
 .cgpt-thread{
@@ -2080,7 +2124,7 @@ div[data-testid="stDialog"] > div{
       <span class="phase">⚡ Running analytics…</span>
       <span class="phase">✨ Crafting answer…</span>
     </div>
-    <div class="ai-loader-sub">Semantic NLQ · DuckDB · your data</div>
+    <div class="ai-loader-sub">Semantic NLQ · warehouse SQL · your data</div>
     <div class="loader-dots"><span></span><span></span><span></span></div>
   </div>
 </div>

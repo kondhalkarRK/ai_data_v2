@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 480" width="1040" height="480" role="img" aria-label="ASK-DB end-to-end query flow">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#8b949e" />
+    </marker>
+  </defs>
+  <rect width="1040" height="480" fill="#161b22" rx="12" />
+  <text x="40" y="28" fill="#e6edf3" font-size="16" font-weight="700" font-family="Segoe UI, system-ui, sans-serif">ASK-DB end-to-end query flow (insurance / PostgreSQL)</text>
+
+  <rect x="40" y="50" width="160" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+  <text x="120" y="76" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">User</text>
+  <text x="120" y="96" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">Chat question</text>
+
+  <line x1="200" y1="82" x2="250" y2="82" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+  <rect x="250" y="50" width="180" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+  <text x="340" y="76" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">Streamlit UI</text>
+  <text x="340" y="96" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">ASK-DB session</text>
+
+  <line x1="430" y1="82" x2="480" y2="82" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+  <rect x="480" y="50" width="200" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+  <text x="580" y="76" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">NLQ engine</text>
+  <text x="580" y="96" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">run_query / guardrails</text>
+
+  <line x1="680" y1="82" x2="730" y2="82" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+  <rect x="730" y="50" width="250" height="64" rx="8" fill="#0d1117" stroke="#2f81f7" />
+  <text x="855" y="76" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">LLM + semantic YAML</text>
+  <text x="855" y="96" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">Generate PostgreSQL SELECT</text>
+
+  <line x1="855" y1="114" x2="855" y2="160" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+  <rect x="730" y="160" width="250" height="72" rx="8" fill="#0d1117" stroke="#30363d" />
+  <text x="855" y="188" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">PostgresBackend</text>
+  <text x="855" y="208" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">LIMIT 1000 · 30s timeout</text>
+  <text x="855" y="224" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">read-only SELECT / WITH</text>
+
+  <line x1="730" y1="196" x2="560" y2="196" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+  <rect x="310" y="160" width="250" height="72" rx="8" fill="#0d1117" stroke="#3fb950" />
+  <text x="435" y="188" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">PostgreSQL warehouse</text>
+  <text x="435" y="208" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">1.5M claims stay here</text>
+  <text x="435" y="224" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">indexes on reported_date</text>
+
+  <line x1="435" y1="232" x2="435" y2="290" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+  <line x1="435" y1="290" x2="120" y2="290" stroke="#8b949e" stroke-width="1.5" />
+  <line x1="120" y1="290" x2="120" y2="130" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)" />
+
+  <rect x="40" y="310" width="280" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+  <text x="180" y="336" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">Tiny result only</text>
+  <text x="180" y="356" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">aggregates / d1000 rows ’ UI 100</text>
+
+  <rect x="360" y="310" width="280" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+  <text x="500" y="336" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">Answer + chart</text>
+  <text x="500" y="356" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">evidence · optional RAG (OKF)</text>
+
+  <rect x="680" y="310" width="300" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
+  <text x="830" y="336" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">Parallel surfaces</text>
+  <text x="830" y="356" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">KPI aggregates · DQ COUNT + 12m</text>
+
+  <text x="40" y="420" fill="#8b949e" font-size="12" font-family="Segoe UI, system-ui, sans-serif">Spinner: ASK-DB is querying your data& (backend-neutral).</text>
+  <text x="40" y="444" fill="#8b949e" font-size="12" font-family="Segoe UI, system-ui, sans-serif">2M rows never enter Streamlit. Postgres computes; UI receives small frames only.</text>
+</svg>
