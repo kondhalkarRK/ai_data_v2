@@ -1,0 +1,401 @@
+agent_id,agent_code,agent_name,channel_name,branch_name,active_flag
+1,AG0001,Ira Iyer,Bancassurance,Hyderabad,True
+2,AG0002,Pari Das,Direct Digital,Ahmedabad,True
+3,AG0003,Rohan Iyer,Bancassurance,Pune East,True
+4,AG0004,Ananya Kulkarni,Bancassurance,Chennai,True
+5,AG0005,Dev Sharma,Corporate,Chandigarh,True
+6,AG0006,Sara Nair,Agency,Hyderabad,True
+7,AG0007,Navya Singh,Broker,Chennai,False
+8,AG0008,Navya Chopra,Corporate,Ahmedabad,True
+9,AG0009,Dev Nair,Agency,Jaipur,True
+10,AG0010,Sara Khan,Broker,Mumbai Central,True
+11,AG0011,Arjun Kulkarni,Direct Digital,Chandigarh,True
+12,AG0012,Ananya Kulkarni,Corporate,Bhubaneswar,True
+13,AG0013,Anika Singh,Corporate,Bengaluru,False
+14,AG0014,Kiara Joshi,Bancassurance,Hyderabad,True
+15,AG0015,Diya Mehta,Agency,Delhi South,True
+16,AG0016,Ira Khan,Corporate,Chennai,True
+17,AG0017,Myra Mehta,Agency,Chennai,True
+18,AG0018,Krishna Iyer,Corporate,Mumbai Central,True
+19,AG0019,Aarav Gupta,Corporate,Kolkata,True
+20,AG0020,Ananya Joshi,Agency,Pune East,True
+21,AG0021,Ananya Iyer,Bancassurance,Hyderabad,True
+22,AG0022,Aditya Patel,Direct Digital,Ahmedabad,True
+23,AG0023,Dev Khan,Corporate,Mumbai Central,True
+24,AG0024,Arjun Nair,Broker,Delhi South,True
+25,AG0025,Yash Patel,Broker,Delhi South,True
+26,AG0026,Diya Chopra,Bancassurance,Kolkata,True
+27,AG0027,Reyansh Chopra,Direct Digital,Chennai,True
+28,AG0028,Aadhya Banerjee,Agency,Pune East,True
+29,AG0029,Rohan Mehta,Bancassurance,Delhi South,True
+30,AG0030,Diya Chopra,Direct Digital,Chennai,True
+31,AG0031,Aditya Joshi,Direct Digital,Bengaluru,True
+32,AG0032,Arjun Khan,Agency,Mumbai Central,True
+33,AG0033,Arjun Mehta,Direct Digital,Mumbai Central,True
+34,AG0034,Aadhya Nair,Direct Digital,Chennai,False
+35,AG0035,Ananya Khan,Bancassurance,Patna,True
+36,AG0036,Ira Khan,Bancassurance,Chandigarh,True
+37,AG0037,Rohan Reddy,Corporate,Delhi South,True
+38,AG0038,Ayaan Sharma,Broker,Chandigarh,True
+39,AG0039,Ayaan Mehta,Broker,Mumbai Central,True
+40,AG0040,Reyansh Joshi,Direct Digital,Ahmedabad,True
+41,AG0041,Anika Banerjee,Corporate,Mumbai Central,False
+42,AG0042,Pari Nair,Broker,Chandigarh,True
+43,AG0043,Sai Das,Direct Digital,Delhi South,True
+44,AG0044,Nikhil Das,Agency,Mumbai Central,False
+45,AG0045,Nikhil Das,Agency,Chandigarh,True
+46,AG0046,Sai Banerjee,Agency,Bhubaneswar,True
+47,AG0047,Krishna Joshi,Bancassurance,Chennai,True
+48,AG0048,Ishaan Gupta,Agency,Hyderabad,True
+49,AG0049,Vivaan Kulkarni,Corporate,Mumbai Central,True
+50,AG0050,Sara Banerjee,Agency,Bengaluru,True
+51,AG0051,Krishna Das,Bancassurance,Chennai,True
+52,AG0052,Arjun Gupta,Broker,Mumbai Central,True
+53,AG0053,Ayaan Khan,Corporate,Ahmedabad,True
+54,AG0054,Kabir Kulkarni,Agency,Ahmedabad,True
+55,AG0055,Ananya Patel,Bancassurance,Ahmedabad,True
+56,AG0056,Vihaan Khan,Bancassurance,Jaipur,True
+57,AG0057,Nikhil Banerjee,Bancassurance,Mumbai Central,True
+58,AG0058,Kabir Patel,Direct Digital,Bengaluru,True
+59,AG0059,Arjun Mehta,Agency,Patna,True
+60,AG0060,Anika Desai,Corporate,Delhi South,True
+61,AG0061,Reyansh Desai,Bancassurance,Kolkata,True
+62,AG0062,Yash Banerjee,Direct Digital,Chennai,True
+63,AG0063,Yash Iyer,Agency,Jaipur,True
+64,AG0064,Pari Gupta,Broker,Delhi South,True
+65,AG0065,Yash Patel,Corporate,Bengaluru,True
+66,AG0066,Arjun Kulkarni,Broker,Mumbai Central,True
+67,AG0067,Myra Singh,Agency,Kolkata,True
+68,AG0068,Pari Sharma,Direct Digital,Mumbai Central,True
+69,AG0069,Ananya Mehta,Bancassurance,Ahmedabad,True
+70,AG0070,Nikhil Khan,Direct Digital,Chandigarh,True
+71,AG0071,Diya Singh,Corporate,Mumbai Central,True
+72,AG0072,Yash Iyer,Broker,Bengaluru,True
+73,AG0073,Dev Patel,Agency,Chandigarh,True
+74,AG0074,Sara Patel,Corporate,Patna,True
+75,AG0075,Krishna Kulkarni,Bancassurance,Patna,True
+76,AG0076,Navya Singh,Corporate,Chennai,True
+77,AG0077,Rohan Iyer,Direct Digital,Bhubaneswar,True
+78,AG0078,Vivaan Singh,Bancassurance,Pune East,True
+79,AG0079,Krishna Nair,Bancassurance,Pune East,True
+80,AG0080,Arjun Chopra,Broker,Delhi South,True
+81,AG0081,Kabir Khan,Direct Digital,Kolkata,True
+82,AG0082,Diya Joshi,Broker,Patna,True
+83,AG0083,Vivaan Reddy,Agency,Hyderabad,True
+84,AG0084,Diya Kulkarni,Corporate,Bengaluru,True
+85,AG0085,Anika Chopra,Bancassurance,Mumbai Central,True
+86,AG0086,Yash Das,Agency,Ahmedabad,True
+87,AG0087,Nikhil Desai,Corporate,Hyderabad,True
+88,AG0088,Vivaan Patel,Bancassurance,Chennai,True
+89,AG0089,Aarav Mehta,Bancassurance,Jaipur,True
+90,AG0090,Yash Desai,Bancassurance,Chennai,True
+91,AG0091,Kabir Patel,Direct Digital,Kolkata,True
+92,AG0092,Navya Iyer,Corporate,Hyderabad,True
+93,AG0093,Navya Banerjee,Corporate,Chandigarh,True
+94,AG0094,Pari Reddy,Broker,Delhi South,True
+95,AG0095,Pari Iyer,Direct Digital,Bhubaneswar,True
+96,AG0096,Yash Das,Broker,Chandigarh,True
+97,AG0097,Ira Das,Agency,Chandigarh,True
+98,AG0098,Reyansh Kulkarni,Corporate,Pune East,True
+99,AG0099,Aarav Chopra,Bancassurance,Bengaluru,True
+100,AG0100,Ananya Reddy,Corporate,Bhubaneswar,True
+101,AG0101,Diya Banerjee,Direct Digital,Chandigarh,True
+102,AG0102,Vivaan Banerjee,Direct Digital,Kolkata,True
+103,AG0103,Ira Das,Agency,Pune East,True
+104,AG0104,Sara Banerjee,Corporate,Mumbai Central,True
+105,AG0105,Kabir Desai,Corporate,Mumbai Central,True
+106,AG0106,Dev Sharma,Agency,Bengaluru,True
+107,AG0107,Nikhil Kulkarni,Corporate,Bengaluru,True
+108,AG0108,Ira Kulkarni,Corporate,Ahmedabad,True
+109,AG0109,Rohan Kulkarni,Bancassurance,Bengaluru,True
+110,AG0110,Sara Khan,Bancassurance,Ahmedabad,True
+111,AG0111,Aadhya Singh,Corporate,Patna,True
+112,AG0112,Aditya Chopra,Bancassurance,Ahmedabad,True
+113,AG0113,Vivaan Joshi,Agency,Mumbai Central,True
+114,AG0114,Ananya Singh,Broker,Bengaluru,True
+115,AG0115,Myra Iyer,Bancassurance,Patna,True
+116,AG0116,Aadhya Singh,Broker,Hyderabad,True
+117,AG0117,Pari Chopra,Broker,Chennai,True
+118,AG0118,Aadhya Khan,Direct Digital,Pune East,True
+119,AG0119,Nikhil Singh,Corporate,Mumbai Central,True
+120,AG0120,Kiara Joshi,Bancassurance,Jaipur,True
+121,AG0121,Kabir Gupta,Corporate,Jaipur,True
+122,AG0122,Ayaan Iyer,Bancassurance,Pune East,True
+123,AG0123,Krishna Mehta,Bancassurance,Hyderabad,True
+124,AG0124,Anika Reddy,Broker,Hyderabad,True
+125,AG0125,Pari Joshi,Bancassurance,Jaipur,True
+126,AG0126,Pari Banerjee,Agency,Hyderabad,True
+127,AG0127,Reyansh Desai,Broker,Delhi South,True
+128,AG0128,Vivaan Patel,Agency,Delhi South,True
+129,AG0129,Vivaan Reddy,Bancassurance,Pune East,True
+130,AG0130,Vivaan Desai,Corporate,Delhi South,True
+131,AG0131,Ananya Nair,Direct Digital,Kolkata,True
+132,AG0132,Diya Nair,Bancassurance,Ahmedabad,True
+133,AG0133,Ananya Reddy,Direct Digital,Hyderabad,True
+134,AG0134,Yash Joshi,Broker,Delhi South,True
+135,AG0135,Aadhya Singh,Direct Digital,Delhi South,True
+136,AG0136,Yash Mehta,Broker,Patna,True
+137,AG0137,Diya Iyer,Corporate,Pune East,True
+138,AG0138,Vivaan Iyer,Bancassurance,Chennai,True
+139,AG0139,Reyansh Banerjee,Corporate,Mumbai Central,True
+140,AG0140,Arjun Khan,Corporate,Pune East,True
+141,AG0141,Reyansh Gupta,Corporate,Ahmedabad,True
+142,AG0142,Ananya Chopra,Direct Digital,Hyderabad,True
+143,AG0143,Navya Mehta,Corporate,Jaipur,True
+144,AG0144,Pari Desai,Direct Digital,Chandigarh,True
+145,AG0145,Ayaan Mehta,Agency,Patna,True
+146,AG0146,Kabir Khan,Bancassurance,Delhi South,True
+147,AG0147,Anika Joshi,Broker,Kolkata,True
+148,AG0148,Reyansh Sharma,Direct Digital,Ahmedabad,True
+149,AG0149,Vihaan Mehta,Bancassurance,Delhi South,True
+150,AG0150,Pari Joshi,Direct Digital,Hyderabad,True
+151,AG0151,Nikhil Desai,Direct Digital,Chandigarh,True
+152,AG0152,Anika Desai,Bancassurance,Patna,True
+153,AG0153,Rohan Iyer,Direct Digital,Chennai,True
+154,AG0154,Aditya Das,Agency,Kolkata,True
+155,AG0155,Anika Nair,Agency,Bengaluru,False
+156,AG0156,Nikhil Khan,Corporate,Hyderabad,True
+157,AG0157,Reyansh Iyer,Agency,Patna,True
+158,AG0158,Pari Kulkarni,Broker,Chandigarh,True
+159,AG0159,Vivaan Nair,Corporate,Mumbai Central,True
+160,AG0160,Kiara Chopra,Direct Digital,Hyderabad,True
+161,AG0161,Ishaan Kulkarni,Broker,Bengaluru,True
+162,AG0162,Sai Kulkarni,Bancassurance,Bengaluru,True
+163,AG0163,Pari Sharma,Direct Digital,Chennai,True
+164,AG0164,Reyansh Gupta,Bancassurance,Hyderabad,True
+165,AG0165,Dev Reddy,Direct Digital,Bhubaneswar,True
+166,AG0166,Pari Banerjee,Corporate,Mumbai Central,True
+167,AG0167,Aadhya Chopra,Bancassurance,Chandigarh,True
+168,AG0168,Kiara Iyer,Bancassurance,Mumbai Central,True
+169,AG0169,Kabir Chopra,Direct Digital,Bhubaneswar,True
+170,AG0170,Sai Khan,Broker,Kolkata,True
+171,AG0171,Krishna Gupta,Bancassurance,Mumbai Central,True
+172,AG0172,Dev Nair,Bancassurance,Chennai,True
+173,AG0173,Diya Mehta,Corporate,Bengaluru,True
+174,AG0174,Myra Reddy,Corporate,Ahmedabad,True
+175,AG0175,Sai Mehta,Direct Digital,Chennai,True
+176,AG0176,Ayaan Reddy,Agency,Mumbai Central,True
+177,AG0177,Vivaan Mehta,Broker,Ahmedabad,True
+178,AG0178,Kabir Khan,Corporate,Chandigarh,True
+179,AG0179,Ira Banerjee,Broker,Hyderabad,True
+180,AG0180,Ayaan Patel,Bancassurance,Jaipur,True
+181,AG0181,Yash Iyer,Agency,Delhi South,True
+182,AG0182,Ayaan Sharma,Agency,Mumbai Central,True
+183,AG0183,Reyansh Khan,Direct Digital,Delhi South,True
+184,AG0184,Anika Nair,Direct Digital,Mumbai Central,True
+185,AG0185,Nikhil Reddy,Bancassurance,Pune East,True
+186,AG0186,Ayaan Patel,Bancassurance,Ahmedabad,False
+187,AG0187,Reyansh Khan,Agency,Delhi South,True
+188,AG0188,Aadhya Kulkarni,Bancassurance,Bengaluru,True
+189,AG0189,Dev Khan,Corporate,Ahmedabad,True
+190,AG0190,Reyansh Banerjee,Bancassurance,Delhi South,True
+191,AG0191,Arjun Singh,Direct Digital,Bengaluru,True
+192,AG0192,Aditya Sharma,Corporate,Kolkata,False
+193,AG0193,Sara Joshi,Bancassurance,Mumbai Central,True
+194,AG0194,Sara Kulkarni,Bancassurance,Bengaluru,True
+195,AG0195,Aadhya Singh,Corporate,Hyderabad,True
+196,AG0196,Reyansh Banerjee,Bancassurance,Pune East,True
+197,AG0197,Vivaan Nair,Direct Digital,Patna,True
+198,AG0198,Aditya Joshi,Broker,Bengaluru,True
+199,AG0199,Rohan Patel,Corporate,Delhi South,True
+200,AG0200,Sara Singh,Direct Digital,Ahmedabad,True
+201,AG0201,Rohan Reddy,Agency,Hyderabad,True
+202,AG0202,Kiara Singh,Direct Digital,Ahmedabad,True
+203,AG0203,Vihaan Das,Broker,Delhi South,False
+204,AG0204,Myra Mehta,Broker,Kolkata,True
+205,AG0205,Ananya Mehta,Agency,Bhubaneswar,True
+206,AG0206,Aadhya Mehta,Agency,Mumbai Central,True
+207,AG0207,Arjun Sharma,Agency,Bhubaneswar,True
+208,AG0208,Rohan Gupta,Direct Digital,Bhubaneswar,True
+209,AG0209,Navya Chopra,Bancassurance,Chandigarh,True
+210,AG0210,Sara Das,Agency,Chennai,True
+211,AG0211,Aarav Desai,Broker,Pune East,True
+212,AG0212,Kiara Banerjee,Direct Digital,Pune East,True
+213,AG0213,Krishna Das,Broker,Mumbai Central,True
+214,AG0214,Nikhil Banerjee,Broker,Kolkata,True
+215,AG0215,Ira Banerjee,Direct Digital,Chennai,True
+216,AG0216,Ira Chopra,Bancassurance,Hyderabad,True
+217,AG0217,Kiara Banerjee,Direct Digital,Ahmedabad,True
+218,AG0218,Aarav Gupta,Bancassurance,Ahmedabad,False
+219,AG0219,Nikhil Nair,Corporate,Patna,True
+220,AG0220,Anika Reddy,Broker,Jaipur,True
+221,AG0221,Aarav Joshi,Bancassurance,Chandigarh,True
+222,AG0222,Krishna Nair,Broker,Pune East,True
+223,AG0223,Ayaan Chopra,Agency,Pune East,True
+224,AG0224,Arjun Patel,Bancassurance,Ahmedabad,True
+225,AG0225,Aadhya Gupta,Corporate,Mumbai Central,True
+226,AG0226,Aadhya Gupta,Agency,Delhi South,True
+227,AG0227,Reyansh Joshi,Direct Digital,Bhubaneswar,True
+228,AG0228,Vihaan Reddy,Broker,Ahmedabad,True
+229,AG0229,Aditya Das,Direct Digital,Patna,True
+230,AG0230,Ananya Singh,Corporate,Mumbai Central,True
+231,AG0231,Rohan Kulkarni,Direct Digital,Pune East,True
+232,AG0232,Aditya Gupta,Bancassurance,Mumbai Central,True
+233,AG0233,Pari Desai,Direct Digital,Bengaluru,True
+234,AG0234,Aditya Desai,Agency,Chandigarh,True
+235,AG0235,Ananya Patel,Broker,Patna,True
+236,AG0236,Arjun Kulkarni,Direct Digital,Mumbai Central,True
+237,AG0237,Arjun Gupta,Corporate,Chandigarh,True
+238,AG0238,Navya Nair,Bancassurance,Bhubaneswar,True
+239,AG0239,Ayaan Singh,Agency,Ahmedabad,True
+240,AG0240,Krishna Khan,Broker,Chennai,True
+241,AG0241,Rohan Iyer,Broker,Delhi South,True
+242,AG0242,Aditya Khan,Corporate,Patna,True
+243,AG0243,Yash Gupta,Agency,Delhi South,False
+244,AG0244,Vihaan Banerjee,Agency,Mumbai Central,True
+245,AG0245,Nikhil Iyer,Bancassurance,Jaipur,True
+246,AG0246,Vihaan Kulkarni,Corporate,Patna,True
+247,AG0247,Rohan Banerjee,Direct Digital,Pune East,True
+248,AG0248,Vivaan Desai,Direct Digital,Jaipur,True
+249,AG0249,Rohan Gupta,Broker,Hyderabad,True
+250,AG0250,Navya Sharma,Bancassurance,Hyderabad,True
+251,AG0251,Ishaan Iyer,Direct Digital,Mumbai Central,True
+252,AG0252,Diya Nair,Agency,Hyderabad,True
+253,AG0253,Sara Iyer,Broker,Chennai,True
+254,AG0254,Anika Das,Bancassurance,Jaipur,True
+255,AG0255,Nikhil Kulkarni,Bancassurance,Bengaluru,True
+256,AG0256,Navya Desai,Broker,Patna,True
+257,AG0257,Arjun Reddy,Broker,Hyderabad,True
+258,AG0258,Ishaan Iyer,Corporate,Chennai,True
+259,AG0259,Navya Banerjee,Broker,Jaipur,True
+260,AG0260,Sara Iyer,Bancassurance,Jaipur,True
+261,AG0261,Krishna Chopra,Agency,Pune East,True
+262,AG0262,Dev Reddy,Corporate,Mumbai Central,True
+263,AG0263,Navya Gupta,Corporate,Patna,True
+264,AG0264,Kiara Singh,Broker,Mumbai Central,True
+265,AG0265,Navya Gupta,Corporate,Bhubaneswar,True
+266,AG0266,Myra Joshi,Direct Digital,Kolkata,True
+267,AG0267,Sara Das,Bancassurance,Jaipur,True
+268,AG0268,Pari Iyer,Direct Digital,Ahmedabad,True
+269,AG0269,Arjun Das,Corporate,Chandigarh,True
+270,AG0270,Sara Khan,Bancassurance,Jaipur,True
+271,AG0271,Ananya Banerjee,Corporate,Ahmedabad,True
+272,AG0272,Aarav Desai,Corporate,Patna,True
+273,AG0273,Anika Iyer,Direct Digital,Delhi South,True
+274,AG0274,Ayaan Gupta,Bancassurance,Pune East,True
+275,AG0275,Ira Kulkarni,Broker,Ahmedabad,True
+276,AG0276,Aarav Nair,Bancassurance,Ahmedabad,True
+277,AG0277,Sara Desai,Direct Digital,Mumbai Central,True
+278,AG0278,Ayaan Singh,Corporate,Kolkata,True
+279,AG0279,Kabir Banerjee,Broker,Hyderabad,True
+280,AG0280,Myra Desai,Broker,Mumbai Central,True
+281,AG0281,Aadhya Patel,Direct Digital,Hyderabad,True
+282,AG0282,Diya Mehta,Broker,Jaipur,True
+283,AG0283,Aarav Das,Agency,Hyderabad,True
+284,AG0284,Sara Chopra,Agency,Ahmedabad,True
+285,AG0285,Arjun Iyer,Broker,Delhi South,True
+286,AG0286,Krishna Desai,Direct Digital,Chandigarh,True
+287,AG0287,Ishaan Reddy,Broker,Chandigarh,True
+288,AG0288,Sai Banerjee,Broker,Delhi South,True
+289,AG0289,Krishna Singh,Broker,Pune East,True
+290,AG0290,Sai Sharma,Agency,Pune East,True
+291,AG0291,Krishna Joshi,Direct Digital,Ahmedabad,True
+292,AG0292,Vivaan Kulkarni,Broker,Ahmedabad,True
+293,AG0293,Vivaan Patel,Bancassurance,Chennai,True
+294,AG0294,Krishna Desai,Broker,Pune East,True
+295,AG0295,Ayaan Nair,Bancassurance,Delhi South,True
+296,AG0296,Nikhil Patel,Direct Digital,Bengaluru,True
+297,AG0297,Vivaan Kulkarni,Agency,Pune East,True
+298,AG0298,Nikhil Joshi,Agency,Pune East,True
+299,AG0299,Yash Das,Corporate,Patna,True
+300,AG0300,Aadhya Joshi,Corporate,Mumbai Central,True
+301,AG0301,Navya Mehta,Broker,Chandigarh,True
+302,AG0302,Pari Sharma,Corporate,Pune East,True
+303,AG0303,Ayaan Iyer,Broker,Ahmedabad,True
+304,AG0304,Vihaan Nair,Direct Digital,Delhi South,True
+305,AG0305,Aadhya Mehta,Direct Digital,Chandigarh,True
+306,AG0306,Aarav Gupta,Bancassurance,Ahmedabad,True
+307,AG0307,Rohan Banerjee,Agency,Pune East,True
+308,AG0308,Aadhya Sharma,Broker,Kolkata,True
+309,AG0309,Ayaan Chopra,Agency,Mumbai Central,True
+310,AG0310,Aditya Iyer,Bancassurance,Mumbai Central,True
+311,AG0311,Arjun Reddy,Broker,Bhubaneswar,True
+312,AG0312,Krishna Gupta,Corporate,Jaipur,True
+313,AG0313,Aarav Banerjee,Direct Digital,Kolkata,True
+314,AG0314,Aadhya Joshi,Bancassurance,Mumbai Central,True
+315,AG0315,Aditya Kulkarni,Direct Digital,Chennai,True
+316,AG0316,Sai Iyer,Agency,Mumbai Central,True
+317,AG0317,Dev Kulkarni,Corporate,Bengaluru,True
+318,AG0318,Pari Khan,Broker,Chandigarh,True
+319,AG0319,Kiara Mehta,Bancassurance,Delhi South,True
+320,AG0320,Nikhil Patel,Direct Digital,Ahmedabad,True
+321,AG0321,Ira Iyer,Bancassurance,Jaipur,True
+322,AG0322,Rohan Banerjee,Direct Digital,Bhubaneswar,True
+323,AG0323,Nikhil Mehta,Broker,Jaipur,True
+324,AG0324,Ishaan Reddy,Corporate,Jaipur,True
+325,AG0325,Ayaan Singh,Bancassurance,Ahmedabad,True
+326,AG0326,Kiara Mehta,Direct Digital,Ahmedabad,True
+327,AG0327,Nikhil Banerjee,Agency,Bhubaneswar,True
+328,AG0328,Ira Das,Corporate,Pune East,True
+329,AG0329,Nikhil Sharma,Direct Digital,Bengaluru,True
+330,AG0330,Aditya Sharma,Broker,Chandigarh,True
+331,AG0331,Sai Iyer,Bancassurance,Delhi South,True
+332,AG0332,Dev Banerjee,Corporate,Jaipur,True
+333,AG0333,Ira Singh,Bancassurance,Ahmedabad,True
+334,AG0334,Reyansh Das,Agency,Chandigarh,True
+335,AG0335,Yash Mehta,Corporate,Ahmedabad,True
+336,AG0336,Ishaan Kulkarni,Bancassurance,Pune East,True
+337,AG0337,Navya Joshi,Corporate,Bhubaneswar,True
+338,AG0338,Vihaan Patel,Corporate,Chandigarh,True
+339,AG0339,Sara Reddy,Direct Digital,Ahmedabad,False
+340,AG0340,Diya Iyer,Bancassurance,Chandigarh,True
+341,AG0341,Aditya Nair,Direct Digital,Chennai,False
+342,AG0342,Nikhil Khan,Corporate,Delhi South,True
+343,AG0343,Diya Nair,Agency,Mumbai Central,True
+344,AG0344,Sai Kulkarni,Bancassurance,Chandigarh,True
+345,AG0345,Nikhil Banerjee,Corporate,Chennai,True
+346,AG0346,Ishaan Sharma,Broker,Jaipur,True
+347,AG0347,Ira Sharma,Broker,Patna,True
+348,AG0348,Ishaan Sharma,Broker,Patna,True
+349,AG0349,Ayaan Sharma,Agency,Ahmedabad,True
+350,AG0350,Vivaan Banerjee,Corporate,Jaipur,True
+351,AG0351,Nikhil Sharma,Agency,Chandigarh,True
+352,AG0352,Diya Reddy,Agency,Ahmedabad,True
+353,AG0353,Vihaan Chopra,Bancassurance,Patna,True
+354,AG0354,Ishaan Das,Direct Digital,Kolkata,True
+355,AG0355,Ishaan Mehta,Corporate,Chandigarh,True
+356,AG0356,Kiara Khan,Bancassurance,Chennai,True
+357,AG0357,Arjun Nair,Agency,Delhi South,True
+358,AG0358,Navya Iyer,Agency,Hyderabad,True
+359,AG0359,Ayaan Singh,Corporate,Mumbai Central,True
+360,AG0360,Ishaan Khan,Direct Digital,Ahmedabad,True
+361,AG0361,Myra Sharma,Broker,Mumbai Central,True
+362,AG0362,Vihaan Mehta,Broker,Ahmedabad,True
+363,AG0363,Kiara Gupta,Bancassurance,Hyderabad,True
+364,AG0364,Anika Das,Agency,Bhubaneswar,True
+365,AG0365,Ananya Iyer,Direct Digital,Ahmedabad,True
+366,AG0366,Vihaan Mehta,Bancassurance,Bengaluru,True
+367,AG0367,Arjun Chopra,Agency,Chennai,True
+368,AG0368,Dev Singh,Direct Digital,Hyderabad,True
+369,AG0369,Myra Khan,Bancassurance,Pune East,True
+370,AG0370,Reyansh Das,Agency,Jaipur,True
+371,AG0371,Nikhil Patel,Direct Digital,Jaipur,True
+372,AG0372,Anika Sharma,Bancassurance,Hyderabad,True
+373,AG0373,Ayaan Khan,Direct Digital,Kolkata,True
+374,AG0374,Navya Desai,Corporate,Chennai,True
+375,AG0375,Kiara Joshi,Broker,Bhubaneswar,True
+376,AG0376,Yash Das,Direct Digital,Chennai,True
+377,AG0377,Ishaan Khan,Agency,Hyderabad,True
+378,AG0378,Myra Desai,Broker,Mumbai Central,True
+379,AG0379,Aditya Desai,Broker,Hyderabad,True
+380,AG0380,Aditya Das,Corporate,Mumbai Central,True
+381,AG0381,Krishna Khan,Agency,Ahmedabad,True
+382,AG0382,Rohan Singh,Direct Digital,Chennai,True
+383,AG0383,Ishaan Reddy,Broker,Mumbai Central,True
+384,AG0384,Rohan Chopra,Agency,Delhi South,True
+385,AG0385,Myra Desai,Agency,Hyderabad,True
+386,AG0386,Reyansh Gupta,Broker,Bhubaneswar,True
+387,AG0387,Krishna Nair,Direct Digital,Delhi South,True
+388,AG0388,Arjun Reddy,Broker,Delhi South,True
+389,AG0389,Kabir Nair,Corporate,Delhi South,True
+390,AG0390,Ishaan Khan,Direct Digital,Bhubaneswar,True
+391,AG0391,Aadhya Joshi,Bancassurance,Patna,True
+392,AG0392,Krishna Iyer,Direct Digital,Bengaluru,False
+393,AG0393,Aadhya Khan,Bancassurance,Jaipur,True
+394,AG0394,Ira Kulkarni,Corporate,Delhi South,True
+395,AG0395,Vivaan Kulkarni,Direct Digital,Hyderabad,True
+396,AG0396,Arjun Reddy,Agency,Bhubaneswar,True
+397,AG0397,Anika Das,Bancassurance,Chennai,True
+398,AG0398,Sai Singh,Broker,Mumbai Central,True
+399,AG0399,Kiara Iyer,Agency,Patna,True
+400,AG0400,Navya Singh,Broker,Ahmedabad,True
