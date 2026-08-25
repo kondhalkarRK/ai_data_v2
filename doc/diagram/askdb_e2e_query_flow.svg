@@ -49,7 +49,7 @@
 
   <rect x="40" y="310" width="280" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
   <text x="180" y="336" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">Tiny result only</text>
-  <text x="180" y="356" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">aggregates / d1000 rows ’ UI 100</text>
+  <text x="180" y="356" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">aggregates / ?1000 rows · UI 100</text>
 
   <rect x="360" y="310" width="280" height="64" rx="8" fill="#0d1117" stroke="#30363d" />
   <text x="500" y="336" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">Answer + chart</text>
@@ -59,6 +59,6 @@
   <text x="830" y="336" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">Parallel surfaces</text>
   <text x="830" y="356" text-anchor="middle" fill="#8b949e" font-size="11" font-family="Segoe UI, system-ui, sans-serif">KPI aggregates · DQ COUNT + 12m</text>
 
-  <text x="40" y="420" fill="#8b949e" font-size="12" font-family="Segoe UI, system-ui, sans-serif">Spinner: ASK-DB is querying your data& (backend-neutral).</text>
+  <text x="40" y="420" fill="#8b949e" font-size="12" font-family="Segoe UI, system-ui, sans-serif">Spinner: ASK-DB is querying your data (backend-neutral).</text>
   <text x="40" y="444" fill="#8b949e" font-size="12" font-family="Segoe UI, system-ui, sans-serif">2M rows never enter Streamlit. Postgres computes; UI receives small frames only.</text>
 </svg>

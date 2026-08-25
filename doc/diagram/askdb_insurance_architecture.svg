@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 900" width="1280" height="900" role="img" aria-label="ASK-DB insurance detailed architecture">
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#8b949e"/>
+    </marker>
+    <style>
+      .t { font-family: Segoe UI, system-ui, sans-serif; }
+      .title { font-size: 20px; font-weight: 700; fill: #e6edf3; }
+      .sec { font-size: 12px; font-weight: 700; fill: #8b949e; letter-spacing: 0.4px; }
+      .h { font-size: 13px; font-weight: 650; fill: #e6edf3; }
+      .s { font-size: 11px; fill: #8b949e; }
+      .tiny { font-size: 10px; fill: #6e7681; }
+    </style>
+  </defs>
+  <rect width="1280" height="900" fill="#0f1419" rx="14"/>
+  <text x="36" y="40" class="t title">ASK-DB  detailed architecture (insurance / PostgreSQL)</text>
+  <text x="36" y="62" class="t s">Numbers from SQL · semantic layer for business language · Streamlit only receives bounded frames</text>
+
+  <!-- Users -->
+  <rect x="36" y="90" width="200" height="120" rx="12" fill="#161b22" stroke="#30363d"/>
+  <text x="52" y="114" class="t sec">USERS</text>
+  <text x="52" y="140" class="t h">Executives / CFO</text>
+  <text x="52" y="160" class="t h">Claims / UW managers</text>
+  <text x="52" y="180" class="t h">Analysts / Demo leads</text>
+  <text x="52" y="198" class="t tiny">Plain-English questions</text>
+
+  <!-- UI -->
+  <rect x="270" y="90" width="320" height="200" rx="12" fill="#161b22" stroke="#2f81f7"/>
+  <text x="286" y="114" class="t sec">STREAMLIT UI (ASK-DB)</text>
+  <text x="286" y="142" class="t h">Chat / Ask  NLQ + clarify chips</text>
+  <text x="286" y="162" class="t h">KPI  windowed aggregates</text>
+  <text x="286" y="182" class="t h">Preview  joined sample LIMIT 100</text>
+  <text x="286" y="202" class="t h">DQ  inventory COUNT + 12m quality</text>
+  <text x="286" y="222" class="t h">Sidebar  LLM model · industry pack</text>
+  <text x="286" y="248" class="t s">Display caps: Chat table d100 · App fetch d1000</text>
+  <text x="286" y="268" class="t tiny">Session: chat history, SQL anchor, tiny DataFrames</text>
+
+  <!-- Brain -->
+  <rect x="630" y="90" width="300" height="200" rx="12" fill="#161b22" stroke="#30363d"/>
+  <text x="646" y="114" class="t sec">QUERY BRAIN</text>
+  <text x="646" y="142" class="t h">Incomplete question (2 suggestions)</text>
+  <text x="646" y="162" class="t h">NLQ engine ’ LLM SQL</text>
+  <text x="646" y="182" class="t h">SQL guardrails (read-only)</text>
+  <text x="646" y="202" class="t h">PostgresBackend (LIMIT + timeout)</text>
+  <text x="646" y="222" class="t h">Narration · evidence · trust</text>
+  <text x="646" y="248" class="t s">Follow-up SQL anchor</text>
+  <text x="646" y="268" class="t tiny">Cache of successful question’result</text>
+
+  <!-- Semantic -->
+  <rect x="970" y="90" width="270" height="200" rx="12" fill="#161b22" stroke="#d29922"/>
+  <text x="986" y="114" class="t sec">SEMANTIC LAYER</text>
+  <text x="986" y="142" class="t h">semantic_model_postgres.yaml</text>
+  <text x="986" y="162" class="t h">business_glossary_postgres.yaml</text>
+  <text x="986" y="182" class="t h">Measures · dims · relationships</text>
+  <text x="986" y="202" class="t h">Domain rules + synonyms</text>
+  <text x="986" y="222" class="t h">East’Region · Motor’LOB</text>
+  <text x="986" y="248" class="t s">Multi-column · 1-based rank</text>
+  <text x="986" y="268" class="t tiny">Industry pack activate ’ live YAML</text>
+
+  <!-- Arrows top -->
+  <line x1="236" y1="150" x2="270" y2="150" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="590" y1="170" x2="630" y2="170" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="930" y1="150" x2="970" y2="150" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="1105" y1="290" x2="1105" y2="330" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="780" y1="290" x2="780" y2="330" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- Warehouse -->
+  <rect x="270" y="330" width="700" height="220" rx="12" fill="#161b22" stroke="#3fb950"/>
+  <text x="286" y="356" class="t sec">POSTGRESQL WAREHOUSE  askdb_dev · schema insurance · role askdb_app (READ-ONLY)</text>
+  <text x="286" y="384" class="t h">fact_claims (~1.5M)</text>
+  <text x="286" y="404" class="t h">fact_policy_monthly (~1.4M)</text>
+  <text x="286" y="424" class="t h">dim_policy · dim_product · dim_region · dim_agent</text>
+  <text x="286" y="444" class="t h">fact_operating_expense_monthly</text>
+  <text x="286" y="472" class="t s">Heavy compute: joins, GROUP BY, windowed KPIs, DQ COUNT</text>
+  <text x="286" y="492" class="t s">Does NOT leave DB as raw millions of rows</text>
+  <text x="286" y="520" class="t tiny">Indexes e.g. reported_date · statement_timeout ~30s · result wrap LIMIT max_result_rows+1</text>
+
+  <!-- Side callouts -->
+  <rect x="36" y="330" width="200" height="220" rx="12" fill="#161b22" stroke="#30363d"/>
+  <text x="52" y="356" class="t sec">DATA IN</text>
+  <text x="52" y="384" class="t h">CSV generate + COPY</text>
+  <text x="52" y="404" class="t s">scale_1_5m load scripts</text>
+  <text x="52" y="432" class="t h">Secrets / config</text>
+  <text x="52" y="452" class="t s">DATA_BACKEND=postgres</text>
+  <text x="52" y="472" class="t s">INDUSTRY_PACK=insurance</text>
+  <text x="52" y="500" class="t h">LLM API</text>
+  <text x="52" y="520" class="t s">SQL text only  not row dumps</text>
+
+  <rect x="1010" y="330" width="230" height="220" rx="12" fill="#161b22" stroke="#30363d"/>
+  <text x="1026" y="356" class="t sec">OPTIONAL KNOWLEDGE</text>
+  <text x="1026" y="384" class="t h">Business docs / OKF</text>
+  <text x="1026" y="404" class="t s">Commentary &amp; definitions</text>
+  <text x="1026" y="432" class="t h">Not source of totals</text>
+  <text x="1026" y="452" class="t s">SQL remains numeric truth</text>
+  <text x="1026" y="488" class="t tiny">Can narrate policy language</text>
+  <text x="1026" y="508" class="t tiny">without inventing KPIs</text>
+
+  <!-- Bottom volume strip -->
+  <rect x="36" y="580" width="1204" height="140" rx="12" fill="#161b22" stroke="#30363d"/>
+  <text x="52" y="608" class="t sec">VOLUME CONTRACT (LEADERSHIP SOUND BITE)</text>
+  <text x="52" y="640" class="t h">1) Postgres may touch 1.5M+ claim rows inside the engine.</text>
+  <text x="52" y="662" class="t h">2) PostgresBackend returns at most ~1,000 rows to Streamlit.</text>
+  <text x="52" y="684" class="t h">3) Chat UI paints at most 100 rows (expandable within that cap).</text>
+  <text x="52" y="706" class="t h">4) KPI / DQ / Preview use aggregates or LIMIT 100  same rule: UI never holds the warehouse.</text>
+
+  <text x="36" y="760" class="t s">Companion: askdb_insurance_query_flow.svg · notes: ../ASKDB_INSURANCE_LEADERSHIP_NOTES.md · tests: ../insurance_test_questions.md</text>
+  <text x="36" y="840" class="t tiny">ASK-DB · Capgemini AI Data Platform · insurance PostgreSQL pilot architecture</text>
+  <text x="36" y="860" class="t tiny">Dual path note: CSV+DuckDB remains for automotive demos; this diagram is the insurance production-shaped path.</text>
+</svg>

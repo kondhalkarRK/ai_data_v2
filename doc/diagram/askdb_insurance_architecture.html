@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASK-DB Insurance — Flow &amp; Architecture</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #161b22;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --line: #30363d;
+      --accent: #2f81f7;
+      --ok: #3fb950;
+      --warn: #d29922;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 28px 24px 56px;
+      line-height: 1.5;
+    }
+    header, .wrap, footer { max-width: 1180px; margin-left: auto; margin-right: auto; }
+    h1 { font-size: 1.65rem; margin: 0 0 8px; font-weight: 650; }
+    h2 { font-size: 1.1rem; margin: 0 0 10px; }
+    .sub { color: var(--muted); margin: 0; max-width: 900px; }
+    .actions { margin: 16px 0 0; display: flex; gap: 10px; flex-wrap: wrap; }
+    a.btn, button {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    a.btn.secondary, button.secondary {
+      background: #21262d;
+      border: 1px solid var(--line);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin: 16px 0;
+      overflow-x: auto;
+    }
+    .card p { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 650;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      margin: 0 6px 6px 0;
+    }
+    .tag.ok { color: var(--ok); border-color: rgba(63,185,80,.35); }
+    .tag.warn { color: var(--warn); border-color: rgba(210,153,34,.35); }
+    .tag.accent { color: var(--accent); border-color: rgba(47,129,247,.4); }
+    footer { margin-top: 20px; color: var(--muted); font-size: 12px; }
+    code { font-size: 12px; background: #0d1117; padding: 1px 5px; border-radius: 4px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+    @media print {
+      body { background: #fff; color: #111; }
+      .card { border-color: #ccc; background: #fff; }
+      .actions { display: none; }
+      .sub, td, th, p, footer { color: #333 !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ASK-DB insurance — flow &amp; detailed architecture</h1>
+    <p class="sub">
+      Leadership pack: how a question moves from Chat → semantic NLQ → PostgreSQL → bounded Streamlit result.
+      Warehouse (~1.5M claims) never loads into the browser.
+    </p>
+    <div class="actions">
+      <a class="btn" href="askdb_insurance_query_flow.svg" download>Download query-flow SVG</a>
+      <a class="btn" href="askdb_insurance_architecture.svg" download>Download architecture SVG</a>
+      <a class="btn secondary" href="../ASKDB_INSURANCE_LEADERSHIP_NOTES.md">Leadership notes</a>
+      <a class="btn secondary" href="../insurance_test_questions.md">Test questions</a>
+      <button type="button" class="secondary" onclick="window.print()">Print / PDF</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>1. Query flow (simple path)</h2>
+      <p>Use this slide when explaining a single Chat question.</p>
+      <object data="askdb_insurance_query_flow.svg" type="image/svg+xml" width="100%" height="520">
+        <img src="askdb_insurance_query_flow.svg" alt="ASK-DB insurance query flow" width="100%" />
+      </object>
+      <p>
+        <span class="tag ok">≤1,000 rows → app</span>
+        <span class="tag accent">≤100 rows → chat table</span>
+        <span class="tag warn">2 clarify chips if vague</span>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>2. Detailed architecture</h2>
+      <p>Layers: users · Streamlit surfaces · query brain · semantic YAML · PostgreSQL warehouse · optional docs.</p>
+      <object data="askdb_insurance_architecture.svg" type="image/svg+xml" width="100%" height="720">
+        <img src="askdb_insurance_architecture.svg" alt="ASK-DB insurance architecture" width="100%" />
+      </object>
+    </div>
+
+    <div class="card">
+      <h2>3. Step table — what leaves the warehouse?</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Component</th>
+            <th>What happens</th>
+            <th>Data to Streamlit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Chat</td>
+            <td>User types question; optional incomplete → 2 suggestions.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Semantic + LLM</td>
+            <td>Glossary/domain rules + schema → one PostgreSQL SELECT.</td>
+            <td>None (prompt text only)</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Guardrails</td>
+            <td>Read-only check; block DML/DDL.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>PostgresBackend</td>
+            <td>Wrap <code>LIMIT 1001</code>, ~30s timeout, pooled connection as <code>askdb_app</code>.</td>
+            <td>None yet</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>PostgreSQL</td>
+            <td>Joins/aggregates on ~1.5M claims / premium months.</td>
+            <td>≤ ~1,000 result rows</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>UI render</td>
+            <td>Format dates, 1-based index; Insight / Table / Chart.</td>
+            <td>Paint ≤ 100 rows in chat</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>4. Where data lives vs what UI holds</h2>
+      <div class="grid2">
+        <div>
+          <p><strong style="color:var(--ok)">Lives in PostgreSQL</strong></p>
+          <ul style="color:var(--muted); font-size:13px; margin:0; padding-left:18px;">
+            <li><code>fact_claims</code> ~1.5M</li>
+            <li><code>fact_policy_monthly</code> ~1.4M</li>
+            <li>dims: policy, product, region, agent</li>
+            <li>All heavy GROUP BY / JOIN work</li>
+          </ul>
+        </div>
+        <div>
+          <p><strong style="color:var(--accent)">Lives in Streamlit session</strong></p>
+          <ul style="color:var(--muted); font-size:13px; margin:0; padding-left:18px;">
+            <li>Chat messages + last SQL anchor</li>
+            <li>Tiny result DataFrames</li>
+            <li>Activated semantic YAML context</li>
+            <li>Never the full warehouse tables</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>5. Parallel surfaces (same volume rule)</h2>
+      <table>
+        <thead>
+          <tr><th>Tab</th><th>Purpose</th><th>Pattern</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Chat / Ask</td>
+            <td>Ad-hoc NLQ</td>
+            <td>SQL → ≤1k → display ≤100</td>
+          </tr>
+          <tr>
+            <td>KPI</td>
+            <td>Executive cards</td>
+            <td>Windowed aggregate SQL (YTD / calendar / rolling / full history)</td>
+          </tr>
+          <tr>
+            <td>Preview</td>
+            <td>Sanity sample</td>
+            <td>Joined claims <code>LIMIT 100</code></td>
+          </tr>
+          <tr>
+            <td>DQ</td>
+            <td>Health / inventory</td>
+            <td>Exact COUNT inventory; quality on rolling windows</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>6. Sound bites for the room</h2>
+      <p style="color:var(--text); font-size:14px;">
+        “Postgres does the million-row work. Streamlit only paints the answer — typically dozens of rows, hard-capped at a thousand into the app and a hundred on the chat table.”
+      </p>
+      <p style="color:var(--text); font-size:14px;">
+        “East means region, Motor means LOB, loss ratio is incurred over earned — taught in the semantic layer so the SQL matches how the business speaks.”
+      </p>
+    </div>
+  </div>
+
+  <footer>
+    ASK-DB · insurance PostgreSQL pilot · diagrams in <code>doc/diagram/</code> ·
+    notes <code>doc/ASKDB_INSURANCE_LEADERSHIP_NOTES.md</code> ·
+    tests <code>doc/insurance_test_questions.md</code>
+  </footer>
+</body>
+</html>
