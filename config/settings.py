@@ -248,6 +248,8 @@ DEFAULTS = {
     "last_query": "", "last_plan": None,
     "llm_calls": 0, "total_tokens": 0,
     "max_llm_calls": 60,
+    "max_llm_tokens": 30_000,
+    "llm_usage_log": [],
     "llm_family": "gpt",
     "llm_tier": "high",
     "llm_model_id": "openai.gpt-5.1",

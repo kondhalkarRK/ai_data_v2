@@ -458,7 +458,7 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
                             f"{anchor.get('sql_anchor_filters')}. "
                             "Return ONLY corrected SQL."
                         )
-                        sql2 = call_llm(retry)
+                        sql2 = call_llm(retry, purpose="sql_retry")
                         if sql2:
                             sql_clean = sql2.strip().strip("`").strip()
                             if sql_clean.lower().startswith("sql"):
@@ -843,7 +843,7 @@ def _run_postgres_query(question: str, status=None):
             + f"\nThe previous SQL failed with: {err}\n"
             + f"PREVIOUS SQL:\n{sql}\nReturn only corrected PostgreSQL SQL:"
         )
-        corrected = _clean_generated_sql(call_llm(retry_prompt))
+        corrected = _clean_generated_sql(call_llm(retry_prompt, purpose="sql_retry"))
         if corrected:
             sql = corrected
             result, err = run_sql(sql, None)
@@ -990,7 +990,7 @@ Schema columns: {list(working_df.columns)}
 Fix and return ONLY corrected SQL:""",
             )
             _persist_semantic_ui_state(question, working_df)
-            sql2 = call_llm(retry_prompt)
+            sql2 = call_llm(retry_prompt, purpose="sql_retry")
             if sql2:
                 sql2 = sql2.strip().strip("`").strip()
                 if status is not None:

@@ -472,28 +472,43 @@ def render():
         with st.expander("⚡ LLM usage", expanded=False):
             from config.llm_catalog import tokens_per_dollar, estimate_usd
             from config.settings import get_llm_config
+            from core.llm_client import usage_caption
 
             cfg = get_llm_config()
-            calls = st.session_state.get("llm_calls", 0)
-            tokens = st.session_state.get("total_tokens", 0)
-            max_calls = max(st.session_state.get("max_llm_calls", 1), 1)
+            calls = int(st.session_state.get("llm_calls", 0) or 0)
+            tokens = int(st.session_state.get("total_tokens", 0) or 0)
+            max_calls = max(int(st.session_state.get("max_llm_calls", 60) or 60), 1)
+            max_tokens = max(int(st.session_state.get("max_llm_tokens", 30_000) or 30_000), 1)
             usd_per_1m = float(cfg.get("usd_per_1m") or 0)
             est = float(st.session_state.get("llm_est_usd") or estimate_usd(tokens, usd_per_1m))
             status_row("Model", cfg.get("label") or "GPT · High", "#a5b4fc")
-            status_row("Calls", calls, "#a5b4fc")
-            status_row("Tokens", f"{tokens:,}", "#a5b4fc")
+            status_row("Calls", f"{calls}/{max_calls}", "#a5b4fc")
+            tok_disp = f"{tokens:,}/{max_tokens // 1000}K" if max_tokens >= 1000 else f"{tokens:,}/{max_tokens}"
+            status_row("Tokens", tok_disp, "#a5b4fc")
             status_row("Est. cost", f"${est:.4f}", "#6ee7b7")
+            st.caption(usage_caption())
             st.caption(
                 f"$1 ≈ {tokens_per_dollar(usd_per_1m):,} tokens · "
                 f"temp {float(cfg.get('temperature') or 0):.1f}"
             )
+            st.caption("Call budget")
             st.progress(min(calls / max_calls, 1.0))
+            st.caption("Token budget")
+            st.progress(min(tokens / max_tokens, 1.0))
+            log = list(st.session_state.get("llm_usage_log") or [])
+            if log:
+                st.caption("Recent calls")
+                for item in log[-5:][::-1]:
+                    purpose = item.get("purpose") or "other"
+                    tot = int(item.get("total_tokens_est") or 0)
+                    st.caption(f"• {purpose} · {tot:,} tok")
             if st.button("⚙️ Settings", use_container_width=True, key="sidebar_llm_settings"):
                 llm_settings_dialog()
             if st.button("RESET", use_container_width=True, key="sidebar_reset"):
                 st.session_state.llm_calls = 0
                 st.session_state.total_tokens = 0
                 st.session_state.llm_est_usd = 0.0
+                st.session_state.llm_usage_log = []
                 st.rerun()
 
         with st.expander("💾 Saved questions", expanded=False):

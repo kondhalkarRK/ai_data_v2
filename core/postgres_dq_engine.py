@@ -309,71 +309,9 @@ def render_postgres_data_quality() -> None:
         if bounds_df is not None and not bounds_df.empty
         else date.today()
     )
-    ytd_default = _ytd_label(as_of)
-    year_vals = _distinct_values(
-        backend,
-        """
-        SELECT DISTINCT EXTRACT(YEAR FROM reported_date)::int AS y
-        FROM insurance.fact_claims
-        WHERE reported_date IS NOT NULL
-        ORDER BY 1 DESC
-        LIMIT 12
-        """,
-    )
-    calendar_years = sorted(
-        {int(float(y)) for y in year_vals if str(y).replace(".", "", 1).isdigit()},
-        reverse=True,
-    )
-    window_options = [
-        "Rolling 12 months",
-        ytd_default,
-        "Full history (all records)",
-    ]
-    for year in calendar_years:
-        if year == as_of.year:
-            continue
-        window_options.append(f"Calendar year {year} (Jan–Dec)")
-    window_options.extend(["FY Apr–Mar (current)", "FY Apr–Mar (previous)"])
-
-    if "ins_dq_window" not in st.session_state:
-        st.session_state.ins_dq_window = "Rolling 12 months"
-    elif st.session_state.ins_dq_window not in window_options:
-        if str(st.session_state.ins_dq_window).startswith("Current year YTD"):
-            st.session_state.ins_dq_window = ytd_default
-        else:
-            st.session_state.ins_dq_window = "Rolling 12 months"
-
-    filt_l, filt_r = st.columns([2.2, 1])
-    with filt_l:
-        window = st.selectbox(
-            "DQ time window",
-            window_options,
-            key="ins_dq_window",
-            help="Same window family as KPI. Full history scans all claim dates in Postgres.",
-        )
-    with filt_r:
-        if st.button("Reset window", key="ins_dq_clear", use_container_width=True):
-            st.session_state.ins_dq_window = "Rolling 12 months"
-            st.rerun()
-
-    if window == "Full history (all records)":
-        start, end, window_label = None, None, "Full history (all records)"
-    elif window == "Rolling 12 months":
-        start, end = rolling_bounds(as_of, 12)
-        window_label = "Rolling 12 months"
-    elif window == "FY Apr–Mar (current)":
-        start, end = fy_april_march_bounds(as_of, previous=False)
-        window_label = f"FY {start.year}–{end.year} (Apr–Mar)"
-    elif window == "FY Apr–Mar (previous)":
-        start, end = fy_april_march_bounds(as_of, previous=True)
-        window_label = f"FY {start.year}–{start.year + 1} (Apr–Mar)"
-    elif window.startswith("Calendar year "):
-        year = int(window.split()[2])
-        start, end = calendar_year_bounds(year, as_of)
-        window_label = f"Calendar year {year} (Jan–Dec)"
-    else:
-        start, end = calendar_ytd_bounds(as_of)
-        window_label = ytd_default
+    # Fixed window — no filter UI (keeps DQ simple and consistent)
+    start, end = rolling_bounds(as_of, 12)
+    window_label = "Rolling 12 months"
 
     fingerprint = backend.get_dataset_fingerprint()
     cache_key = f"{fingerprint}|{window_label}|{start}|{end}"

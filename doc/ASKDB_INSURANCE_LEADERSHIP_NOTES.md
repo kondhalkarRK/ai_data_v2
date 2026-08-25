@@ -143,10 +143,11 @@ Walk **simple → complex** from [`insurance_test_questions.md`](insurance_test_
 
 | File | Use |
 |------|-----|
-| [`diagram/askdb_insurance_architecture.html`](diagram/askdb_insurance_architecture.html) | Full architecture + flow (print/PDF friendly) |
-| [`diagram/askdb_insurance_architecture.svg`](diagram/askdb_insurance_architecture.svg) | Drop into PowerPoint / Confluence |
+| [`diagram/askdb_enterprise_architecture.html`](diagram/askdb_enterprise_architecture.html) | Six-layer enterprise architecture (print/PDF) |
+| [`diagram/askdb_enterprise_architecture.svg`](diagram/askdb_enterprise_architecture.svg) | Drop into PowerPoint / Confluence |
+| [`diagram/askdb_insurance_architecture.html`](diagram/askdb_insurance_architecture.html) | Insurance flow + architecture pack |
 | [`diagram/askdb_insurance_query_flow.svg`](diagram/askdb_insurance_query_flow.svg) | Single-path query flow |
-| [`diagram/askdb_e2e_query_flow.html`](diagram/askdb_e2e_query_flow.html) | Earlier E2E pack (same story) |
+| [`diagram/askdb_e2e_query_flow.html`](diagram/askdb_e2e_query_flow.html) | Earlier E2E pack |
 
 ---
 
