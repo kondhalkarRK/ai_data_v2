@@ -99,7 +99,7 @@ def test_cg_studio_catalog_includes_listed_endpoints():
     assert haiku["model"] == "anthropic.claude-haiku-4-5-20251001-v1:0"
     from datetime import date
 
-    from config.llm_catalog import estimate_usd, tokens_per_dollar
+    from config.llm_catalog import estimate_usd, tokens_per_dollar, questions_per_dollar
     from core.insurance_kpi_engine import (
         calendar_year_bounds,
         calendar_ytd_bounds,
@@ -118,6 +118,8 @@ def test_cg_studio_catalog_includes_listed_endpoints():
     assert cy_s == date(2025, 1, 1) and cy_e == date(2025, 12, 31)
     assert tokens_per_dollar(10.0) == 100_000
     assert round(estimate_usd(100_000, 10.0), 2) == 1.0
+    assert questions_per_dollar(10.0, with_narration=False) == 40
+    assert questions_per_dollar(10.0, with_narration=True) == 16
 
 
 def test_insurance_semantic_joins_connect_each_dimension():

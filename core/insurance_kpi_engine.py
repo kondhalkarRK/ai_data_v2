@@ -72,11 +72,55 @@ def _number(value, *, money: bool = False, percent: bool = False) -> str:
 
 
 def _chart_layout(fig):
+    theme = str(st.session_state.get("ui_theme") or "dark").lower()
+    if theme == "light":
+        font = "#1b2430"
+        grid = "rgba(27,36,48,0.12)"
+        zero = "rgba(27,36,48,0.35)"
+        legend = "#334155"
+    elif theme == "ai":
+        font = "#e2e8f0"
+        grid = "rgba(148,163,184,0.18)"
+        zero = "rgba(226,232,240,0.35)"
+        legend = "#cbd5e1"
+    else:
+        font = "#e2e8f0"
+        grid = "rgba(148,163,184,0.16)"
+        zero = "rgba(226,232,240,0.28)"
+        legend = "#cbd5e1"
+
     fig.update_layout(
-        margin=dict(l=0, r=0, t=40, b=0),
+        margin=dict(l=8, r=8, t=44, b=8),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         height=320,
+        font=dict(color=font, size=12),
+        title_font=dict(color=font, size=14),
+        legend=dict(font=dict(color=legend)),
+        xaxis=dict(
+            color=font,
+            gridcolor=grid,
+            zerolinecolor=zero,
+            linecolor=grid,
+            tickfont=dict(color=font),
+            title_font=dict(color=font),
+        ),
+        yaxis=dict(
+            color=font,
+            gridcolor=grid,
+            zerolinecolor=zero,
+            linecolor=grid,
+            tickfont=dict(color=font),
+            title_font=dict(color=font),
+        ),
+        colorway=["#2563eb", "#0f9d6e", "#c2410c", "#7c3aed", "#0891b2"]
+        if theme == "light"
+        else ["#38bdf8", "#34d399", "#fbbf24", "#a78bfa", "#f472b6"],
+    )
+    fig.update_traces(
+        selector=dict(type="scatter"),
+        line=dict(width=2.5),
+        marker=dict(size=7),
     )
     return fig
 

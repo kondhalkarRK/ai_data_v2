@@ -307,12 +307,47 @@ button[kind="primary"],.stButton > button[kind="primary"]{
   color:#1b2430 !important;
   caret-color:#2563eb !important;
 }
+.cgpt-composer [data-testid="stChatInput"],
+.cgpt-composer [data-testid="stChatInput"] textarea,
+.cgpt-composer [data-testid="stChatInput"] > div,
+.cgpt-composer [data-testid="stChatInput"] div[data-baseweb="base-input"],
+.cgpt-composer [data-testid="stChatInput"] div[data-baseweb="textarea"]{
+  background:#ffffff !important;
+  color:#1b2430 !important;
+  border-color:rgba(27,36,48,0.12) !important;
+  box-shadow:none !important;
+}
 [data-testid="stChatInput"] textarea::placeholder{color:#9aa3b2 !important;}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]){
+  flex-direction:row-reverse !important;
+  justify-content:flex-end !important;
+}
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) [data-testid="stChatMessageContent"]{
-  background:#eef3ff !important;color:#1e3a8a !important;border:1px solid rgba(37,99,235,0.12) !important;
+  background:#eef3ff !important;color:#1e3a8a !important;
+  border:1px solid rgba(37,99,235,0.12) !important;
+  margin-left:auto !important;
+  margin-right:0 !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]),
+[data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])){
+  flex-direction:row !important;
+  justify-content:flex-start !important;
 }
 [data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])) [data-testid="stChatMessageContent"]{
-  background:#ffffff !important;color:#1b2430 !important;border:1px solid rgba(27,36,48,0.08) !important;
+  background:#ffffff !important;color:#1b2430 !important;
+  border:1px solid rgba(27,36,48,0.08) !important;
+  margin-right:auto !important;
+  margin-left:0 !important;
+}
+.chat-block{
+  background:#f7f8fb !important;
+  border:1px solid rgba(27,36,48,0.10) !important;
+}
+.chat-block-title{color:#5b6575 !important;}
+.chat-turn-meta{
+  background:rgba(37,99,235,0.08) !important;
+  border-color:rgba(37,99,235,0.16) !important;
+  color:#334155 !important;
 }
 div[class*="st-key-chat_answer_mode"] div[data-baseweb="select"] > div{
   background:#ffffff !important;

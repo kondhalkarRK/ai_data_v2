@@ -138,3 +138,26 @@ def tokens_per_dollar(usd_per_1m: float) -> int:
 
 def estimate_usd(tokens: int, usd_per_1m: float) -> float:
     return float(tokens) / 1_000_000.0 * float(usd_per_1m)
+
+
+# Indicative average tokens per Chat turn (prompt + completion).
+TOKENS_PER_QUESTION_NO_NARRATION = 2_500
+TOKENS_PER_QUESTION_WITH_NARRATION = 6_000
+
+
+def questions_per_dollar(
+    usd_per_1m: float,
+    *,
+    with_narration: bool = False,
+) -> int:
+    """Rough count of Chat questions $1 can buy at indicative Studio pricing."""
+    tokens = tokens_per_dollar(usd_per_1m)
+    per_q = (
+        TOKENS_PER_QUESTION_WITH_NARRATION
+        if with_narration
+        else TOKENS_PER_QUESTION_NO_NARRATION
+    )
+    if not tokens or not per_q:
+        return 0
+    return max(int(tokens // per_q), 0)
+

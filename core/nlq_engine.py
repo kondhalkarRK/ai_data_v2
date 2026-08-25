@@ -104,6 +104,9 @@ def format_result_dates(df: pd.DataFrame) -> pd.DataFrame:
         if pd.api.types.is_datetime64_any_dtype(df[col]):
             if any(x in col.lower() for x in ["month", "period", "ym", "year_month"]):
                 df[col] = df[col].dt.strftime("%Y-%m")
+    # Business-friendly 1-based row numbers in the table index
+    if len(df) > 0:
+        df.index = range(1, len(df) + 1)
     return df
 
 
@@ -760,12 +763,29 @@ RULES:
 2. Use only qualified tables and columns present in the physical schema.
 3. Use PostgreSQL syntax: date_trunc, extract, to_char, FILTER, and NULLIF.
 4. Never use DuckDB functions such as strftime and never query a table named df.
-5. Insurance numbers come from SQL. Premium must come from policy-month/premium
-   facts, not duplicated claim rows.
+5. Insurance numbers come from SQL. Premium must come from
+   insurance.fact_policy_monthly, never from claim rows.
 6. Protect ratios with NULLIF(denominator, 0).
 7. Use meaningful aliases and LIMIT detail/ranking results to at most 500 rows.
 8. Do not emit INSERT, UPDATE, DELETE, DDL, COPY, procedures, or multiple statements.
 9. Return only SQL without markdown fences or explanation.
+10. MULTI-COLUMN DEFAULT: Analytical answers must return at least one business
+    dimension label PLUS the metric(s). Never return a single anonymous measure
+    column alone (e.g. only SUM(...)) unless the user explicitly asks for one
+    number / total / scalar. Prefer patterns like:
+    region_name + claim_count + claims_incurred; product_name + LOB + premium;
+    month + claim_count + incurred.
+11. ENTITY MAPPING: East/West/North/South (and EST/WST/NTH/STH) →
+    dim_region.region_name / region_code. Motor/Health/Property →
+    dim_product.line_of_business. Customer/policyholder → dim_policy.customer_key.
+    Prefer LEFT JOIN from facts to dimensions.
+12. RANKING: For top/best/worst/N questions, include
+    ROW_NUMBER() OVER (ORDER BY ...) AS rank starting at 1, then the dimension
+    label and metric columns. Do not rely on 0-based array positions.
+13. TIME DEFAULT: If the user omits a period, use the latest 12 months ending at
+    MAX(reported_date) for claims or MAX(accounting_month) for premium.
+14. Prefer human-readable labels (region_name, product_name, line_of_business)
+    over raw foreign-key IDs in the SELECT list.
 
 QUESTION: {question}
 

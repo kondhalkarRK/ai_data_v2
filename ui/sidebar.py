@@ -161,6 +161,7 @@ def llm_settings_dialog():
         DEFAULT_TIER,
         get_profile,
         models_for_family,
+        questions_per_dollar,
         tokens_per_dollar,
     )
 
@@ -196,27 +197,40 @@ def llm_settings_dialog():
     )
     profile = get_profile(family, tier, chosen_id)
     per_dollar = tokens_per_dollar(profile["usd_per_1m"])
+    q_plain = questions_per_dollar(profile["usd_per_1m"], with_narration=False)
+    q_narr = questions_per_dollar(profile["usd_per_1m"], with_narration=True)
     st.markdown(f"**{profile['label']}**")
     st.caption(f"Request model id: `{profile['model']}`")
     st.caption(
         f"Indicative price: ${profile['usd_per_1m']:.2f} per 1M tokens · "
         f"$1 ≈ {per_dollar:,} tokens"
     )
+    st.caption(
+        f"~$1 buys ≈ **{q_plain:,}** questions without narration · "
+        f"**{q_narr:,}** with narration "
+        "(indicative; ~2.5k / ~6k tokens per turn)."
+    )
 
-    st.markdown("#### Studio catalog")
-    rows = []
-    for item in CG_ENDPOINTS:
-        rows.append(
-            {
-                "Provider": "OpenAI" if item["family"] == "gpt" else "Bedrock",
-                "Size": item["tier"].title(),
-                "Label": item["label"],
-                "Model id": item["id"],
-                "$ / 1M tokens": f"${item['usd_per_1m']:.2f}",
-                "$1 buys": f"{tokens_per_dollar(item['usd_per_1m']):,} tokens",
-            }
+    with st.expander("Studio catalog", expanded=False):
+        rows = []
+        for item in CG_ENDPOINTS:
+            rows.append(
+                {
+                    "Provider": "OpenAI" if item["family"] == "gpt" else "Bedrock",
+                    "Size": item["tier"].title(),
+                    "Label": item["label"],
+                    "Model id": item["id"],
+                    "$ / 1M tokens": f"${item['usd_per_1m']:.2f}",
+                    "$1 buys tokens": f"{tokens_per_dollar(item['usd_per_1m']):,}",
+                    "Q/$ no narr.": f"{questions_per_dollar(item['usd_per_1m'], with_narration=False):,}",
+                    "Q/$ + narr.": f"{questions_per_dollar(item['usd_per_1m'], with_narration=True):,}",
+                }
+            )
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.caption(
+            "Question estimates assume ~2,500 tokens/turn without narration and "
+            "~6,000 with narration (SQL + insight). Actual usage varies."
         )
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
     temperature = st.slider(
         "Temperature",

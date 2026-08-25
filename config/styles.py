@@ -1949,6 +1949,7 @@ div[data-testid="stExpander"] details:hover summary{
 }
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]){
   flex-direction:row-reverse !important;
+  justify-content:flex-end !important;
 }
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) [data-testid="stChatMessageContent"]{
   background:linear-gradient(145deg,rgba(51,65,85,0.88),rgba(30,41,59,0.92)) !important;
@@ -1957,12 +1958,20 @@ div[data-testid="stExpander"] details:hover summary{
   padding:10px 14px !important;
   max-width:min(78%,640px) !important;
   margin-left:auto !important;
+  margin-right:0 !important;
   box-shadow:0 6px 20px rgba(0,0,0,0.15) !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]),
+[data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])){
+  flex-direction:row !important;
+  justify-content:flex-start !important;
 }
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) [data-testid="stChatMessageContent"],
 [data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])) [data-testid="stChatMessageContent"]{
   background:transparent !important;border:none !important;
   padding:4px 0 8px 2px !important;max-width:100% !important;
+  margin-right:auto !important;
+  margin-left:0 !important;
 }
 .cgpt-starter-hints{
   display:flex;flex-wrap:wrap;gap:8px;justify-content:center;

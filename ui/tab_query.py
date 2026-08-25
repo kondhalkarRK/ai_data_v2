@@ -14,7 +14,7 @@ import pandas as pd
 import streamlit as st
 
 from core.nlq_engine import run_query, run_sql
-from core.data_backend.factory import postgres_mode_enabled
+from core.data_backend.factory import get_backend, postgres_mode_enabled
 from core.sql_guardrails import sql_is_safe
 from core.chart_engine import auto_chart_type, build_chart
 from core.llm_client import call_llm
@@ -1328,6 +1328,36 @@ def _blocked_reply(question: str) -> str:
 
 def _greeting_reply(working_df: pd.DataFrame) -> str:
     greet = _time_of_day_greeting()
+    turn = 0
+    try:
+        turn = int(get_state().get("turn_count") or 0)
+    except Exception:
+        turn = 0
+    first = turn <= 1
+
+    if postgres_mode_enabled():
+        claims = 0
+        tables = 0
+        try:
+            backend = get_backend()
+            counts = backend.table_row_counts(include_views=False)
+            claims = int(counts.get("fact_claims") or 0)
+            tables = len(counts)
+        except Exception:
+            pass
+        body = (
+            f"{greet}\n\n"
+            f"You are connected to the **PostgreSQL** insurance warehouse"
+            + (f" with **{claims:,} claims** across {tables} tables" if claims else "")
+            + ".\n\n"
+            "I can help you explore:\n"
+            "• Loss ratio and incurred claims by LOB or region\n"
+            "• Motor severity / claim counts (e.g. Q2 2026)\n"
+            "• Rolling 12-month or calendar-year trends\n"
+            "What would you like to start with?"
+        )
+        return body
+
     n = len(working_df) if working_df is not None else 0
     hook = ""
     insights = _safe_insights(working_df, limit=1)
@@ -1336,15 +1366,9 @@ def _greeting_reply(working_df: pd.DataFrame) -> str:
             f"\nI noticed {insights[0].get('title', 'an interesting pattern')} "
             f"— want me to dig into that?"
         )
-    turn = 0
-    try:
-        turn = int(get_state().get("turn_count") or 0)
-    except Exception:
-        turn = 0
-    first = turn <= 1
     body = (
         f"{greet}\n\n"
-        f"I can see you have {n:,} rows of automotive sales data loaded.\n\n"
+        f"I can see you have {n:,} rows loaded for analysis.\n\n"
         "Here are a few things I can help you explore today:\n"
         "• Revenue performance by colour or make\n"
         "• Top performing salespeople\n"
@@ -1396,7 +1420,20 @@ def _conversational_reply(
         history = ""
 
     data_summary = ""
-    if working_df is not None and not working_df.empty:
+    if postgres_mode_enabled():
+        try:
+            backend = get_backend()
+            counts = backend.table_row_counts(include_views=False)
+            claims = int(counts.get("fact_claims") or 0)
+            data_summary = (
+                f"PostgreSQL insurance warehouse connected: "
+                f"{claims:,} claims in fact_claims, "
+                f"{len(counts)} physical tables. "
+                "Answer from SQL against the database, not a local dataframe."
+            )
+        except Exception:
+            data_summary = "PostgreSQL insurance warehouse is the active data source."
+    elif working_df is not None and not working_df.empty:
         cols = ", ".join(str(c) for c in list(working_df.columns)[:18])
         data_summary = (
             f"Dataset loaded: {len(working_df):,} rows, "
@@ -1443,7 +1480,9 @@ Your personality:
   Brief and precise — no waffle
 
 Your purpose:
-  Help users explore their automotive sales dataset using natural language.
+  Help users explore their data using natural language.
+  In PostgreSQL insurance mode, numbers come from the database.
+  In CSV mode, numbers come from the loaded working dataset.
 
 You can: answer data questions, explain results, run what-if scenarios,
 surface patterns, guide users to better questions.
@@ -1535,8 +1574,13 @@ def _append_assistant(content, message_type, data=None):
 
 
 def process_chat_message(question: str, working_df: pd.DataFrame):
-    if not question or not str(question).strip() or working_df is None:
+    if not question or not str(question).strip():
         return
+    # CSV/DuckDB mode needs a loaded frame; Postgres uses the warehouse.
+    if not postgres_mode_enabled() and working_df is None:
+        return
+    if working_df is None:
+        working_df = pd.DataFrame()
     q = question.strip()
     now = datetime.now().strftime("%H:%M")
     st.session_state.setdefault("chat_messages", [])

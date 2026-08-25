@@ -74,18 +74,44 @@ def _qualify(schema: str, table: str) -> str:
     return f'"{schema}"."{table}"'
 
 
-def _quality_window(backend) -> dict[str, Any]:
+def _quality_window(
+    backend,
+    start: date | None = None,
+    end: date | None = None,
+    *,
+    window_label: str = "Rolling 12 months",
+) -> dict[str, Any]:
     schema = str(getattr(backend, "_schema", "insurance") or "insurance")
     claims = _qualify(schema, "fact_claims")
     bounds_sql = f"""
-        SELECT COALESCE(MAX(reported_date), CURRENT_DATE) AS max_date
+        SELECT
+            COALESCE(MIN(reported_date), CURRENT_DATE) AS min_date,
+            COALESCE(MAX(reported_date), CURRENT_DATE) AS max_date
         FROM {claims}
     """
     bounds, error = backend.execute_sql(bounds_sql)
     if error or bounds is None or bounds.empty:
         return {"error": error or "No claims date bound", "rows": 0}
+    data_min = pd.to_datetime(bounds.iloc[0]["min_date"]).date()
     as_of = pd.to_datetime(bounds.iloc[0]["max_date"]).date()
-    start = (pd.Timestamp(as_of) - pd.DateOffset(months=12)).date()
+    if end is None:
+        end = as_of
+    if start is None and window_label != "Full history (all records)":
+        start = (pd.Timestamp(end) - pd.DateOffset(months=12)).date()
+    if start is None:
+        start = data_min
+
+    date_filter = (
+        f"c.reported_date >= {_sql_date(start)} AND c.reported_date <= {_sql_date(end)}"
+        if window_label != "Full history (all records)"
+        else "TRUE"
+    )
+    # Full history still uses min/max for gap span labels
+    if window_label == "Full history (all records)":
+        start, end = data_min, as_of
+        date_filter = (
+            f"c.reported_date >= {_sql_date(start)} AND c.reported_date <= {_sql_date(end)}"
+        )
 
     null_parts = [
         f'COUNT(*) FILTER (WHERE c.{col} IS NULL) AS {col}_nulls'
@@ -99,25 +125,30 @@ def _quality_window(backend) -> dict[str, Any]:
         )
     quality_sql = f"""
         SELECT
-            COUNT(*) AS rows_12m,
+            COUNT(*) AS rows_tested,
             COUNT(DISTINCT c.claim_id) AS distinct_claims,
             COUNT(DISTINCT c.claim_number) AS distinct_numbers,
             {", ".join(null_parts)},
             {", ".join(amount_parts)}
         FROM {claims} c
-        WHERE c.reported_date >= {_sql_date(start)}
-          AND c.reported_date <= {_sql_date(as_of)}
+        WHERE {date_filter}
     """
     quality, qerr = backend.execute_sql(quality_sql)
     if qerr or quality is None or quality.empty:
-        return {"error": qerr or "Quality query failed", "rows": 0, "start": start, "end": as_of}
+        return {
+            "error": qerr or "Quality query failed",
+            "rows": 0,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "window_label": window_label,
+        }
 
     row = quality.iloc[0]
-    rows_12m = int(row["rows_12m"] or 0)
+    rows_tested = int(row["rows_tested"] or 0)
     distinct_claims = int(row["distinct_claims"] or 0)
     distinct_numbers = int(row["distinct_numbers"] or 0)
-    duplicate_ids = max(rows_12m - distinct_claims, 0)
-    duplicate_numbers = max(rows_12m - distinct_numbers, 0)
+    duplicate_ids = max(rows_tested - distinct_claims, 0)
+    duplicate_numbers = max(rows_tested - distinct_numbers, 0)
 
     nulls = []
     total_nulls = 0
@@ -129,8 +160,8 @@ def _quality_window(backend) -> dict[str, Any]:
             nulls.append(
                 {
                     "Check": f"Nulls in {col}",
-                    "Value": f"{count:,} ({round(count / max(rows_12m, 1) * 100, 2)}%)",
-                    "Status": "Watch" if count / max(rows_12m, 1) < 0.05 else "Action",
+                    "Value": f"{count:,} ({round(count / max(rows_tested, 1) * 100, 2)}%)",
+                    "Status": "Watch" if count / max(rows_tested, 1) < 0.05 else "Action",
                 }
             )
 
@@ -146,8 +177,7 @@ def _quality_window(backend) -> dict[str, Any]:
         out_sql = f"""
             SELECT COUNT(*) AS outlier_count
             FROM {claims} c
-            WHERE c.reported_date >= {_sql_date(start)}
-              AND c.reported_date <= {_sql_date(as_of)}
+            WHERE {date_filter}
               AND c.{col} IS NOT NULL
               AND (c.{col} < {lower} OR c.{col} > {upper})
         """
@@ -167,13 +197,13 @@ def _quality_window(backend) -> dict[str, Any]:
             SELECT date_trunc('month', reported_date)::date AS m
             FROM {claims}
             WHERE reported_date >= {_sql_date(start)}
-              AND reported_date <= {_sql_date(as_of)}
+              AND reported_date <= {_sql_date(end)}
             GROUP BY 1
         ),
         span AS (
             SELECT generate_series(
                 date_trunc('month', {_sql_date(start)})::date,
-                date_trunc('month', {_sql_date(as_of)})::date,
+                date_trunc('month', {_sql_date(end)})::date,
                 interval '1 month'
             )::date AS m
         )
@@ -189,7 +219,7 @@ def _quality_window(backend) -> dict[str, Any]:
         else 0
     )
 
-    assessed_cells = max(rows_12m * len(QUALITY_COLUMNS), 1)
+    assessed_cells = max(rows_tested * len(QUALITY_COLUMNS), 1)
     null_pct = round(total_nulls / assessed_cells * 100, 2)
     completeness = round(100.0 - null_pct, 1)
     score = 100.0
@@ -202,7 +232,7 @@ def _quality_window(backend) -> dict[str, Any]:
     findings = [
         {
             "Check": "Completeness",
-            "Value": f"{completeness}% on 12-month grain",
+            "Value": f"{completeness}% on selected window",
             "Status": "Good" if completeness >= 98 else "Watch",
         },
         {
@@ -227,8 +257,8 @@ def _quality_window(backend) -> dict[str, Any]:
     return {
         "error": None,
         "start": start.isoformat(),
-        "end": as_of.isoformat(),
-        "rows": rows_12m,
+        "end": end.isoformat(),
+        "rows": rows_tested,
         "completeness": completeness,
         "null_pct": null_pct,
         "duplicates": duplicate_numbers,
@@ -236,25 +266,125 @@ def _quality_window(backend) -> dict[str, Any]:
         "missing_months": missing_months,
         "score": score,
         "findings": findings,
+        "window_label": window_label,
+        "as_of": as_of.isoformat(),
     }
 
 
-def compute_postgres_data_quality() -> dict[str, Any]:
+def compute_postgres_data_quality(
+    start: date | None = None,
+    end: date | None = None,
+    *,
+    window_label: str = "Rolling 12 months",
+) -> dict[str, Any]:
     backend = get_backend()
     inventory = _inventory(backend)
-    quality = _quality_window(backend)
+    quality = _quality_window(
+        backend, start=start, end=end, window_label=window_label
+    )
     return {"inventory": inventory, "quality": quality}
 
 
 def render_postgres_data_quality() -> None:
+    import plotly.graph_objects as go
+
+    from core.insurance_kpi_engine import (
+        calendar_year_bounds,
+        calendar_ytd_bounds,
+        fy_april_march_bounds,
+        rolling_bounds,
+        _ytd_label,
+        _distinct_values,
+    )
+
     backend = get_backend()
+    bounds_df, _ = backend.execute_sql(
+        """
+        SELECT COALESCE(MAX(reported_date), CURRENT_DATE) AS max_date
+        FROM insurance.fact_claims
+        """
+    )
+    as_of = (
+        pd.to_datetime(bounds_df.iloc[0]["max_date"]).date()
+        if bounds_df is not None and not bounds_df.empty
+        else date.today()
+    )
+    ytd_default = _ytd_label(as_of)
+    year_vals = _distinct_values(
+        backend,
+        """
+        SELECT DISTINCT EXTRACT(YEAR FROM reported_date)::int AS y
+        FROM insurance.fact_claims
+        WHERE reported_date IS NOT NULL
+        ORDER BY 1 DESC
+        LIMIT 12
+        """,
+    )
+    calendar_years = sorted(
+        {int(float(y)) for y in year_vals if str(y).replace(".", "", 1).isdigit()},
+        reverse=True,
+    )
+    window_options = [
+        "Rolling 12 months",
+        ytd_default,
+        "Full history (all records)",
+    ]
+    for year in calendar_years:
+        if year == as_of.year:
+            continue
+        window_options.append(f"Calendar year {year} (Jan–Dec)")
+    window_options.extend(["FY Apr–Mar (current)", "FY Apr–Mar (previous)"])
+
+    if "ins_dq_window" not in st.session_state:
+        st.session_state.ins_dq_window = "Rolling 12 months"
+    elif st.session_state.ins_dq_window not in window_options:
+        if str(st.session_state.ins_dq_window).startswith("Current year YTD"):
+            st.session_state.ins_dq_window = ytd_default
+        else:
+            st.session_state.ins_dq_window = "Rolling 12 months"
+
+    filt_l, filt_r = st.columns([2.2, 1])
+    with filt_l:
+        window = st.selectbox(
+            "DQ time window",
+            window_options,
+            key="ins_dq_window",
+            help="Same window family as KPI. Full history scans all claim dates in Postgres.",
+        )
+    with filt_r:
+        if st.button("Reset window", key="ins_dq_clear", use_container_width=True):
+            st.session_state.ins_dq_window = "Rolling 12 months"
+            st.rerun()
+
+    if window == "Full history (all records)":
+        start, end, window_label = None, None, "Full history (all records)"
+    elif window == "Rolling 12 months":
+        start, end = rolling_bounds(as_of, 12)
+        window_label = "Rolling 12 months"
+    elif window == "FY Apr–Mar (current)":
+        start, end = fy_april_march_bounds(as_of, previous=False)
+        window_label = f"FY {start.year}–{end.year} (Apr–Mar)"
+    elif window == "FY Apr–Mar (previous)":
+        start, end = fy_april_march_bounds(as_of, previous=True)
+        window_label = f"FY {start.year}–{start.year + 1} (Apr–Mar)"
+    elif window.startswith("Calendar year "):
+        year = int(window.split()[2])
+        start, end = calendar_year_bounds(year, as_of)
+        window_label = f"Calendar year {year} (Jan–Dec)"
+    else:
+        start, end = calendar_ytd_bounds(as_of)
+        window_label = ytd_default
+
     fingerprint = backend.get_dataset_fingerprint()
+    cache_key = f"{fingerprint}|{window_label}|{start}|{end}"
     cached = st.session_state.get("_pg_dq_cache")
-    if not cached or cached.get("fp") != fingerprint:
-        with st.spinner("Profiling inventory and rolling 12-month quality…"):
+    if not cached or cached.get("key") != cache_key:
+        with st.spinner("ASK-DB is profiling data quality…"):
             st.session_state["_pg_dq_cache"] = {
-                "fp": fingerprint,
-                "report": compute_postgres_data_quality(),
+                "key": cache_key,
+                "report": compute_postgres_data_quality(
+                    start=start, end=end, window_label=window_label
+                ),
             }
         cached = st.session_state["_pg_dq_cache"]
 
@@ -274,23 +404,64 @@ def render_postgres_data_quality() -> None:
 
     st.markdown("### Data health")
     st.caption(
-        "Full-store inventory is exact table counts. Quality tests run only on the "
-        "rolling 12-month claims window (index-friendly). History beyond 12 months "
-        "is not scanned for nulls or outliers."
+        "Inventory counts cover the full store. Quality tests use the selected "
+        "time window (default rolling 12 months)."
     )
 
-    left, right = st.columns([1.1, 2.2])
+    left, right = st.columns([1.15, 2.1])
     with left:
         st.markdown(
-            f"<div style='text-align:center;padding:12px 0;'>"
-            f"<div style='font-size:56px;font-weight:800;color:{score_color};line-height:1;'>"
+            f"<div style='text-align:center;padding:4px 0;'>"
+            f"<div style='font-size:42px;font-weight:800;color:{score_color};line-height:1;'>"
             f"{score:.0f}</div>"
-            f"<div style='color:#94a3b8;letter-spacing:0.08em;font-size:12px;margin-top:8px;'>"
+            f"<div style='color:#94a3b8;letter-spacing:0.08em;font-size:11px;margin-top:6px;'>"
             f"HEALTH SCORE</div>"
-            f"<div style='color:{score_color};font-weight:700;margin-top:4px;'>{score_label}</div>"
+            f"<div style='color:{score_color};font-weight:700;margin-top:2px;'>{score_label}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
+        _theme = str(st.session_state.get("ui_theme") or "dark").lower()
+        if _theme == "light":
+            _gauge_steps = [
+                {"range": [0, 50], "color": "#fee2e2"},
+                {"range": [50, 70], "color": "#ffedd5"},
+                {"range": [70, 100], "color": "#d1fae5"},
+            ]
+            _gauge_font = "#5b6575"
+        else:
+            _gauge_steps = [
+                {"range": [0, 50], "color": "#1c0505"},
+                {"range": [50, 70], "color": "#1c1204"},
+                {"range": [70, 100], "color": "#052e16"},
+            ]
+            _gauge_font = "#8b949e"
+        fig_gauge = go.Figure(
+            go.Indicator(
+                mode="gauge+number",
+                value=score,
+                gauge={
+                    "axis": {"range": [0, 100], "tickwidth": 1},
+                    "bar": {"color": score_color},
+                    "bgcolor": "rgba(0,0,0,0)",
+                    "steps": _gauge_steps,
+                    "threshold": {
+                        "line": {"color": score_color, "width": 3},
+                        "thickness": 0.8,
+                        "value": score,
+                    },
+                },
+                number={"suffix": "", "font": {"size": 20, "color": score_color}},
+            )
+        )
+        fig_gauge.update_layout(
+            height=160,
+            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=_gauge_font),
+        )
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
     with right:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Claims in store", f"{inv['claim_rows']:,}")
@@ -298,14 +469,14 @@ def render_postgres_data_quality() -> None:
         c3.metric("Physical rows", f"{inv['physical_rows']:,}")
         c4.metric("Tables", f"{inv['table_count']}")
         d1, d2, d3, d4 = st.columns(4)
-        d1.metric("12m claims tested", f"{int(q.get('rows') or 0):,}")
+        d1.metric("Claims tested", f"{int(q.get('rows') or 0):,}")
         d2.metric("Completeness", f"{q.get('completeness', 0)}%")
         d3.metric("Duplicate numbers", f"{int(q.get('duplicates') or 0):,}")
         d4.metric("Missing months", f"{int(q.get('missing_months') or 0)}")
 
     st.caption(
-        f"Quality window {q.get('start') or '—'} → {q.get('end') or '—'} · "
-        "incremental loads should keep this window current without restating history."
+        f"{window_label} · {q.get('start') or '—'} → {q.get('end') or '—'} · "
+        "computed in PostgreSQL"
     )
 
     if inv.get("tables"):
@@ -316,7 +487,10 @@ def render_postgres_data_quality() -> None:
 
     findings = q.get("findings") or []
     if findings:
-        st.markdown("#### Quality findings (12 months)")
+        st.markdown("#### Quality findings")
         find_df = pd.DataFrame(findings)
         st.dataframe(find_df, use_container_width=True, hide_index=True)
-        st.caption("Good = within operating tolerance. Watch = explain in the demo. Action = fix before scale-up.")
+        st.caption(
+            "Good = within operating tolerance. Watch = explain in the demo. "
+            "Action = fix before scale-up."
+        )

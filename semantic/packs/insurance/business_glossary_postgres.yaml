@@ -4,35 +4,42 @@ domain: "Insurance"
 terms:
   Gross Written Premium:
     definition: "Premium booked for policies written during the period."
-    synonyms: [GWP, written premium, premium booked]
+    synonyms: [GWP, written premium, premium booked, booked premium]
     maps_to_measure: gross_written_premium
     sql_expression: "SUM(insurance.fact_policy_monthly.written_premium)"
     category: Financial
 
   Earned Premium:
     definition: "The portion of written premium recognized for coverage already provided."
-    synonyms: [premium earned, recognized premium]
+    synonyms: [premium earned, recognized premium, EP]
     maps_to_measure: earned_premium
     sql_expression: "SUM(insurance.fact_policy_monthly.earned_premium)"
     category: Financial
 
   Claims Incurred:
-    definition: "Paid claims plus outstanding reserves."
-    synonyms: [incurred loss, incurred claims, total loss]
+    definition: "Paid claims plus outstanding reserves (incurred_amount)."
+    synonyms: [incurred loss, incurred claims, total loss, incurred]
     maps_to_measure: claims_incurred
     sql_expression: "SUM(insurance.fact_claims.incurred_amount)"
     category: Claims
 
   Claims Paid:
     definition: "Claim amounts actually paid during the selected scope."
-    synonyms: [claim payout, paid loss, total payout]
+    synonyms: [claim payout, paid loss, total payout, paid claims]
     maps_to_measure: claims_paid
     sql_expression: "SUM(insurance.fact_claims.paid_amount)"
     category: Claims
 
+  Claim Count:
+    definition: "Number of distinct claims in scope."
+    synonyms: [number of claims, claims volume, claim volume, how many claims]
+    maps_to_measure: claim_count
+    sql_expression: "COUNT(DISTINCT insurance.fact_claims.claim_id)"
+    category: Claims
+
   Loss Ratio:
     definition: "Incurred claims divided by earned premium at a compatible period and business grain."
-    synonyms: [claims ratio, loss to premium ratio]
+    synonyms: [claims ratio, loss to premium ratio, LR]
     maps_to_measure: loss_ratio
     calculation_rules:
       - "Use incurred_amount, not reported_amount."
@@ -48,7 +55,7 @@ terms:
 
   Average Claim Severity:
     definition: "Incurred claim amount divided by distinct claim count."
-    synonyms: [severity, average loss, average claim cost]
+    synonyms: [severity, average loss, average claim cost, avg severity]
     maps_to_measure: average_claim_severity
     category: Claims
 
@@ -66,37 +73,152 @@ terms:
 
   Settlement Time:
     definition: "Days from claim report date to settlement date for settled claims."
-    synonyms: [claim cycle time, turnaround time, TAT]
+    synonyms: [claim cycle time, turnaround time, TAT, settlement days]
     category: Operations
 
   Reserve:
     definition: "Estimated remaining liability for reported claims not yet fully paid."
-    synonyms: [outstanding reserve, case reserve]
+    synonyms: [outstanding reserve, case reserve, reserve amount]
     category: Claims
 
   Line of Business:
     definition: "Insurance product grouping such as Motor, Health, or Property."
-    synonyms: [LOB, product line, insurance line]
+    synonyms: [LOB, product line, insurance line, business line]
     maps_to_dimension: Product
     category: Product
+
+  Motor:
+    definition: "Motor line of business (private car, commercial vehicle, OD/TP)."
+    synonyms: [auto, automobile, car insurance, motor LOB, vehicle]
+    maps_to_dimension: Product
+    sql_expression: "insurance.dim_product.line_of_business = 'Motor'"
+    category: Product
+
+  Health:
+    definition: "Health line of business (individual, family, group)."
+    synonyms: [health LOB, medical insurance, mediclaim]
+    maps_to_dimension: Product
+    sql_expression: "insurance.dim_product.line_of_business = 'Health'"
+    category: Product
+
+  Property:
+    definition: "Property line of business (fire, package, burglary)."
+    synonyms: [property LOB, fire insurance, SME property]
+    maps_to_dimension: Product
+    sql_expression: "insurance.dim_product.line_of_business = 'Property'"
+    category: Product
+
+  Region:
+    definition: "Geographic sales/claims territory. Values: West, North, South, East."
+    synonyms: [territory, geography, zone, area, geo]
+    maps_to_dimension: Region
+    category: Geography
+
+  East:
+    definition: "East region (e.g. West Bengal / Kolkata footprint)."
+    synonyms: [eastern, east region, EST]
+    maps_to_dimension: Region
+    sql_expression: "insurance.dim_region.region_name = 'East'"
+    category: Geography
+
+  West:
+    definition: "West region (e.g. Maharashtra / Mumbai footprint)."
+    synonyms: [western, west region, WST]
+    maps_to_dimension: Region
+    sql_expression: "insurance.dim_region.region_name = 'West'"
+    category: Geography
+
+  North:
+    definition: "North region (e.g. Delhi footprint)."
+    synonyms: [northern, north region, NTH]
+    maps_to_dimension: Region
+    sql_expression: "insurance.dim_region.region_name = 'North'"
+    category: Geography
+
+  South:
+    definition: "South region (e.g. Karnataka / Bengaluru footprint)."
+    synonyms: [southern, south region, STH]
+    maps_to_dimension: Region
+    sql_expression: "insurance.dim_region.region_name = 'South'"
+    category: Geography
+
+  Policy:
+    definition: "Insurance contract held by a customer (dim_policy)."
+    synonyms: [coverage, contract, policy contract, policyholder policy]
+    maps_to_dimension: Policy
+    category: Product
+
+  Customer:
+    definition: "Policyholder identified by customer_key on dim_policy."
+    synonyms: [policyholder, insured, client, customer key]
+    maps_to_dimension: Policy
+    sql_expression: "insurance.dim_policy.customer_key"
+    category: Customer
+
+  Agent:
+    definition: "Intermediary who sells/services policies (dim_agent)."
+    synonyms: [broker, channel partner, intermediary, advisor]
+    maps_to_dimension: Agent
+    category: People
+
+  Product:
+    definition: "Insurance product in dim_product (code, name, LOB, family)."
+    synonyms: [insurance product, plan name, product name]
+    maps_to_dimension: Product
+    category: Product
+
+  Claim Status:
+    definition: "Lifecycle status: Open, Approved, Settled, Repudiated, Under Review."
+    synonyms: [status, claim stage, claim state]
+    category: Claims
+
+  Premium:
+    definition: "Prefer earned_premium for loss ratio; written_premium for GWP. Always from fact_policy_monthly."
+    synonyms: [premium income, premium collected]
+    maps_to_measure: earned_premium
+    category: Financial
 
 domain_rules:
   - "SQL is the source of truth for numerical results."
   - "Documents provide management commentary, definitions, and actions, not database facts."
-  - "Never sum premium from claim rows."
-  - "Use incurred claims divided by earned premium for loss ratio."
+  - "Never sum premium from claim rows — use insurance.fact_policy_monthly."
+  - "Loss ratio = SUM(incurred_amount) / NULLIF(SUM(earned_premium), 0) at compatible grain."
   - "Use NULLIF to protect ratio denominators."
+  - "Map East/West/North/South (and EST/WST/NTH/STH) to dim_region.region_name / region_code."
+  - "Map Motor/Health/Property to dim_product.line_of_business."
+  - "Customer questions use dim_policy.customer_key; join claims/premium via policy_id."
+  - "Default analytical outputs must return a business dimension plus metric columns — never a single anonymous measure column unless the user explicitly asks for one number only."
+  - "For rankings and top-N, include a 1-based rank column (ROW_NUMBER starting at 1) plus the dimension label and metric."
+  - "Prefer LEFT JOIN from facts to dimensions so unmatched keys still appear."
+  - "Use reported_date for claims time filters and accounting_month for premium time filters."
+  - "When the user says period/month without specifying, prefer the latest 12 months ending at MAX(reported_date)."
 
 sql_patterns:
   monthly_claim_trend:
-    description: "Claims grouped by reported month"
+    description: "Claims grouped by reported month with count and incurred"
     trigger_words: [monthly claims, claims trend, by month]
-    pattern: "SELECT date_trunc('month', reported_date)::date AS month, SUM(incurred_amount) AS claims_incurred FROM insurance.fact_claims GROUP BY 1 ORDER BY 1"
+    pattern: >
+      SELECT date_trunc('month', c.reported_date)::date AS month,
+             COUNT(DISTINCT c.claim_id) AS claim_count,
+             SUM(c.incurred_amount) AS claims_incurred
+      FROM insurance.fact_claims c
+      GROUP BY 1 ORDER BY 1
   premium_by_product:
-    description: "Written and earned premium by product"
+    description: "Written and earned premium by product/LOB"
     trigger_words: [premium by product, GWP by line, earned premium]
-    pattern: "Aggregate insurance.fact_policy_monthly then join insurance.dim_product on product_id"
-  loss_ratio:
-    description: "Separately aggregate monthly claims and premium before calculating loss ratio"
-    trigger_words: [loss ratio, claims ratio]
-    pattern: "Claims CTE by month/product plus premium CTE by month/product; incurred / NULLIF(earned, 0)"
+    pattern: >
+      Aggregate insurance.fact_policy_monthly then join insurance.dim_product;
+      return product_name, line_of_business, written_premium, earned_premium
+  loss_ratio_by_region:
+    description: "Loss ratio by region with supporting columns"
+    trigger_words: [loss ratio by region, regional loss ratio, east loss ratio]
+    pattern: >
+      Aggregate claims by region_id and premium by region_id separately,
+      join on region, return region_name, claims_incurred, earned_premium, loss_ratio
+  top_products_by_claims:
+    description: "Ranked products by claim count / incurred"
+    trigger_words: [top products, highest claims, worst products]
+    pattern: >
+      SELECT ROW_NUMBER() OVER (ORDER BY metric DESC) AS rank,
+             product_name, line_of_business, claim_count, claims_incurred
+      — rank must start at 1
