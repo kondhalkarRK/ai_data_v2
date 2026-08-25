@@ -1883,6 +1883,18 @@ div[data-testid="stExpander"] details:hover summary{
   background: rgba(15, 23, 42, 0.45);
   border: 1px solid rgba(148, 163, 184, 0.14);
 }
+.chat-block-viz .chat-viz-pane{
+  animation: chatVizFade 0.22s ease-out;
+}
+@keyframes chatVizFade{
+  from{opacity:0.35; transform:translateY(4px);}
+  to{opacity:1; transform:translateY(0);}
+}
+.cgpt-composer .stButton > button{
+  font-size: 11px !important;
+  min-height: 2rem !important;
+  white-space: nowrap;
+}
 .chat-block-title{
   font-size: 12px;
   font-weight: 650;

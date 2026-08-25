@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASK-DB Enterprise Architecture</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --accent: #2563eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 28px 24px 48px;
+      line-height: 1.5;
+    }
+    header, .wrap, footer { max-width: 1180px; margin-left: auto; margin-right: auto; }
+    h1 { font-size: 1.6rem; margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0; }
+    .actions { margin: 16px 0 0; display: flex; gap: 10px; flex-wrap: wrap; }
+    a.btn, button {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    a.btn.secondary, button.secondary {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin: 16px 0;
+      overflow-x: auto;
+    }
+    .card h2 { margin: 0 0 10px; font-size: 1.05rem; }
+    .card p { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); }
+    footer { color: var(--muted); font-size: 12px; margin-top: 12px; }
+    @media print {
+      .actions { display: none; }
+      body { background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ASK-DB enterprise architecture</h1>
+    <p class="sub">
+      Six-layer view for project documentation: User Interface, Application, AI, Data, Analytics, Monitoring.
+    </p>
+    <div class="actions">
+      <a class="btn" href="askdb_enterprise_architecture.svg" download>Download SVG</a>
+      <a class="btn secondary" href="../ASKDB_INSURANCE_LEADERSHIP_NOTES.md">Leadership notes</a>
+      <a class="btn secondary" href="askdb_insurance_architecture.html">Insurance flow pack</a>
+      <button type="button" class="secondary" onclick="window.print()">Print / PDF</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>Architecture diagram</h2>
+      <p>Clean layered model suitable for leadership decks and technical design reviews.</p>
+      <object data="askdb_enterprise_architecture.svg" type="image/svg+xml" width="100%" height="760">
+        <img src="askdb_enterprise_architecture.svg" alt="ASK-DB enterprise architecture" width="100%" />
+      </object>
+    </div>
+
+    <div class="card">
+      <h2>Layer summary</h2>
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Components</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>User Interface</td>
+            <td>Chat, Dashboard, Visualization, Composer modes</td>
+            <td>Human interaction; Table|Chart toggle; bounded display</td>
+          </tr>
+          <tr>
+            <td>Application</td>
+            <td>Query Processor, Prompt Builder, Context Manager, Insight Generator</td>
+            <td>Orchestrate NLQ, anchors, BI insights</td>
+          </tr>
+          <tr>
+            <td>AI</td>
+            <td>LLM, Semantic Search, Embeddings, RAG</td>
+            <td>SQL generation; optional narration; retrieval helpers</td>
+          </tr>
+          <tr>
+            <td>Data</td>
+            <td>Insurance warehouse, metadata, glossary, vectors</td>
+            <td>Source of truth stays in PostgreSQL</td>
+          </tr>
+          <tr>
+            <td>Analytics</td>
+            <td>Chart, Table, Insight generators</td>
+            <td>Present small result frames with BI-grade findings</td>
+          </tr>
+          <tr>
+            <td>Monitoring</td>
+            <td>Token tracking, usage metrics, audit</td>
+            <td>Calls X/60 · Tokens Y/30K · purpose log</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    ASK-DB · files in <code>doc/diagram/</code>
+  </footer>
+</body>
+</html>

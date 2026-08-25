@@ -27,7 +27,59 @@ from ui.decision_share import (
 )
 
 RESULT_DISPLAY_LIMIT = 100
-CHAT_PREVIEW_ROWS = 8
+CHAT_PREVIEW_ROWS = 5
+
+# Composer output modes (Cursor-style chips)
+_ANSWER_MODE_META = {
+    "Full": {
+        "label": "Insights + Table + Chart",
+        "help": "Use for a complete answer: BI insights plus a table/chart view.",
+    },
+    "Insights": {
+        "label": "Insights",
+        "help": "Generate business insights from the returned data.",
+    },
+    "Table": {
+        "label": "Table",
+        "help": "Display structured tabular data.",
+    },
+    "Chart": {
+        "label": "Chart",
+        "help": "Visualize results as charts.",
+    },
+    "Narration": {
+        "label": "Narration",
+        "help": (
+            "Generate Insights + Table + Chart with LLM narration. "
+            "Use only when detailed explanations are required. Increases token consumption."
+        ),
+    },
+}
+
+
+def _normalize_answer_mode(mode: str | bool | None) -> str:
+    if isinstance(mode, bool):
+        return "Full" if mode else "Table"
+    m = (mode or "Full").strip()
+    legacy = {"Both": "Full", "Narration": "Narration", "Table": "Table"}
+    if m in legacy and m not in _ANSWER_MODE_META:
+        m = legacy.get(m, m)
+    if m == "Both":
+        return "Full"
+    if m not in _ANSWER_MODE_META:
+        return "Full"
+    return m
+
+
+def _answer_mode_flags(mode: str | bool | None) -> dict:
+    m = _normalize_answer_mode(mode)
+    return {
+        "mode": m,
+        "show_insight": m in ("Full", "Insights", "Narration"),
+        "show_viz": m in ("Full", "Table", "Chart", "Narration"),
+        "prefer_chart": m == "Chart",
+        "want_llm_narration": m == "Narration",
+    }
 
 
 def _render_limited_dataframe(rdf: pd.DataFrame, *, preview_rows: int | None = None) -> None:
@@ -174,11 +226,13 @@ def _render_query_answer_blocks(
     *,
     show_narr: bool,
     show_table: bool,
+    show_chart: bool = False,
+    prefer_chart: bool = False,
     rdf: pd.DataFrame | None,
     narr: dict | None,
     src_q: str,
 ) -> None:
-    """Clean Insight / Table / Chart blocks with corner expand."""
+    """Insight block (optional) + single Table|Chart toggle (one view at a time)."""
     ref = _chat_msg_ref(msg)
     if isinstance(rdf, pd.DataFrame) and not rdf.empty:
         st.session_state[f"_chat_payload_df_{ref}"] = rdf
@@ -208,35 +262,68 @@ def _render_query_answer_blocks(
             )
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if show_table and isinstance(rdf, pd.DataFrame):
+    show_viz = (show_table or show_chart) and isinstance(rdf, pd.DataFrame)
+    if show_viz:
         if rdf.empty:
             st.info("No rows returned for this question.")
         else:
-            st.markdown('<div class="chat-block">', unsafe_allow_html=True)
-            _chat_block_header(
-                f"Table · {len(rdf):,} rows",
-                button_key=f"exp_tbl_{ref}",
-                kind="table",
-                ref=ref,
-            )
-            _render_limited_dataframe(rdf, preview_rows=CHAT_PREVIEW_ROWS)
-            st.markdown("</div>", unsafe_allow_html=True)
+            view_key = f"tc_view_{ref}"
+            default_view = "Chart" if prefer_chart else "Table"
+            if view_key not in st.session_state:
+                st.session_state[view_key] = default_view
 
-            st.markdown('<div class="chat-block">', unsafe_allow_html=True)
-            _chat_block_header(
-                "Chart",
-                button_key=f"exp_cht_{ref}",
-                kind="chart",
-                ref=ref,
-            )
-            _render_chat_chart(
-                rdf.head(RESULT_DISPLAY_LIMIT),
-                src_q,
-                f"chat_{ref}",
-                show_controls=False,
-            )
-            st.caption("Tap ⛶ to change chart type and axes.")
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown('<div class="chat-block chat-block-viz">', unsafe_allow_html=True)
+            head_l, head_m, head_r = st.columns([0.42, 0.48, 0.1])
+            with head_l:
+                st.markdown(
+                    f'<div class="chat-block-title">Results · {len(rdf):,} rows</div>',
+                    unsafe_allow_html=True,
+                )
+            with head_m:
+                try:
+                    view = st.segmented_control(
+                        "View",
+                        options=["Table", "Chart"],
+                        key=view_key,
+                        label_visibility="collapsed",
+                    )
+                except Exception:
+                    view = st.radio(
+                        "View",
+                        options=["Table", "Chart"],
+                        key=view_key,
+                        horizontal=True,
+                        label_visibility="collapsed",
+                    )
+                if view not in ("Table", "Chart"):
+                    view = st.session_state.get(view_key) or default_view
+                    st.session_state[view_key] = view
+            with head_r:
+                expand_kind = "chart" if view == "Chart" else "table"
+                if st.button(
+                    "⛶",
+                    key=f"exp_viz_{ref}",
+                    help=f"Expand {view}",
+                    use_container_width=True,
+                ):
+                    st.session_state["_chat_expand"] = {
+                        "kind": expand_kind,
+                        "ref": ref,
+                    }
+                    st.rerun()
+
+            st.markdown('<div class="chat-viz-pane">', unsafe_allow_html=True)
+            if view == "Chart":
+                _render_chat_chart(
+                    rdf.head(RESULT_DISPLAY_LIMIT),
+                    src_q,
+                    f"chat_{ref}",
+                    show_controls=False,
+                )
+                st.caption("Tap ⛶ to change chart type and axes.")
+            else:
+                _render_limited_dataframe(rdf, preview_rows=CHAT_PREVIEW_ROWS)
+            st.markdown("</div></div>", unsafe_allow_html=True)
 try:
     from config.constants import OKF_ENABLED
 except ImportError:
@@ -427,11 +514,13 @@ def _safe_insights(df, limit=4):
         return []
 
 
-def _safe_narration(df, question, evidence=None):
+def _safe_narration(df, question, evidence=None, *, force_llm: bool = False):
     if narration_engine is None:
         return None
     try:
-        return narration_engine.generate_narration(df, question, evidence=evidence)
+        return narration_engine.generate_narration(
+            df, question, evidence=evidence, force_llm=force_llm
+        )
     except Exception:
         return None
 
@@ -1593,11 +1682,11 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     })
     st.session_state["_chat_needs_scroll"] = True
 
-    mode = st.session_state.get("chat_answer_mode")
-    if mode in ("Narration", "Table", "Both"):
-        narration_on = mode in ("Narration", "Both")
-    else:
-        narration_on = st.session_state.get("chat_narration_on", True)
+    mode = _normalize_answer_mode(st.session_state.get("chat_answer_mode"))
+    flags = _answer_mode_flags(mode)
+    narration_on = flags["show_insight"] or flags["want_llm_narration"]
+    st.session_state.chat_narration_on = narration_on
+    st.session_state.chat_answer_mode = mode
 
     # 1. Destructive
     if detect_destructive(q):
@@ -1770,8 +1859,13 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     except Exception:
         pass
 
-    want_narr = narration_on  # Table = skip LLM narration; Narration/Both = generate
-    narr = _safe_narration(df_result, q, evidence) if want_narr else None
+    want_insight = flags["show_insight"]
+    want_llm = flags["want_llm_narration"]
+    narr = (
+        _safe_narration(df_result, q, evidence, force_llm=want_llm)
+        if want_insight
+        else None
+    )
     summary = (narr or {}).get("result_summary") or (
         f"{len(df_result)} rows returned" if isinstance(df_result, pd.DataFrame) else "Done"
     )
@@ -1800,8 +1894,8 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             "evidence": evidence,
             "narration": narr,
             "result_summary": summary,
-            "force_narration": want_narr,
-            "answer_mode": st.session_state.get("chat_answer_mode", "Both"),
+            "force_narration": want_llm,
+            "answer_mode": mode,
             "source_question": q,
             "glossary_matches": list(st.session_state.get("last_glossary_matches") or []),
             "elapsed": elapsed,
@@ -1824,16 +1918,16 @@ def render_user_bubble(msg):
         st.caption(msg["timestamp"])
 
 
-def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
+def _render_assistant_content(msg, working_df, view_mode: str = "Full"):
     data = msg.get("data") or {}
     mtype = msg.get("message_type", "chat")
-    # Back-compat: old callers may pass bool narration_on
-    if isinstance(view_mode, bool):
-        mode = "Both" if view_mode else "Table"
-    else:
-        mode = (view_mode or "Both").strip()
-    show_table = mode in ("Table", "Both")
-    show_narr = mode in ("Narration", "Both")
+    # Prefer mode stored on the message; fall back to live composer mode
+    stored = (data.get("answer_mode") if isinstance(data, dict) else None) or view_mode
+    flags = _answer_mode_flags(stored)
+    show_table = flags["show_viz"]
+    show_chart = flags["show_viz"]
+    show_narr = flags["show_insight"]
+    prefer_chart = flags["prefer_chart"]
     card_cls = {
         "chat": "assistant-card card-chat",
         "query": "assistant-card card-query",
@@ -1921,6 +2015,8 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
             msg,
             show_narr=show_narr,
             show_table=show_table,
+            show_chart=show_chart,
+            prefer_chart=prefer_chart,
             rdf=rdf if isinstance(rdf, pd.DataFrame) else None,
             narr=narr,
             src_q=src_q,
@@ -1994,7 +2090,7 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Both"):
     # Keep timestamps off query cards — blocks already read cleanly.
 
 
-def render_assistant_bubble(msg, working_df, view_mode: str = "Both"):
+def render_assistant_bubble(msg, working_df, view_mode: str = "Full"):
     """Back-compat wrapper — renders inside native chat message shell."""
     with st.chat_message("assistant"):
         _render_assistant_content(msg, working_df, view_mode)
@@ -2004,7 +2100,10 @@ def render_chat_mode(working_df, tables, dfs):
     st.session_state.setdefault("chat_messages", [])
     if "chat_answer_mode" not in st.session_state:
         legacy = st.session_state.get("chat_narration_on", True)
-        st.session_state.chat_answer_mode = "Both" if legacy else "Table"
+        st.session_state.chat_answer_mode = "Full" if legacy else "Table"
+    st.session_state.chat_answer_mode = _normalize_answer_mode(
+        st.session_state.chat_answer_mode
+    )
 
     _run_chat_expand_dialog()
 
@@ -2016,7 +2115,7 @@ def render_chat_mode(working_df, tables, dfs):
     render_pinned_strip(on_ask=_queue_question)
 
     st.markdown('<div class="cgpt-chat-shell">', unsafe_allow_html=True)
-    chat_box = st.container(height=680, border=False)
+    chat_box = st.container(height=620, border=False)
     with chat_box:
         st.markdown('<div class="cgpt-thread">', unsafe_allow_html=True)
         if not st.session_state.chat_messages:
@@ -2062,32 +2161,41 @@ def render_chat_mode(working_df, tables, dfs):
                 ):
                     process_chat_message(sugs[1], working_df)
 
-    # Composer — pinned input bar (ChatGPT / Cursor style)
-    _mode_labels = {
-        "Both": "Insight + Table",
-        "Narration": "Insight only",
-        "Table": "Table + Chart",
-    }
-    if st.session_state.chat_answer_mode not in _mode_labels:
-        st.session_state.chat_answer_mode = "Both"
-
+    # Composer — Cursor-style output chips above chat input
     st.markdown('<div class="cgpt-composer">', unsafe_allow_html=True)
-    top_row_l, top_row_r = st.columns([1.2, 4.8])
-    with top_row_l:
-        mode = st.selectbox(
-            "Answer mode",
-            options=list(_mode_labels.keys()),
-            format_func=lambda k: _mode_labels[k],
-            label_visibility="collapsed",
-            key="chat_answer_mode",
-            help="Insight = narration · Table + Chart = data views · Insight + Table = both",
+    st.markdown(
+        '<div class="cgpt-composer-hint">Choose what to generate · Enter to send · ⛶ expands</div>',
+        unsafe_allow_html=True,
+    )
+    chip_cols = st.columns(len(_ANSWER_MODE_META))
+    for col, (key, meta) in zip(chip_cols, _ANSWER_MODE_META.items()):
+        with col:
+            active = st.session_state.chat_answer_mode == key
+            label = meta["label"]
+            if st.button(
+                label,
+                key=f"chat_mode_chip_{key}",
+                use_container_width=True,
+                type="primary" if active else "secondary",
+                help=meta["help"],
+            ):
+                st.session_state.chat_answer_mode = key
+                st.rerun()
+
+    mode = _normalize_answer_mode(st.session_state.chat_answer_mode)
+    flags = _answer_mode_flags(mode)
+    st.session_state.chat_narration_on = flags["show_insight"]
+    if mode == "Narration":
+        st.caption(
+            "Narration uses the LLM for detailed explanations and increases token consumption. "
+            "Prefer Insights + Table + Chart for routine analysis."
         )
-    with top_row_r:
-        st.markdown(
-            '<div class="cgpt-composer-hint">Enter to send · ⛶ expands Insight, Table, or Chart</div>',
-            unsafe_allow_html=True,
-        )
-    st.session_state.chat_narration_on = mode in ("Narration", "Both")
+    try:
+        from core.llm_client import usage_caption
+        st.caption(usage_caption())
+    except Exception:
+        pass
+
     question = st.chat_input(
         "Ask a question about your data…",
         key="chat_main_input",

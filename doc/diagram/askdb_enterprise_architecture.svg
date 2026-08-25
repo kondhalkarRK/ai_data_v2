@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 920" width="1180" height="920" role="img" aria-label="ASK-DB enterprise architecture six layers">
+  <defs>
+    <style>
+      .t { font-family: Segoe UI, Helvetica, Arial, sans-serif; }
+      .title { font-size: 22px; font-weight: 700; fill: #0f172a; }
+      .sub { font-size: 12px; fill: #64748b; }
+      .layer { font-size: 11px; font-weight: 700; fill: #334155; letter-spacing: 0.06em; }
+      .boxh { font-size: 13px; font-weight: 650; fill: #0f172a; }
+      .boxs { font-size: 11px; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1180" height="920" fill="#f8fafc" rx="8"/>
+  <text x="40" y="42" class="t title">ASK-DB Enterprise Architecture</text>
+  <text x="40" y="64" class="t sub">Insurance Analytics Copilot  UI · Application · AI · Data · Analytics · Monitoring</text>
+
+  <!-- Layer 1 UI -->
+  <rect x="40" y="90" width="1100" height="110" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="56" y="112" class="t layer">1. USER INTERFACE LAYER</text>
+  <rect x="56" y="128" width="240" height="54" rx="8" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="176" y="150" text-anchor="middle" class="t boxh">Chat Interface</text>
+  <text x="176" y="168" text-anchor="middle" class="t boxs">NL questions · clarify chips</text>
+  <rect x="316" y="128" width="240" height="54" rx="8" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="436" y="150" text-anchor="middle" class="t boxh">Dashboard</text>
+  <text x="436" y="168" text-anchor="middle" class="t boxs">KPI · Preview · DQ</text>
+  <rect x="576" y="128" width="240" height="54" rx="8" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="696" y="150" text-anchor="middle" class="t boxh">Visualization Layer</text>
+  <text x="696" y="168" text-anchor="middle" class="t boxs">Table | Chart toggle</text>
+  <rect x="836" y="128" width="280" height="54" rx="8" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="976" y="150" text-anchor="middle" class="t boxh">Composer Modes</text>
+  <text x="976" y="168" text-anchor="middle" class="t boxs">Insights · Table · Chart · Full · Narration</text>
+
+  <!-- Layer 2 Application -->
+  <rect x="40" y="220" width="1100" height="110" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="56" y="242" class="t layer">2. APPLICATION LAYER</text>
+  <rect x="56" y="258" width="240" height="54" rx="8" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="176" y="280" text-anchor="middle" class="t boxh">Query Processor</text>
+  <text x="176" y="298" text-anchor="middle" class="t boxs">NLQ · guardrails · run_query</text>
+  <rect x="316" y="258" width="240" height="54" rx="8" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="436" y="280" text-anchor="middle" class="t boxh">Prompt Builder</text>
+  <text x="436" y="298" text-anchor="middle" class="t boxs">Schema + semantic context</text>
+  <rect x="576" y="258" width="240" height="54" rx="8" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="696" y="280" text-anchor="middle" class="t boxh">Context Manager</text>
+  <text x="696" y="298" text-anchor="middle" class="t boxs">SQL anchor · conversation</text>
+  <rect x="836" y="258" width="280" height="54" rx="8" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="976" y="280" text-anchor="middle" class="t boxh">Insight Generator</text>
+  <text x="976" y="298" text-anchor="middle" class="t boxs">BI rules · optional LLM narrate</text>
+
+  <!-- Layer 3 AI -->
+  <rect x="40" y="350" width="1100" height="110" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="56" y="372" class="t layer">3. AI LAYER</text>
+  <rect x="56" y="388" width="240" height="54" rx="8" fill="#faf5ff" stroke="#d8b4fe"/>
+  <text x="176" y="410" text-anchor="middle" class="t boxh">LLM Service</text>
+  <text x="176" y="428" text-anchor="middle" class="t boxs">SQL gen · narration (opt-in)</text>
+  <rect x="316" y="388" width="240" height="54" rx="8" fill="#faf5ff" stroke="#d8b4fe"/>
+  <text x="436" y="410" text-anchor="middle" class="t boxh">Semantic Search</text>
+  <text x="436" y="428" text-anchor="middle" class="t boxs">Measures · dims · synonyms</text>
+  <rect x="576" y="388" width="240" height="54" rx="8" fill="#faf5ff" stroke="#d8b4fe"/>
+  <text x="696" y="410" text-anchor="middle" class="t boxh">Embedding Service</text>
+  <text x="696" y="428" text-anchor="middle" class="t boxs">Schema / glossary vectors</text>
+  <rect x="836" y="388" width="280" height="54" rx="8" fill="#faf5ff" stroke="#d8b4fe"/>
+  <text x="976" y="410" text-anchor="middle" class="t boxh">RAG Pipeline</text>
+  <text x="976" y="428" text-anchor="middle" class="t boxs">Query memory · OKF (optional)</text>
+
+  <!-- Layer 4 Data -->
+  <rect x="40" y="480" width="1100" height="110" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="56" y="502" class="t layer">4. DATA LAYER</text>
+  <rect x="56" y="518" width="240" height="54" rx="8" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="176" y="540" text-anchor="middle" class="t boxh">Insurance Dataset</text>
+  <text x="176" y="558" text-anchor="middle" class="t boxs">PostgreSQL ~1.5M claims</text>
+  <rect x="316" y="518" width="240" height="54" rx="8" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="436" y="540" text-anchor="middle" class="t boxh">Metadata Repository</text>
+  <text x="436" y="558" text-anchor="middle" class="t boxs">semantic_model YAML</text>
+  <rect x="576" y="518" width="240" height="54" rx="8" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="696" y="540" text-anchor="middle" class="t boxh">Glossary Store</text>
+  <text x="696" y="558" text-anchor="middle" class="t boxs">Business terms · domain rules</text>
+  <rect x="836" y="518" width="280" height="54" rx="8" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="976" y="540" text-anchor="middle" class="t boxh">Vector Database</text>
+  <text x="976" y="558" text-anchor="middle" class="t boxs">Chroma · schema / OKF index</text>
+
+  <!-- Layer 5 Analytics -->
+  <rect x="40" y="610" width="1100" height="110" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="56" y="632" class="t layer">5. ANALYTICS LAYER</text>
+  <rect x="56" y="648" width="340" height="54" rx="8" fill="#ecfeff" stroke="#67e8f9"/>
+  <text x="226" y="670" text-anchor="middle" class="t boxh">Chart Generator</text>
+  <text x="226" y="688" text-anchor="middle" class="t boxs">Auto chart type · Plotly / matplotlib</text>
+  <rect x="416" y="648" width="340" height="54" rx="8" fill="#ecfeff" stroke="#67e8f9"/>
+  <text x="586" y="670" text-anchor="middle" class="t boxh">Table Generator</text>
+  <text x="586" y="688" text-anchor="middle" class="t boxs">Bounded frames d1000 / display d100</text>
+  <rect x="776" y="648" width="340" height="54" rx="8" fill="#ecfeff" stroke="#67e8f9"/>
+  <text x="946" y="670" text-anchor="middle" class="t boxh">Insight Generator</text>
+  <text x="946" y="688" text-anchor="middle" class="t boxs">Trend · risk · financial · anomaly · actions</text>
+
+  <!-- Layer 6 Monitoring -->
+  <rect x="40" y="740" width="1100" height="110" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="56" y="762" class="t layer">6. MONITORING LAYER</text>
+  <rect x="56" y="778" width="340" height="54" rx="8" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="226" y="800" text-anchor="middle" class="t boxh">Token Tracking</text>
+  <text x="226" y="818" text-anchor="middle" class="t boxs">Calls X/60 · Tokens Y/30K</text>
+  <rect x="416" y="778" width="340" height="54" rx="8" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="586" y="800" text-anchor="middle" class="t boxh">Usage Metrics</text>
+  <text x="586" y="818" text-anchor="middle" class="t boxs">Purpose log · est. cost · progress</text>
+  <rect x="776" y="778" width="340" height="54" rx="8" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="946" y="800" text-anchor="middle" class="t boxh">Audit Logs</text>
+  <text x="946" y="818" text-anchor="middle" class="t boxs">Session LLM usage · SQL evidence</text>
+
+  <text x="40" y="890" class="t sub">ASK-DB · Capgemini AI Data Platform · Numbers from PostgreSQL · Streamlit receives bounded result frames only</text>
+</svg>

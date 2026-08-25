@@ -197,9 +197,8 @@ class NarrationEngine:
                 knowledge_lines.append(f"[{source}, {locator}] {body}")
             knowledge_context = "\n".join(knowledge_lines) or "None retrieved."
 
-            prompt = f"""You are a concise insurance analytics executive.
-Use DATA only for numerical findings. Use BUSINESS KNOWLEDGE only for
-definitions, management commentary, operating context, or actions.
+            prompt = f"""You are a senior insurance BI analyst writing executive insights.
+Use DATA only for numbers. Prefer actionable intelligence over generic summaries.
 
 QUESTION: "{question}"
 {sql_hint}
@@ -210,15 +209,21 @@ DATA:
 BUSINESS KNOWLEDGE:
 {knowledge_context}
 
-Format (keep brief — max ~120 words total):
+Cover when supported by DATA (skip empty sections):
+- Trend analysis (growth, decline, seasonality)
+- Risk (concentration by region/product, claim pressure)
+- Financial (premium-to-claim / loss ratio signals)
+- Anomalies (spikes, drops, outliers)
+- One concrete business recommendation
 
-HEADLINE: one line with the key number
+Format (max ~160 words):
+
+HEADLINE: one line with the key business takeaway
 NARRATIVE: 1–2 short paragraphs with specific values
-FINDINGS: 2–3 bullets with numbers
-RECOMMENDATION: one follow-up action
+FINDINGS: 3–5 bullets with numbers (trend/risk/financial/anomaly)
+RECOMMENDATION: one actionable follow-up
 
-No markdown fences. No invented figures. Never treat a document statement as a
-database result. Mention document context only when it is relevant."""
+No markdown fences. No invented figures."""
 
             text = call_llm_narration(prompt)
             parsed = self._parse_llm_narration(text or "", question)
@@ -244,6 +249,7 @@ database result. Mention document context only when it is relevant."""
         evidence: dict | None = None,
         mode: str = "standard",
         knowledge_snippets: list | None = None,
+        force_llm: bool = False,
     ) -> dict[str, Any]:
         q_hint = self._q_hint(question)
 
@@ -263,8 +269,8 @@ database result. Mention document context only when it is relevant."""
                 "knowledge_citations": [],
             }
 
-        llm_narr = None
-        if NARRATION_USE_LLM or self._wants_llm_narration(question):
+        use_llm = bool(force_llm) or NARRATION_USE_LLM or self._wants_llm_narration(question)
+        if use_llm:
             if knowledge_snippets is None and OKF_ENABLED:
                 try:
                     from features.okf_knowledge.okf_retriever import (
@@ -281,8 +287,16 @@ database result. Mention document context only when it is relevant."""
                 evidence,
                 knowledge_snippets=knowledge_snippets,
             )
-        if llm_narr:
-            return llm_narr
+            if llm_narr:
+                return llm_narr
+
+        try:
+            from features.business_insights import generate_business_insights
+            bi = generate_business_insights(result_df, question)
+            if bi and (bi.get("key_findings") or bi.get("narrative_text")):
+                return bi
+        except Exception:
+            pass
 
         return self._generate_rule_based_narration(
             result_df, question, intent=intent, evidence=evidence,
