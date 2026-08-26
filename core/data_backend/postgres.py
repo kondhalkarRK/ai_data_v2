@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from typing import Any
 
 import pandas as pd
@@ -30,6 +31,14 @@ class PostgresBackend(DataBackend):
             1, int(config.get("statement_timeout_seconds") or 30)
         )
         self._pool = None
+        self._catalog_cache: list[tuple] | None = None
+        self._catalog_cache_ts: float = 0.0
+        self._health_cache: tuple[bool, str] | None = None
+        self._health_cache_ts: float = 0.0
+        self._schema_text_cache: str | None = None
+        self._fingerprint_cache: str | None = None
+        self._catalog_ttl_seconds = 120.0
+        self._health_ttl_seconds = 60.0
 
     @property
     def backend_id(self) -> str:
@@ -46,23 +55,36 @@ class PostgresBackend(DataBackend):
                 "Install requirements.txt and restart Streamlit."
             )
 
+    def _pool_kwargs(self) -> dict[str, Any]:
+        """Build psycopg connect kwargs from discrete fields or a connection URL."""
+        url = (self._config.get("connection_url") or "").strip()
+        timeout = int(self._config.get("connect_timeout_seconds", 10))
+        if url:
+            # libpq connection string / URI; still force a bounded connect timeout.
+            return {
+                "conninfo": url,
+                "connect_timeout": timeout,
+                "application_name": "askdb_streamlit",
+            }
+        return {
+            "host": self._config.get("host", "localhost"),
+            "port": int(self._config.get("port", 5432)),
+            "dbname": self._config.get("database", "askdb_dev"),
+            "user": self._config.get("user", "askdb_app"),
+            "password": self._config.get("password") or "",
+            "sslmode": self._config.get("sslmode", "prefer"),
+            "connect_timeout": timeout,
+            "application_name": "askdb_streamlit",
+        }
+
     def _get_pool(self):
         self._ensure_driver()
         if self._pool is None:
+            kwargs = self._pool_kwargs()
+            conninfo = kwargs.pop("conninfo", "")
             self._pool = ConnectionPool(
-                conninfo="",
-                kwargs={
-                    "host": self._config.get("host", "localhost"),
-                    "port": int(self._config.get("port", 5432)),
-                    "dbname": self._config.get("database", "askdb_dev"),
-                    "user": self._config.get("user", "askdb_app"),
-                    "password": self._config.get("password") or "",
-                    "sslmode": self._config.get("sslmode", "prefer"),
-                    "connect_timeout": int(
-                        self._config.get("connect_timeout_seconds", 10)
-                    ),
-                    "application_name": "askdb_streamlit",
-                },
+                conninfo=conninfo,
+                kwargs=kwargs,
                 min_size=max(1, int(self._config.get("pool_min_size") or 1)),
                 max_size=max(1, int(self._config.get("pool_max_size") or 5)),
                 open=True,
@@ -78,16 +100,29 @@ class PostgresBackend(DataBackend):
             self._pool = None
 
     def health_check(self) -> tuple[bool, str]:
-        if not self._config.get("password"):
+        url = (self._config.get("connection_url") or "").strip()
+        if not url and not self._config.get("password"):
             return False, "PostgreSQL password is not configured."
+        now = time.time()
+        if (
+            self._health_cache is not None
+            and (now - self._health_cache_ts) < self._health_ttl_seconds
+        ):
+            return self._health_cache
         try:
             with self._get_pool().connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT current_database(), current_schema()")
                     database, _ = cur.fetchone()
-            return True, f"Connected to {database}.{self._schema}."
+            result = (True, f"Connected to {database}.{self._schema}.")
+            self._health_cache = result
+            self._health_cache_ts = now
+            return result
         except Exception as exc:
-            return False, f"PostgreSQL unavailable: {exc}"
+            result = (False, f"PostgreSQL unavailable: {exc}")
+            self._health_cache = result
+            self._health_cache_ts = now
+            return result
 
     def execute_sql(self, sql: str) -> tuple[pd.DataFrame | None, str | None]:
         safe, reason = sql_is_safe(sql)
@@ -99,6 +134,15 @@ class PostgresBackend(DataBackend):
             f"SELECT * FROM ({statement}) AS _askdb_result "
             f"LIMIT {self._max_rows + 1}"
         )
+        t1 = time.perf_counter()
+        try:
+            from core.observability import span as obs_span
+        except Exception:
+            obs_span = None
+        exec_cm = obs_span("pg.execute") if obs_span else None
+        rec = {}
+        if exec_cm is not None:
+            rec = exec_cm.__enter__()
         try:
             with self._get_pool().connection() as conn:
                 with conn.transaction():
@@ -116,11 +160,31 @@ class PostgresBackend(DataBackend):
             result = pd.DataFrame(rows[: self._max_rows], columns=columns)
             result.attrs["askdb_truncated"] = truncated
             result.attrs["askdb_max_rows"] = self._max_rows
+            latency_ms = int((time.perf_counter() - t1) * 1000)
+            result.attrs["askdb_db_ms"] = latency_ms
+            if rec is not None:
+                rec.setdefault("attrs", {})
+                rec["attrs"]["rows"] = len(result)
+                rec["attrs"]["truncated"] = truncated
+                rec["attrs"]["sql_chars"] = len(statement)
+            if exec_cm is not None:
+                exec_cm.__exit__(None, None, None)
             return result, None
         except Exception as exc:
+            if rec is not None:
+                rec["ok"] = False
+                rec["error"] = str(exc)[:300]
+            if exec_cm is not None:
+                exec_cm.__exit__(None, None, None)
             return None, str(exc)
 
     def _catalog_rows(self) -> list[tuple]:
+        now = time.time()
+        if (
+            self._catalog_cache is not None
+            and (now - self._catalog_cache_ts) < self._catalog_ttl_seconds
+        ):
+            return self._catalog_cache
         query = """
             SELECT table_name, column_name, data_type, ordinal_position
             FROM information_schema.columns
@@ -130,7 +194,12 @@ class PostgresBackend(DataBackend):
         with self._get_pool().connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, (self._schema,))
-                return cur.fetchall()
+                rows = cur.fetchall()
+        self._catalog_cache = rows
+        self._catalog_cache_ts = now
+        self._schema_text_cache = None
+        self._fingerprint_cache = None
+        return rows
 
     def list_tables(self) -> list[str]:
         return [name for name, _kind in self.list_relations()]
@@ -164,6 +233,8 @@ class PostgresBackend(DataBackend):
         return [name for name, kind in self.list_relations() if kind == "BASE TABLE"]
 
     def describe_schema(self) -> str:
+        if self._schema_text_cache:
+            return self._schema_text_cache
         try:
             lines: list[str] = []
             current_table = None
@@ -172,7 +243,10 @@ class PostgresBackend(DataBackend):
                     current_table = table
                     lines.append(f"TABLE {self._schema}.{table}:")
                 lines.append(f"  {column} ({data_type})")
-            return "\n".join(lines)
+            text = "\n".join(lines)
+            # Keep prompt lean: facts + key dims first, cap size
+            self._schema_text_cache = text[:4500] if len(text) > 4500 else text
+            return self._schema_text_cache
         except Exception:
             return ""
 
@@ -265,6 +339,8 @@ class PostgresBackend(DataBackend):
                 return pd.DataFrame(cur.fetchall(), columns=columns)
 
     def get_dataset_fingerprint(self) -> str:
+        if self._fingerprint_cache:
+            return self._fingerprint_cache
         try:
             payload = {
                 "backend": self.backend_id,
@@ -275,6 +351,7 @@ class PostgresBackend(DataBackend):
             digest = hashlib.sha256(
                 json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
             ).hexdigest()[:16]
-            return f"postgres:{digest}"
+            self._fingerprint_cache = f"postgres:{digest}"
+            return self._fingerprint_cache
         except Exception:
             return f"postgres:{self._config.get('database')}:{self._schema}:unavailable"

@@ -129,18 +129,38 @@ def _invoke_llm(
         st.error("🚫 LLM token budget reached (Tokens / 30K).")
         return None
 
+    t0 = time.perf_counter()
     try:
-        bound = llm.bind(max_completion_tokens=max_completion_tokens)
-        resp = bound.invoke(prompt)
+        from core.observability import span as obs_span
     except Exception:
+        obs_span = None
+
+    def _do_invoke():
         try:
-            resp = llm.invoke(prompt)
-        except Exception as e:
-            st.error(f"⚠️ AI service call failed: {e}")
-            return None
+            bound = llm.bind(max_completion_tokens=max_completion_tokens)
+            return bound.invoke(prompt)
+        except Exception:
+            return llm.invoke(prompt)
+
+    rec = {"attrs": {}}
+    resp = None
+    try:
+        if obs_span is not None:
+            with obs_span(f"llm.{purpose or 'other'}", prompt_chars=len(prompt or "")) as rec:
+                rec.setdefault("attrs", {})["prompt_chars"] = len(prompt or "")
+                resp = _do_invoke()
+        else:
+            resp = _do_invoke()
+    except Exception as e:
+        st.error(f"⚠️ AI service call failed: {e}")
+        return None
 
     text = getattr(resp, "content", str(resp))
     prompt_tok, completion_tok, total_tok = _extract_usage_tokens(resp, prompt, text)
+    duration_ms = int((time.perf_counter() - t0) * 1000)
+    if isinstance(rec, dict):
+        rec.setdefault("attrs", {})["tokens"] = total_tok
+        rec.setdefault("attrs", {})["duration_ms"] = duration_ms
 
     # Soft-clamp remaining budget
     remaining = max_tokens - int(st.session_state.total_tokens or 0)
@@ -156,6 +176,8 @@ def _invoke_llm(
         "completion_tokens_est": completion_tok,
         "total_tokens_est": total_tok,
         "ts": time.time(),
+        "duration_ms": duration_ms,
+        "prompt_chars": len(prompt or ""),
     }
     log = list(st.session_state.get("llm_usage_log") or [])
     log.append(entry)

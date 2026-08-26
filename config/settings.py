@@ -60,6 +60,31 @@ def _as_int(value, default: int) -> int:
         return default
 
 
+def _as_bool(value, default: bool = False) -> bool:
+    if value is None or value == "":
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def is_streamlit_cloud() -> bool:
+    """True when running on Streamlit Community Cloud (not local `streamlit run`)."""
+    if _as_bool(os.getenv("IS_STREAMLIT_CLOUD"), False):
+        return True
+    if os.getenv("STREAMLIT_RUNTIME_ENV", "").strip().lower() == "cloud":
+        return True
+    # Community Cloud mounts the repo under /mount/src
+    if os.path.isdir("/mount/src"):
+        return True
+    return False
+
+
+def is_loopback_host(host: str | None) -> bool:
+    h = (host or "").strip().lower()
+    return h in {"", "localhost", "127.0.0.1", "::1"}
+
+
 def get_data_config() -> dict:
     """Return backend configuration without exposing credentials to the UI."""
     backend = str(_secret("DATA_BACKEND", "csv_duckdb")).strip().lower()
@@ -67,12 +92,29 @@ def get_data_config() -> dict:
         logger.warning("Unknown DATA_BACKEND=%s; using csv_duckdb.", backend)
         backend = "csv_duckdb"
 
+    # Default SSL: prefer locally; require on Streamlit Cloud (managed Postgres).
+    default_ssl = "require" if is_streamlit_cloud() else "prefer"
+    # Fall back to CSV/DuckDB when Postgres is unreachable (needed for Streamlit Cloud
+    # when secrets still point at localhost, or the remote DB is down).
+    fallback_csv = _as_bool(
+        _secret("POSTGRES_FALLBACK_CSV", "true"),
+        True,
+    )
+
     return {
         "backend": backend,
         "industry_pack": str(
             _secret("INDUSTRY_PACK", "insurance" if backend == "postgres" else "automotive")
         ).strip().lower(),
+        "postgres_fallback_csv": fallback_csv,
         "postgres": {
+            # Optional full URL (Neon/Supabase/etc.). When set, host/user/password are ignored.
+            "connection_url": _section_secret(
+                "postgres", "connection_url", "POSTGRES_URL", ""
+            )
+            or _section_secret(
+                "postgres", "url", "DATABASE_URL", ""
+            ),
             "host": _section_secret("postgres", "host", "POSTGRES_HOST", "localhost"),
             "port": _as_int(
                 _section_secret("postgres", "port", "POSTGRES_PORT", 5432),
@@ -91,7 +133,7 @@ def get_data_config() -> dict:
                 "postgres", "schema", "POSTGRES_SCHEMA", "insurance"
             ),
             "sslmode": _section_secret(
-                "postgres", "sslmode", "POSTGRES_SSLMODE", "prefer"
+                "postgres", "sslmode", "POSTGRES_SSLMODE", default_ssl
             ),
             "connect_timeout_seconds": _as_int(
                 _section_secret(

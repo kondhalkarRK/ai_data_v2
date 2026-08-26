@@ -28,6 +28,9 @@ from ui.decision_share import (
 
 RESULT_DISPLAY_LIMIT = 100
 CHAT_PREVIEW_ROWS = 5
+# Expand dialog: open fast with a small slice; reveal more on demand (no re-query).
+EXPAND_INITIAL_ROWS = 20
+CHART_INITIAL_POINTS = 20
 
 # Composer output modes (Cursor-style chips)
 _ANSWER_MODE_META = {
@@ -122,6 +125,7 @@ def _chat_block_header(title: str, *, button_key: str, kind: str, ref: str) -> N
             help=f"Expand {title}",
             use_container_width=True,
         ):
+            st.session_state.pop(f"_chat_expand_all_{ref}_{kind}", None)
             st.session_state["_chat_expand"] = {"kind": kind, "ref": ref}
             st.rerun()
 
@@ -172,7 +176,12 @@ def _render_chat_chart(
 
 
 def _run_chat_expand_dialog() -> None:
-    """One large expand dialog for table / chart / narration."""
+    """One large expand dialog for table / chart / narration.
+
+    Table/chart open on a small slice (20 rows) so the dialog is instant;
+    remaining rows (up to RESULT_DISPLAY_LIMIT) load only when the user asks —
+    data is already in session_state (no Postgres round-trip).
+    """
     payload = st.session_state.get("_chat_expand")
     if not payload:
         return
@@ -180,32 +189,87 @@ def _run_chat_expand_dialog() -> None:
     ref = payload.get("ref")
     titles = {"table": "Results table", "chart": "Chart", "narration": "Insight"}
     title = titles.get(kind, "Expand")
+    show_all_key = f"_chat_expand_all_{ref}_{kind}"
 
     @st.dialog(title, width="large")
     def _dialog() -> None:
         if kind == "table":
             df = st.session_state.get(f"_chat_payload_df_{ref}")
             if isinstance(df, pd.DataFrame) and not df.empty:
+                capped = df.head(RESULT_DISPLAY_LIMIT)
+                total = len(capped)
+                show_all = bool(st.session_state.get(show_all_key))
+                n_show = total if show_all else min(EXPAND_INITIAL_ROWS, total)
+                view = capped.head(n_show)
                 safe_dataframe(
-                    df.head(RESULT_DISPLAY_LIMIT),
+                    view,
                     use_container_width=True,
+                    height=min(420, 36 + 28 * max(n_show, 3)),
                 )
                 st.caption(
-                    f"{min(len(df), RESULT_DISPLAY_LIMIT):,} rows · "
-                    f"{df.shape[1]} columns"
+                    f"Showing {n_show:,} of {total:,} rows"
+                    + (
+                        f" (result has {len(df):,} · display cap {RESULT_DISPLAY_LIMIT:,})"
+                        if len(df) > total
+                        else f" · {capped.shape[1]} columns"
+                    )
                 )
+                if not show_all and total > EXPAND_INITIAL_ROWS:
+                    more = total - EXPAND_INITIAL_ROWS
+                    if st.button(
+                        f"Show remaining {more:,} rows",
+                        key=f"chat_dlg_more_tbl_{ref}",
+                        use_container_width=True,
+                        type="primary",
+                    ):
+                        st.session_state[show_all_key] = True
+                        st.rerun()
+                elif show_all and total > EXPAND_INITIAL_ROWS:
+                    if st.button(
+                        f"Show first {EXPAND_INITIAL_ROWS} only",
+                        key=f"chat_dlg_less_tbl_{ref}",
+                        use_container_width=True,
+                    ):
+                        st.session_state[show_all_key] = False
+                        st.rerun()
             else:
                 st.info("No table for this answer.")
         elif kind == "chart":
             df = st.session_state.get(f"_chat_payload_df_{ref}")
             q = st.session_state.get(f"_chat_payload_q_{ref}") or ""
             if isinstance(df, pd.DataFrame) and not df.empty:
+                capped = df.head(RESULT_DISPLAY_LIMIT)
+                total = len(capped)
+                show_all = bool(st.session_state.get(show_all_key))
+                n_show = total if show_all else min(CHART_INITIAL_POINTS, total)
                 _render_chat_chart(
-                    df.head(RESULT_DISPLAY_LIMIT),
+                    capped.head(n_show),
                     q,
-                    f"dlg_{ref}",
+                    f"dlg_{ref}_{'all' if show_all else 'fast'}",
                     show_controls=True,
                 )
+                st.caption(
+                    f"Chart uses {n_show:,} of {total:,} rows"
+                    + (f" (capped at {RESULT_DISPLAY_LIMIT:,})" if len(df) > total else "")
+                )
+                if not show_all and total > CHART_INITIAL_POINTS:
+                    more = total - CHART_INITIAL_POINTS
+                    if st.button(
+                        f"Plot remaining {more:,} points",
+                        key=f"chat_dlg_more_cht_{ref}",
+                        use_container_width=True,
+                        type="primary",
+                    ):
+                        st.session_state[show_all_key] = True
+                        st.rerun()
+                elif show_all and total > CHART_INITIAL_POINTS:
+                    if st.button(
+                        f"Plot first {CHART_INITIAL_POINTS} only",
+                        key=f"chat_dlg_less_cht_{ref}",
+                        use_container_width=True,
+                    ):
+                        st.session_state[show_all_key] = False
+                        st.rerun()
             else:
                 st.info("No chart for this answer.")
         elif kind == "narration":
@@ -216,6 +280,7 @@ def _run_chat_expand_dialog() -> None:
                 st.info("No insight text for this answer.")
         if st.button("Close", key=f"chat_dlg_close_{ref}", use_container_width=True):
             st.session_state.pop("_chat_expand", None)
+            st.session_state.pop(show_all_key, None)
             st.rerun()
 
     _dialog()
@@ -306,6 +371,9 @@ def _render_query_answer_blocks(
                     help=f"Expand {view}",
                     use_container_width=True,
                 ):
+                    expand_kind = "chart" if view == "Chart" else "table"
+                    # Always open expand on the fast 20-row slice
+                    st.session_state.pop(f"_chat_expand_all_{ref}_{expand_kind}", None)
                     st.session_state["_chat_expand"] = {
                         "kind": expand_kind,
                         "ref": ref,
@@ -315,12 +383,17 @@ def _render_query_answer_blocks(
             st.markdown('<div class="chat-viz-pane">', unsafe_allow_html=True)
             if view == "Chart":
                 _render_chat_chart(
-                    rdf.head(RESULT_DISPLAY_LIMIT),
+                    rdf.head(CHART_INITIAL_POINTS),
                     src_q,
                     f"chat_{ref}",
                     show_controls=False,
                 )
-                st.caption("Tap ⛶ to change chart type and axes.")
+                n_c = min(len(rdf), CHART_INITIAL_POINTS)
+                extra = max(0, min(len(rdf), RESULT_DISPLAY_LIMIT) - n_c)
+                st.caption(
+                    f"Chart preview · {n_c:,} points"
+                    + (f" · ⛶ to plot up to {RESULT_DISPLAY_LIMIT:,} more" if extra else " · ⛶ to expand")
+                )
             else:
                 _render_limited_dataframe(rdf, preview_rows=CHAT_PREVIEW_ROWS)
             st.markdown("</div></div>", unsafe_allow_html=True)
@@ -1820,6 +1893,18 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         if status is not None:
             status.update(label=random.choice(_CHAT_STATUS["run"]))
         t0 = time.time()
+        try:
+            from core.observability import start_trace, finish_trace, span as obs_span
+
+            start_trace(
+                q,
+                backend="postgres" if postgres_mode_enabled() else "duckdb",
+                answer_mode=mode,
+                want_llm_narration=flags.get("want_llm_narration"),
+            )
+        except Exception:
+            obs_span = None
+            finish_trace = None
         out = run_query(working_df, q)
         if isinstance(out, tuple) and len(out) == 4:
             df_result, sql, err, evidence = out
@@ -1829,6 +1914,11 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         elapsed = round(time.time() - t0, 2)
 
     if err:
+        try:
+            from core.observability import finish_trace
+            finish_trace()
+        except Exception:
+            pass
         err_s = str(err)
         if err_s.startswith("missing_column:"):
             try:
@@ -1861,11 +1951,31 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
 
     want_insight = flags["show_insight"]
     want_llm = flags["want_llm_narration"]
-    narr = (
-        _safe_narration(df_result, q, evidence, force_llm=want_llm)
-        if want_insight
-        else None
-    )
+    try:
+        from core.observability import span as _isp
+
+        with _isp("insight", llm=want_llm):
+            narr = (
+                _safe_narration(df_result, q, evidence, force_llm=want_llm)
+                if want_insight
+                else None
+            )
+    except Exception:
+        narr = (
+            _safe_narration(df_result, q, evidence, force_llm=want_llm)
+            if want_insight
+            else None
+        )
+    pipeline_trace = None
+    try:
+        from core.observability import finish_trace
+
+        pipeline_trace = finish_trace()
+    except Exception:
+        pipeline_trace = None
+    if pipeline_trace and isinstance(evidence, dict):
+        evidence["pipeline_trace"] = pipeline_trace
+        elapsed = round((pipeline_trace.get("total_ms") or 0) / 1000.0, 2)
     summary = (narr or {}).get("result_summary") or (
         f"{len(df_result)} rows returned" if isinstance(df_result, pd.DataFrame) else "Done"
     )
@@ -1899,6 +2009,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             "source_question": q,
             "glossary_matches": list(st.session_state.get("last_glossary_matches") or []),
             "elapsed": elapsed,
+            "pipeline_trace": pipeline_trace,
         },
     )
     st.rerun()
@@ -2080,6 +2191,40 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Full"):
                     st.caption(f"Columns: {', '.join(map(str, cols)) if cols else '—'}")
 
                 render_trust_score_card(evidence, show_summary=False)
+
+                trace = (evidence or {}).get("pipeline_trace") or data.get("pipeline_trace")
+                if isinstance(trace, dict) and (trace.get("spans") or trace.get("total_ms")):
+                    st.markdown("**Pipeline trace (LLMOps)**")
+                    llm_s = (trace.get("llm_ms") or 0) / 1000
+                    db_s = (trace.get("db_ms") or 0) / 1000
+                    tot_s = (trace.get("total_ms") or 0) / 1000
+                    st.caption(
+                        f"Total {tot_s:.2f}s · LLM {llm_s:.2f}s · Database {db_s:.2f}s"
+                        + (" · SQL retry" if trace.get("retried_sql") else "")
+                    )
+                    rows = []
+                    for s in trace.get("spans") or []:
+                        rows.append(
+                            {
+                                "stage": s.get("name"),
+                                "ms": s.get("latency_ms"),
+                                "ok": s.get("ok", True),
+                            }
+                        )
+                    if rows:
+                        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                    mlf = (trace.get("mlflow") or {})
+                    if mlf.get("enabled"):
+                        st.caption(
+                            f"MLflow experiment `{mlf.get('experiment')}` · "
+                            f"trace `{trace.get('trace_id')}` · "
+                            f"run `mlflow ui` in the project folder to open the leadership view."
+                        )
+                    else:
+                        st.caption(
+                            "MLflow not installed — timings are still captured in-session. "
+                            "pip install mlflow then restart to persist traces."
+                        )
 
                 sql = data.get("sql")
                 if sql and not str(sql).startswith("-- Answered from OKF"):
