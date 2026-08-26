@@ -501,7 +501,7 @@ def render():
                 for item in log[-5:][::-1]:
                     purpose = item.get("purpose") or "other"
                     tot = int(item.get("total_tokens_est") or 0)
-                    st.caption(f"• {purpose} · {tot:,} tok")
+                    st.caption(f"• {purpose} · {tot:,} tok · {int(item.get('duration_ms') or 0)} ms")
             if st.button("⚙️ Settings", use_container_width=True, key="sidebar_llm_settings"):
                 llm_settings_dialog()
             if st.button("RESET", use_container_width=True, key="sidebar_reset"):
@@ -510,6 +510,46 @@ def render():
                 st.session_state.llm_est_usd = 0.0
                 st.session_state.llm_usage_log = []
                 st.rerun()
+
+        with st.expander("🔬 LLMOps trace", expanded=False):
+            try:
+                from core.observability import session_kpis, last_trace, mlflow_status
+            except Exception:
+                session_kpis = last_trace = mlflow_status = None
+            if session_kpis is None:
+                st.caption("Observability module unavailable.")
+            else:
+                kpis = session_kpis()
+                mlf = mlflow_status()
+                status_row("Questions traced", kpis.get("n") or 0, "#a5b4fc")
+                status_row("p50 latency", f"{(kpis.get('p50_ms') or 0)/1000:.2f}s", "#6ee7b7")
+                status_row("p95 latency", f"{(kpis.get('p95_ms') or 0)/1000:.2f}s", "#fcd34d")
+                status_row("LLM p50", f"{(kpis.get('llm_p50_ms') or 0)/1000:.2f}s", "#a5b4fc")
+                status_row("SQL retry rate", f"{100*(kpis.get('retry_rate') or 0):.0f}%", "#fca5a5")
+                if mlf.get("enabled"):
+                    status_row("MLflow", "ON", "#6ee7b7")
+                    st.caption(f"Experiment: {mlf.get('experiment')}")
+                    st.caption("Leadership view: `mlflow ui --backend-store-uri ./mlruns`")
+                else:
+                    status_row("MLflow", "off (no extra latency)", "#94a3b8")
+                    st.caption(
+                        "In-app traces always run. Turn on MLflow only for the leadership UI "
+                        "(first enable can take a few seconds to load the library)."
+                    )
+                persist = st.checkbox(
+                    "Persist traces to MLflow",
+                    value=bool(st.session_state.get("askdb_mlflow_on")),
+                    key="askdb_mlflow_on",
+                    help="Writes runs under ./mlruns. Does not speed queries — used for audit/demo.",
+                )
+                if persist and not mlf.get("enabled"):
+                    st.caption("MLflow will attach on the next question.")
+                last = last_trace()
+                if last:
+                    st.caption("Last question")
+                    st.caption((last.get("question") or "")[:90])
+                    for s in last.get("spans") or []:
+                        st.caption(f"  {s.get('name')}: {s.get('latency_ms')} ms")
 
         with st.expander("💾 Saved questions", expanded=False):
             saved_count = cache_store.count_active()

@@ -145,6 +145,17 @@ max_result_rows = 1000
 - Keep `DATA_BACKEND = "csv_duckdb"` until Steps 2–5 succeed.
 - Restart Streamlit after changing secrets.
 
+### Streamlit Community Cloud
+
+`host = "localhost"` **does not work** on Streamlit Cloud — that hostname is the cloud container, not your laptop.
+
+Use one of:
+
+1. **CSV demo on Cloud:** set `DATA_BACKEND = "csv_duckdb"` in Cloud secrets (App settings → Secrets).
+2. **Insurance Postgres on Cloud:** point `[postgres]` at a **publicly reachable** managed DB (Neon, Supabase, RDS, etc.) with `sslmode = "require"`, or set `connection_url = "postgresql://..."`.
+
+If Postgres is unreachable and `POSTGRES_FALLBACK_CSV = "true"` (default), the app boots in CSV/DuckDB mode with a warning instead of crashing.
+
 ---
 
 ## Step 7 — Start the app and check connection

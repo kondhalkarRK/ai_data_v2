@@ -53,8 +53,10 @@ Desktop.ini
 *.zip
 *.tar.gz
 
-# Local vector / embedding DBs (if created outside rag_storage)
-.chroma/
+# MLflow local tracking
+mlruns/
+mlartifacts/
+
 chroma/
 *.duckdb
 *.duckdb.wal

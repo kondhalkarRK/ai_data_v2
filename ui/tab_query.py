@@ -1893,6 +1893,18 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         if status is not None:
             status.update(label=random.choice(_CHAT_STATUS["run"]))
         t0 = time.time()
+        try:
+            from core.observability import start_trace, finish_trace, span as obs_span
+
+            start_trace(
+                q,
+                backend="postgres" if postgres_mode_enabled() else "duckdb",
+                answer_mode=mode,
+                want_llm_narration=flags.get("want_llm_narration"),
+            )
+        except Exception:
+            obs_span = None
+            finish_trace = None
         out = run_query(working_df, q)
         if isinstance(out, tuple) and len(out) == 4:
             df_result, sql, err, evidence = out
@@ -1902,6 +1914,11 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         elapsed = round(time.time() - t0, 2)
 
     if err:
+        try:
+            from core.observability import finish_trace
+            finish_trace()
+        except Exception:
+            pass
         err_s = str(err)
         if err_s.startswith("missing_column:"):
             try:
@@ -1934,11 +1951,31 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
 
     want_insight = flags["show_insight"]
     want_llm = flags["want_llm_narration"]
-    narr = (
-        _safe_narration(df_result, q, evidence, force_llm=want_llm)
-        if want_insight
-        else None
-    )
+    try:
+        from core.observability import span as _isp
+
+        with _isp("insight", llm=want_llm):
+            narr = (
+                _safe_narration(df_result, q, evidence, force_llm=want_llm)
+                if want_insight
+                else None
+            )
+    except Exception:
+        narr = (
+            _safe_narration(df_result, q, evidence, force_llm=want_llm)
+            if want_insight
+            else None
+        )
+    pipeline_trace = None
+    try:
+        from core.observability import finish_trace
+
+        pipeline_trace = finish_trace()
+    except Exception:
+        pipeline_trace = None
+    if pipeline_trace and isinstance(evidence, dict):
+        evidence["pipeline_trace"] = pipeline_trace
+        elapsed = round((pipeline_trace.get("total_ms") or 0) / 1000.0, 2)
     summary = (narr or {}).get("result_summary") or (
         f"{len(df_result)} rows returned" if isinstance(df_result, pd.DataFrame) else "Done"
     )
@@ -1972,6 +2009,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             "source_question": q,
             "glossary_matches": list(st.session_state.get("last_glossary_matches") or []),
             "elapsed": elapsed,
+            "pipeline_trace": pipeline_trace,
         },
     )
     st.rerun()
@@ -2153,6 +2191,40 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Full"):
                     st.caption(f"Columns: {', '.join(map(str, cols)) if cols else '—'}")
 
                 render_trust_score_card(evidence, show_summary=False)
+
+                trace = (evidence or {}).get("pipeline_trace") or data.get("pipeline_trace")
+                if isinstance(trace, dict) and (trace.get("spans") or trace.get("total_ms")):
+                    st.markdown("**Pipeline trace (LLMOps)**")
+                    llm_s = (trace.get("llm_ms") or 0) / 1000
+                    db_s = (trace.get("db_ms") or 0) / 1000
+                    tot_s = (trace.get("total_ms") or 0) / 1000
+                    st.caption(
+                        f"Total {tot_s:.2f}s · LLM {llm_s:.2f}s · Database {db_s:.2f}s"
+                        + (" · SQL retry" if trace.get("retried_sql") else "")
+                    )
+                    rows = []
+                    for s in trace.get("spans") or []:
+                        rows.append(
+                            {
+                                "stage": s.get("name"),
+                                "ms": s.get("latency_ms"),
+                                "ok": s.get("ok", True),
+                            }
+                        )
+                    if rows:
+                        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                    mlf = (trace.get("mlflow") or {})
+                    if mlf.get("enabled"):
+                        st.caption(
+                            f"MLflow experiment `{mlf.get('experiment')}` · "
+                            f"trace `{trace.get('trace_id')}` · "
+                            f"run `mlflow ui` in the project folder to open the leadership view."
+                        )
+                    else:
+                        st.caption(
+                            "MLflow not installed — timings are still captured in-session. "
+                            "pip install mlflow then restart to persist traces."
+                        )
 
                 sql = data.get("sql")
                 if sql and not str(sql).startswith("-- Answered from OKF"):

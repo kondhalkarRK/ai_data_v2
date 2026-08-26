@@ -4,7 +4,11 @@ import pandas as pd
 
 from config.settings   import get_data_config, init_session_state
 from config.styles     import apply_styles
-from core.data_backend.factory import get_backend, postgres_mode_enabled
+from core.data_backend.factory import (
+    ensure_data_backend_ready,
+    get_backend,
+    postgres_mode_enabled,
+)
 from core.join_engine  import get_working_df
 from ui import sidebar, tab_preview, tab_kpi, tab_query
 
@@ -21,6 +25,25 @@ st.set_page_config(layout="wide", page_title="ASK - DB", page_icon="💬")
 
 init_session_state()
 apply_styles()
+
+# Resolve Postgres vs CSV early. Streamlit Cloud cannot use host=localhost;
+# we soft-fallback to csv_duckdb so the hosted app still boots.
+_backend_ready, _backend_status = ensure_data_backend_ready()
+if not _backend_ready:
+    st.error(f"PostgreSQL connection is not ready: {_backend_status}")
+    st.info(
+        "For local: start Postgres and set [postgres] in .streamlit/secrets.toml. "
+        "For Streamlit Cloud: use a reachable managed Postgres host/connection_url "
+        "(not localhost), or set DATA_BACKEND = \"csv_duckdb\"."
+    )
+    st.stop()
+_fallback_reason = st.session_state.get("_postgres_fallback_reason")
+if _fallback_reason and not st.session_state.get("_postgres_fallback_shown"):
+    st.warning(
+        "Running in CSV/DuckDB mode — PostgreSQL was not reachable.\n\n"
+        f"{_fallback_reason}"
+    )
+    st.session_state["_postgres_fallback_shown"] = True
 
 # PostgreSQL insurance deployments start with the configured semantic pack
 # before any semantic singleton is built.
@@ -127,17 +150,6 @@ if not _postgres_mode and not st.session_state.dfs:
     st.info("👈 Upload one or more CSV files to get started.")
     st.stop()
 
-if _postgres_mode:
-    _backend = get_backend()
-    _db_ok, _db_message = _backend.health_check()
-    if not _db_ok:
-        st.error(f"PostgreSQL connection is not ready: {_db_message}")
-        st.info(
-            "Check DATA_BACKEND and the [postgres] values in "
-            ".streamlit/secrets.toml, then restart the app."
-        )
-        st.stop()
-
 glossary_store.seed_glossary_once()
 try:
     from features.rag_query_memory import query_memory as _qm
@@ -161,7 +173,7 @@ if OKF_ENABLED and not st.session_state.get("_okf_autosseed_done"):
     st.session_state["_okf_autosseed_done"] = True
 
 if _postgres_mode:
-    tables = _backend.list_tables()
+    tables = get_backend().list_tables()
     working_df = pd.DataFrame()
 else:
     tables = list(st.session_state.dfs.keys())

@@ -726,37 +726,55 @@ def _postgres_prompt(question: str, schema: str) -> str:
     semantic_parts: list[str] = []
     builder = _get_semantic_builder()
     if builder is not None:
-        for method_name, args in (
-            ("build_base_context", ()),
-            ("build_glossary_sql_hints", (question,)),
-            ("build_domain_rules_block", ()),
-        ):
-            try:
-                value = getattr(builder, method_name)(*args)
-                if value:
-                    semantic_parts.append(str(value))
-            except Exception:
-                pass
+        # Static blocks (base + domain rules) cached per session; glossary is per-question.
+        cache = None
+        try:
+            cache = st.session_state.setdefault("_pg_semantic_static", {})
+        except Exception:
+            cache = {}
+        static = cache.get("text") if isinstance(cache, dict) else None
+        if not static:
+            static_parts: list[str] = []
+            for method_name in ("build_base_context", "build_domain_rules_block"):
+                try:
+                    value = getattr(builder, method_name)()
+                    if value:
+                        static_parts.append(str(value))
+                except Exception:
+                    pass
+            static = "\n\n".join(static_parts)[:2800]
+            if isinstance(cache, dict):
+                cache["text"] = static
+        if static:
+            semantic_parts.append(static)
+        try:
+            hints = builder.build_glossary_sql_hints(question)
+            if hints:
+                semantic_parts.append(str(hints)[:900])
+        except Exception:
+            pass
 
     anchor_block = ""
     if _CONV_OK:
         try:
             anchor = get_sql_anchor()
             if anchor and should_use_anchor(question):
+                sql_a = str(anchor.get("sql_anchor") or "")[:1500]
                 anchor_block = (
                     "\nPRIOR SUCCESSFUL SQL (modify it for the follow-up while "
-                    f"preserving applicable filters):\n{anchor.get('sql_anchor', '')}\n"
+                    f"preserving applicable filters):\n{sql_a}\n"
                 )
         except Exception:
             pass
 
-    semantic_context = "\n\n".join(semantic_parts)[:5000]
+    semantic_context = "\n\n".join(semantic_parts)[:3500]
+    schema_block = (schema or "")[:4500]
     return f"""You are an expert PostgreSQL analytics SQL generator.
 
 {semantic_context}
 
 PHYSICAL POSTGRESQL SCHEMA:
-{schema}
+{schema_block}
 {anchor_block}
 RULES:
 1. Return one read-only SELECT query or read-only WITH...SELECT query.
@@ -771,21 +789,13 @@ RULES:
 9. Return only SQL without markdown fences or explanation.
 10. MULTI-COLUMN DEFAULT: Analytical answers must return at least one business
     dimension label PLUS the metric(s). Never return a single anonymous measure
-    column alone (e.g. only SUM(...)) unless the user explicitly asks for one
-    number / total / scalar. Prefer patterns like:
-    region_name + claim_count + claims_incurred; product_name + LOB + premium;
-    month + claim_count + incurred.
-11. ENTITY MAPPING: East/West/North/South (and EST/WST/NTH/STH) →
-    dim_region.region_name / region_code. Motor/Health/Property →
-    dim_product.line_of_business. Customer/policyholder → dim_policy.customer_key.
-    Prefer LEFT JOIN from facts to dimensions.
-12. RANKING: For top/best/worst/N questions, include
-    ROW_NUMBER() OVER (ORDER BY ...) AS rank starting at 1, then the dimension
-    label and metric columns. Do not rely on 0-based array positions.
-13. TIME DEFAULT: If the user omits a period, use the latest 12 months ending at
-    MAX(reported_date) for claims or MAX(accounting_month) for premium.
-14. Prefer human-readable labels (region_name, product_name, line_of_business)
-    over raw foreign-key IDs in the SELECT list.
+    column alone unless the user explicitly asks for one number / total / scalar.
+11. ENTITY MAPPING: East/West/North/South → dim_region.region_name.
+    Motor/Health/Property → dim_product.line_of_business.
+    Customer/policyholder → dim_policy.customer_key. Prefer LEFT JOIN facts→dims.
+12. RANKING: ROW_NUMBER() OVER (...) AS rank starting at 1 plus labels + metrics.
+13. TIME DEFAULT: latest 12 months to MAX(reported_date) / MAX(accounting_month).
+14. Prefer region_name, product_name, line_of_business over raw IDs.
 
 QUESTION: {question}
 
@@ -793,8 +803,11 @@ SQL:"""
 
 
 def _run_postgres_query(question: str, status=None):
+    from core.observability import span as obs_span
+
     backend = get_backend()
-    healthy, message = backend.health_check()
+    with obs_span("pg.health"):
+        healthy, message = backend.health_check()
     if not healthy:
         return _pack_return(None, "", message, None)
 
@@ -817,9 +830,14 @@ def _run_postgres_query(question: str, status=None):
         )
         if evidence is not None:
             evidence["backend"] = "postgres"
+            evidence["from_cache"] = True
         return _pack_return(result, sql, err, evidence)
 
-    schema = backend.describe_schema()
+    with obs_span("prompt.build") as rec:
+        schema = backend.describe_schema()
+        rec.setdefault("attrs", {})["schema_chars"] = len(schema or "")
+        prompt = _postgres_prompt(question, schema)
+        rec["attrs"]["prompt_chars"] = len(prompt or "")
     if not schema:
         return _pack_return(
             None, "", "PostgreSQL schema could not be discovered.", None
@@ -827,7 +845,7 @@ def _run_postgres_query(question: str, status=None):
 
     if status is not None:
         status.update(label="✨ Generating PostgreSQL SQL with AI...")
-    sql = _clean_generated_sql(call_llm(_postgres_prompt(question, schema)))
+    sql = _clean_generated_sql(call_llm(prompt, purpose="sql"))
     if not sql:
         return _pack_return(None, "", "LLM did not return SQL.", None)
 
@@ -839,7 +857,7 @@ def _run_postgres_query(question: str, status=None):
         if status is not None:
             status.update(label="🔁 Correcting PostgreSQL SQL...")
         retry_prompt = (
-            _postgres_prompt(question, schema)
+            prompt
             + f"\nThe previous SQL failed with: {err}\n"
             + f"PREVIOUS SQL:\n{sql}\nReturn only corrected PostgreSQL SQL:"
         )
