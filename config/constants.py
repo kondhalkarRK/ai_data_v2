@@ -22,10 +22,12 @@ _LAST_NAME_CANDIDATES  = ["last_name","lastname","lname","surname"]
 # ─────────────────────────────────────────────────────────────────
 MAX_CONVERSATION_TURNS = 10
 FOLLOWUP_TRIGGER_TOKENS = [
-    "same", "now", "also", "but", "only",
-    "filter", "instead", "what about",
-    "how about", "additionally", "too",
-    "and what", "show only", "just",
+    # Prefer multi-word / explicit refine cues — bare "just"/"also"/"only"
+    # hijack complete insurance questions like "just show GWP by product".
+    "same", "instead", "filter",
+    "what about", "how about", "additionally",
+    "and what", "show only", "just show", "just for", "only for",
+    "same but", "same for", "filter by", "filter to",
 ]
 MAX_FOLLOWUP_QUESTION_WORDS = 8
 

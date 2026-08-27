@@ -66,6 +66,10 @@ def test_sql_guardrails_block_postgres_escape_paths():
     """
     assert sql_is_safe(gap_sql)[0] is True
     assert sql_is_safe("SET search_path TO insurance")[0] is False
+    assert sql_is_safe(
+        "WITH x AS (DELETE FROM insurance.fact_claims RETURNING *) SELECT * FROM x"
+    )[0] is False
+    assert sql_is_safe("SELECT * INTO tmp FROM insurance.dim_region")[0] is False
 
 
 def test_two_cfo_decks_extract_as_slide_citations():

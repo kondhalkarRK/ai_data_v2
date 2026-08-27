@@ -173,8 +173,20 @@ def activate_pack(pack_id: str) -> tuple[bool, str]:
         "semantic_base_context",
         "semantic_column_map",
         "_pg_semantic_static",
+        "last_glossary_matches",
+        "last_glossary_hints",
     ):
         st.session_state.pop(key, None)
+
+    # Drop session NLQ answer cache so prior pack SQL cannot be reused.
+    try:
+        memory = st.session_state.get("memory")
+        if isinstance(memory, dict):
+            memory.clear()
+        else:
+            st.session_state.memory = {}
+    except Exception:
+        pass
 
     st.session_state.industry_pack_id = pack_id
     return True, f"Activated '{pack_id}' pack."

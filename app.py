@@ -6,8 +6,12 @@ from config.settings   import get_data_config, init_session_state
 from config.styles     import apply_styles
 from core.data_backend.factory import (
     ensure_data_backend_ready,
+    get_active_backend_id,
     get_backend,
+    get_configured_backend_id,
+    is_postgres_fallback_active,
     postgres_mode_enabled,
+    retry_postgres_backend,
 )
 from core.join_engine  import get_working_df
 from ui import sidebar, tab_preview, tab_kpi, tab_query
@@ -37,13 +41,46 @@ if not _backend_ready:
         "(not localhost), or set DATA_BACKEND = \"csv_duckdb\"."
     )
     st.stop()
-_fallback_reason = st.session_state.get("_postgres_fallback_reason")
-if _fallback_reason and not st.session_state.get("_postgres_fallback_shown"):
-    st.warning(
-        "Running in CSV/DuckDB mode — PostgreSQL was not reachable.\n\n"
-        f"{_fallback_reason}"
+def _render_backend_status_strip() -> None:
+    """Always-visible backend mode chrome (never one-shot only)."""
+    configured = get_configured_backend_id()
+    active = get_active_backend_id()
+    pack = (
+        st.session_state.get("industry_pack_id")
+        or get_data_config().get("industry_pack")
+        or ""
     )
-    st.session_state["_postgres_fallback_shown"] = True
+    fallback_reason = st.session_state.get("_postgres_fallback_reason") or ""
+
+    if active == "postgres":
+        label = f"Backend · Postgres · {pack or 'default'} · healthy"
+        if _backend_status:
+            label = f"{label} · {_backend_status}"
+        st.caption(label)
+        return
+
+    if configured == "postgres" and (fallback_reason or is_postgres_fallback_active()):
+        left, right = st.columns([0.82, 0.18])
+        with left:
+            st.warning(
+                "Running in **CSV/DuckDB** mode — PostgreSQL was not reachable. "
+                "Answers are not from the warehouse until Retry succeeds.\n\n"
+                f"{fallback_reason}"
+            )
+        with right:
+            if st.button("Retry Postgres", key="retry_postgres_btn", use_container_width=True):
+                ok, msg = retry_postgres_backend()
+                if ok and postgres_mode_enabled():
+                    st.success(msg or "PostgreSQL reconnected.")
+                else:
+                    st.error(msg or "PostgreSQL still unavailable.")
+                st.rerun()
+        return
+
+    st.caption(f"Backend · CSV/DuckDB{f' · {pack}' if pack else ''}")
+
+
+_render_backend_status_strip()
 
 # PostgreSQL insurance deployments start with the configured semantic pack
 # before any semantic singleton is built.

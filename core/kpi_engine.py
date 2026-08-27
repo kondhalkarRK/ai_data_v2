@@ -308,7 +308,38 @@ def _kpi_card_html(
     trend: str | None = None,
     trend_up: bool | None = None,
     featured: bool = False,
+    *,
+    source_columns: str | list[str] | None = None,
+    aggregation: str | None = None,
+    records_count=None,
+    filters: str = "Active KPI filters",
+    formula: str | None = None,
+    business_logic: str | None = None,
 ) -> str:
+    """Prefer flip cards when calculation meta is available."""
+    try:
+        from ui.kpi_flip_cards import flip_kpi_card_html
+
+        explain_sub = sub or "Hover or click to explain"
+        if trend:
+            explain_sub = f"{trend} · {explain_sub}"
+        return flip_kpi_card_html(
+            label=label,
+            value=value,
+            accent=accent,
+            sub=explain_sub,
+            source_columns=source_columns or "working dataset columns",
+            aggregation=aggregation or "Computed",
+            records_count=records_count,
+            filters=filters,
+            formula=formula,
+            business_logic=business_logic or sub,
+            delay=delay,
+            featured=featured,
+        )
+    except Exception:
+        pass
+
     trend_html = ""
     if trend:
         cls = "up" if trend_up else "down"
@@ -323,6 +354,30 @@ def _kpi_card_html(
         f'<div class="ks">{sub}</div>'
         f"</div>"
     )
+
+
+_AUTO_KPI_EXPLAIN = {
+    "Total Revenue": {
+        "source_columns": "total_sales / revenue",
+        "aggregation": "SUM",
+        "business_logic": "Sum of revenue measure over the filtered working frame.",
+    },
+    "Units Sold": {
+        "source_columns": "order_qty / units",
+        "aggregation": "SUM",
+        "business_logic": "Sum of volume measure over the filtered working frame.",
+    },
+    "Orders": {
+        "source_columns": "order_id",
+        "aggregation": "COUNT DISTINCT",
+        "business_logic": "Distinct orders in the filtered working frame.",
+    },
+    "AOV": {
+        "source_columns": ["total_sales", "order_id"],
+        "formula": "SUM(revenue) ÷ COUNT(DISTINCT orders)",
+        "business_logic": "Average order value on the filtered set.",
+    },
+}
 
 
 def render_kpi_tab(df: pd.DataFrame):
@@ -584,24 +639,108 @@ def render_kpi_tab(df: pd.DataFrame):
                 None,
             ))
 
-        for i in range(0, len(cards), 4):
-            row = cards[i:i + 4]
-            cols = st.columns(4)
-            for j, col in enumerate(cols):
-                with col:
-                    if j < len(row):
-                        label, value, sub, accent, trend, trend_up = row[j]
-                        delay = (i + j) * 0.05
-                        featured = (i + j) == 0
-                        st.markdown(
-                            _kpi_card_html(
-                                label, value, sub, accent, delay, trend, trend_up, featured
-                            ),
-                            unsafe_allow_html=True,
-                        )
-            st.markdown(
-                "<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True
+        filter_desc_parts = []
+        for i in range(slots):
+            sc = st.session_state.get(f"kpi_custom_col_{i + 1}")
+            sv = st.session_state.get(f"kpi_custom_val_{i + 1}")
+            if (
+                sc
+                and sc != "— Select column —"
+                and sv
+                and sv != "— Select value —"
+            ):
+                filter_desc_parts.append(f"{sc}={sv}")
+        filters_txt = " · ".join(filter_desc_parts) if filter_desc_parts else "None"
+
+        st.markdown(
+            '<p class="kpi-flip-caption">'
+            "Hover a card to peek at the calculation — click to pin the explanation."
+            "</p>",
+            unsafe_allow_html=True,
+        )
+
+        flip_payload = []
+        for i, (label, value, sub, accent, trend, trend_up) in enumerate(cards):
+            clean = (
+                str(label)
+                .replace("🌟", "")
+                .replace("📦", "")
+                .replace("🌍", "")
+                .replace("🛒", "")
+                .replace("🎨", "")
+                .replace("💰", "")
+                .replace("📅", "")
+                .replace("🏭", "")
+                .strip()
             )
+            meta = {}
+            for key, info in _AUTO_KPI_EXPLAIN.items():
+                if key.lower() in clean.lower():
+                    meta = info
+                    break
+            formula = meta.get("formula")
+            if not formula and "÷" in str(sub):
+                formula = str(sub)
+            flip_payload.append(
+                {
+                    "label": clean,
+                    "value": value,
+                    "accent": accent,
+                    "sub": (
+                        f"{trend} · Hover or click to explain"
+                        if trend
+                        else "Hover or click to explain"
+                    ),
+                    "source_columns": meta.get("source_columns")
+                    or kpis.get("_rev_col")
+                    or "working dataset",
+                    "aggregation": meta.get("aggregation") or "Computed on filtered frame",
+                    "records_count": len(filtered_df),
+                    "records_label": "Filtered rows",
+                    "filters": filters_txt,
+                    "formula": formula,
+                    "business_logic": meta.get("business_logic") or sub,
+                    "featured": i == 0,
+                    "card_id": f"auto-kpi-{i}",
+                }
+            )
+
+        try:
+            from ui.kpi_flip_cards import render_flip_kpi_grid
+
+            st.markdown(
+                render_flip_kpi_grid(flip_payload, columns=4),
+                unsafe_allow_html=True,
+            )
+        except Exception:
+            for i in range(0, len(cards), 4):
+                row = cards[i : i + 4]
+                cols = st.columns(4)
+                for j, col in enumerate(cols):
+                    with col:
+                        if j < len(row):
+                            label, value, sub, accent, trend, trend_up = row[j]
+                            delay = (i + j) * 0.05
+                            featured = (i + j) == 0
+                            st.markdown(
+                                _kpi_card_html(
+                                    label,
+                                    value,
+                                    sub,
+                                    accent,
+                                    delay,
+                                    trend,
+                                    trend_up,
+                                    featured,
+                                    filters=filters_txt,
+                                    records_count=len(filtered_df),
+                                    business_logic=sub,
+                                ),
+                                unsafe_allow_html=True,
+                            )
+                st.markdown(
+                    "<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True
+                )
 
         st.markdown("---")
 

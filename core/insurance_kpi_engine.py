@@ -10,8 +10,30 @@ import streamlit as st
 
 from core.data_backend.factory import get_backend
 from core.kpi_engine import _fmt_currency, _fmt_number
+from ui.kpi_flip_cards import render_flip_kpi_grid
 
 _ALL = "All"
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _cached_sql_frame(sql: str, fingerprint: str) -> tuple[list | None, list | None, str | None]:
+    """Cache KPI SQL results by fingerprint + SQL text (120s TTL)."""
+    backend = get_backend()
+    df, err = backend.execute_sql(sql)
+    if err or df is None:
+        return None, None, err
+    return df.to_dict(orient="list"), list(df.columns), None
+
+
+def _exec_sql_cached(sql: str) -> tuple[pd.DataFrame | None, str | None]:
+    try:
+        fingerprint = get_backend().get_dataset_fingerprint()
+    except Exception:
+        fingerprint = "unknown"
+    rows, cols, err = _cached_sql_frame(sql, fingerprint)
+    if err or rows is None or cols is None:
+        return None, err
+    return pd.DataFrame(rows, columns=cols), None
 
 
 def _sql_date(value: date) -> str:
@@ -126,7 +148,7 @@ def _chart_layout(fig):
 
 
 def _distinct_values(backend, sql: str) -> list[str]:
-    frame, error = backend.execute_sql(sql)
+    frame, error = _exec_sql_cached(sql)
     if error or frame is None or frame.empty:
         return []
     return [str(v) for v in frame.iloc[:, 0].dropna().tolist()]
@@ -175,17 +197,21 @@ SELECT
     {through} AS data_through,
     p.written_premium,
     p.earned_premium,
+    p.premium_rows,
     c.claims_incurred,
     c.claims_paid,
     c.claim_count,
+    c.claim_rows,
     c.claims_incurred / NULLIF(p.earned_premium, 0) AS loss_ratio,
     c.claims_incurred / NULLIF(c.claim_count, 0) AS average_severity,
     c.approval_rate,
     c.avg_settlement_days,
-    p.renewed::numeric / NULLIF(p.due_for_renewal, 0) AS renewal_rate
+    p.renewed::numeric / NULLIF(p.due_for_renewal, 0) AS renewal_rate,
+    p.due_for_renewal
 FROM (
     SELECT
         COUNT(DISTINCT c.claim_id) AS claim_count,
+        COUNT(*) AS claim_rows,
         SUM(c.paid_amount) AS claims_paid,
         SUM(c.incurred_amount) AS claims_incurred,
         AVG(c.approved_flag::int) AS approval_rate,
@@ -200,6 +226,7 @@ CROSS JOIN (
     SELECT
         SUM(pm.written_premium) AS written_premium,
         SUM(pm.earned_premium) AS earned_premium,
+        COUNT(*) AS premium_rows,
         COUNT(*) FILTER (WHERE pm.due_for_renewal_flag) AS due_for_renewal,
         COUNT(*) FILTER (WHERE pm.renewed_flag) AS renewed
     FROM insurance.fact_policy_monthly pm
@@ -294,9 +321,167 @@ LIMIT 20
 """
 
 
+def _filter_summary(window_label: str, lob: str, region: str) -> str:
+    parts = [window_label]
+    if lob and lob != _ALL:
+        parts.append(f"LOB={lob}")
+    else:
+        parts.append("LOB=All")
+    if region and region != _ALL:
+        parts.append(f"Region={region}")
+    else:
+        parts.append("Region=All")
+    return " · ".join(parts)
+
+
+def _safe_int(value) -> int | None:
+    try:
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            return None
+        return int(float(value))
+    except Exception:
+        return None
+
+
+def _build_insurance_flip_cards(row: pd.Series, filters: str) -> list[dict]:
+    premium_rows = _safe_int(row.get("premium_rows"))
+    claim_rows = _safe_int(row.get("claim_rows"))
+    claim_count = _safe_int(row.get("claim_count"))
+    due_renewal = _safe_int(row.get("due_for_renewal"))
+
+    return [
+        {
+            "label": "Gross Written Premium",
+            "value": _number(row["written_premium"], money=True),
+            "accent": "premium",
+            "source_columns": "insurance.fact_policy_monthly.written_premium",
+            "aggregation": "SUM",
+            "records_count": premium_rows,
+            "records_label": "Policy-month rows",
+            "filters": filters,
+            "business_logic": "GWP from policy-month grain — never from claim rows.",
+            "featured": True,
+        },
+        {
+            "label": "Earned Premium",
+            "value": _number(row["earned_premium"], money=True),
+            "accent": "premium",
+            "source_columns": "insurance.fact_policy_monthly.earned_premium",
+            "aggregation": "SUM",
+            "records_count": premium_rows,
+            "records_label": "Policy-month rows",
+            "filters": filters,
+            "business_logic": "Earned premium recognised over the coverage period.",
+        },
+        {
+            "label": "Claims Incurred",
+            "value": _number(row["claims_incurred"], money=True),
+            "accent": "claims",
+            "source_columns": "insurance.fact_claims.incurred_amount",
+            "aggregation": "SUM",
+            "records_count": claim_rows,
+            "records_label": "Claim rows",
+            "filters": filters,
+            "business_logic": "Total incurred amount on reported claims in window.",
+        },
+        {
+            "label": "Claims Paid",
+            "value": _number(row["claims_paid"], money=True),
+            "accent": "claims",
+            "source_columns": "insurance.fact_claims.paid_amount",
+            "aggregation": "SUM",
+            "records_count": claim_rows,
+            "records_label": "Claim rows",
+            "filters": filters,
+            "business_logic": "Cash paid on claims (may lag incurred).",
+        },
+        {
+            "label": "Claim Count",
+            "value": _number(row["claim_count"]),
+            "accent": "units",
+            "source_columns": "insurance.fact_claims.claim_id",
+            "aggregation": "COUNT DISTINCT",
+            "records_count": claim_count,
+            "records_label": "Distinct claims",
+            "filters": filters,
+            "business_logic": "Unique claim IDs after LOB / region / time filters.",
+        },
+        {
+            "label": "Loss Ratio",
+            "value": _number(row["loss_ratio"], percent=True),
+            "accent": "ratio",
+            "source_columns": [
+                "fact_claims.incurred_amount",
+                "fact_policy_monthly.earned_premium",
+            ],
+            "formula": "SUM(incurred_amount) ÷ SUM(earned_premium)",
+            "records_count": claim_rows,
+            "records_label": "Claim rows in num.",
+            "filters": filters,
+            "business_logic": (
+                "Incurred claims over earned premium. Premium stays on "
+                "policy-month grain so claim joins cannot inflate it."
+            ),
+        },
+        {
+            "label": "Average Severity",
+            "value": _number(row["average_severity"], money=True),
+            "accent": "ratio",
+            "source_columns": [
+                "fact_claims.incurred_amount",
+                "fact_claims.claim_id",
+            ],
+            "formula": "SUM(incurred_amount) ÷ COUNT(DISTINCT claim_id)",
+            "records_count": claim_count,
+            "records_label": "Distinct claims",
+            "filters": filters,
+            "business_logic": "Average incurred cost per distinct claim.",
+        },
+        {
+            "label": "Approval Rate",
+            "value": _number(row["approval_rate"], percent=True),
+            "accent": "ratio",
+            "source_columns": "insurance.fact_claims.approved_flag",
+            "aggregation": "AVG (0/1 flag)",
+            "records_count": claim_rows,
+            "records_label": "Claim rows",
+            "filters": filters,
+            "business_logic": "Share of claim rows with approved_flag = true.",
+        },
+        {
+            "label": "Avg Settlement Days",
+            "value": _number(row["avg_settlement_days"]),
+            "accent": "date",
+            "source_columns": [
+                "fact_claims.settlement_date",
+                "fact_claims.reported_date",
+            ],
+            "formula": "AVG(settlement_date − reported_date) WHERE settled",
+            "records_count": claim_rows,
+            "records_label": "Claim rows",
+            "filters": filters,
+            "business_logic": "Only settled claims (non-null settlement_date).",
+        },
+        {
+            "label": "Renewal Rate",
+            "value": _number(row["renewal_rate"], percent=True),
+            "accent": "share",
+            "source_columns": [
+                "fact_policy_monthly.renewed_flag",
+                "fact_policy_monthly.due_for_renewal_flag",
+            ],
+            "formula": "COUNT(renewed) ÷ COUNT(due_for_renewal)",
+            "records_count": due_renewal,
+            "records_label": "Due for renewal",
+            "filters": filters,
+            "business_logic": "Renewals among policies marked due in the window.",
+        },
+    ]
+
+
 def render_insurance_kpi_tab() -> None:
     backend = get_backend()
-    bounds_df, bounds_err = backend.execute_sql(
+    bounds_df, bounds_err = _exec_sql_cached(
         """
         SELECT GREATEST(
             COALESCE((SELECT MAX(reported_date) FROM insurance.fact_claims), DATE '1900-01-01'),
@@ -402,7 +587,7 @@ def render_insurance_kpi_tab() -> None:
         start, end = calendar_ytd_bounds(as_of)
         window_label = ytd_default
 
-    result, error = backend.execute_sql(_kpi_sql(start, end, lob, region))
+    result, error = _exec_sql_cached(_kpi_sql(start, end, lob, region))
     if error or result is None or result.empty:
         st.warning(
             "Insurance KPI query failed. "
@@ -421,34 +606,29 @@ def render_insurance_kpi_tab() -> None:
             f"{window_label} · {range_txt} · "
             f"LOB={lob} · Region={region} · computed in PostgreSQL"
         )
+        st.markdown(
+            '<p class="kpi-flip-caption">'
+            "Hover a card to peek at the calculation — click to pin the explanation."
+            "</p>",
+            unsafe_allow_html=True,
+        )
 
-        cards = [
-            ("Gross Written Premium", _number(row["written_premium"], money=True)),
-            ("Earned Premium", _number(row["earned_premium"], money=True)),
-            ("Claims Incurred", _number(row["claims_incurred"], money=True)),
-            ("Claims Paid", _number(row["claims_paid"], money=True)),
-            ("Claim Count", _number(row["claim_count"])),
-            ("Loss Ratio", _number(row["loss_ratio"], percent=True)),
-            ("Average Severity", _number(row["average_severity"], money=True)),
-            ("Approval Rate", _number(row["approval_rate"], percent=True)),
-            ("Avg Settlement Days", _number(row["avg_settlement_days"])),
-            ("Renewal Rate", _number(row["renewal_rate"], percent=True)),
-        ]
-
-        for offset in range(0, len(cards), 5):
-            columns = st.columns(5)
-            for column, (label, value) in zip(columns, cards[offset : offset + 5]):
-                column.metric(label, value)
+        filters = _filter_summary(window_label, lob, region)
+        flip_cards = _build_insurance_flip_cards(row, filters)
+        st.markdown(
+            render_flip_kpi_grid(flip_cards, columns=5),
+            unsafe_allow_html=True,
+        )
 
         st.caption(
             "Loss ratio uses incurred claims ÷ earned premium. Premium is sourced "
             "from policy-month grain, never duplicated across claim rows."
         )
 
-        monthly, monthly_err = backend.execute_sql(_monthly_sql(start, end, lob, region))
-        lob_df, lob_err = backend.execute_sql(_lob_sql(start, end, lob, region))
-        region_df, region_err = backend.execute_sql(_region_sql(start, end, lob, region))
-        status, status_err = backend.execute_sql(_status_sql(start, end, lob, region))
+        monthly, monthly_err = _exec_sql_cached(_monthly_sql(start, end, lob, region))
+        lob_df, lob_err = _exec_sql_cached(_lob_sql(start, end, lob, region))
+        region_df, region_err = _exec_sql_cached(_region_sql(start, end, lob, region))
+        status, status_err = _exec_sql_cached(_status_sql(start, end, lob, region))
 
         st.markdown("---")
         st.markdown("#### Insurance KPI dashboard")

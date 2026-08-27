@@ -23,8 +23,13 @@ def _postgres_backend(config_items: tuple[tuple[str, object], ...]) -> PostgresB
     return PostgresBackend(dict(config_items))
 
 
-def get_active_backend_id() -> str:
+def get_configured_backend_id() -> str:
     configured = get_data_config()["backend"]
+    return configured if configured in {"csv_duckdb", "postgres"} else "csv_duckdb"
+
+
+def get_active_backend_id() -> str:
+    configured = get_configured_backend_id()
     try:
         selected = st.session_state.get("data_backend", configured)
     except Exception:
@@ -47,6 +52,41 @@ def postgres_mode_enabled() -> bool:
     return get_active_backend_id() == "postgres"
 
 
+def is_postgres_fallback_active() -> bool:
+    """True when secrets want Postgres but this session is on CSV fallback."""
+    try:
+        reason = st.session_state.get("_postgres_fallback_reason")
+    except Exception:
+        reason = None
+    return (
+        get_configured_backend_id() == "postgres"
+        and get_active_backend_id() != "postgres"
+        and bool(reason)
+    )
+
+
+def _clear_postgres_health_caches() -> None:
+    try:
+        backend = get_backend()
+        clear = getattr(backend, "clear_runtime_caches", None)
+        if callable(clear):
+            clear()
+            return
+        for attr in (
+            "_health_cache",
+            "_health_cache_ts",
+            "_catalog_cache",
+            "_relations_cache",
+            "_counts_cache",
+            "_fingerprint_cache",
+            "_schema_text_cache",
+        ):
+            if hasattr(backend, attr):
+                setattr(backend, attr, None if not attr.endswith("_ts") else 0.0)
+    except Exception:
+        pass
+
+
 def _switch_to_csv(reason: str) -> str:
     """Session-scoped fallback to CSV/DuckDB; returns the human-readable reason."""
     try:
@@ -56,6 +96,26 @@ def _switch_to_csv(reason: str) -> str:
         pass
     logger.warning("Falling back to csv_duckdb: %s", reason)
     return reason
+
+
+def retry_postgres_backend() -> tuple[bool, str]:
+    """
+    Clear sticky CSV fallback and re-probe Postgres when secrets request it.
+
+    Returns (ok_to_continue, status_message) same as ensure_data_backend_ready.
+    """
+    if get_configured_backend_id() != "postgres":
+        return False, "DATA_BACKEND is not set to postgres in secrets."
+
+    try:
+        st.session_state.data_backend = "postgres"
+        st.session_state.pop("_postgres_fallback_reason", None)
+        st.session_state.pop("_postgres_fallback_shown", None)
+    except Exception:
+        pass
+
+    _clear_postgres_health_caches()
+    return ensure_data_backend_ready()
 
 
 def ensure_data_backend_ready() -> tuple[bool, str]:
@@ -94,6 +154,7 @@ def ensure_data_backend_ready() -> tuple[bool, str]:
     if ok:
         try:
             st.session_state.pop("_postgres_fallback_reason", None)
+            st.session_state.pop("_postgres_fallback_shown", None)
         except Exception:
             pass
         return True, message

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import html
 import random
+import re
 import time
 import uuid
 from contextlib import contextmanager
@@ -112,6 +113,59 @@ def _chat_msg_ref(msg: dict) -> str:
     stamp = str(msg.get("timestamp") or "")
     body = str(msg.get("content") or "")[:48]
     return f"c{abs(hash(stamp + body)) % 10_000_000}"
+
+
+_CHAT_FULL_DF_CAP = 6
+_CHAT_SLIM_ROWS = max(CHAT_PREVIEW_ROWS, 50)
+
+
+def _park_result_dataframe(msg_id: str, df: pd.DataFrame | None) -> pd.DataFrame | None:
+    """Keep a slim copy in chat history; park full frame for expand/share."""
+    if not isinstance(df, pd.DataFrame):
+        return df
+    registry = st.session_state.setdefault("_chat_full_dfs", {})
+    if not isinstance(registry, dict):
+        registry = {}
+        st.session_state["_chat_full_dfs"] = registry
+    registry[msg_id] = df
+    while len(registry) > _CHAT_FULL_DF_CAP:
+        oldest = next(iter(registry))
+        registry.pop(oldest, None)
+    slim = df.head(_CHAT_SLIM_ROWS).copy()
+    try:
+        slim.attrs = dict(getattr(df, "attrs", {}) or {})
+    except Exception:
+        pass
+    slim.attrs["askdb_full_rows"] = len(df)
+    slim.attrs["askdb_parked"] = True
+    return slim
+
+
+def _resolve_result_dataframe(msg: dict) -> pd.DataFrame | None:
+    data = msg.get("data") or {}
+    rdf = data.get("result_df")
+    ref = _chat_msg_ref(msg)
+    parked = (st.session_state.get("_chat_full_dfs") or {}).get(ref)
+    if isinstance(parked, pd.DataFrame):
+        return parked
+    return rdf if isinstance(rdf, pd.DataFrame) else None
+
+
+def _empty_recovery_suggestions(question: str, working_df: pd.DataFrame) -> list[str]:
+    try:
+        from core.incomplete_question import build_suggestions
+
+        sugs = [s for s in (build_suggestions(question, working_df) or []) if s][:2]
+        if sugs:
+            return sugs
+    except Exception:
+        pass
+    if postgres_mode_enabled():
+        return [
+            "Show claim count by region for 2025",
+            "Show GWP by line of business for 2025",
+        ]
+    return ["Show revenue by colour", "Show units by make for 2024"]
 
 
 def _chat_block_header(title: str, *, button_key: str, kind: str, ref: str) -> None:
@@ -1071,9 +1125,20 @@ def _render_ask_bundle(bundle, working_df):
 
 # ── Chat intelligence (chat_ench.md) ──────────────────────────────
 
-_DESTRUCTIVE_TERMS = (
-    "delete", "drop", "remove data", "update", "truncate", "modify",
-    "alter", "overwrite", "wipe", "destroy", "erase", "clear data",
+_DESTRUCTIVE_PATTERNS = (
+    r"\bdrop\s+table\b",
+    r"\bdelete\s+from\b",
+    r"\btruncate\s+(table\b)?",
+    r"\bupdate\s+\w+\s+set\b",
+    r"\balter\s+table\b",
+    r"\binsert\s+into\b",
+    r"\bremove\s+data\b",
+    r"\bclear\s+data\b",
+    r"\berase\s+(all\s+)?data\b",
+    r"\bwipe\b",
+    r"\bdestroy\b",
+    r"\boverwrite\b",
+    r"\bmodify\s+the\s+(table|database|schema)\b",
 )
 
 _SURPRISE_PHRASES = (
@@ -1090,8 +1155,9 @@ _AMBIGUOUS_EXACT = (
 
 
 def detect_destructive(question: str) -> bool:
+    """True only for clear data-mutation intent — not analytical 'drop/update' wording."""
     q = (question or "").lower()
-    return any(t in q for t in _DESTRUCTIVE_TERMS)
+    return any(re.search(p, q) for p in _DESTRUCTIVE_PATTERNS)
 
 
 def detect_surprise_me(question: str) -> bool:
@@ -1148,11 +1214,22 @@ def _suggested_qs(df: pd.DataFrame, limit: int = 2) -> list[str]:
 def compute_trust_score(evidence, result_df, working_df) -> tuple[int, dict]:
     """Four-component Data Trust Score (0–100). Row coverage removed — intentional
     small result sets (e.g. top 10) must not lower confidence."""
-    matches = st.session_state.get("last_glossary_matches") or []
-    hints = st.session_state.get("last_glossary_hints") or ""
+    evidence = evidence or {}
+    matches = evidence.get("glossary_matches")
+    if matches is None:
+        matches = st.session_state.get("last_glossary_matches") or []
+    hints = evidence.get("glossary_hints")
+    if hints is None:
+        hints = st.session_state.get("last_glossary_hints") or ""
+
+    try:
+        row_count = int(evidence.get("row_count"))
+    except Exception:
+        row_count = len(result_df) if result_df is not None else 0
+    empty = bool(evidence.get("empty_result")) or row_count == 0
 
     # 1 Semantic match (0–25)
-    n = len(matches)
+    n = len(matches) if isinstance(matches, (list, tuple)) else 0
     semantic = 0 if n == 0 else (12 if n == 1 else 25)
 
     # 2 Glossary match (0–25)
@@ -1168,8 +1245,8 @@ def compute_trust_score(evidence, result_df, working_df) -> tuple[int, dict]:
         glossary = 0
 
     # 3 SQL validation (0–25)
-    path = (evidence or {}).get("execution_path", "fallback")
-    used_retry = bool((evidence or {}).get("sql_retry") or (evidence or {}).get("sql2_used"))
+    path = evidence.get("execution_path", "fallback")
+    used_retry = bool(evidence.get("sql_retry") or evidence.get("sql2_used"))
     if used_retry:
         sql_val = 5
     elif path == "semantic":
@@ -1182,7 +1259,7 @@ def compute_trust_score(evidence, result_df, working_df) -> tuple[int, dict]:
         sql_val = 5
 
     # 4 Join quality (0–25) — resolution / path quality
-    src = (evidence or {}).get("resolution_source") or ""
+    src = evidence.get("resolution_source") or ""
     if src == "semantic_llm":
         join_q = 25
     elif src == "cache" or path == "cache":
@@ -1202,7 +1279,12 @@ def compute_trust_score(evidence, result_df, working_df) -> tuple[int, dict]:
         "sql_validation": sql_val,
         "join_quality": join_q,
     }
-    return sum(breakdown.values()), breakdown
+    score = sum(breakdown.values())
+    # Empty successful SQL must not read as Excellent / Perfect confidence.
+    if empty:
+        score = min(score, 45)
+        breakdown["empty_cap"] = True
+    return score, breakdown
 
 
 def _trust_band(score: int) -> tuple[str, str]:
@@ -1440,20 +1522,55 @@ def run_surprise_analysis(df: pd.DataFrame) -> dict:
 
 def _friendly_error(question: str, err: str) -> str:
     e = (err or "").lower()
-    if "column" in e and ("not found" in e or "does not exist" in e or "binder" in e):
+    insurance = False
+    try:
+        insurance = postgres_mode_enabled() or (
+            str(st.session_state.get("industry_pack_id") or "").lower() == "insurance"
+        )
+    except Exception:
+        insurance = False
+
+    if "canceling statement due to statement timeout" in e or "statement timeout" in e:
+        reason = "The warehouse query hit the time limit"
+        etype = "timeout"
+        simpler = (
+            "Show claim count by region for 2025"
+            if insurance
+            else "Show revenue by colour"
+        )
+    elif "column" in e and ("not found" in e or "does not exist" in e or "binder" in e):
         reason = "I couldn't find that column in your data"
         etype = "column not found"
+        simpler = (
+            "Show GWP by line of business for 2025"
+            if insurance
+            else "Show revenue by colour"
+        )
     elif "syntax" in e or "parser" in e:
         reason = "The query structure was unexpected"
         etype = "syntax"
+        simpler = (
+            "Show claim count by region for 2025"
+            if insurance
+            else "Show revenue by colour"
+        )
     elif "no row" in e or "empty" in e:
         reason = "No data matched those filters"
         etype = "no rows"
+        simpler = (
+            "Show earned premium by region for 2025"
+            if insurance
+            else "Show revenue by colour"
+        )
     else:
         reason = "Unexpected technical issue"
         etype = "technical"
+        simpler = (
+            "Show claim count by region for 2025"
+            if insurance
+            else "Show revenue by colour"
+        )
 
-    simpler = "Show revenue by colour"
     try:
         prompt = (
             f'A data query failed.\nOriginal question: "{question}"\n'
@@ -1748,12 +1865,17 @@ def _chat_scroll_to_bottom():
 
 
 def _append_assistant(content, message_type, data=None):
+    payload = dict(data or {})
+    msg_id = f"m_{uuid.uuid4().hex[:12]}"
+    rdf = payload.get("result_df")
+    if isinstance(rdf, pd.DataFrame) and not rdf.empty:
+        payload["result_df"] = _park_result_dataframe(msg_id, rdf)
     st.session_state.chat_messages.append({
-        "id": f"m_{uuid.uuid4().hex[:12]}",
+        "id": msg_id,
         "role": "assistant",
         "content": content,
         "message_type": message_type,
-        "data": data or {},
+        "data": payload,
         "timestamp": datetime.now().strftime("%H:%M"),
     })
     st.session_state["_chat_needs_scroll"] = True
@@ -1969,6 +2091,41 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         st.rerun()
         return
 
+    # Empty successful SQL — don't present as a normal high-confidence answer.
+    if isinstance(df_result, pd.DataFrame) and df_result.empty:
+        evidence = evidence or {}
+        try:
+            score, breakdown = compute_trust_score(evidence, df_result, working_df)
+            evidence["trust_score"] = score
+            evidence["trust_breakdown"] = breakdown
+            evidence["empty_result"] = True
+            evidence["row_count"] = 0
+        except Exception:
+            pass
+        try:
+            from core.observability import finish_trace
+
+            finish_trace()
+        except Exception:
+            pass
+        sugs = _empty_recovery_suggestions(q, working_df)
+        _append_assistant(
+            "No rows matched that question. Try a wider time window, drop a filter, "
+            "or pick one of these alternatives:",
+            "empty_result",
+            {
+                "result_df": df_result,
+                "sql": sql,
+                "evidence": evidence,
+                "suggestions": sugs,
+                "source_question": q,
+                "answer_mode": mode,
+                "elapsed": elapsed,
+            },
+        )
+        st.rerun()
+        return
+
     evidence = evidence or {}
     try:
         score, breakdown = compute_trust_score(evidence, df_result, working_df)
@@ -2060,7 +2217,7 @@ def render_user_bubble(msg):
 def _query_share_payload(msg: dict) -> dict:
     """Build the lightweight share model; binary exports remain lazy."""
     data = msg.get("data") or {}
-    rdf = data.get("result_df")
+    rdf = _resolve_result_dataframe(msg)
     src_q = data.get("source_question") or msg.get("content") or ""
     return build_share_payload(
         question=src_q,
@@ -2082,18 +2239,26 @@ def _render_response_header(msg: dict, *, default_expanded: bool) -> bool:
         st.session_state[state_key] = bool(default_expanded)
     expanded = bool(st.session_state[state_key])
 
-    rdf = data.get("result_df")
+    rdf = _resolve_result_dataframe(msg)
     rows = len(rdf) if isinstance(rdf, pd.DataFrame) else 0
+    if isinstance(rdf, pd.DataFrame):
+        full_rows = getattr(rdf, "attrs", {}).get("askdb_full_rows")
+        if full_rows:
+            rows = int(full_rows)
+    if mtype == "empty_result":
+        rows = 0
     elapsed = data.get("elapsed")
     meta = []
-    if rows:
+    if mtype == "empty_result":
+        meta.append("0 rows")
+    elif rows:
         meta.append(f"{rows:,} rows")
     if elapsed is not None:
         meta.append(f"{elapsed}s")
     title = "Response" + (f" · {' · '.join(meta)}" if meta else "")
 
     with st.container(key=f"response_header_{ref}"):
-        if mtype == "query":
+        if mtype in ("query", "empty_result"):
             head_l, head_toggle, head_actions = st.columns([0.72, 0.08, 0.20])
         else:
             head_l, head_toggle = st.columns([0.92, 0.08])
@@ -2147,27 +2312,48 @@ def _render_assistant_content(
         "blocked": "assistant-card card-blocked",
         "oob": "assistant-card card-oob",
         "clarification": "assistant-card card-clarification",
+        "empty_result": "assistant-card card-error",
         "error_friendly": "assistant-card card-error",
         "error": "assistant-card card-error",
     }.get(mtype, "assistant-card card-chat")
 
-    if mtype in ("chat", "oob", "clarification", "blocked", "error", "error_friendly"):
+    if mtype in (
+        "chat", "oob", "clarification", "blocked", "error", "error_friendly", "empty_result"
+    ):
         body = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
         st.markdown(
             f'<div class="chat-reply-text {card_cls}">{body}</div>',
             unsafe_allow_html=True,
         )
-        if mtype == "clarification":
+        if mtype in ("clarification", "empty_result"):
             sugs = (data.get("suggestions") or [])[:2]
+            ref = _chat_msg_ref(msg)
             if sugs:
-                chips = "".join(
-                    f'<div class="clarification-chip">{i + 1}. {html.escape(s)}</div>'
-                    for i, s in enumerate(sugs)
-                )
-                st.markdown(
-                    f'<div class="clarification-chip-row">{chips}</div>',
-                    unsafe_allow_html=True,
-                )
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button(
+                        f"1) {sugs[0][:72]}{'…' if len(sugs[0]) > 72 else ''}",
+                        key=f"empty_sug_0_{ref}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["_dr_pending_question"] = sugs[0]
+                        st.rerun()
+                if len(sugs) > 1:
+                    with c2:
+                        if st.button(
+                            f"2) {sugs[1][:72]}{'…' if len(sugs[1]) > 72 else ''}",
+                            key=f"empty_sug_1_{ref}",
+                            use_container_width=True,
+                        ):
+                            st.session_state["_dr_pending_question"] = sugs[1]
+                            st.rerun()
+            sql = data.get("sql")
+            if sql and mtype == "empty_result":
+                with st.expander("SQL that returned 0 rows", expanded=False):
+                    st.code(sql, language="sql")
+            evidence = data.get("evidence")
+            if evidence and mtype == "empty_result":
+                render_trust_score_card(evidence, show_summary=False)
 
     elif mtype == "surprise":
         sur = data.get("surprise") or {}
@@ -2212,7 +2398,7 @@ def _render_assistant_content(
     elif mtype == "query":
         evidence = data.get("evidence")
         elapsed = data.get("elapsed")
-        rdf = data.get("result_df")
+        rdf = _resolve_result_dataframe(msg)
         src_q = data.get("source_question") or msg.get("content") or ""
         narr = data.get("narration")
 

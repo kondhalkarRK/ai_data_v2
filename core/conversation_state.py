@@ -298,6 +298,21 @@ def resolve_clarification(choice: str) -> str | None:
     metric = opts.get(key) or opts.get(key[:1])
     if not metric:
         return reply or original
+    try:
+        from core.data_backend.factory import postgres_mode_enabled
+
+        if postgres_mode_enabled():
+            return f"show {metric} by region"
+    except Exception:
+        pass
+    try:
+        pack = str(
+            __import__("streamlit").session_state.get("industry_pack_id") or ""
+        ).lower()
+        if pack == "insurance":
+            return f"show {metric} by region"
+    except Exception:
+        pass
     return f"show {metric} by colour"
 
 
@@ -565,7 +580,11 @@ def is_data_question(question: str, df=None) -> bool:
         "movie", "song", "football", "cricket", "restaurant", "cook",
     )
     if any(w in q for w in lifestyle) and not any(
-        w in q for w in ("revenue", "sales", "units", "colour", "make", "region", "order")
+        w in q
+        for w in (
+            "revenue", "sales", "units", "colour", "make", "region", "order",
+            "claim", "premium", "gwp", "loss", "policy",
+        )
     ):
         return False
 
@@ -574,7 +593,8 @@ def is_data_question(question: str, df=None) -> bool:
         "what are you", "introduce yourself",
     ]
     if any(g in q for g in general) and not any(
-        w in q for w in ("show", "revenue", "sales", "colour", "make")
+        w in q
+        for w in ("show", "revenue", "sales", "colour", "make", "claim", "premium", "gwp")
     ):
         return False
 
@@ -597,6 +617,10 @@ def is_data_question(question: str, df=None) -> bool:
         "model", "salesperson", "region", "quarter", "month", "year",
         "trend", "top", "bottom", "compare", "average", "total",
         "car type", "vehicle", "ev", "electric",
+        # Insurance
+        "claim", "claims", "premium", "gwp", "loss ratio", "severity",
+        "incurred", "earned", "written", "policy", "policies", "lob",
+        "line of business", "renewal", "retention", "frequency",
     )
     has_data_term = any(t in q for t in data_terms)
 

@@ -41,10 +41,10 @@ _OOB_EXTRA = [
 ]
 
 _FOLLOWUP_EXTRA = [
-    "same", "now", "also", "but", "only",
-    "filter", "instead", "what about",
-    "how about", "additionally", "too",
-    "and what", "show only", "just show",
+    "same", "instead", "filter",
+    "what about", "how about", "additionally",
+    "and what", "show only", "just show", "just for", "only for",
+    "same but", "same for", "filter by", "filter to",
     "drill down", "drill into", "break down", "break that down",
     "deeper", "more detail", "zoom in", "dig into", "slice by", "split by",
 ]
@@ -104,11 +104,22 @@ def is_standalone_analytical_question(question: str) -> bool:
 
     has_metric = any(
         w in q for w in (
+            # Automotive / sales
             "revenue", "sales", "units", "orders", "volume", "total",
             "sold", "amount", "count",
+            # Insurance
+            "claim", "claims", "premium", "gwp", "loss ratio", "loss_ratio",
+            "severity", "incurred", "earned", "written", "policy", "policies",
+            "renewal", "retention", "frequency", "combined ratio",
         )
     )
-    has_breakdown = any(w in q for w in (" by ", " per ", "group by", "breakdown", "compare"))
+    has_breakdown = any(
+        w in q
+        for w in (
+            " by ", " per ", "group by", "breakdown", "compare",
+            " across ", " vs ", " versus ",
+        )
+    )
     has_time = bool(re.search(r"\b20\d{2}\b", q)) or any(
         w in q for w in ("month", "year", "quarter", "trend", "monthly", "yearly")
     )

@@ -15,6 +15,78 @@ from features.question_cache import cache_manager, cache_triggers
 from features.rag_query_memory import query_memory, glossary_store
 from features.vector_schema_retrieval import schema_retriever
 
+
+def _active_pack_id() -> str:
+    try:
+        pack = st.session_state.get("industry_pack_id")
+        if pack:
+            return str(pack)
+    except Exception:
+        pass
+    try:
+        from config.settings import get_data_config
+
+        return str(get_data_config().get("industry_pack") or "default")
+    except Exception:
+        return "default"
+
+
+def _result_is_empty(result) -> bool:
+    if result is None:
+        return True
+    try:
+        return bool(getattr(result, "empty", False)) or len(result) == 0
+    except Exception:
+        return False
+
+
+def _unpack_memory_entry(cached):
+    """Support legacy (result, sql, err) tuples and dict entries with meta."""
+    if isinstance(cached, dict):
+        return (
+            cached.get("result"),
+            cached.get("sql") or "",
+            cached.get("err"),
+            cached,
+        )
+    if isinstance(cached, (list, tuple)) and len(cached) >= 3:
+        return cached[0], cached[1], cached[2], None
+    return None, "", "invalid cache entry", None
+
+
+def _attach_glossary_to_evidence(evidence: dict | None, result=None) -> dict | None:
+    if evidence is None:
+        return None
+    try:
+        evidence["glossary_matches"] = list(
+            st.session_state.get("last_glossary_matches") or []
+        )
+        evidence["glossary_hints"] = st.session_state.get("last_glossary_hints") or ""
+    except Exception:
+        evidence.setdefault("glossary_matches", [])
+        evidence.setdefault("glossary_hints", "")
+    empty = _result_is_empty(result)
+    evidence["empty_result"] = empty
+    try:
+        evidence["row_count"] = 0 if result is None else int(len(result))
+    except Exception:
+        evidence["row_count"] = 0
+    return evidence
+
+
+def _store_session_nlq_cache(cache_key: str, result, sql: str, err=None, **meta) -> None:
+    if err or _result_is_empty(result):
+        return
+    entry = {
+        "result": result,
+        "sql": sql,
+        "err": None,
+        "glossary_matches": list(st.session_state.get("last_glossary_matches") or []),
+        "glossary_hints": st.session_state.get("last_glossary_hints") or "",
+    }
+    entry.update(meta)
+    st.session_state.memory[cache_key] = entry
+
 try:
     from core.conversation_state import (
         get_state,
@@ -472,7 +544,7 @@ def nlq_to_sql(question: str, df: pd.DataFrame, status=None) -> str | None:
                         ) + 1
                     except Exception:
                         pass
-                    query_memory.store_successful_query(question, sql_clean)
+                    # Do not store in query memory until run_sql succeeds.
                     return sql_clean
 
     # Schema (optionally narrowed)
@@ -679,8 +751,7 @@ SQL:"""
     if status is not None:
         status.update(label="✨ Generating SQL with AI...")
     sql_result = call_llm(prompt)
-    if sql_result is not None:
-        query_memory.store_successful_query(question, sql_result)
+    # Query memory is updated only after successful execution in run_query.
     return sql_result
 
 
@@ -834,22 +905,39 @@ def _run_postgres_query(question: str, status=None):
         )
 
     fingerprint = backend.get_dataset_fingerprint()
-    cache_key = f"nlq_postgres_{fingerprint}_{question.strip().lower()}"
+    pack = _active_pack_id()
+    cache_key = f"nlq_postgres_{pack}_{fingerprint}_{question.strip().lower()}"
     cached = st.session_state.memory.get(cache_key)
     if cached:
-        result, sql, err = cached
-        evidence = (
-            build_evidence(sql or "", result, "cache", question)
-            if _EVIDENCE_OK else None
-        )
-        if evidence is not None:
-            evidence["backend"] = "postgres"
-            evidence["from_cache"] = True
-        return _pack_return(result, sql, err, evidence)
+        result, sql, err, meta = _unpack_memory_entry(cached)
+        if not err and not _result_is_empty(result):
+            evidence = (
+                build_evidence(sql or "", result, "cache", question)
+                if _EVIDENCE_OK else None
+            )
+            if evidence is not None:
+                evidence["backend"] = "postgres"
+                evidence["from_cache"] = True
+                if isinstance(meta, dict):
+                    evidence["glossary_matches"] = list(
+                        meta.get("glossary_matches") or []
+                    )
+                    evidence["glossary_hints"] = meta.get("glossary_hints") or ""
+                    evidence["sql_retry"] = bool(meta.get("sql_retry"))
+                _attach_glossary_to_evidence(evidence, result)
+            return _pack_return(result, sql, err, evidence)
 
     with obs_span("prompt.build") as rec:
         schema = backend.describe_schema()
         rec.setdefault("attrs", {})["schema_chars"] = len(schema or "")
+        # Clear soft-anchor for full standalone insurance asks
+        try:
+            from core.question_normaliser import is_standalone_analytical_question
+
+            if _CONV_OK and is_standalone_analytical_question(question):
+                clear_sql_anchor()
+        except Exception:
+            pass
         prompt = _postgres_prompt(question, schema)
         rec["attrs"]["prompt_chars"] = len(prompt or "")
     if not schema:
@@ -866,6 +954,7 @@ def _run_postgres_query(question: str, status=None):
     if status is not None:
         status.update(label="⚙️ Executing query in PostgreSQL...")
     result, err = run_sql(sql, None)
+    sql_retry_used = False
 
     if err and not err.startswith("\U0001f512"):
         if status is not None:
@@ -879,16 +968,30 @@ def _run_postgres_query(question: str, status=None):
         if corrected:
             sql = corrected
             result, err = run_sql(sql, None)
+            sql_retry_used = True
+            try:
+                st.session_state["_sql_retry_used"] = True
+            except Exception:
+                pass
 
     evidence = None
     if result is not None and not err:
-        st.session_state.memory[cache_key] = (result, sql, None)
+        _store_session_nlq_cache(
+            cache_key, result, sql, sql_retry=sql_retry_used
+        )
+        if not _result_is_empty(result):
+            try:
+                query_memory.store_successful_query(question, sql)
+            except Exception:
+                pass
         if _EVIDENCE_OK:
             evidence = build_evidence(sql, result, "semantic", question)
             evidence["backend"] = "postgres"
             evidence["dataset_fingerprint"] = fingerprint
             evidence["resolution_source"] = "semantic_llm"
-        if _CONV_OK:
+            evidence["sql_retry"] = sql_retry_used
+            _attach_glossary_to_evidence(evidence, result)
+        if _CONV_OK and not _result_is_empty(result):
             try:
                 update_state(
                     {"intent_type": "semantic_sql"},
@@ -905,6 +1008,8 @@ def _run_postgres_query(question: str, status=None):
     elif _EVIDENCE_OK:
         evidence = build_evidence(sql, None, "semantic", question)
         evidence["backend"] = "postgres"
+        evidence["sql_retry"] = sql_retry_used
+        _attach_glossary_to_evidence(evidence, result)
 
     return _pack_return(result, sql, err, evidence)
 
@@ -946,39 +1051,63 @@ def run_query(working_df: pd.DataFrame | None, question: str, status=None):
             pass
 
         st.session_state["_original_question"] = question
-        cache_key = f"nlq_{question.strip().lower()}"
+        pack = _active_pack_id()
+        try:
+            fingerprint = get_backend(
+                working_df, st.session_state.get("dfs") or {}
+            ).get_dataset_fingerprint()
+        except Exception:
+            fingerprint = "csv"
+        cache_key = f"nlq_{pack}_{fingerprint}_{question.strip().lower()}"
         if cache_key in st.session_state.memory:
             cached = st.session_state.memory[cache_key]
-            result, sql, err = cached[0], cached[1], cached[2]
-            evidence = (
-                build_evidence(sql or "", result, "cache", question)
-                if _EVIDENCE_OK else None
-            )
-            update_history(question, {"sql": sql, "evidence": evidence, "execution_path": "cache"})
-            return _pack_return(result, sql, err, evidence)
+            result, sql, err, meta = _unpack_memory_entry(cached)
+            if err or _result_is_empty(result):
+                st.session_state.memory.pop(cache_key, None)
+            else:
+                evidence = (
+                    build_evidence(sql or "", result, "cache", question)
+                    if _EVIDENCE_OK else None
+                )
+                if evidence is not None and isinstance(meta, dict):
+                    evidence["glossary_matches"] = list(
+                        meta.get("glossary_matches") or []
+                    )
+                    evidence["glossary_hints"] = meta.get("glossary_hints") or ""
+                    evidence["sql_retry"] = bool(meta.get("sql_retry"))
+                    _attach_glossary_to_evidence(evidence, result)
+                update_history(
+                    question,
+                    {"sql": sql, "evidence": evidence, "execution_path": "cache"},
+                )
+                return _pack_return(result, sql, err, evidence)
 
         saved = cache_manager.lookup(question, working_df)
         if saved is not None:
             sql = saved["sql"]
             if saved.get("result_df") is not None:
-                if status is not None:
-                    status.update(label="⚡ Served from saved question...")
-                evidence = (
-                    build_evidence(sql, saved["result_df"], "cache", question)
-                    if _EVIDENCE_OK else None
-                )
-                if evidence is not None:
-                    evidence["resolution_source"] = "saved_question"
-                update_history(
-                    question,
-                    {"sql": sql, "evidence": evidence, "execution_path": "cache"},
-                )
-                return _pack_return(saved["result_df"], sql, None, evidence)
+                if _result_is_empty(saved["result_df"]):
+                    pass
+                else:
+                    if status is not None:
+                        status.update(label="⚡ Served from saved question...")
+                    evidence = (
+                        build_evidence(sql, saved["result_df"], "cache", question)
+                        if _EVIDENCE_OK else None
+                    )
+                    if evidence is not None:
+                        evidence["resolution_source"] = "saved_question"
+                        _attach_glossary_to_evidence(evidence, saved["result_df"])
+                    update_history(
+                        question,
+                        {"sql": sql, "evidence": evidence, "execution_path": "cache"},
+                    )
+                    return _pack_return(saved["result_df"], sql, None, evidence)
 
             if status is not None:
                 status.update(label="⚡ Reusing saved SQL (no LLM)...")
             result, err = run_sql(sql, working_df)
-            if result is not None and not err:
+            if result is not None and not err and not _result_is_empty(result):
                 if cache_triggers.should_cache_result(question, working_df, result):
                     cache_manager.save(question, working_df, sql, result)
                 evidence = (
@@ -987,6 +1116,7 @@ def run_query(working_df: pd.DataFrame | None, question: str, status=None):
                 )
                 if evidence is not None:
                     evidence["resolution_source"] = "saved_question"
+                    _attach_glossary_to_evidence(evidence, result)
                 update_history(
                     question,
                     {"sql": sql, "evidence": evidence, "execution_path": "cache"},
@@ -1034,14 +1164,20 @@ Fix and return ONLY corrected SQL:""",
                 except Exception:
                     pass
 
-        if result is not None:
-            st.session_state.memory[cache_key] = (result, sql, None)
-            cache_manager.save(
-                question,
-                working_df,
+        if result is not None and not err:
+            _store_session_nlq_cache(
+                cache_key,
+                result,
                 sql,
-                result if cache_triggers.should_cache_result(question, working_df, result) else None,
+                sql_retry=bool(st.session_state.get("_sql_retry_used")),
             )
+            if not _result_is_empty(result):
+                if cache_triggers.should_cache_result(question, working_df, result):
+                    cache_manager.save(question, working_df, sql, result)
+                try:
+                    query_memory.store_successful_query(question, sql)
+                except Exception:
+                    pass
 
             if _EVIDENCE_OK:
                 evidence = build_evidence(sql, result, execution_path, question)
@@ -1050,8 +1186,9 @@ Fix and return ONLY corrected SQL:""",
                 evidence["modified"] = bool(st.session_state.get("_modification_used"))
                 evidence["followup_intent"] = st.session_state.get("_followup_intent")
                 evidence["followup_subject"] = st.session_state.get("_followup_subject")
+                _attach_glossary_to_evidence(evidence, result)
 
-            if _CONV_OK:
+            if _CONV_OK and not _result_is_empty(result):
                 try:
                     update_state(
                         {"intent_type": "semantic_sql"},
@@ -1076,6 +1213,7 @@ Fix and return ONLY corrected SQL:""",
                 pass
         elif _EVIDENCE_OK:
             evidence = build_evidence(sql or "", None, execution_path, question)
+            _attach_glossary_to_evidence(evidence, result)
 
         # Missing-column follow-up → friendly chat signal
         missing = st.session_state.pop("_anchor_missing_column", None)

@@ -104,10 +104,30 @@ class PostgresBackend(DataBackend):
             self._pool.close()
             self._pool = None
 
+    def _has_auth(self) -> bool:
+        """True when connection_url or discrete password is configured."""
+        if (self._config.get("connection_url") or "").strip():
+            return True
+        return bool(self._config.get("password"))
+
+    def clear_runtime_caches(self) -> None:
+        """Drop health/catalog/count caches so Retry Postgres can re-probe."""
+        self._health_cache = None
+        self._health_cache_ts = 0.0
+        self._catalog_cache = None
+        self._catalog_cache_ts = 0.0
+        self._relations_cache = None
+        self._relations_cache_ts = 0.0
+        self._counts_cache = None
+        self._counts_cache_ts = 0.0
+        self._counts_cache_exact = None
+        self._counts_cache_exact_ts = 0.0
+        self._schema_text_cache = None
+        self._fingerprint_cache = None
+
     def health_check(self) -> tuple[bool, str]:
-        url = (self._config.get("connection_url") or "").strip()
-        if not url and not self._config.get("password"):
-            return False, "PostgreSQL password is not configured."
+        if not self._has_auth():
+            return False, "PostgreSQL password or connection_url is not configured."
         now = time.time()
         if (
             self._health_cache is not None
@@ -211,7 +231,7 @@ class PostgresBackend(DataBackend):
 
     def list_relations(self) -> list[tuple[str, str]]:
         """Return (name, BASE TABLE|VIEW|MATERIALIZED VIEW) in the configured schema."""
-        if not self._config.get("password"):
+        if not self._has_auth():
             return []
         now = time.time()
         if (
@@ -277,18 +297,46 @@ class PostgresBackend(DataBackend):
                 cur.execute(query)
                 return int(cur.fetchone()[0])
 
-    def table_row_counts(self, include_views: bool = False) -> dict[str, int]:
+    def table_row_counts(
+        self, include_views: bool = False, *, exact: bool = False
+    ) -> dict[str, int]:
+        """Return row counts. Default uses pg_class.reltuples (fast estimates)."""
         counts: dict[str, int] = {}
-        if not self._config.get("password"):
+        if not self._has_auth():
             return counts
         now = time.time()
+        cache_attr = "_counts_cache_exact" if exact else "_counts_cache"
+        ts_attr = "_counts_cache_exact_ts" if exact else "_counts_cache_ts"
+        cached = getattr(self, cache_attr, None)
+        cached_ts = float(getattr(self, ts_attr, 0.0) or 0.0)
         if (
             not include_views
-            and self._counts_cache is not None
-            and (now - self._counts_cache_ts) < self._meta_ttl_seconds
+            and cached is not None
+            and (now - cached_ts) < self._meta_ttl_seconds
         ):
-            return dict(self._counts_cache)
+            return dict(cached)
         try:
+            if not exact and not include_views:
+                with self._get_pool().connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            SELECT c.relname::text,
+                                   GREATEST(c.reltuples, 0)::bigint AS est
+                            FROM pg_catalog.pg_class c
+                            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                            WHERE n.nspname = %s
+                              AND c.relkind IN ('r', 'p')
+                            ORDER BY 1
+                            """,
+                            (self._schema,),
+                        )
+                        for name, est in cur.fetchall():
+                            counts[str(name)] = int(est or 0)
+                self._counts_cache = dict(counts)
+                self._counts_cache_ts = now
+                return counts
+
             relations = self.list_relations()
             with self._get_pool().connection() as conn:
                 with conn.cursor() as cur:
@@ -302,14 +350,14 @@ class PostgresBackend(DataBackend):
                         cur.execute(query)
                         counts[table] = int(cur.fetchone()[0])
             if not include_views:
-                self._counts_cache = dict(counts)
-                self._counts_cache_ts = now
+                setattr(self, cache_attr, dict(counts))
+                setattr(self, ts_attr, now)
         except Exception:
             return counts
         return counts
 
     def list_foreign_keys(self) -> list[dict[str, str]]:
-        if not self._config.get("password"):
+        if not self._has_auth():
             return []
         query = """
             SELECT
