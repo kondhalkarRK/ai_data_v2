@@ -3,10 +3,57 @@ domain: "Insurance"
 
 terms:
   Gross Written Premium:
-    definition: "Premium booked for policies written during the period."
-    synonyms: [GWP, written premium, premium booked, booked premium]
+    definition: "Premium booked for policies written during the period. Default metric for sales / selling / revenue-style insurance questions."
+    synonyms:
+      - GWP
+      - written premium
+      - premium booked
+      - booked premium
+      - sale
+      - sales
+      - selling
+      - sold
+      - total sale
+      - total sales
+      - premium sales
+      - business written
     maps_to_measure: gross_written_premium
     sql_expression: "SUM(insurance.fact_policy_monthly.written_premium)"
+    calculation_rules:
+      - "Use fact_policy_monthly.written_premium — never claim rows."
+      - "For 'sale/sales/selling' without a metric name, default to GWP."
+    example_questions:
+      - "what is total sale of policy across type"
+      - "GWP by region last 12 months"
+    category: Financial
+
+  Top Selling:
+    definition: "Ranking intent for highest GWP (written premium). Prefer product / LOB grain unless the user asks for individual policy numbers."
+    synonyms:
+      - top selling
+      - best selling
+      - highest selling
+      - top sale
+      - top sales
+      - best seller
+      - best sellers
+      - highest sales
+      - most sold
+      - top products by sales
+    maps_to_measure: gross_written_premium
+    sql_expression: "SUM(insurance.fact_policy_monthly.written_premium)"
+    calculation_rules:
+      - "ORDER BY SUM(written_premium) DESC with ROW_NUMBER() AS rank starting at 1."
+      - "Default grain: dim_product.product_name and/or line_of_business — not policy_number."
+      - "If N is missing, LIMIT 10."
+      - "Join fact_policy_monthly → dim_product; optional dim_region / year grain."
+    disambiguation:
+      - "top selling policy → product/LOB by GWP, not one row per policy_id"
+      - "top selling agent → dim_agent by GWP"
+    example_questions:
+      - "top selling policy across year"
+      - "best selling products in East"
+      - "top 5 selling LOBs"
     category: Financial
 
   Earned Premium:
@@ -83,8 +130,9 @@ terms:
 
   Line of Business:
     definition: "Insurance product grouping such as Motor, Health, or Property."
-    synonyms: [LOB, product line, insurance line, business line]
+    synonyms: [LOB, product line, insurance line, business line, type, policy type, product type]
     maps_to_dimension: Product
+    sql_expression: "insurance.dim_product.line_of_business"
     category: Product
 
   Motor:
@@ -143,9 +191,12 @@ terms:
     category: Geography
 
   Policy:
-    definition: "Insurance contract held by a customer (dim_policy)."
+    definition: "Insurance contract held by a customer (dim_policy). For 'selling policy' rankings prefer Product/LOB by GWP."
     synonyms: [coverage, contract, policy contract, policyholder policy]
     maps_to_dimension: Policy
+    disambiguation:
+      - "selling/sales + policy → rank products by GWP, not policy_number"
+      - "policy number / specific policy → dim_policy.policy_number"
     category: Product
 
   Customer:
@@ -157,14 +208,16 @@ terms:
 
   Agent:
     definition: "Intermediary who sells/services policies (dim_agent)."
-    synonyms: [broker, channel partner, intermediary, advisor]
+    synonyms: [broker, channel partner, intermediary, advisor, channel, sales channel]
     maps_to_dimension: Agent
+    sql_expression: "insurance.dim_agent.channel_name"
     category: People
 
   Product:
     definition: "Insurance product in dim_product (code, name, LOB, family)."
-    synonyms: [insurance product, plan name, product name]
+    synonyms: [insurance product, plan name, product name, plan]
     maps_to_dimension: Product
+    sql_expression: "insurance.dim_product.product_name"
     category: Product
 
   Claim Status:
@@ -173,25 +226,68 @@ terms:
     category: Claims
 
   Premium:
-    definition: "Prefer earned_premium for loss ratio; written_premium for GWP. Always from fact_policy_monthly."
+    definition: "Prefer earned_premium for loss ratio; written_premium for GWP/sales. Always from fact_policy_monthly."
     synonyms: [premium income, premium collected]
     maps_to_measure: earned_premium
     category: Financial
 
+  Accounting Year:
+    definition: "Calendar year grain over premium accounting_month (or claims reported_date when question is claims)."
+    synonyms:
+      - year
+      - yearly
+      - annual
+      - annually
+      - calendar year
+      - across year
+      - by year
+      - per year
+      - year wise
+      - year-wise
+    maps_to_dimension: Accounting Month
+    sql_expression: "EXTRACT(YEAR FROM insurance.fact_policy_monthly.accounting_month)::int"
+    time_grains:
+      year: "EXTRACT(YEAR FROM accounting_month)::int AS year"
+      claims_year: "EXTRACT(YEAR FROM reported_date)::int AS year"
+    calculation_rules:
+      - "Premium/sales questions: GROUP BY EXTRACT(YEAR FROM accounting_month)."
+      - "Claims questions: GROUP BY EXTRACT(YEAR FROM reported_date)."
+      - "'across year' / 'by year' means break out by year, not only filter one year."
+    example_questions:
+      - "top selling policy across year"
+      - "GWP by year and LOB"
+    category: Time
+
+  Accounting Month Grain:
+    definition: "Month grain for premium reporting."
+    synonyms: [by month, monthly, month wise, month-wise, per month]
+    maps_to_dimension: Accounting Month
+    sql_expression: "date_trunc('month', insurance.fact_policy_monthly.accounting_month)::date"
+    category: Time
+
 domain_rules:
-  - "SQL is the source of truth for numerical results."
-  - "Documents provide management commentary, definitions, and actions, not database facts."
-  - "Never sum premium from claim rows — use insurance.fact_policy_monthly."
-  - "Loss ratio = SUM(incurred_amount) / NULLIF(SUM(earned_premium), 0) at compatible grain."
-  - "Use NULLIF to protect ratio denominators."
-  - "Map East/West/North/South (and EST/WST/NTH/STH) to dim_region.region_name / region_code."
-  - "Map Motor/Health/Property to dim_product.line_of_business."
-  - "Customer questions use dim_policy.customer_key; join claims/premium via policy_id."
-  - "Default analytical outputs must return a business dimension plus metric columns — never a single anonymous measure column unless the user explicitly asks for one number only."
-  - "For rankings and top-N, include a 1-based rank column (ROW_NUMBER starting at 1) plus the dimension label and metric."
-  - "Prefer LEFT JOIN from facts to dimensions so unmatched keys still appear."
-  - "Use reported_date for claims time filters and accounting_month for premium time filters."
-  - "When the user says period/month without specifying, prefer the latest 12 months ending at MAX(reported_date)."
+  always_rules:
+    - "SQL is the source of truth for numerical results."
+    - "Documents provide management commentary, definitions, and actions, not database facts."
+    - "Never sum premium from claim rows — use insurance.fact_policy_monthly."
+    - "Loss ratio = SUM(incurred_amount) / NULLIF(SUM(earned_premium), 0) at compatible grain."
+    - "Use NULLIF to protect ratio denominators."
+    - "Map East/West/North/South (and EST/WST/NTH/STH) to dim_region.region_name / region_code."
+    - "Map Motor/Health/Property to dim_product.line_of_business."
+    - "Customer questions use dim_policy.customer_key; join claims/premium via policy_id."
+    - "Sale/sales/selling/top selling default metric = Gross Written Premium (written_premium)."
+    - "Top selling policy/product → rank product_name / line_of_business by GWP with 1-based rank; LIMIT 10 if N missing."
+    - "'Across year' / by year → GROUP BY EXTRACT(YEAR FROM accounting_month) for premium."
+  never_rules:
+    - "Never invent premium from fact_claims."
+    - "Never return only a single anonymous measure column for analytical questions."
+    - "Do not rank individual policy_number for 'top selling policy' unless the user asks for policy numbers."
+  default_behaviours:
+    - "Default analytical outputs must return a business dimension plus metric columns."
+    - "For rankings and top-N, include a 1-based rank column (ROW_NUMBER starting at 1) plus the dimension label and metric."
+    - "Prefer LEFT JOIN from facts to dimensions so unmatched keys still appear."
+    - "Use reported_date for claims time filters and accounting_month for premium time filters."
+    - "When the user says period/month without specifying, prefer the latest 12 months ending at MAX(reported_date)."
 
 sql_patterns:
   monthly_claim_trend:
@@ -205,10 +301,26 @@ sql_patterns:
       GROUP BY 1 ORDER BY 1
   premium_by_product:
     description: "Written and earned premium by product/LOB"
-    trigger_words: [premium by product, GWP by line, earned premium]
+    trigger_words: [premium by product, GWP by line, earned premium, sales by type]
     pattern: >
       Aggregate insurance.fact_policy_monthly then join insurance.dim_product;
       return product_name, line_of_business, written_premium, earned_premium
+  top_selling_by_year:
+    description: "Top products/LOB by GWP broken out by calendar year"
+    trigger_words: [top selling, best selling, across year, by year, top sales]
+    pattern: >
+      SELECT EXTRACT(YEAR FROM fpm.accounting_month)::int AS year,
+             dp.product_name, dp.line_of_business,
+             SUM(fpm.written_premium) AS total_written_premium,
+             ROW_NUMBER() OVER (
+               PARTITION BY EXTRACT(YEAR FROM fpm.accounting_month)
+               ORDER BY SUM(fpm.written_premium) DESC
+             ) AS rank
+      FROM insurance.fact_policy_monthly fpm
+      LEFT JOIN insurance.dim_product dp ON dp.product_id = fpm.product_id
+      GROUP BY 1, 2, 3
+      ORDER BY year, rank
+      — keep ranks starting at 1; filter rank <= 10 if user said top without N
   loss_ratio_by_region:
     description: "Loss ratio by region with supporting columns"
     trigger_words: [loss ratio by region, regional loss ratio, east loss ratio]
