@@ -107,45 +107,52 @@ def _render_postgres_preview():
         st.info("No readable tables or views were found in the configured schema.")
         return
 
-    st.markdown("---")
-    st.markdown("#### Individual table view")
-    selected = st.selectbox(
-        "Select PostgreSQL table or view",
-        tables,
-        key="postgres_preview_table",
-    )
-    preview_limit = 100
-    preview = backend.get_preview(selected, limit=preview_limit)
-    full_n = int(counts.get(selected) or 0)
-    if selected not in counts:
-        full_n = int(backend.count_relation(selected))
-    st.markdown(f"#### {selected}")
-    st.markdown(
-        f"""<div class="stat-row">
+    with st.expander("Individual table view", expanded=False):
+        st.caption("Open only when you need a single table — keeps preview light.")
+        load_individual = st.checkbox(
+            "Load individual table preview",
+            value=False,
+            key="preview_load_individual_pg",
+        )
+        if not load_individual:
+            return
+        selected = st.selectbox(
+            "Select PostgreSQL table or view",
+            tables,
+            key="postgres_preview_table",
+        )
+        preview_limit = 100
+        preview = backend.get_preview(selected, limit=preview_limit)
+        full_n = int(counts.get(selected) or 0)
+        if selected not in counts:
+            full_n = int(backend.count_relation(selected))
+        st.markdown(f"#### {selected}")
+        st.markdown(
+            f"""<div class="stat-row">
       <div class="stat-card"><div class="sv">{full_n:,}</div><div class="sl">Loaded rows</div></div>
       <div class="stat-card"><div class="sv">{preview.shape[1]}</div><div class="sl">Columns</div></div>
       <div class="stat-card"><div class="sv">{preview.select_dtypes(include='number').shape[1]}</div><div class="sl">Numeric Cols</div></div>
     </div>""",
-        unsafe_allow_html=True,
-    )
-    safe_dataframe(preview, use_container_width=True)
-    st.caption(
-        f"Showing first {min(preview_limit, len(preview)):,} of {full_n:,} rows "
-        "(server-side LIMIT). ASK-DB does not load the full PostgreSQL table into Streamlit."
-    )
+            unsafe_allow_html=True,
+        )
+        safe_dataframe(preview, use_container_width=True)
+        st.caption(
+            f"Showing first {min(preview_limit, len(preview)):,} of {full_n:,} rows "
+            "(server-side LIMIT). ASK-DB does not load the full PostgreSQL table into Streamlit."
+        )
 
-    with st.expander("Column details"):
-        info = [
-            {
-                "Column": column,
-                "Type": str(preview[column].dtype),
-                "Non-Null in preview": int(preview[column].notna().sum()),
-                "Null in preview": int(preview[column].isna().sum()),
-                "Unique in preview": int(preview[column].nunique()),
-            }
-            for column in preview.columns
-        ]
-        st.dataframe(pd.DataFrame(info), use_container_width=True)
+        with st.expander("Column details"):
+            info = [
+                {
+                    "Column": column,
+                    "Type": str(preview[column].dtype),
+                    "Non-Null in preview": int(preview[column].notna().sum()),
+                    "Null in preview": int(preview[column].isna().sum()),
+                    "Unique in preview": int(preview[column].nunique()),
+                }
+                for column in preview.columns
+            ]
+            st.dataframe(pd.DataFrame(info), use_container_width=True)
 
 
 def render(working_df, tables, dfs):
@@ -175,31 +182,38 @@ def render(working_df, tables, dfs):
             st.caption(f"Showing first 100 of {len(working_preview_df):,} rows")
 
     st.markdown("---")
-    st.markdown("#### Individual Table View")
-    sel = st.selectbox("Select Table", tables, key="preview_table_sel")
-    pdf = dfs[sel]
-    st.markdown(
-        f"""<div class="stat-row">
+    with st.expander("Individual Table View", expanded=False):
+        st.caption("Open only when you need a single source table.")
+        load_individual = st.checkbox(
+            "Load individual table preview",
+            value=False,
+            key="preview_load_individual_csv",
+        )
+        if load_individual:
+            sel = st.selectbox("Select Table", tables, key="preview_table_sel")
+            pdf = dfs[sel]
+            st.markdown(
+                f"""<div class="stat-row">
       <div class="stat-card"><div class="sv">{pdf.shape[0]:,}</div><div class="sl">Rows</div></div>
       <div class="stat-card"><div class="sv">{pdf.shape[1]}</div><div class="sl">Columns</div></div>
       <div class="stat-card"><div class="sv">{pdf.select_dtypes(include='number').shape[1]}</div><div class="sl">Numeric Cols</div></div>
     </div>""",
-        unsafe_allow_html=True,
-    )
-    safe_dataframe(pdf.head(100), use_container_width=True)
-    if len(pdf) > 100:
-        st.caption(f"Showing first 100 of {len(pdf):,} rows")
+                unsafe_allow_html=True,
+            )
+            safe_dataframe(pdf.head(100), use_container_width=True)
+            if len(pdf) > 100:
+                st.caption(f"Showing first 100 of {len(pdf):,} rows")
 
-    with st.expander("Column Details"):
-        info = []
-        for col in dfs[sel].columns:
-            s = dfs[sel][col]
-            info.append({
-                "Column": col,
-                "Type": str(s.dtype),
-                "Non-Null": int(s.notna().sum()),
-                "Null": int(s.isna().sum()),
-                "Unique": int(s.nunique()),
-                "Sample": str(s.dropna().iloc[0]) if s.notna().any() else "N/A",
-            })
-        st.dataframe(pd.DataFrame(info), use_container_width=True)
+            with st.expander("Column Details"):
+                info = []
+                for col in dfs[sel].columns:
+                    s = dfs[sel][col]
+                    info.append({
+                        "Column": col,
+                        "Type": str(s.dtype),
+                        "Non-Null": int(s.notna().sum()),
+                        "Null": int(s.isna().sum()),
+                        "Unique": int(s.nunique()),
+                        "Sample": str(s.dropna().iloc[0]) if s.notna().any() else "N/A",
+                    })
+                st.dataframe(pd.DataFrame(info), use_container_width=True)

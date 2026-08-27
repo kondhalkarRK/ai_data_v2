@@ -178,12 +178,24 @@ def _render_chat_chart(
         st.info("Chart not available for this result")
 
 
+def _clear_chat_expand() -> None:
+    """Dismiss expand dialog permanently until the user clicks expand again."""
+    payload = st.session_state.pop("_chat_expand", None) or {}
+    ref = payload.get("ref")
+    kind = payload.get("kind")
+    if ref and kind:
+        st.session_state.pop(f"_chat_expand_all_{ref}_{kind}", None)
+
+
 def _run_chat_expand_dialog() -> None:
     """One large expand dialog for table / chart / narration.
 
     Table/chart open on a small slice (20 rows) so the dialog is instant;
     remaining rows (up to RESULT_DISPLAY_LIMIT) load only when the user asks —
     data is already in session_state (no Postgres round-trip).
+
+    Closing via Close or clicking outside clears `_chat_expand` so the dialog
+    does not keep reopening on every Chat rerun.
     """
     payload = st.session_state.get("_chat_expand")
     if not payload:
@@ -194,8 +206,7 @@ def _run_chat_expand_dialog() -> None:
     title = titles.get(kind, "Expand")
     show_all_key = f"_chat_expand_all_{ref}_{kind}"
 
-    @st.dialog(title, width="large")
-    def _dialog() -> None:
+    def _dialog_body() -> None:
         if kind == "table":
             df = st.session_state.get(f"_chat_payload_df_{ref}")
             if isinstance(df, pd.DataFrame) and not df.empty:
@@ -282,9 +293,18 @@ def _run_chat_expand_dialog() -> None:
             else:
                 st.info("No insight text for this answer.")
         if st.button("Close", key=f"chat_dlg_close_{ref}", use_container_width=True):
-            st.session_state.pop("_chat_expand", None)
-            st.session_state.pop(show_all_key, None)
+            _clear_chat_expand()
             st.rerun()
+
+    # Prefer on_dismiss so clicking outside / X also clears the sticky flag.
+    try:
+        @st.dialog(title, width="large", on_dismiss=_clear_chat_expand)
+        def _dialog() -> None:
+            _dialog_body()
+    except TypeError:
+        @st.dialog(title, width="large")
+        def _dialog() -> None:
+            _dialog_body()
 
     _dialog()
 
@@ -1760,6 +1780,9 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     })
     st.session_state["_chat_needs_scroll"] = True
 
+    # Asking a new question must not reopen a prior expand dialog.
+    _clear_chat_expand()
+
     # Do not write chat_answer_mode here — the segmented_control owns that key.
     mode = _normalize_answer_mode(st.session_state.get("chat_answer_mode"))
     flags = _answer_mode_flags(mode)
@@ -2461,6 +2484,7 @@ def render_chat_mode(working_df, tables, dfs):
                 help="Clear chat",
             ):
                 st.session_state.chat_messages = []
+                _clear_chat_expand()
                 clear_state()
                 clear_sql_anchor()
                 st.toast("Chat Room cleared", icon="🗑")
