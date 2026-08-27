@@ -1760,11 +1760,11 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     })
     st.session_state["_chat_needs_scroll"] = True
 
+    # Do not write chat_answer_mode here — the segmented_control owns that key.
     mode = _normalize_answer_mode(st.session_state.get("chat_answer_mode"))
     flags = _answer_mode_flags(mode)
     narration_on = flags["show_insight"] or flags["want_llm_narration"]
     st.session_state.chat_narration_on = narration_on
-    st.session_state.chat_answer_mode = mode
 
     # 1. Destructive
     if detect_destructive(q):
@@ -2332,12 +2332,15 @@ def _chat_record_status(working_df: pd.DataFrame) -> str:
 
 def render_chat_mode(working_df, tables, dfs):
     st.session_state.setdefault("chat_messages", [])
-    if "chat_answer_mode" not in st.session_state:
+    # Initialize / migrate answer mode BEFORE the widget with the same key is created.
+    raw_mode = st.session_state.get("chat_answer_mode")
+    if raw_mode is None:
         legacy = st.session_state.get("chat_narration_on", True)
         st.session_state.chat_answer_mode = "Full" if legacy else "Table"
-    st.session_state.chat_answer_mode = _normalize_answer_mode(
-        st.session_state.chat_answer_mode
-    )
+    else:
+        normalized = _normalize_answer_mode(raw_mode)
+        if normalized != raw_mode:
+            st.session_state.chat_answer_mode = normalized
 
     _run_chat_expand_dialog()
 
