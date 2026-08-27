@@ -520,22 +520,20 @@ def unpin_decision(pin_id: str) -> None:
 
 
 def render_pinned_strip(on_ask) -> None:
-    """Pinned insights row — shown above Chat Room thread."""
+    """Compact pinned-decisions popover shown above the Chat Room thread."""
     pins = st.session_state.get("pinned_decisions") or []
     if not pins:
         return
-    st.markdown('<div class="dr-pinned-label">📌 Pinned decisions</div>', unsafe_allow_html=True)
-    cols = st.columns(min(len(pins), 4))
-    for i, pin in enumerate(pins[:4]):
-        with cols[i]:
+    with st.popover(f"📌 Pinned ({len(pins)})", help="Open or remove pinned decisions"):
+        for pin in pins[:8]:
             st.markdown(
-                f'<div class="dr-pin-card"><div class="dr-pin-headline">'
+                f'<div class="dr-pin-card dr-pin-card-compact"><div class="dr-pin-headline">'
                 f'{html.escape(str(pin.get("headline", "Insight"))[:48])}</div>'
                 f'<div class="dr-pin-meta">{html.escape(str(pin.get("pinned_at", "")))}'
                 f' · {pin.get("row_count", 0):,} rows</div></div>',
                 unsafe_allow_html=True,
             )
-            c1, c2 = st.columns(2)
+            c1, c2 = st.columns([4, 1])
             with c1:
                 if st.button("Open", key=f"pin_open_{pin['id']}", use_container_width=True):
                     q = pin.get("suggested_question") or pin.get("question")
@@ -647,7 +645,22 @@ def render_share_and_pin(
             if teams_text:
                 st.text_area("Paste into Teams", value=teams_text, height=90, key=f"{key_prefix}_teams_ta")
 
-            pdf_bytes = build_pdf_bytes(payload)
+            # PDF/PPT chart generation is expensive. Streamlit executes closed
+            # popover bodies on every rerun, so prepare files only on request.
+            export_key = f"{key_prefix}_prepared_exports"
+            if st.button(
+                "Prepare PDF / PowerPoint",
+                key=f"{key_prefix}_prepare_exports",
+                use_container_width=True,
+            ):
+                with st.spinner("Preparing export files…"):
+                    st.session_state[export_key] = {
+                        "pdf": build_pdf_bytes(payload),
+                        "ppt": build_pptx_bytes(payload),
+                    }
+
+            exports = st.session_state.get(export_key) or {}
+            pdf_bytes = exports.get("pdf")
             if pdf_bytes:
                 st.download_button(
                     "📄 Download PDF (brief + chart + table)",
@@ -657,7 +670,7 @@ def render_share_and_pin(
                     key=f"{key_prefix}_pdf",
                     use_container_width=True,
                 )
-            else:
+            elif export_key in st.session_state:
                 st.download_button(
                     "📄 Download HTML brief",
                     data=build_html_brief(payload).encode("utf-8"),
@@ -667,7 +680,7 @@ def render_share_and_pin(
                     use_container_width=True,
                 )
 
-            ppt_bytes = build_pptx_bytes(payload)
+            ppt_bytes = exports.get("ppt")
             if ppt_bytes:
                 st.download_button(
                     "📊 Download PowerPoint (brief + chart + table)",
@@ -677,7 +690,7 @@ def render_share_and_pin(
                     key=f"{key_prefix}_ppt",
                     use_container_width=True,
                 )
-            else:
+            elif export_key in st.session_state:
                 st.caption("Install python-pptx for PowerPoint export.")
 
             rdf = payload.get("result_df")

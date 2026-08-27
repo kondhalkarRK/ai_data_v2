@@ -224,9 +224,14 @@ if (
         st.session_state.semantic_column_map   = ""
 # ─────────────────────────────────────────────────────────────────
 
-# Active-view only: Streamlit st.tabs still runs every tab body on each click.
-# A radio switcher renders ONE panel → much snappier expanders / composer chips.
-_VIEW_OPTIONS = ["💬 Chat Room", "📄 Data Preview", "📊 KPI Summary"]
+# Keep the product workflow order while rendering only one view. Native
+# st.tabs runs every tab body on each click and makes UI interactions sluggish.
+_VIEW_OPTIONS = ["📄 Data Preview", "📊 KPI", "💬 Chat Room"]
+if not st.session_state.get("_main_view_order_v2"):
+    st.session_state.main_view = _VIEW_OPTIONS[0]
+    st.session_state["_main_view_order_v2"] = True
+elif st.session_state.get("main_view") == "📊 KPI Summary":
+    st.session_state.main_view = "📊 KPI"
 st.session_state.setdefault("main_view", _VIEW_OPTIONS[0])
 _main_view = st.radio(
     "Main view",
@@ -254,16 +259,7 @@ def _render_tab_safely(render_fn, label: str):
 
 if _main_view == "📄 Data Preview":
     _render_tab_safely(tab_preview.render, "Data Preview")
-elif _main_view == "📊 KPI Summary":
+elif _main_view == "📊 KPI":
     _render_tab_safely(tab_kpi.render, "KPI Summary")
 else:
     _render_tab_safely(tab_query.render, "Chat Room")
-
-st.markdown("---")
-st.markdown(
-    "<div class='app-footer'>"
-    f"ASK - DB &nbsp;·&nbsp; {'PostgreSQL' if _postgres_mode else 'DuckDB'} "
-    "· AI Data Copilot · Streamlit"
-    "</div>",
-    unsafe_allow_html=True,
-)

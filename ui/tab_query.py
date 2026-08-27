@@ -7,6 +7,7 @@ from __future__ import annotations
 import html
 import random
 import time
+import uuid
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -23,7 +24,6 @@ from ui.decision_share import (
     build_share_payload,
     render_share_and_pin,
     render_pinned_strip,
-    render_proactive_landing,
 )
 
 RESULT_DISPLAY_LIMIT = 100
@@ -106,6 +106,9 @@ def _render_limited_dataframe(rdf: pd.DataFrame, *, preview_rows: int | None = N
 
 
 def _chat_msg_ref(msg: dict) -> str:
+    message_id = str(msg.get("id") or "").strip()
+    if message_id:
+        return message_id
     stamp = str(msg.get("timestamp") or "")
     body = str(msg.get("content") or "")[:48]
     return f"c{abs(hash(stamp + body)) % 10_000_000}"
@@ -1726,6 +1729,7 @@ def _chat_scroll_to_bottom():
 
 def _append_assistant(content, message_type, data=None):
     st.session_state.chat_messages.append({
+        "id": f"m_{uuid.uuid4().hex[:12]}",
         "role": "assistant",
         "content": content,
         "message_type": message_type,
@@ -1747,6 +1751,7 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
     now = datetime.now().strftime("%H:%M")
     st.session_state.setdefault("chat_messages", [])
     st.session_state.chat_messages.append({
+        "id": f"m_{uuid.uuid4().hex[:12]}",
         "role": "user",
         "content": q,
         "timestamp": now,
@@ -2029,9 +2034,81 @@ def render_user_bubble(msg):
         st.caption(msg["timestamp"])
 
 
-def _render_assistant_content(msg, working_df, view_mode: str = "Full"):
+def _query_share_payload(msg: dict) -> dict:
+    """Build the lightweight share model; binary exports remain lazy."""
+    data = msg.get("data") or {}
+    rdf = data.get("result_df")
+    src_q = data.get("source_question") or msg.get("content") or ""
+    return build_share_payload(
+        question=src_q,
+        narration=data.get("narration"),
+        result_df=rdf if isinstance(rdf, pd.DataFrame) else None,
+        evidence=data.get("evidence"),
+        elapsed=data.get("elapsed"),
+        sql=data.get("sql"),
+    )
+
+
+def _render_response_header(msg: dict, *, default_expanded: bool) -> bool:
+    """Compact response header with collapse, Pin, and Share at top-right."""
     data = msg.get("data") or {}
     mtype = msg.get("message_type", "chat")
+    ref = _chat_msg_ref(msg)
+    state_key = f"_response_expanded_{ref}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = bool(default_expanded)
+    expanded = bool(st.session_state[state_key])
+
+    rdf = data.get("result_df")
+    rows = len(rdf) if isinstance(rdf, pd.DataFrame) else 0
+    elapsed = data.get("elapsed")
+    meta = []
+    if rows:
+        meta.append(f"{rows:,} rows")
+    if elapsed is not None:
+        meta.append(f"{elapsed}s")
+    title = "Response" + (f" · {' · '.join(meta)}" if meta else "")
+
+    with st.container(key=f"response_header_{ref}"):
+        if mtype == "query":
+            head_l, head_toggle, head_actions = st.columns([0.72, 0.08, 0.20])
+        else:
+            head_l, head_toggle = st.columns([0.92, 0.08])
+            head_actions = None
+        with head_l:
+            st.markdown(
+                f'<div class="response-header-title">{html.escape(title)}</div>',
+                unsafe_allow_html=True,
+            )
+        with head_toggle:
+            if st.button(
+                "▼" if expanded else "▶",
+                key=f"response_toggle_{ref}",
+                help="Collapse response" if expanded else "Expand response",
+                use_container_width=True,
+            ):
+                st.session_state[state_key] = not expanded
+                st.rerun()
+        if head_actions is not None:
+            with head_actions:
+                render_share_and_pin(
+                    _query_share_payload(msg),
+                    key_prefix=f"chat_{ref}",
+                )
+    return expanded
+
+
+def _render_assistant_content(
+    msg,
+    working_df,
+    view_mode: str = "Full",
+    *,
+    default_expanded: bool = True,
+):
+    data = msg.get("data") or {}
+    mtype = msg.get("message_type", "chat")
+    if not _render_response_header(msg, default_expanded=default_expanded):
+        return
     # Prefer mode stored on the message; fall back to live composer mode
     stored = (data.get("answer_mode") if isinstance(data, dict) else None) or view_mode
     flags = _answer_mode_flags(stored)
@@ -2116,12 +2193,6 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Full"):
         src_q = data.get("source_question") or msg.get("content") or ""
         narr = data.get("narration")
 
-        if elapsed is not None:
-            st.markdown(
-                f'<div class="chat-turn-meta">{html.escape(str(elapsed))}s</div>',
-                unsafe_allow_html=True,
-            )
-
         _render_query_answer_blocks(
             msg,
             show_narr=show_narr,
@@ -2132,27 +2203,6 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Full"):
             narr=narr,
             src_q=src_q,
         )
-
-        share_payload = build_share_payload(
-            question=src_q,
-            narration=narr,
-            result_df=rdf if isinstance(rdf, pd.DataFrame) else None,
-            evidence=evidence,
-            elapsed=elapsed,
-            sql=data.get("sql"),
-            chart_x=(rdf.select_dtypes(exclude="number").columns.tolist()[0]
-                     if isinstance(rdf, pd.DataFrame) and len(rdf.select_dtypes(exclude="number").columns)
-                     else (list(rdf.columns)[0] if isinstance(rdf, pd.DataFrame) and len(rdf.columns) else None)),
-            chart_y=(rdf.select_dtypes(include="number").columns.tolist()[0]
-                     if isinstance(rdf, pd.DataFrame) and len(rdf.select_dtypes(include="number").columns)
-                     else None),
-            chart_type=auto_chart_type(rdf, src_q) if isinstance(rdf, pd.DataFrame) else None,
-        )
-        if share_payload.get("headline") or (
-            isinstance(rdf, pd.DataFrame) and not rdf.empty
-        ):
-            key_p = f"chat_{msg.get('timestamp', '')}_{abs(hash(src_q)) % 99999}"
-            render_share_and_pin(share_payload, key_prefix=key_p)
 
         if show_table or show_narr:
             with st.expander("Details · trust, context, SQL", expanded=False):
@@ -2265,6 +2315,21 @@ def render_assistant_bubble(msg, working_df, view_mode: str = "Full"):
         _render_assistant_content(msg, working_df, view_mode)
 
 
+def _chat_record_status(working_df: pd.DataFrame) -> str:
+    """One-line dataset context without pulling warehouse rows into memory."""
+    if postgres_mode_enabled():
+        try:
+            counts = get_backend().table_row_counts()
+            has_claims = "fact_claims" in counts
+            n = int(counts.get("fact_claims", 0) if has_claims else sum(counts.values()))
+            noun = "claim records" if has_claims else "records"
+            return f"{n:,} {noun} available. Ask your query in natural language."
+        except Exception:
+            return "PostgreSQL connected. Ask your query in natural language."
+    n = len(working_df) if isinstance(working_df, pd.DataFrame) else 0
+    return f"{n:,} records loaded. Ask your query in natural language."
+
+
 def render_chat_mode(working_df, tables, dfs):
     st.session_state.setdefault("chat_messages", [])
     if "chat_answer_mode" not in st.session_state:
@@ -2281,15 +2346,24 @@ def render_chat_mode(working_df, tables, dfs):
 
     pending_q = st.session_state.pop("_dr_pending_question", None)
 
-    render_pinned_strip(on_ask=_queue_question)
+    status_col, pins_col = st.columns([0.82, 0.18])
+    with status_col:
+        st.markdown(
+            f'<div class="chat-record-status">{html.escape(_chat_record_status(working_df))}</div>',
+            unsafe_allow_html=True,
+        )
+    with pins_col:
+        render_pinned_strip(on_ask=_queue_question)
 
     st.markdown('<div class="cgpt-chat-shell">', unsafe_allow_html=True)
-    chat_box = st.container(height=620, border=False)
+    chat_box = st.container(height=480, border=False)
     with chat_box:
         st.markdown('<div class="cgpt-thread">', unsafe_allow_html=True)
         if not st.session_state.chat_messages:
-            insights = _safe_insights(working_df, limit=3)
-            render_proactive_landing(working_df, insights, on_ask=_queue_question)
+            st.markdown(
+                '<div class="chat-empty-state">Start with a metric, dimension, and time period.</div>',
+                unsafe_allow_html=True,
+            )
         else:
             view_mode = st.session_state.chat_answer_mode
             messages = st.session_state.chat_messages
@@ -2308,13 +2382,24 @@ def render_chat_mode(working_df, tables, dfs):
                     st.session_state.chat_show_all_history = True
                     st.rerun()
                 messages = messages[-_CHAT_RENDER_LIMIT:]
+            assistant_refs = [
+                _chat_msg_ref(m) for m in messages if m.get("role") == "assistant"
+            ]
+            latest_assistant_ref = assistant_refs[-1] if assistant_refs else ""
             for msg in messages:
                 if msg.get("role") == "user":
                     with st.chat_message("user"):
                         st.markdown(str(msg.get("content", "")))
                 else:
                     with st.chat_message("assistant"):
-                        _render_assistant_content(msg, working_df, view_mode)
+                        _render_assistant_content(
+                            msg,
+                            working_df,
+                            view_mode,
+                            default_expanded=(
+                                _chat_msg_ref(msg) == latest_assistant_ref
+                            ),
+                        )
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown('<div id="chat-scroll-anchor"></div>', unsafe_allow_html=True)
 
@@ -2346,55 +2431,46 @@ def render_chat_mode(working_df, tables, dfs):
                 ):
                     process_chat_message(sugs[1], working_df)
 
-    # Composer — Cursor-style output chips above chat input
-    st.markdown('<div class="cgpt-composer">', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="cgpt-composer-hint">Choose what to generate · Enter to send · ⛶ expands</div>',
-        unsafe_allow_html=True,
-    )
-    chip_cols = st.columns(len(_ANSWER_MODE_META))
-    for col, (key, meta) in zip(chip_cols, _ANSWER_MODE_META.items()):
-        with col:
-            active = st.session_state.chat_answer_mode == key
-            label = meta["label"]
+    # Compact, sticky composer — core output controls remain in the viewport.
+    with st.container(key="chat_composer"):
+        mode_col, clear_col = st.columns([0.9, 0.1])
+        with mode_col:
+            try:
+                st.segmented_control(
+                    "Response output",
+                    options=list(_ANSWER_MODE_META),
+                    key="chat_answer_mode",
+                    label_visibility="collapsed",
+                )
+            except Exception:
+                st.radio(
+                    "Response output",
+                    options=list(_ANSWER_MODE_META),
+                    key="chat_answer_mode",
+                    horizontal=True,
+                    label_visibility="collapsed",
+                )
+        with clear_col:
             if st.button(
-                label,
-                key=f"chat_mode_chip_{key}",
+                "⌫",
                 use_container_width=True,
-                type="primary" if active else "secondary",
-                help=meta["help"],
+                key="clear_chat_btn",
+                help="Clear chat",
             ):
-                st.session_state.chat_answer_mode = key
+                st.session_state.chat_messages = []
+                clear_state()
+                clear_sql_anchor()
+                st.toast("Chat Room cleared", icon="🗑")
                 st.rerun()
 
-    mode = _normalize_answer_mode(st.session_state.chat_answer_mode)
-    flags = _answer_mode_flags(mode)
-    st.session_state.chat_narration_on = flags["show_insight"]
-    if mode == "Narration":
-        st.caption(
-            "Narration uses the LLM for detailed explanations and increases token consumption. "
-            "Prefer Insights + Table + Chart for routine analysis."
+        mode = _normalize_answer_mode(st.session_state.chat_answer_mode)
+        flags = _answer_mode_flags(mode)
+        st.session_state.chat_narration_on = flags["show_insight"]
+
+        question = st.chat_input(
+            "Ask a question about your data…",
+            key="chat_main_input",
         )
-    try:
-        from core.llm_client import usage_caption
-        st.caption(usage_caption())
-    except Exception:
-        pass
-
-    question = st.chat_input(
-        "Ask a question about your data…",
-        key="chat_main_input",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    clr_l, clr_r = st.columns([6, 1])
-    with clr_r:
-        if st.button("Clear chat", use_container_width=True, key="clear_chat_btn"):
-            st.session_state.chat_messages = []
-            clear_state()
-            clear_sql_anchor()
-            st.toast("Chat Room cleared", icon="🗑")
-            st.rerun()
 
     if pending_q:
         process_chat_message(pending_q, working_df)
