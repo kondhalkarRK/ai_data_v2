@@ -263,20 +263,47 @@ if (
 
 # Keep the product workflow order while rendering only one view. Native
 # st.tabs runs every tab body on each click and makes UI interactions sluggish.
-_VIEW_OPTIONS = ["📄 Data Preview", "📊 KPI", "💬 Chat Room"]
-if not st.session_state.get("_main_view_order_v2"):
-    st.session_state.main_view = _VIEW_OPTIONS[0]
-    st.session_state["_main_view_order_v2"] = True
-elif st.session_state.get("main_view") == "📊 KPI Summary":
-    st.session_state.main_view = "📊 KPI"
+_VIEW_OPTIONS = ["Data Preview", "KPI", "Chat Room"]
+_VIEW_LEGACY = {
+    "📄 Data Preview": "Data Preview",
+    "📊 KPI": "KPI",
+    "📊 KPI Summary": "KPI",
+    "💬 Chat Room": "Chat Room",
+}
+if not st.session_state.get("_main_view_order_v3"):
+    legacy = st.session_state.get("main_view")
+    st.session_state.main_view = _VIEW_LEGACY.get(legacy, _VIEW_OPTIONS[0])
+    st.session_state["_main_view_order_v3"] = True
+elif st.session_state.get("main_view") in _VIEW_LEGACY:
+    st.session_state.main_view = _VIEW_LEGACY[st.session_state.main_view]
 st.session_state.setdefault("main_view", _VIEW_OPTIONS[0])
-_main_view = st.radio(
-    "Main view",
-    _VIEW_OPTIONS,
-    horizontal=True,
-    label_visibility="collapsed",
-    key="main_view",
-)
+if st.session_state.main_view not in _VIEW_OPTIONS:
+    st.session_state.main_view = _VIEW_OPTIONS[0]
+
+with st.container(key="askdb_main_nav"):
+    st.markdown(
+        '<div class="askdb-nav-shell">'
+        '<div class="askdb-nav-kicker">Workspace</div>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    try:
+        _main_view = st.segmented_control(
+            "Workspace",
+            options=_VIEW_OPTIONS,
+            key="main_view",
+            label_visibility="collapsed",
+        )
+    except Exception:
+        _main_view = st.radio(
+            "Workspace",
+            _VIEW_OPTIONS,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="main_view",
+        )
+if not _main_view:
+    _main_view = st.session_state.get("main_view", _VIEW_OPTIONS[0])
 
 
 def _render_tab_safely(render_fn, label: str):
@@ -294,9 +321,9 @@ def _render_tab_safely(render_fn, label: str):
         )
 
 
-if _main_view == "📄 Data Preview":
+if _main_view == "Data Preview":
     _render_tab_safely(tab_preview.render, "Data Preview")
-elif _main_view == "📊 KPI":
+elif _main_view == "KPI":
     _render_tab_safely(tab_kpi.render, "KPI Summary")
 else:
     _render_tab_safely(tab_query.render, "Chat Room")

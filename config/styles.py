@@ -2271,24 +2271,177 @@ div[data-testid="stDialog"] > div{
   border-radius:16px !important;
 }
 
-/* ═══ Enterprise compact workspace ═══ */
+/* ═══ Premium workspace nav (pill / segmented) ═══ */
+div[class*="st-key-askdb_main_nav"],
 div[class*="st-key-main_view"]{
   position:sticky;
   top:0;
   z-index:90;
-  padding:3px 6px 5px;
-  margin:-2px 0 5px;
-  background:rgba(3,7,17,0.94);
-  backdrop-filter:blur(10px);
-  border-bottom:1px solid rgba(148,163,184,0.12);
+  padding:8px 8px 10px;
+  margin:-2px 0 8px;
+  background:
+    linear-gradient(180deg, rgba(3,7,17,0.96) 0%, rgba(3,7,17,0.78) 70%, rgba(3,7,17,0.35) 100%);
+  backdrop-filter:blur(16px) saturate(140%);
+  -webkit-backdrop-filter:blur(16px) saturate(140%);
+  border-bottom:1px solid rgba(148,163,184,0.10);
 }
+.askdb-nav-shell{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 0 2px;
+}
+.askdb-nav-kicker{
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:#64748b;
+  margin-bottom:2px;
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"],
+div[class*="st-key-askdb_main_nav"] > div{
+  display:flex;
+  justify-content:center;
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] > div,
+div[class*="st-key-askdb_main_nav"] [data-baseweb="button-group"],
+div[class*="st-key-askdb_main_nav"] div[role="group"]{
+  background:
+    linear-gradient(180deg, rgba(30,41,59,0.72), rgba(15,23,42,0.92)) !important;
+  border:1px solid rgba(148,163,184,0.20) !important;
+  border-radius:999px !important;
+  padding:4px !important;
+  gap:3px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 10px 28px rgba(0,0,0,0.28) !important;
+  width:fit-content !important;
+  max-width:100%;
+  margin:0 auto !important;
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button,
+div[class*="st-key-askdb_main_nav"] div[role="group"] button{
+  position:relative !important;
+  border:none !important;
+  border-radius:999px !important;
+  background:transparent !important;
+  color:#94a3b8 !important;
+  font-size:13px !important;
+  font-weight:650 !important;
+  letter-spacing:0.01em !important;
+  min-height:38px !important;
+  height:auto !important;
+  padding:8px 20px !important;
+  box-shadow:none !important;
+  transition:
+    color .2s cubic-bezier(.2,.8,.2,1),
+    background .22s cubic-bezier(.2,.8,.2,1),
+    box-shadow .22s cubic-bezier(.2,.8,.2,1),
+    transform .18s cubic-bezier(.2,.8,.2,1) !important;
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button p,
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button span,
+div[class*="st-key-askdb_main_nav"] div[role="group"] button p,
+div[class*="st-key-askdb_main_nav"] div[role="group"] button span{
+  color:inherit !important;
+  font-weight:650 !important;
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button:hover,
+div[class*="st-key-askdb_main_nav"] div[role="group"] button:hover{
+  color:#e2e8f0 !important;
+  background:rgba(148,163,184,0.12) !important;
+  transform:translateY(-1px);
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button:active,
+div[class*="st-key-askdb_main_nav"] div[role="group"] button:active{
+  transform:translateY(0) scale(0.98);
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button[kind="primary"],
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button[aria-pressed="true"],
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button[aria-checked="true"],
+div[class*="st-key-askdb_main_nav"] [data-testid="stBaseButton-primary"],
+div[class*="st-key-askdb_main_nav"] div[role="group"] button[aria-pressed="true"],
+div[class*="st-key-askdb_main_nav"] div[role="group"] button[aria-checked="true"]{
+  color:#f8fafc !important;
+  background:
+    linear-gradient(135deg, rgba(14,165,233,0.95), rgba(56,189,248,0.82)) !important;
+  box-shadow:
+    0 0 0 1px rgba(125,211,252,0.35),
+    0 6px 18px rgba(14,165,233,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.28) !important;
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button[kind="primary"]:hover,
+div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button[aria-pressed="true"]:hover,
+div[class*="st-key-askdb_main_nav"] [data-testid="stBaseButton-primary"]:hover{
+  color:#ffffff !important;
+  background:
+    linear-gradient(135deg, rgba(2,132,199,0.98), rgba(56,189,248,0.90)) !important;
+}
+
+/* Radio fallback — pill track, hide native circles */
+div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] > div,
 div[class*="st-key-main_view"] [role="radiogroup"]{
-  gap:4px !important;
+  display:flex !important;
+  justify-content:center !important;
+  flex-wrap:wrap !important;
+  gap:3px !important;
+  width:fit-content !important;
+  max-width:100%;
+  margin:0 auto !important;
+  padding:4px !important;
+  background:
+    linear-gradient(180deg, rgba(30,41,59,0.72), rgba(15,23,42,0.92)) !important;
+  border:1px solid rgba(148,163,184,0.20) !important;
+  border-radius:999px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 10px 28px rgba(0,0,0,0.28) !important;
 }
+div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] label,
 div[class*="st-key-main_view"] label{
-  min-height:30px !important;
-  padding:3px 12px !important;
-  font-size:12px !important;
+  position:relative !important;
+  min-height:38px !important;
+  padding:8px 18px !important;
+  margin:0 !important;
+  border-radius:999px !important;
+  border:none !important;
+  background:transparent !important;
+  color:#94a3b8 !important;
+  font-size:13px !important;
+  font-weight:650 !important;
+  letter-spacing:0.01em !important;
+  transition:
+    color .2s ease,
+    background .22s ease,
+    box-shadow .22s ease,
+    transform .18s ease !important;
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] label:hover,
+div[class*="st-key-main_view"] label:hover{
+  color:#e2e8f0 !important;
+  background:rgba(148,163,184,0.12) !important;
+  transform:translateY(-1px);
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] label:has(input:checked),
+div[class*="st-key-main_view"] label:has(input:checked){
+  color:#f8fafc !important;
+  background:
+    linear-gradient(135deg, rgba(14,165,233,0.95), rgba(56,189,248,0.82)) !important;
+  box-shadow:
+    0 0 0 1px rgba(125,211,252,0.35),
+    0 6px 18px rgba(14,165,233,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.28) !important;
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] label > div:first-child,
+div[class*="st-key-main_view"] label > div:first-child,
+div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] svg{
+  display:none !important;
+}
+div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] label div[data-testid="stMarkdownContainer"] p,
+div[class*="st-key-main_view"] label div[data-testid="stMarkdownContainer"] p{
+  color:inherit !important;
+  font-weight:650 !important;
 }
 .chat-record-status{
   min-height:30px;
@@ -2407,12 +2560,20 @@ div[class*="st-key-response_header_"] [data-testid="stPopover"] > button{
   .cgpt-row-user,.cgpt-row-assistant{padding-left:6px !important;padding-right:6px !important;}
   .stat-row{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
   .kpi-row{gap:8px !important;}
+  div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button,
+  div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] label{
+    padding:7px 14px !important;
+    font-size:12.5px !important;
+  }
 }
 @media (max-width:640px){
   .stApp,.block-container{padding:5px 0.4rem 10px !important;}
+  div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button,
+  div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] label,
   div[class*="st-key-main_view"] label{
-    padding:3px 6px !important;
-    font-size:10px !important;
+    padding:7px 12px !important;
+    font-size:12px !important;
+    min-height:34px !important;
   }
   div[class*="st-key-chat_composer"]{bottom:2px;padding:6px;}
   div[class*="st-key-chat_composer"] [data-testid="stSegmentedControl"] button{
