@@ -50,33 +50,54 @@ if _fallback_reason and not st.session_state.get("_postgres_fallback_shown"):
 if postgres_mode_enabled():
     try:
         from semantic.industry_packs import activate_pack, get_active_pack_id
+        import os as _os
 
         _configured_pack = get_data_config().get("industry_pack") or "insurance"
-        if get_active_pack_id() != _configured_pack:
+        _pack_stamp = ""
+        if _configured_pack == "insurance":
+            _pg = _os.path.join(
+                _os.path.dirname(__file__),
+                "semantic",
+                "packs",
+                "insurance",
+                "business_glossary_postgres.yaml",
+            )
+            if _os.path.isfile(_pg):
+                _pack_stamp = str(int(_os.path.getmtime(_pg)))
+        _need_pack = (
+            get_active_pack_id() != _configured_pack
+            or st.session_state.get("_insurance_pack_stamp") != _pack_stamp
+        )
+        if _need_pack:
             _pack_ok, _pack_message = activate_pack(_configured_pack)
-            if not _pack_ok:
+            if _pack_ok:
+                st.session_state["_insurance_pack_stamp"] = _pack_stamp
+            else:
                 st.warning(f"Industry pack not activated: {_pack_message}")
     except Exception as _pack_error:
         st.warning(f"Industry pack initialization failed: {_pack_error}")
 
-# ── Immediate boot screen — avoids any blank-screen moment while the
-# semantic model / embedding engine (the slowest part of startup)
-# loads. Cleared as soon as that init finishes below.
-_boot_screen = st.empty()
-_boot_screen.markdown(
-    """
+# Boot splash only while semantic singletons are first-created (not every click).
+_needs_boot = (
+    "semantic_loader" not in st.session_state
+    or st.session_state.get("semantic_loader") is None
+)
+_boot_screen = st.empty() if _needs_boot else None
+if _boot_screen is not None:
+    _boot_screen.markdown(
+        """
     <div class="boot-screen-overlay">
       <div class="ai-orb">
         <div class="ring ring1"></div>
         <div class="ring ring2"></div>
         <div class="core"></div>
       </div>
-      <div class="boot-screen-title">Initializing ASK - DB…</div>
-      <div class="boot-screen-sub">Loading semantic model &amp; embedding engine</div>
+      <div class="boot-title">ASK - DB</div>
+      <div class="boot-sub">Loading semantic layer…</div>
     </div>
     """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
 
 # ── Initialise semantic singletons ONCE at startup ───────────────
 # get_*() functions handle their own lazy loading internally.
@@ -142,7 +163,8 @@ except Exception:
 # ─────────────────────────────────────────────────────────────────
 
 # ── Startup is done — clear the boot screen ───────────────────────
-_boot_screen.empty()
+if _boot_screen is not None:
+    _boot_screen.empty()
 
 sidebar.render()
 _postgres_mode = postgres_mode_enabled()
@@ -202,34 +224,40 @@ if (
         st.session_state.semantic_column_map   = ""
 # ─────────────────────────────────────────────────────────────────
 
-tab_preview_ui, tab_kpi_ui, tab_query_ui = st.tabs(
-    ["📄 Data Preview", "📊 KPI Summary", "💬 Chat Room"]
+# Active-view only: Streamlit st.tabs still runs every tab body on each click.
+# A radio switcher renders ONE panel → much snappier expanders / composer chips.
+_VIEW_OPTIONS = ["💬 Chat Room", "📄 Data Preview", "📊 KPI Summary"]
+st.session_state.setdefault("main_view", _VIEW_OPTIONS[0])
+_main_view = st.radio(
+    "Main view",
+    _VIEW_OPTIONS,
+    horizontal=True,
+    label_visibility="collapsed",
+    key="main_view",
 )
 
 
-def _render_tab_safely(tab_container, render_fn, label: str):
-    """
-    Run a tab's render() inside a safety boundary. If it raises, show a
-    clean, contained error card in that tab instead of letting the
-    exception propagate and crash the whole app with a raw traceback.
-    """
-    with tab_container:
-        try:
-            render_fn(working_df, tables, st.session_state.dfs)
-        except Exception as e:
-            st.error(f"⚠️ {label} hit an unexpected error and couldn't load.")
-            with st.expander("Technical details"):
-                st.code(str(e))
-            st.caption(
-                "The rest of the app is unaffected — try switching tabs "
-                "or refreshing. If this keeps happening, use the 👎 "
-                "feedback button to report it."
-            )
+def _render_tab_safely(render_fn, label: str):
+    """Run one view inside a safety boundary so errors stay contained."""
+    try:
+        render_fn(working_df, tables, st.session_state.dfs)
+    except Exception as e:
+        st.error(f"⚠️ {label} hit an unexpected error and couldn't load.")
+        with st.expander("Technical details"):
+            st.code(str(e))
+        st.caption(
+            "The rest of the app is unaffected — try switching views "
+            "or refreshing. If this keeps happening, use the 👎 "
+            "feedback button to report it."
+        )
 
 
-_render_tab_safely(tab_preview_ui, tab_preview.render, "Data Preview")
-_render_tab_safely(tab_kpi_ui,     tab_kpi.render,     "KPI Summary")
-_render_tab_safely(tab_query_ui,   tab_query.render,   "Chat Room")
+if _main_view == "📄 Data Preview":
+    _render_tab_safely(tab_preview.render, "Data Preview")
+elif _main_view == "📊 KPI Summary":
+    _render_tab_safely(tab_kpi.render, "KPI Summary")
+else:
+    _render_tab_safely(tab_query.render, "Chat Room")
 
 st.markdown("---")
 st.markdown(

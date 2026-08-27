@@ -59,15 +59,20 @@ def _render_postgres_preview():
         unsafe_allow_html=True,
     )
 
-    with st.expander("Data quality", expanded=True):
+    with st.expander("Data quality", expanded=False):
         from core.postgres_dq_engine import render_postgres_data_quality
 
-        try:
-            render_postgres_data_quality()
-        except Exception as exc:
-            st.error("Data quality could not be computed.")
-            with st.expander("Technical details"):
-                st.code(str(exc))
+        if st.checkbox(
+            "Compute data quality (warehouse queries)",
+            value=bool(st.session_state.get("preview_run_dq")),
+            key="preview_run_dq",
+        ):
+            try:
+                render_postgres_data_quality()
+            except Exception as exc:
+                st.error("Data quality could not be computed.")
+                with st.expander("Technical details"):
+                    st.code(str(exc))
 
     with st.expander(
         "Joined claims view (all columns · LIMIT 100)",
@@ -75,22 +80,28 @@ def _render_postgres_preview():
     ):
         st.caption(
             "Claims LEFT JOIN policy, product, region, agent. "
-            "Hidden until expanded — warehouse stays in PostgreSQL."
+            "Load only when you need it — keeps warehouse work off the hot path."
         )
-        with st.spinner("ASK-DB is preparing the joined preview…"):
-            joined, joined_err = backend.execute_sql(_JOINED_SQL)
-        if joined_err or joined is None:
-            st.warning(f"Joined preview unavailable: {joined_err or 'No rows'}")
-        else:
-            st.markdown(
-                f"""<div class="stat-row">
+        load_joined = st.checkbox(
+            "Load joined preview from PostgreSQL",
+            value=False,
+            key="preview_load_joined",
+        )
+        if load_joined:
+            with st.spinner("ASK-DB is preparing the joined preview…"):
+                joined, joined_err = backend.execute_sql(_JOINED_SQL)
+            if joined_err or joined is None:
+                st.warning(f"Joined preview unavailable: {joined_err or 'No rows'}")
+            else:
+                st.markdown(
+                    f"""<div class="stat-row">
               <div class="stat-card"><div class="sv">{len(joined):,}</div><div class="sl">Rows shown</div></div>
               <div class="stat-card"><div class="sv">{joined.shape[1]}</div><div class="sl">Columns (joined)</div></div>
               <div class="stat-card"><div class="sv">{claim_rows:,}</div><div class="sl">Claim grain in DB</div></div>
             </div>""",
-                unsafe_allow_html=True,
-            )
-            safe_dataframe(joined, use_container_width=True)
+                    unsafe_allow_html=True,
+                )
+                safe_dataframe(joined, use_container_width=True)
 
     if not tables:
         st.info("No readable tables or views were found in the configured schema.")

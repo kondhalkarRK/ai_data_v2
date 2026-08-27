@@ -55,6 +55,9 @@ Desktop.ini
 
 # MLflow local tracking
 mlruns/
+mlflow.db
+mlflow.db-*
+
 mlartifacts/
 
 chroma/

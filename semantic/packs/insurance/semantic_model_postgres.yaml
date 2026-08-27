@@ -126,7 +126,7 @@ measures:
     source_column: written_premium
     aggregation: sum
     format: currency
-    synonyms: [GWP, written premium, premium booked]
+    synonyms: [GWP, written premium, premium booked, sale, sales, selling, total sale, total sales]
   earned_premium:
     display_name: "Earned Premium"
     expression: "SUM(earned_premium)"
@@ -187,22 +187,31 @@ measures:
 
 dimensions:
   Reported Date: {display_name: "Reported Date", source_table: fact_claims, source_column: reported_date, type: date, synonyms: [claim date, reported month, period]}
-  Accounting Month: {display_name: "Accounting Month", source_table: fact_policy_monthly, source_column: accounting_month, type: date, synonyms: [premium month, month, period]}
-  Product: {display_name: "Product", source_table: dim_product, attributes: [product_name, line_of_business, product_family, coverage_type], synonyms: [LOB, insurance product, line, Motor, Health, Property, auto, mediclaim]}
+  Accounting Month: {display_name: "Accounting Month", source_table: fact_policy_monthly, source_column: accounting_month, type: date, synonyms: [premium month, month, period, year, yearly, annual, across year, by year]}
+  Product: {display_name: "Product", source_table: dim_product, attributes: [product_name, line_of_business, product_family, coverage_type], synonyms: [LOB, insurance product, line, Motor, Health, Property, auto, mediclaim, type, policy type]}
   Region: {display_name: "Region", source_table: dim_region, attributes: [region_name, state_name, country_name], synonyms: [territory, geography, state, East, West, North, South, EST, WST, NTH, STH]}
   Agent: {display_name: "Agent", source_table: dim_agent, attributes: [agent_name, channel_name, branch_name], synonyms: [broker, channel, intermediary, advisor]}
   Policy: {display_name: "Policy", source_table: dim_policy, attributes: [policy_number, policy_status, coverage_tier, customer_key], synonyms: [coverage, contract, customer, policyholder, insured]}
 
 domain_rules:
-  - "Premium must be aggregated from fact_policy_monthly, never from fact_claims."
-  - "Loss ratio is incurred claims divided by earned premium at a compatible month/product/region grain."
-  - "Protect every ratio with NULLIF on the denominator."
-  - "Use reported_date for claims reporting and accounting_month for premium reporting."
-  - "Use PostgreSQL syntax when the physical table names are schema-qualified."
-  - "East, West, North, South refer to dim_region.region_name (codes EST/WST/NTH/STH)."
-  - "Motor, Health, Property refer to dim_product.line_of_business."
-  - "Customer / policyholder maps to dim_policy.customer_key."
-  - "Never return only a single unnamed measure column for analytical questions; always include the grouping dimension label(s) and relevant supporting metrics unless the user asked for one scalar."
-  - "For top/best/worst rankings, emit a 1-based rank column via ROW_NUMBER() OVER (...) starting at 1."
-  - "Prefer LEFT JOIN from fact tables to dimensions."
-  - "Default time scope when unspecified: rolling 12 months to MAX(reported_date) / MAX(accounting_month)."
+  always_rules:
+    - "Premium must be aggregated from fact_policy_monthly, never from fact_claims."
+    - "Loss ratio is incurred claims divided by earned premium at a compatible month/product/region grain."
+    - "Protect every ratio with NULLIF on the denominator."
+    - "Use reported_date for claims reporting and accounting_month for premium reporting."
+    - "Use PostgreSQL syntax when the physical table names are schema-qualified."
+    - "East, West, North, South refer to dim_region.region_name (codes EST/WST/NTH/STH)."
+    - "Motor, Health, Property refer to dim_product.line_of_business."
+    - "Customer / policyholder maps to dim_policy.customer_key."
+    - "Sale/sales/selling/top selling → Gross Written Premium (SUM(written_premium))."
+    - "Top selling policy → rank product_name/LOB by GWP with 1-based ROW_NUMBER; not policy_number unless asked."
+    - "Across year / by year → GROUP BY EXTRACT(YEAR FROM accounting_month) for premium."
+  never_rules:
+    - "Never return only a single unnamed measure column for analytical questions."
+    - "Never invent premium from claim rows."
+  default_behaviours:
+    - "Always include the grouping dimension label(s) and relevant supporting metrics unless the user asked for one scalar."
+    - "For top/best/worst rankings, emit a 1-based rank column via ROW_NUMBER() OVER (...) starting at 1."
+    - "Prefer LEFT JOIN from fact tables to dimensions."
+    - "Default time scope when unspecified: rolling 12 months to MAX(reported_date) / MAX(accounting_month)."
+    - "If top-N count is missing, LIMIT 10."

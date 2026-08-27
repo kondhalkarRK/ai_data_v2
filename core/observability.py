@@ -16,6 +16,7 @@ from typing import Any, Iterator
 _MLFLOW_OK = False
 _MLFLOW_INIT = False
 _mlflow = None
+_MLFLOW_ERROR = ""
 
 EXPERIMENT_NAME = "askdb-insurance-chat"
 
@@ -39,7 +40,7 @@ def _mlflow_wanted() -> bool:
 
 
 def _ensure_mlflow() -> bool:
-    global _MLFLOW_OK, _MLFLOW_INIT, _mlflow
+    global _MLFLOW_OK, _MLFLOW_INIT, _mlflow, _MLFLOW_ERROR
     if not _mlflow_wanted():
         return False
     if _MLFLOW_INIT:
@@ -47,22 +48,62 @@ def _ensure_mlflow() -> bool:
     _MLFLOW_INIT = True
     try:
         import mlflow
+    except ImportError as exc:
+        _MLFLOW_OK = False
+        _mlflow = None
+        _MLFLOW_ERROR = f"not_installed: {exc}"
+        return False
+    except Exception as exc:
+        _MLFLOW_OK = False
+        _mlflow = None
+        _MLFLOW_ERROR = f"import_failed: {exc}"
+        return False
 
+    try:
         _mlflow = mlflow
-        uri = os.environ.get("MLFLOW_TRACKING_URI") or os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "mlruns",
-        )
+        # Quiet optional Git metadata noise on Windows when git.exe is missing.
+        os.environ.setdefault("GIT_PYTHON_REFRESH", "quiet")
+        env_uri = (os.environ.get("MLFLOW_TRACKING_URI") or "").strip()
+        if env_uri:
+            uri = env_uri
+        else:
+            # MLflow 3.x: prefer local SQLite (file:// mlruns store is maintenance-mode).
+            from pathlib import Path
+
+            root = Path(__file__).resolve().parent.parent
+            db_path = root / "mlflow.db"
+            uri = f"sqlite:///{db_path.as_posix()}"
+            # Keep artifact files next to the DB for `mlflow ui`.
+            os.environ.setdefault(
+                "MLFLOW_ARTIFACTS_DESTINATION",
+                str(root / "mlruns"),
+            )
         mlflow.set_tracking_uri(uri)
         mlflow.set_experiment(EXPERIMENT_NAME)
         _MLFLOW_OK = True
-    except Exception:
+        _MLFLOW_ERROR = ""
+    except Exception as exc:
         _MLFLOW_OK = False
         _mlflow = None
+        _MLFLOW_ERROR = f"init_failed: {exc}"
     return _MLFLOW_OK
 
 
 def mlflow_status() -> dict[str, Any]:
+    """
+    Status for UI:
+      state: off | ready | missing | error
+    """
+    wanted = _mlflow_wanted()
+    if not wanted:
+        return {
+            "enabled": False,
+            "wanted": False,
+            "state": "off",
+            "tracking_uri": "",
+            "experiment": None,
+            "detail": "Persistence off — in-app timings still work.",
+        }
     ok = _ensure_mlflow()
     uri = ""
     if ok and _mlflow is not None:
@@ -70,10 +111,29 @@ def mlflow_status() -> dict[str, Any]:
             uri = str(_mlflow.get_tracking_uri())
         except Exception:
             uri = ""
+    if ok:
+        return {
+            "enabled": True,
+            "wanted": True,
+            "state": "ready",
+            "tracking_uri": uri,
+            "experiment": EXPERIMENT_NAME,
+            "detail": f"Writing runs to {uri or './mlruns'}.",
+        }
+    err = _MLFLOW_ERROR or "unknown"
+    state = "missing" if err.startswith("not_installed") else "error"
+    detail = (
+        "Package missing — run: pip install mlflow  then restart Streamlit."
+        if state == "missing"
+        else f"MLflow failed to start ({err}). Restart Streamlit after fixing."
+    )
     return {
-        "enabled": ok,
-        "tracking_uri": uri,
-        "experiment": EXPERIMENT_NAME if ok else None,
+        "enabled": False,
+        "wanted": True,
+        "state": state,
+        "tracking_uri": "",
+        "experiment": None,
+        "detail": detail,
     }
 
 

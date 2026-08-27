@@ -2218,13 +2218,37 @@ def _render_assistant_content(msg, working_df, view_mode: str = "Full"):
                         st.caption(
                             f"MLflow experiment `{mlf.get('experiment')}` · "
                             f"trace `{trace.get('trace_id')}` · "
-                            f"run `mlflow ui` in the project folder to open the leadership view."
+                            f"run `mlflow ui --backend-store-uri sqlite:///./mlflow.db` for the leadership view."
                         )
                     else:
-                        st.caption(
-                            "MLflow not installed — timings are still captured in-session. "
-                            "pip install mlflow then restart to persist traces."
-                        )
+                        # Prefer live status (checkbox may have been toggled after this answer).
+                        try:
+                            from core.observability import mlflow_status as _mlf_now
+
+                            live = _mlf_now()
+                        except Exception:
+                            live = {}
+                        state = live.get("state") or mlf.get("state") or "off"
+                        if state == "ready":
+                            st.caption(
+                                "MLflow is ON now — ask again to persist this style of answer "
+                                "(this answer was traced in-app only)."
+                            )
+                        elif state == "missing":
+                            st.caption(
+                                "MLflow package missing — timings are still in-session. "
+                                "Run: pip install mlflow  then restart Streamlit."
+                            )
+                        elif state == "error":
+                            st.caption(
+                                live.get("detail")
+                                or "MLflow failed to start — timings are still in-session."
+                            )
+                        else:
+                            st.caption(
+                                "In-app timings only for this answer. "
+                                "Check **Persist traces to MLflow** in the sidebar, then ask again."
+                            )
 
                 sql = data.get("sql")
                 if sql and not str(sql).startswith("-- Answered from OKF"):
@@ -2268,7 +2292,23 @@ def render_chat_mode(working_df, tables, dfs):
             render_proactive_landing(working_df, insights, on_ask=_queue_question)
         else:
             view_mode = st.session_state.chat_answer_mode
-            for msg in st.session_state.chat_messages:
+            messages = st.session_state.chat_messages
+            # Cap history re-render — full thread × tables/charts is the main click lag.
+            _CHAT_RENDER_LIMIT = 12
+            st.session_state.setdefault("chat_show_all_history", False)
+            if (
+                len(messages) > _CHAT_RENDER_LIMIT
+                and not st.session_state.chat_show_all_history
+            ):
+                hidden = len(messages) - _CHAT_RENDER_LIMIT
+                if st.button(
+                    f"Show earlier messages ({hidden})",
+                    key="chat_show_earlier",
+                ):
+                    st.session_state.chat_show_all_history = True
+                    st.rerun()
+                messages = messages[-_CHAT_RENDER_LIMIT:]
+            for msg in messages:
                 if msg.get("role") == "user":
                     with st.chat_message("user"):
                         st.markdown(str(msg.get("content", "")))

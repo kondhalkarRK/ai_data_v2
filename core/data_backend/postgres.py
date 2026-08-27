@@ -39,6 +39,11 @@ class PostgresBackend(DataBackend):
         self._fingerprint_cache: str | None = None
         self._catalog_ttl_seconds = 120.0
         self._health_ttl_seconds = 60.0
+        self._relations_cache: list[tuple[str, str]] | None = None
+        self._relations_cache_ts: float = 0.0
+        self._counts_cache: dict[str, int] | None = None
+        self._counts_cache_ts: float = 0.0
+        self._meta_ttl_seconds = 120.0
 
     @property
     def backend_id(self) -> str:
@@ -208,6 +213,12 @@ class PostgresBackend(DataBackend):
         """Return (name, BASE TABLE|VIEW|MATERIALIZED VIEW) in the configured schema."""
         if not self._config.get("password"):
             return []
+        now = time.time()
+        if (
+            self._relations_cache is not None
+            and (now - self._relations_cache_ts) < self._meta_ttl_seconds
+        ):
+            return list(self._relations_cache)
         try:
             with self._get_pool().connection() as conn:
                 with conn.cursor() as cur:
@@ -225,7 +236,10 @@ class PostgresBackend(DataBackend):
                         """,
                         (self._schema, self._schema),
                     )
-                    return [(str(row[0]), str(row[1])) for row in cur.fetchall()]
+                    rows = [(str(row[0]), str(row[1])) for row in cur.fetchall()]
+            self._relations_cache = rows
+            self._relations_cache_ts = now
+            return list(rows)
         except Exception:
             return []
 
@@ -267,6 +281,13 @@ class PostgresBackend(DataBackend):
         counts: dict[str, int] = {}
         if not self._config.get("password"):
             return counts
+        now = time.time()
+        if (
+            not include_views
+            and self._counts_cache is not None
+            and (now - self._counts_cache_ts) < self._meta_ttl_seconds
+        ):
+            return dict(self._counts_cache)
         try:
             relations = self.list_relations()
             with self._get_pool().connection() as conn:
@@ -280,6 +301,9 @@ class PostgresBackend(DataBackend):
                         )
                         cur.execute(query)
                         counts[table] = int(cur.fetchone()[0])
+            if not include_views:
+                self._counts_cache = dict(counts)
+                self._counts_cache_ts = now
         except Exception:
             return counts
         return counts

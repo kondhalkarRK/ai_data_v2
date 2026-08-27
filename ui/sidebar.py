@@ -520,30 +520,44 @@ def render():
                 st.caption("Observability module unavailable.")
             else:
                 kpis = session_kpis()
-                mlf = mlflow_status()
                 status_row("Questions traced", kpis.get("n") or 0, "#a5b4fc")
                 status_row("p50 latency", f"{(kpis.get('p50_ms') or 0)/1000:.2f}s", "#6ee7b7")
                 status_row("p95 latency", f"{(kpis.get('p95_ms') or 0)/1000:.2f}s", "#fcd34d")
                 status_row("LLM p50", f"{(kpis.get('llm_p50_ms') or 0)/1000:.2f}s", "#a5b4fc")
                 status_row("SQL retry rate", f"{100*(kpis.get('retry_rate') or 0):.0f}%", "#fca5a5")
-                if mlf.get("enabled"):
-                    status_row("MLflow", "ON", "#6ee7b7")
-                    st.caption(f"Experiment: {mlf.get('experiment')}")
-                    st.caption("Leadership view: `mlflow ui --backend-store-uri ./mlruns`")
-                else:
-                    status_row("MLflow", "off (no extra latency)", "#94a3b8")
-                    st.caption(
-                        "In-app traces always run. Turn on MLflow only for the leadership UI "
-                        "(first enable can take a few seconds to load the library)."
-                    )
                 persist = st.checkbox(
                     "Persist traces to MLflow",
                     value=bool(st.session_state.get("askdb_mlflow_on")),
                     key="askdb_mlflow_on",
                     help="Writes runs under ./mlruns. Does not speed queries — used for audit/demo.",
                 )
-                if persist and not mlf.get("enabled"):
+                # Re-read after checkbox so status matches the toggle on this rerun.
+                mlf = mlflow_status()
+                state = mlf.get("state") or "off"
+                if state == "ready":
+                    status_row("MLflow", "ON", "#6ee7b7")
+                    st.caption(f"Experiment: {mlf.get('experiment')}")
+                    st.caption(
+                        "Leadership view: `mlflow ui --backend-store-uri sqlite:///./mlflow.db`"
+                    )
+                elif state == "missing":
+                    status_row("MLflow", "not installed", "#fca5a5")
+                    st.caption(mlf.get("detail") or "pip install mlflow")
+                elif state == "error":
+                    status_row("MLflow", "error", "#fca5a5")
+                    st.caption(mlf.get("detail") or "Init failed")
+                else:
+                    status_row("MLflow", "off (no extra latency)", "#94a3b8")
+                    st.caption(
+                        "In-app traces always run. Turn on MLflow only for the leadership UI "
+                        "(first enable can take a few seconds to load the library)."
+                    )
+                if persist and state == "ready":
+                    st.caption("Next question will be written to mlflow.db.")
+                elif persist and state == "off":
                     st.caption("MLflow will attach on the next question.")
+                elif persist and state in {"missing", "error"}:
+                    st.caption(mlf.get("detail") or "")
                 last = last_trace()
                 if last:
                     st.caption("Last question")

@@ -109,7 +109,13 @@ class SemanticLoader:
 
     def get_domain_rules(self) -> dict:
         self._ensure_loaded()
-        return self._glossary.get("domain_rules", {}) or {}
+        raw = self._glossary.get("domain_rules", {}) or {}
+        # Insurance packs historically used a plain list; normalize to dict sections.
+        if isinstance(raw, list):
+            return {"always_rules": [str(x) for x in raw if str(x).strip()]}
+        if isinstance(raw, dict):
+            return raw
+        return {}
 
     def get_sql_patterns(self) -> dict:
         self._ensure_loaded()
@@ -237,6 +243,8 @@ class SemanticLoader:
             tokens = list(words)
             for i in range(len(words) - 1):
                 tokens.append(f"{words[i]} {words[i + 1]}")
+            for i in range(len(words) - 2):
+                tokens.append(f"{words[i]} {words[i + 1]} {words[i + 2]}")
             # Prefer longer matches first
             tokens = sorted(set(tokens), key=len, reverse=True)
 

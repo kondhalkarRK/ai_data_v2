@@ -751,8 +751,20 @@ def _postgres_prompt(question: str, schema: str) -> str:
             hints = builder.build_glossary_sql_hints(question)
             if hints:
                 semantic_parts.append(str(hints)[:900])
+            # Persist matches for Data Trust Score (semantic / glossary /25).
+            try:
+                matches = builder._loader.get_glossary_hints_for_question(question)
+                st.session_state.last_glossary_matches = matches or []
+                st.session_state.last_glossary_hints = hints or ""
+            except Exception:
+                st.session_state.last_glossary_matches = []
+                st.session_state.last_glossary_hints = hints or ""
         except Exception:
-            pass
+            try:
+                st.session_state.last_glossary_matches = []
+                st.session_state.last_glossary_hints = ""
+            except Exception:
+                pass
 
     anchor_block = ""
     if _CONV_OK:
@@ -795,9 +807,11 @@ RULES:
     Customer/policyholder → dim_policy.customer_key. Prefer LEFT JOIN facts→dims.
 12. RANKING: ROW_NUMBER() OVER (...) AS rank starting at 1 plus labels + metrics.
 13. TIME DEFAULT: latest 12 months to MAX(reported_date) / MAX(accounting_month).
-14. Prefer region_name, product_name, line_of_business over raw IDs.
-
-QUESTION: {question}
+15. SALE / TOP SELLING: Map sale/sales/selling/top selling →
+    SUM(written_premium) as GWP. Rank product_name / line_of_business
+    (not policy_number) with ROW_NUMBER starting at 1; LIMIT 10 if N missing.
+16. YEAR GRAIN: across year / by year / yearly →
+    GROUP BY EXTRACT(YEAR FROM accounting_month) for premium questions.
 
 SQL:"""
 

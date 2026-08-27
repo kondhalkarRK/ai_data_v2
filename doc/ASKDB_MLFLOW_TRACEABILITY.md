@@ -2,11 +2,15 @@
 
 Observability does **not** make the model faster. It shows **where time went**: LLM SQL vs PostgreSQL vs narration.
 
+For a plain-language walkthrough (p50 / p90 / p95, stages, MLflow vs in-app), see
+[`ASKDB_LLMOPS_SIMPLE_GUIDE.md`](./ASKDB_LLMOPS_SIMPLE_GUIDE.md).
+
 ## What to show in a meeting
 
 1. Ask any insurance question in Chat.
 2. Open **Details · trust, context, SQL** on the answer — **Pipeline trace**.
 3. Open the sidebar expander **LLMOps trace** — p50/p95, SQL retry rate, last spans.
+
 In-app pipeline timings are **always on** (no extra model wait).
 
 MLflow persistence is **opt-in** so Chat does not pay a multi-second library import on every session:
@@ -14,10 +18,12 @@ MLflow persistence is **opt-in** so Chat does not pay a multi-second library imp
 - Sidebar → **LLMOps trace** → **Persist traces to MLflow**
 - Or set `ASKDB_MLFLOW=1` then restart
 
+Local store (MLflow 3.x): SQLite file `mlflow.db` in the project root.
+
 Then:
 
 ```bash
-mlflow ui --backend-store-uri ./mlruns --port 5000
+mlflow ui --backend-store-uri sqlite:///./mlflow.db --port 5000
 ```
 
 Open http://127.0.0.1:5000 → experiment **askdb-insurance-chat**.

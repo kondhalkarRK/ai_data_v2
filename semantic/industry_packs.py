@@ -172,6 +172,7 @@ def activate_pack(pack_id: str) -> tuple[bool, str]:
         "semantic_builder",
         "semantic_base_context",
         "semantic_column_map",
+        "_pg_semantic_static",
     ):
         st.session_state.pop(key, None)
 
