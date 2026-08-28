@@ -2311,12 +2311,13 @@ div[class*="st-key-askdb_main_nav"] div[role="group"]{
     linear-gradient(180deg, rgba(30,41,59,0.72), rgba(15,23,42,0.92)) !important;
   border:1px solid rgba(148,163,184,0.20) !important;
   border-radius:999px !important;
-  padding:4px !important;
-  gap:3px !important;
+  padding:6px 32px !important;
+  gap:36px !important;
+  justify-content:space-evenly !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.05),
     0 10px 28px rgba(0,0,0,0.28) !important;
-  width:fit-content !important;
+  width:min(760px, 100%) !important;
   max-width:100%;
   margin:0 auto !important;
 }
@@ -2332,8 +2333,10 @@ div[class*="st-key-askdb_main_nav"] div[role="group"] button{
   letter-spacing:0.01em !important;
   min-height:38px !important;
   height:auto !important;
-  padding:8px 20px !important;
+  min-width:128px !important;
+  padding:8px 28px !important;
   box-shadow:none !important;
+  flex:0 1 auto !important;
   transition:
     color .2s cubic-bezier(.2,.8,.2,1),
     background .22s cubic-bezier(.2,.8,.2,1),
@@ -2383,13 +2386,13 @@ div[class*="st-key-askdb_main_nav"] [data-testid="stBaseButton-primary"]:hover{
 div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] > div,
 div[class*="st-key-main_view"] [role="radiogroup"]{
   display:flex !important;
-  justify-content:center !important;
+  justify-content:space-evenly !important;
   flex-wrap:wrap !important;
-  gap:3px !important;
-  width:fit-content !important;
+  gap:36px !important;
+  width:min(760px, 100%) !important;
   max-width:100%;
   margin:0 auto !important;
-  padding:4px !important;
+  padding:6px 28px !important;
   background:
     linear-gradient(180deg, rgba(30,41,59,0.72), rgba(15,23,42,0.92)) !important;
   border:1px solid rgba(148,163,184,0.20) !important;
@@ -2483,6 +2486,16 @@ div[class*="st-key-chat_composer"] [data-testid="stHorizontalBlock"]{
 div[class*="st-key-chat_composer"] [data-testid="stChatInput"]{
   margin-top:3px !important;
 }
+.chat-llm-usage{
+  max-width:880px;
+  margin:0 auto 4px;
+  padding:0 4px;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:0.02em;
+  color:#64748b;
+  text-align:right;
+}
 div[class*="st-key-response_header_"]{
   min-height:34px;
   padding:1px 0 4px;
@@ -2560,20 +2573,32 @@ div[class*="st-key-response_header_"] [data-testid="stPopover"] > button{
   .cgpt-row-user,.cgpt-row-assistant{padding-left:6px !important;padding-right:6px !important;}
   .stat-row{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
   .kpi-row{gap:8px !important;}
+  div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] > div,
+  div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] > div{
+    gap:20px !important;
+    padding:6px 18px !important;
+  }
   div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button,
   div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] label{
-    padding:7px 14px !important;
+    padding:7px 16px !important;
     font-size:12.5px !important;
+    min-width:104px !important;
   }
 }
 @media (max-width:640px){
   .stApp,.block-container{padding:5px 0.4rem 10px !important;}
+  div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] > div,
+  div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] > div{
+    gap:12px !important;
+    padding:5px 10px !important;
+  }
   div[class*="st-key-askdb_main_nav"] [data-testid="stSegmentedControl"] button,
   div[class*="st-key-askdb_main_nav"] [data-testid="stRadio"] label,
   div[class*="st-key-main_view"] label{
-    padding:7px 12px !important;
-    font-size:12px !important;
+    padding:7px 10px !important;
+    font-size:11.5px !important;
     min-height:34px !important;
+    min-width:88px !important;
   }
   div[class*="st-key-chat_composer"]{bottom:2px;padding:6px;}
   div[class*="st-key-chat_composer"] [data-testid="stSegmentedControl"] button{

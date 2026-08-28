@@ -204,4 +204,4 @@ def usage_caption() -> str:
     max_tokens = max(int(st.session_state.get("max_llm_tokens") or 30_000), 1)
     tok_label = f"{tokens:,}" if tokens < 1000 else f"{tokens / 1000:.1f}K".replace(".0K", "K")
     max_tok_label = f"{max_tokens // 1000}K" if max_tokens >= 1000 else str(max_tokens)
-    return f"Calls {calls}/{max_calls} · Tokens {tok_label}/{max_tok_label}"
+    return f"LLM usage {calls}/{max_calls} · Tokens {tok_label}/{max_tok_label}"

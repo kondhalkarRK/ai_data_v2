@@ -53,10 +53,7 @@ def _render_backend_status_strip() -> None:
     fallback_reason = st.session_state.get("_postgres_fallback_reason") or ""
 
     if active == "postgres":
-        label = f"Backend · Postgres · {pack or 'default'} · healthy"
-        if _backend_status:
-            label = f"{label} · {_backend_status}"
-        st.caption(label)
+        # Healthy Postgres: no top status line (sidebar + SQL path carry status).
         return
 
     if configured == "postgres" and (fallback_reason or is_postgres_fallback_active()):

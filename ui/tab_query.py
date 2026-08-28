@@ -51,21 +51,18 @@ _ANSWER_MODE_META = {
         "label": "Chart",
         "help": "Visualize results as charts.",
     },
-    "Narration": {
-        "label": "Narration",
-        "help": (
-            "Generate Insights + Table + Chart with LLM narration. "
-            "Use only when detailed explanations are required. Increases token consumption."
-        ),
-    },
 }
+
+
+def _composer_mode_options() -> list[str]:
+    return list(_ANSWER_MODE_META)
 
 
 def _normalize_answer_mode(mode: str | bool | None) -> str:
     if isinstance(mode, bool):
         return "Full" if mode else "Table"
     m = (mode or "Full").strip()
-    legacy = {"Both": "Full", "Narration": "Narration", "Table": "Table"}
+    legacy = {"Both": "Full", "Narration": "Full", "Table": "Table"}
     if m in legacy and m not in _ANSWER_MODE_META:
         m = legacy.get(m, m)
     if m == "Both":
@@ -2548,7 +2545,7 @@ def render_chat_mode(working_df, tables, dfs):
         st.session_state.chat_answer_mode = "Full" if legacy else "Table"
     else:
         normalized = _normalize_answer_mode(raw_mode)
-        if normalized != raw_mode:
+        if normalized != raw_mode or raw_mode == "Narration":
             st.session_state.chat_answer_mode = normalized
 
     _run_chat_expand_dialog()
@@ -2645,19 +2642,29 @@ def render_chat_mode(working_df, tables, dfs):
 
     # Compact, sticky composer — core output controls remain in the viewport.
     with st.container(key="chat_composer"):
+        try:
+            from core.llm_client import usage_caption
+
+            st.markdown(
+                f'<div class="chat-llm-usage">{html.escape(usage_caption())}</div>',
+                unsafe_allow_html=True,
+            )
+        except Exception:
+            pass
+
         mode_col, clear_col = st.columns([0.9, 0.1])
         with mode_col:
             try:
                 st.segmented_control(
                     "Response output",
-                    options=list(_ANSWER_MODE_META),
+                    options=_composer_mode_options(),
                     key="chat_answer_mode",
                     label_visibility="collapsed",
                 )
             except Exception:
                 st.radio(
                     "Response output",
-                    options=list(_ANSWER_MODE_META),
+                    options=_composer_mode_options(),
                     key="chat_answer_mode",
                     horizontal=True,
                     label_visibility="collapsed",
