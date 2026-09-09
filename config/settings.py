@@ -298,7 +298,7 @@ DEFAULTS = {
     "llm_temperature": 0.2,
     "llm_est_usd": 0.0,
     "auto_join_base": None,
-    "ui_theme": "dark",  # light | dark | ai
+    "ui_theme": "light",  # light | dark | ai
     "data_backend": "csv_duckdb",
 }
 

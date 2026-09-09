@@ -358,7 +358,7 @@ def render_postgres_data_quality() -> None:
             f"</div>",
             unsafe_allow_html=True,
         )
-        _theme = str(st.session_state.get("ui_theme") or "dark").lower()
+        _theme = str(st.session_state.get("ui_theme") or "light").lower()
         if _theme == "light":
             _gauge_steps = [
                 {"range": [0, 50], "color": "#fee2e2"},

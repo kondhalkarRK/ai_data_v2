@@ -7,9 +7,9 @@ from config.themes import theme_bg_html, theme_css
 
 
 def apply_styles() -> None:
-    theme = st.session_state.get("ui_theme", "dark")
+    theme = st.session_state.get("ui_theme", "light")
     if theme not in ("light", "dark", "ai"):
-        theme = "dark"
+        theme = "light"
         st.session_state.ui_theme = theme
 
     st.markdown(r"""

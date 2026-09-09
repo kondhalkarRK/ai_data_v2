@@ -334,21 +334,45 @@ def render():
                     """
                 )
         with _theme_col:
-            with st.popover("🎨", help="Appearance"):
-                st.caption("Theme")
-                t1, t2, t3 = st.columns(3)
-                with t1:
-                    if st.button("☀️", key="theme_pick_light", help="Light", use_container_width=True):
-                        st.session_state.ui_theme = "light"
-                        st.rerun()
-                with t2:
-                    if st.button("🌙", key="theme_pick_dark", help="Dark", use_container_width=True):
-                        st.session_state.ui_theme = "dark"
-                        st.rerun()
-                with t3:
-                    if st.button("✨", key="theme_pick_ai", help="AI", use_container_width=True):
-                        st.session_state.ui_theme = "ai"
-                        st.rerun()
+            # On/off light theme slider (clean white when ON)
+            _theme_now = str(st.session_state.get("ui_theme") or "light").lower()
+            if _theme_now not in ("light", "dark", "ai"):
+                _theme_now = "light"
+                st.session_state.ui_theme = "light"
+            # Keep Streamlit toggle widget in sync with theme state
+            st.session_state["theme_light_slider"] = _theme_now == "light"
+            st.markdown(
+                f'<div class="theme-slider-label">'
+                f'<span class="theme-slider-icon">'
+                f'{"☀️" if _theme_now == "light" else ("✨" if _theme_now == "ai" else "🌙")}'
+                f"</span>"
+                f'<span class="theme-slider-text">'
+                f'{"Light" if _theme_now == "light" else ("AI" if _theme_now == "ai" else "Dark")}'
+                f"</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            _toggle = st.toggle(
+                "Light theme",
+                key="theme_light_slider",
+                label_visibility="collapsed",
+                help="ON = clean white theme · OFF = dark theme",
+            )
+            if _toggle and _theme_now != "light":
+                st.session_state.ui_theme = "light"
+                st.rerun()
+            if (not _toggle) and _theme_now == "light":
+                st.session_state.ui_theme = "dark"
+                st.rerun()
+            if st.button(
+                "✨ AI",
+                key="theme_pick_ai",
+                help="Aurora AI theme",
+                use_container_width=True,
+            ):
+                st.session_state.ui_theme = "ai"
+                st.session_state["theme_light_slider"] = False
+                st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
         section_spacer()
@@ -571,6 +595,18 @@ def render():
                     st.caption((last.get("question") or "")[:90])
                     for s in last.get("spans") or []:
                         st.caption(f"  {s.get('name')}: {s.get('latency_ms')} ms")
+
+        # Visualization-only ontology explorer (React app). Does not alter semantic engine.
+        with st.expander("🕸 Ontology Browser", expanded=False):
+            st.caption(
+                "Force · Centrality · Hierarchy graph of YAML tables, entities, "
+                "relationships, and glossary synonyms."
+            )
+            st.markdown(
+                "[Open Ontology Browser](http://localhost:5173/#/graph/active) "
+                "· run `cd ontology-browser && npm run dev`"
+            )
+            st.caption("Source of truth: semantic/*.yaml (mirrored, not rewritten).")
 
         with st.expander("💾 Saved questions", expanded=False):
             saved_count = cache_store.count_active()

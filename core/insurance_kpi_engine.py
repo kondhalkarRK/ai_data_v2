@@ -94,7 +94,7 @@ def _number(value, *, money: bool = False, percent: bool = False) -> str:
 
 
 def _chart_layout(fig):
-    theme = str(st.session_state.get("ui_theme") or "dark").lower()
+    theme = str(st.session_state.get("ui_theme") or "light").lower()
     if theme == "light":
         font = "#1b2430"
         grid = "rgba(27,36,48,0.12)"
