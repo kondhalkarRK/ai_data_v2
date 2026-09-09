@@ -58,6 +58,10 @@ mlruns/
 mlflow.db
 mlflow.db-*
 
+# ASK-DB runtime logs (keep folder placeholders)
+logs/**/*.log
+logs/**/*.log.*
+
 mlartifacts/
 
 chroma/

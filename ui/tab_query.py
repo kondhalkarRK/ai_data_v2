@@ -2040,6 +2040,14 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         if status is not None:
             status.update(label=random.choice(_CHAT_STATUS["run"]))
         t0 = time.time()
+        # File-based query timeline (MLflow TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS)
+        try:
+            from utils.logger import begin_query_tracking, end_query_tracking
+
+            _qtracker = begin_query_tracking(q)
+        except Exception:
+            _qtracker = None
+            end_query_tracking = None  # type: ignore
         try:
             from core.observability import start_trace, finish_trace, span as obs_span
 
@@ -2064,6 +2072,11 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         try:
             from core.observability import finish_trace
             finish_trace()
+        except Exception:
+            pass
+        try:
+            if end_query_tracking is not None:
+                end_query_tracking(_qtracker, success=False, error=str(err))
         except Exception:
             pass
         err_s = str(err)
@@ -2103,6 +2116,11 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
             from core.observability import finish_trace
 
             finish_trace()
+        except Exception:
+            pass
+        try:
+            if end_query_tracking is not None:
+                end_query_tracking(_qtracker, success=True, rows=0)
         except Exception:
             pass
         sugs = _empty_recovery_suggestions(q, working_df)
@@ -2155,6 +2173,13 @@ def process_chat_message(question: str, working_df: pd.DataFrame):
         pipeline_trace = finish_trace()
     except Exception:
         pipeline_trace = None
+    # Close file-based query tracker as SUCCESS
+    try:
+        if end_query_tracking is not None:
+            n_rows = len(df_result) if isinstance(df_result, pd.DataFrame) else 0
+            end_query_tracking(_qtracker, success=True, rows=n_rows)
+    except Exception:
+        pass
     if pipeline_trace and isinstance(evidence, dict):
         evidence["pipeline_trace"] = pipeline_trace
         elapsed = round((pipeline_trace.get("total_ms") or 0) / 1000.0, 2)
@@ -2470,7 +2495,13 @@ def _render_assistant_content(
                     if rows:
                         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
                     mlf = (trace.get("mlflow") or {})
-                    if mlf.get("enabled"):
+                    # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS
+                    if mlf.get("state") == "disabled":
+                        st.caption(
+                            "MLflow TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — "
+                            "see logs/query_logs and logs/performance_logs."
+                        )
+                    elif mlf.get("enabled"):
                         st.caption(
                             f"MLflow experiment `{mlf.get('experiment')}` · "
                             f"trace `{trace.get('trace_id')}` · "
@@ -2485,7 +2516,12 @@ def _render_assistant_content(
                         except Exception:
                             live = {}
                         state = live.get("state") or mlf.get("state") or "off"
-                        if state == "ready":
+                        if state == "disabled":
+                            st.caption(
+                                "MLflow TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — "
+                                "file logs under logs/ are authoritative."
+                            )
+                        elif state == "ready":
                             st.caption(
                                 "MLflow is ON now — ask again to persist this style of answer "
                                 "(this answer was traced in-app only)."
@@ -2502,8 +2538,8 @@ def _render_assistant_content(
                             )
                         else:
                             st.caption(
-                                "In-app timings only for this answer. "
-                                "Check **Persist traces to MLflow** in the sidebar, then ask again."
+                                "In-app pipeline timings only. "
+                                "Accurate file logs: logs/query_logs & logs/performance_logs."
                             )
 
                 sql = data.get("sql")

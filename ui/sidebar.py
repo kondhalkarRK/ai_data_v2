@@ -525,16 +525,23 @@ def render():
                 status_row("p95 latency", f"{(kpis.get('p95_ms') or 0)/1000:.2f}s", "#fcd34d")
                 status_row("LLM p50", f"{(kpis.get('llm_p50_ms') or 0)/1000:.2f}s", "#a5b4fc")
                 status_row("SQL retry rate", f"{100*(kpis.get('retry_rate') or 0):.0f}%", "#fca5a5")
-                persist = st.checkbox(
-                    "Persist traces to MLflow",
-                    value=bool(st.session_state.get("askdb_mlflow_on")),
-                    key="askdb_mlflow_on",
-                    help="Writes runs under ./mlruns. Does not speed queries — used for audit/demo.",
-                )
-                # Re-read after checkbox so status matches the toggle on this rerun.
+                # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — MLflow checkbox disabled
+                # persist = st.checkbox(
+                #     "Persist traces to MLflow",
+                #     value=bool(st.session_state.get("askdb_mlflow_on")),
+                #     key="askdb_mlflow_on",
+                #     help="Writes runs under ./mlruns. Does not speed queries — used for audit/demo.",
+                # )
+                st.session_state["askdb_mlflow_on"] = False
                 mlf = mlflow_status()
                 state = mlf.get("state") or "off"
-                if state == "ready":
+                if state == "disabled":
+                    status_row("MLflow", "TEMP DISABLED", "#fcd34d")
+                    st.caption(
+                        "TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — "
+                        "use logs/query_logs, logs/performance_logs, logs/error_logs."
+                    )
+                elif state == "ready":
                     status_row("MLflow", "ON", "#6ee7b7")
                     st.caption(f"Experiment: {mlf.get('experiment')}")
                     st.caption(
@@ -547,17 +554,17 @@ def render():
                     status_row("MLflow", "error", "#fca5a5")
                     st.caption(mlf.get("detail") or "Init failed")
                 else:
-                    status_row("MLflow", "off (no extra latency)", "#94a3b8")
+                    status_row("MLflow", "off (file logs active)", "#94a3b8")
                     st.caption(
-                        "In-app traces always run. Turn on MLflow only for the leadership UI "
-                        "(first enable can take a few seconds to load the library)."
+                        "In-app traces still run. Accurate timelines are written under logs/."
                     )
-                if persist and state == "ready":
-                    st.caption("Next question will be written to mlflow.db.")
-                elif persist and state == "off":
-                    st.caption("MLflow will attach on the next question.")
-                elif persist and state in {"missing", "error"}:
-                    st.caption(mlf.get("detail") or "")
+                # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — original persist captions
+                # if persist and state == "ready":
+                #     st.caption("Next question will be written to mlflow.db.")
+                # elif persist and state == "off":
+                #     st.caption("MLflow will attach on the next question.")
+                # elif persist and state in {"missing", "error"}:
+                #     st.caption(mlf.get("detail") or "")
                 last = last_trace()
                 if last:
                     st.caption("Last question")

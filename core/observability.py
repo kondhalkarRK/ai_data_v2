@@ -4,6 +4,11 @@ LLMOps traces for ASK-DB: in-app pipeline timings + optional MLflow.
 
 Does not speed the model. It attributes wall-clock to llm.sql / pg.execute /
 narration so leadership can see where 15s went.
+
+# TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS
+# MLflow persistence is temporarily disabled. In-app PipelineTrace spans still
+# run (session_state timings). Prefer utils.logger query/performance logs for
+# accurate file-based timelines until MLflow is re-enabled.
 """
 from __future__ import annotations
 
@@ -20,6 +25,9 @@ _MLFLOW_ERROR = ""
 
 EXPERIMENT_NAME = "askdb-insurance-chat"
 
+# TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — hard gate; flip to True to re-enable.
+_MLFLOW_TEMPORARILY_DISABLED = True
+
 
 def _session_safe() -> dict[str, Any] | None:
     try:
@@ -31,6 +39,16 @@ def _session_safe() -> dict[str, Any] | None:
 
 
 def _mlflow_wanted() -> bool:
+    # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS
+    if _MLFLOW_TEMPORARILY_DISABLED:
+        return False
+    # --- original enable logic (kept for restore) ---
+    # if os.environ.get("ASKDB_MLFLOW", "").strip() in {"1", "true", "yes", "on"}:
+    #     return True
+    # ss = _session_safe()
+    # if ss is not None and ss.get("askdb_mlflow_on"):
+    #     return True
+    # return False
     if os.environ.get("ASKDB_MLFLOW", "").strip() in {"1", "true", "yes", "on"}:
         return True
     ss = _session_safe()
@@ -41,6 +59,11 @@ def _mlflow_wanted() -> bool:
 
 def _ensure_mlflow() -> bool:
     global _MLFLOW_OK, _MLFLOW_INIT, _mlflow, _MLFLOW_ERROR
+    # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS
+    if _MLFLOW_TEMPORARILY_DISABLED:
+        _MLFLOW_OK = False
+        _MLFLOW_ERROR = "temp_disabled_for_performance_analysis"
+        return False
     if not _mlflow_wanted():
         return False
     if _MLFLOW_INIT:
@@ -92,8 +115,21 @@ def _ensure_mlflow() -> bool:
 def mlflow_status() -> dict[str, Any]:
     """
     Status for UI:
-      state: off | ready | missing | error
+      state: off | ready | missing | error | disabled
     """
+    # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS
+    if _MLFLOW_TEMPORARILY_DISABLED:
+        return {
+            "enabled": False,
+            "wanted": False,
+            "state": "disabled",
+            "tracking_uri": "",
+            "experiment": None,
+            "detail": (
+                "TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — "
+                "file logs under logs/query_logs|performance_logs|error_logs."
+            ),
+        }
     wanted = _mlflow_wanted()
     if not wanted:
         return {
@@ -149,7 +185,27 @@ class PipelineTrace:
         self._active: list[tuple[str, float, dict]] = []
         self._mlflow_run = None
         self._mlflow_cm = None
-        if _ensure_mlflow() and _mlflow is not None:
+        # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — skip MLflow run open
+        # if _ensure_mlflow() and _mlflow is not None:
+        #     try:
+        #         self._mlflow_cm = _mlflow.start_run(
+        #             run_name=f"q-{self.trace_id}",
+        #             tags={
+        #                 "askdb.trace_id": self.trace_id,
+        #                 "askdb.backend": str(self.tags.get("backend") or ""),
+        #                 "askdb.mode": str(self.tags.get("answer_mode") or ""),
+        #             },
+        #         )
+        #         self._mlflow_run = self._mlflow_cm.__enter__()
+        #         _mlflow.log_param("question", self.question[:250])
+        #         for k, v in self.tags.items():
+        #             if v is None:
+        #                 continue
+        #             _mlflow.log_param(str(k)[:250], str(v)[:250])
+        #     except Exception:
+        #         self._mlflow_run = None
+        #         self._mlflow_cm = None
+        if (not _MLFLOW_TEMPORARILY_DISABLED) and _ensure_mlflow() and _mlflow is not None:
             try:
                 self._mlflow_cm = _mlflow.start_run(
                     run_name=f"q-{self.trace_id}",
@@ -179,7 +235,13 @@ class PipelineTrace:
         }
         t1 = time.perf_counter()
         parent = None
-        if _ensure_mlflow() and _mlflow is not None and self._mlflow_run is not None:
+        # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — no MLflow nested spans
+        if (
+            (not _MLFLOW_TEMPORARILY_DISABLED)
+            and _ensure_mlflow()
+            and _mlflow is not None
+            and self._mlflow_run is not None
+        ):
             try:
                 start_span = getattr(_mlflow, "start_span", None)
                 if callable(start_span):
@@ -201,7 +263,12 @@ class PipelineTrace:
                     parent.__exit__(None, None, None)
                 except Exception:
                     pass
-            if _mlflow is not None and self._mlflow_run is not None:
+            # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — no MLflow metrics
+            if (
+                (not _MLFLOW_TEMPORARILY_DISABLED)
+                and _mlflow is not None
+                and self._mlflow_run is not None
+            ):
                 try:
                     _mlflow.log_metric(f"span.{name.replace('.', '_')}_ms", rec["latency_ms"])
                     if rec.get("attrs", {}).get("prompt_chars"):
@@ -216,6 +283,16 @@ class PipelineTrace:
                         )
                 except Exception:
                     pass
+            # Mirror span into file-based performance logger when a query is active
+            try:
+                from utils.logger import get_current_tracker
+
+                tracker = get_current_tracker()
+                if tracker is not None:
+                    stage = _span_to_stage_name(name)
+                    tracker.record_stage(stage, rec["latency_ms"] / 1000.0)
+            except Exception:
+                pass
 
     def finish(self) -> dict[str, Any]:
         total_ms = int((time.perf_counter() - self.t0) * 1000)
@@ -242,7 +319,12 @@ class PipelineTrace:
             "spans": self.spans,
             "mlflow": mlflow_status(),
         }
-        if _mlflow is not None and self._mlflow_run is not None:
+        # TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS — no MLflow finish metrics
+        if (
+            (not _MLFLOW_TEMPORARILY_DISABLED)
+            and _mlflow is not None
+            and self._mlflow_run is not None
+        ):
             try:
                 _mlflow.log_metric("total_ms", total_ms)
                 _mlflow.log_metric("llm_ms", summary["llm_ms"])
@@ -278,6 +360,19 @@ class PipelineTrace:
         ss["pipeline_trace_log"] = hist[-50:]
 
 
+def _span_to_stage_name(name: str) -> str:
+    n = (name or "").lower()
+    if n.startswith("llm.sql") or n == "prompt.build":
+        return "SQL Generation"
+    if n.startswith("llm."):
+        return "LLM Processing"
+    if n.startswith("pg.") or n.startswith("db."):
+        return "Database Execution"
+    if n in {"insight", "llm.narration"}:
+        return "Insight / Narration"
+    return name
+
+
 _CURRENT: PipelineTrace | None = None
 
 
@@ -301,6 +396,16 @@ def span(name: str, **attrs: Any) -> Iterator[dict[str, Any]]:
             yield rec
         finally:
             rec["latency_ms"] = int((time.perf_counter() - t1) * 1000)
+            try:
+                from utils.logger import get_current_tracker
+
+                tracker = get_current_tracker()
+                if tracker is not None:
+                    tracker.record_stage(
+                        _span_to_stage_name(name), rec["latency_ms"] / 1000.0
+                    )
+            except Exception:
+                pass
         return
     with tr.span(name, **attrs) as rec:
         yield rec

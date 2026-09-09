@@ -194,6 +194,13 @@ class PostgresBackend(DataBackend):
                 rec["attrs"]["sql_chars"] = len(statement)
             if exec_cm is not None:
                 exec_cm.__exit__(None, None, None)
+            # File-based DB call counter (MLflow TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS)
+            try:
+                from utils.logger import note_db_call
+
+                note_db_call(latency_ms / 1000.0, rows=len(result))
+            except Exception:
+                pass
             return result, None
         except Exception as exc:
             if rec is not None:
@@ -201,6 +208,12 @@ class PostgresBackend(DataBackend):
                 rec["error"] = str(exc)[:300]
             if exec_cm is not None:
                 exec_cm.__exit__(None, None, None)
+            try:
+                from utils.logger import note_db_call
+
+                note_db_call(time.perf_counter() - t1)
+            except Exception:
+                pass
             return None, str(exc)
 
     def _catalog_rows(self) -> list[tuple]:

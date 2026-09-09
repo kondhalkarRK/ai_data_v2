@@ -30,6 +30,15 @@ st.set_page_config(layout="wide", page_title="ASK - DB", page_icon="💬")
 init_session_state()
 apply_styles()
 
+# File-based query / performance / error logging
+# (MLflow persistence TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS)
+try:
+    from utils.logger import init_logging
+
+    init_logging()
+except Exception:
+    pass
+
 # Resolve Postgres vs CSV early. Streamlit Cloud cannot use host=localhost;
 # we soft-fallback to csv_duckdb so the hosted app still boots.
 _backend_ready, _backend_status = ensure_data_backend_ready()

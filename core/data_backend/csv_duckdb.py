@@ -49,6 +49,9 @@ class CsvDuckDbBackend(DataBackend):
             return None, "No CSV working dataset is loaded."
 
         con = None
+        import time as _time
+
+        t1 = _time.perf_counter()
         try:
             con = self._connection()
             result = con.execute(sql.strip()).df()
@@ -58,8 +61,21 @@ class CsvDuckDbBackend(DataBackend):
                 result = result.head(max_rows).copy()
             result.attrs["askdb_truncated"] = truncated
             result.attrs["askdb_max_rows"] = max_rows
+            # File-based DB call counter (MLflow TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS)
+            try:
+                from utils.logger import note_db_call
+
+                note_db_call(_time.perf_counter() - t1, rows=len(result))
+            except Exception:
+                pass
             return result, None
         except Exception as exc:
+            try:
+                from utils.logger import note_db_call
+
+                note_db_call(_time.perf_counter() - t1)
+            except Exception:
+                pass
             return None, str(exc)
         finally:
             if con is not None:

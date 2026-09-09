@@ -170,6 +170,14 @@ def _invoke_llm(
     st.session_state.llm_calls += 1
     st.session_state.total_tokens = int(st.session_state.total_tokens or 0) + total_tok
 
+    # File-based query tracker (MLflow TEMP_DISABLED_FOR_PERFORMANCE_ANALYSIS)
+    try:
+        from utils.logger import note_api_call
+
+        note_api_call(duration_ms / 1000.0)
+    except Exception:
+        pass
+
     entry = {
         "purpose": purpose or "other",
         "prompt_tokens_est": prompt_tok,
