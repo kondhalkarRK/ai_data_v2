@@ -1,0 +1,281 @@
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+/*
+ * NQL Insight design tokens.
+ *
+ * Theme switching is a class on <html> that swaps CSS custom properties. Nothing
+ * re-renders, which is what keeps the toggle under the 50 ms budget in spec section 19.
+ *
+ * Hue values carry over from the legacy config/themes.py so the product still looks
+ * like itself: light primary #2563eb, success #0f9d6e, dark surface #07111f.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Surfaces */
+  --background: 0 0% 100%;
+  --surface: 210 25% 98%;
+  --surface-raised: 0 0% 100%;
+  --surface-sunken: 210 20% 96%;
+
+  /* Text */
+  --foreground: 213 27% 15%;
+  --muted: 210 20% 96%;
+  --muted-foreground: 215 16% 45%;
+
+  /* Brand and intent */
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 258 90% 66%;
+  --accent-foreground: 0 0% 100%;
+  --success: 162 84% 33%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 30 60% 12%;
+  --danger: 0 72% 51%;
+  --danger-foreground: 0 0% 100%;
+  --info: 199 89% 48%;
+
+  /* Chrome */
+  --border: 214 25% 90%;
+  --input: 214 25% 90%;
+  --ring: 221 83% 53%;
+  --sidebar: 213 30% 99%;
+  --sidebar-border: 214 25% 91%;
+
+  /* Charts. Ordered for categorical use; distinguishable in both themes. */
+  --chart-1: 221 83% 53%;
+  --chart-2: 162 84% 33%;
+  --chart-3: 258 90% 66%;
+  --chart-4: 38 92% 50%;
+  --chart-5: 199 89% 48%;
+  --chart-6: 340 75% 55%;
+
+  /* Shape. One radius scale so every card, input and button agree. */
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06);
+  --shadow-raised: 0 4px 12px -2px rgb(16 24 40 / 0.08), 0 2px 6px -2px rgb(16 24 40 / 0.05);
+  --shadow-overlay: 0 16px 40px -8px rgb(16 24 40 / 0.18);
+
+  /* Layout */
+  --sidebar-width: 15rem;
+  --sidebar-width-collapsed: 3.75rem;
+  --topbar-height: 3.5rem;
+}
+
+.dark {
+  --background: 217 45% 5%;
+  --surface: 213 52% 8%;
+  --surface-raised: 213 44% 11%;
+  --surface-sunken: 217 48% 6%;
+
+  --foreground: 213 31% 91%;
+  --muted: 215 32% 14%;
+  --muted-foreground: 215 20% 65%;
+
+  --primary: 234 89% 74%;
+  --primary-foreground: 222 47% 11%;
+  --accent: 255 92% 76%;
+  --accent-foreground: 222 47% 11%;
+  --success: 158 64% 67%;
+  --success-foreground: 222 47% 11%;
+  --warning: 45 96% 74%;
+  --warning-foreground: 222 47% 11%;
+  --danger: 0 91% 80%;
+  --danger-foreground: 222 47% 11%;
+  --info: 199 89% 60%;
+
+  --border: 215 30% 18%;
+  --input: 215 30% 18%;
+  --ring: 234 89% 74%;
+  --sidebar: 213 52% 7%;
+  --sidebar-border: 215 30% 16%;
+
+  --chart-1: 234 89% 74%;
+  --chart-2: 158 64% 67%;
+  --chart-3: 255 92% 76%;
+  --chart-4: 45 96% 74%;
+  --chart-5: 199 89% 60%;
+  --chart-6: 340 82% 72%;
+
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-raised: 0 4px 14px -2px rgb(0 0 0 / 0.5);
+  --shadow-overlay: 0 16px 44px -8px rgb(0 0 0 / 0.65);
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-surface: hsl(var(--surface));
+  --color-surface-raised: hsl(var(--surface-raised));
+  --color-surface-sunken: hsl(var(--surface-sunken));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-danger: hsl(var(--danger));
+  --color-danger-foreground: hsl(var(--danger-foreground));
+  --color-info: hsl(var(--info));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+  --color-chart-6: hsl(var(--chart-6));
+
+  --radius-card: var(--radius-card);
+  --radius-control: var(--radius-control);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+
+  /* One typographic scale, used everywhere. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.375rem;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.125rem;
+  --text-xl--line-height: 1.625rem;
+  --text-2xl: 1.375rem;
+  --text-2xl--line-height: 1.875rem;
+  --text-3xl: 1.75rem;
+  --text-3xl--line-height: 2.125rem;
+
+  /* next/font injects Inter as --font-inter; the fallback chain lives here. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+  --animate-orbit: orbit 9s linear infinite;
+  --animate-breathe: breathe 4.5s ease-in-out infinite;
+  --animate-fade-in: fade-in 220ms ease-out;
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    /* Prevents a layout shift when a scrollbar appears on route change. */
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* A single visible focus treatment, so keyboard navigation is never ambiguous. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius-control);
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.22);
+  }
+}
+
+@layer utilities {
+  .card-surface {
+    background-color: hsl(var(--surface-raised));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Truncates to a fixed number of lines without a plugin. */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.045);
+    opacity: 1;
+  }
+}
+
+/*
+ * Spec section 8: respect prefers-reduced-motion. Animation is decoration here, never
+ * the only signal that something is happening, so removing it costs no information.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

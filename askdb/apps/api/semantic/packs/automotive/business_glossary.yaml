@@ -1,0 +1,79 @@
+version: "2.0"
+domain: Automotive Sales
+terms:
+  Revenue:
+    definition: Total monetary value of completed vehicle sales.
+    display_label: Revenue
+    synonyms: [sales, turnover, income, gross sales, sales value]
+    category: Financial
+    maps_to_measure: revenue
+    sql_expression: "SUM(automotive.fact_sales.total_sales)"
+    calculation_rules:
+      - Use total_sales, never price_per_unit.
+  Units Sold:
+    definition: Total vehicle quantity sold; one order may contain multiple units.
+    synonyms: [volume, cars sold, vehicles sold, top selling, best selling]
+    category: Sales Volume
+    maps_to_measure: units_sold
+    sql_expression: "SUM(automotive.fact_sales.order_qty)"
+    disambiguation:
+      - Top selling means units sold unless revenue is named.
+  Orders:
+    definition: Number of distinct sales orders.
+    synonyms: [order count, transactions, deals]
+    category: Sales Activity
+    maps_to_measure: orders
+  Average Selling Price:
+    definition: Revenue divided by units sold.
+    synonyms: [ASP, average price, price achieved]
+    category: Pricing
+    maps_to_measure: average_selling_price
+  Vehicle:
+    definition: A vehicle product identified by make, model, body style and powertrain.
+    synonyms: [car, automobile, carline, model, make, brand]
+    category: Product
+    maps_to_dimension: Car
+  Electric Vehicle:
+    definition: A battery-electric passenger vehicle.
+    synonyms: [EV, electric car, BEV, battery electric]
+    category: Product
+    maps_to_dimension: Car
+    sql_expression: "automotive.dim_carline.engine_type = 'Electric'"
+  Colour:
+    definition: Exterior paint colour or finish.
+    synonyms: [color, paint, finish, shade]
+    category: Product Attribute
+    maps_to_dimension: Colour
+  Salesperson:
+    definition: A member of the sales team responsible for vehicle sales.
+    synonyms: [sales rep, seller, agent, account manager]
+    category: People
+    maps_to_dimension: Salesperson
+  Region:
+    definition: A geographic sales territory.
+    synonyms: [geography, territory, city, state, location]
+    category: Geography
+    maps_to_dimension: Region
+  Dealer:
+    definition: An authorized vehicle sales outlet.
+    synonyms: [dealership, outlet, showroom, dealer network]
+    category: Network
+    maps_to_dimension: Dealer
+  Target Units:
+    definition: Planned monthly unit volume by vehicle make.
+    synonyms: [target volume, plan units, budget units]
+    category: Planning
+    maps_to_measure: target_units
+  Target Revenue:
+    definition: Planned monthly sales value by vehicle make.
+    synonyms: [plan revenue, budget revenue, sales target value]
+    category: Planning
+    maps_to_measure: target_revenue
+
+domain_rules:
+  always_rules:
+    - SQL is the source of truth for numerical results.
+    - Top selling defaults to SUM(order_qty).
+    - Electric vehicle means engine_type = 'Electric'.
+  never_rules:
+    - Never rank top selling vehicles by revenue unless revenue is explicit.

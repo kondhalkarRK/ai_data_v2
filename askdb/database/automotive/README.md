@@ -1,0 +1,5 @@
+-- Mirror of apps/api/migrations/automotive/versions/0001_automotive_schema.py
+-- Applied via Alembic; this file is documentation for operators.
+--
+--   python scripts/migrate.py automotive upgrade head
+--   python scripts/seed_automotive.py --rows 1000000 --replace

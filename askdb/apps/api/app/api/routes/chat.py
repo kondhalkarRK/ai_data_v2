@@ -1,0 +1,184 @@
+"""Chat SSE and activity routes."""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import AsyncIterator
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
+from pydantic import Field
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+
+from app.api.deps import (
+    ActiveIndustry,
+    RequireAnalyst,
+    RequireViewer,
+    get_app_session,
+    get_app_settings,
+    get_registry,
+)
+from app.core.config import Settings
+from app.core.exceptions import NqlError
+from app.db.session import DatabaseRegistry
+from app.schemas.common import ApiModel
+from app.services.chat.service import ChatService
+
+router = APIRouter(tags=["chat"])
+
+
+class AskRequest(ApiModel):
+    question: str = Field(min_length=1, max_length=4000)
+    conversation_id: uuid.UUID | None = None
+
+
+class SaveQuestionRequest(ApiModel):
+    title: str = Field(min_length=1, max_length=240)
+    question: str = Field(min_length=1, max_length=4000)
+    sql_text: str | None = None
+
+
+async def _analytics(
+    industry: ActiveIndustry,
+    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
+) -> AsyncIterator[AsyncConnection]:
+    async with registry.analytics_connection(industry) as connection:
+        yield connection
+
+
+@router.post("/chat/ask")
+async def chat_ask(
+    body: AskRequest,
+    user: RequireAnalyst,
+    industry: ActiveIndustry,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+) -> StreamingResponse:
+    service = ChatService(
+        app_session=session,
+        analytics=analytics,
+        settings=settings,
+        user=user,
+        industry=industry,
+    )
+
+    async def event_stream() -> AsyncIterator[bytes]:
+        try:
+            async for frame in service.ask_stream(body.question, body.conversation_id):
+                yield frame.encode("utf-8")
+        except NqlError as exc:
+            payload = (
+                f"event: error\ndata: "
+                f'{{"code":"{exc.code}","message":{json_quote(exc.message)}}}\n\n'
+            )
+            yield payload.encode("utf-8")
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+def json_quote(value: str) -> str:
+    import json
+
+    return json.dumps(value)
+
+
+@router.get("/history")
+async def query_history(
+    user: RequireViewer,
+    industry: ActiveIndustry,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+) -> list[dict[str, Any]]:
+    service = ChatService(
+        app_session=session,
+        analytics=analytics,
+        settings=settings,
+        user=user,
+        industry=industry,
+    )
+    rows = await service.list_history()
+    return [
+        {
+            "id": str(row.id),
+            "question": row.question,
+            "sqlText": row.sql_text,
+            "status": row.status,
+            "rowCount": row.row_count,
+            "trustScore": row.trust_score,
+            "latencyMs": row.latency_ms,
+            "createdAt": row.created_at.isoformat(),
+        }
+        for row in rows
+    ]
+
+
+@router.get("/questions")
+async def list_saved_questions(
+    user: RequireViewer,
+    industry: ActiveIndustry,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+) -> list[dict[str, Any]]:
+    service = ChatService(
+        app_session=session,
+        analytics=analytics,
+        settings=settings,
+        user=user,
+        industry=industry,
+    )
+    rows = await service.list_saved()
+    return [
+        {
+            "id": str(row.id),
+            "title": row.title,
+            "question": row.question,
+            "sqlText": row.sql_text,
+            "isShared": row.is_shared,
+            "createdAt": row.created_at.isoformat(),
+        }
+        for row in rows
+    ]
+
+
+@router.post("/questions")
+async def save_question(
+    body: SaveQuestionRequest,
+    user: RequireViewer,
+    industry: ActiveIndustry,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+) -> dict[str, Any]:
+    service = ChatService(
+        app_session=session,
+        analytics=analytics,
+        settings=settings,
+        user=user,
+        industry=industry,
+    )
+    row = await service.save_question(
+        title=body.title, question=body.question, sql_text=body.sql_text
+    )
+    return {"id": str(row.id), "title": row.title}
+
+
+@router.get("/cost")
+async def cost_analytics(
+    user: RequireAnalyst,
+    industry: ActiveIndustry,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+) -> dict[str, Any]:
+    service = ChatService(
+        app_session=session,
+        analytics=analytics,
+        settings=settings,
+        user=user,
+        industry=industry,
+    )
+    return await service.cost_summary()

@@ -1,0 +1,94 @@
+version: "2.0"
+domain: Insurance
+terms:
+  Gross Written Premium:
+    definition: Premium booked for policies written during the period.
+    synonyms: [GWP, written premium, sales, selling, business written]
+    category: Financial
+    maps_to_measure: gross_written_premium
+    sql_expression: "SUM(insurance.fact_policy_monthly.written_premium)"
+  Earned Premium:
+    definition: The portion of premium recognized for coverage already provided.
+    synonyms: [premium earned, recognized premium, EP]
+    category: Financial
+    maps_to_measure: earned_premium
+  Claims Incurred:
+    definition: Paid claims plus outstanding reserves.
+    synonyms: [incurred loss, total loss, incurred]
+    category: Claims
+    maps_to_measure: claims_incurred
+  Claims Paid:
+    definition: Claim amounts actually paid during the selected scope.
+    synonyms: [claim payout, paid loss, total payout]
+    category: Claims
+    maps_to_measure: claims_paid
+  Claim Count:
+    definition: Number of distinct claims in scope.
+    synonyms: [number of claims, claims volume, how many claims]
+    category: Claims
+    maps_to_measure: claim_count
+  Loss Ratio:
+    definition: Incurred claims divided by earned premium at compatible period and business grain.
+    synonyms: [claims ratio, loss to premium ratio, LR]
+    category: Risk
+    maps_to_measure: loss_ratio
+    calculation_rules:
+      - Aggregate claims and premium separately before joining at compatible grain.
+  Claim Frequency:
+    definition: Distinct claim count divided by exposure units.
+    synonyms: [claims per exposure, frequency rate]
+    category: Risk
+    maps_to_measure: claim_frequency
+  Average Claim Severity:
+    definition: Incurred amount divided by distinct claim count.
+    synonyms: [severity, average loss, average claim cost]
+    category: Claims
+    maps_to_measure: average_claim_severity
+  Approval Rate:
+    definition: Approved claims divided by all filed claims.
+    synonyms: [claim approval rate, approved percentage]
+    category: Operations
+    maps_to_measure: approval_rate
+  Renewal Rate:
+    definition: Renewed policies divided by policies due for renewal.
+    synonyms: [persistency, retention rate, policy retention]
+    category: Customer
+    maps_to_measure: renewal_rate
+  Product:
+    definition: Insurance product and line of business.
+    synonyms: [insurance product, plan, LOB, business line]
+    category: Product
+    maps_to_dimension: Product
+  Region:
+    definition: Geographic sales and claims territory.
+    synonyms: [territory, geography, zone, state]
+    category: Geography
+    maps_to_dimension: Region
+  Policy:
+    definition: Insurance contract held by a customer.
+    synonyms: [coverage, contract, customer, policyholder]
+    category: Product
+    maps_to_dimension: Policy
+  Agent:
+    definition: Intermediary who sells or services policies.
+    synonyms: [broker, intermediary, advisor, channel]
+    category: People
+    maps_to_dimension: Agent
+  Accounting Month:
+    definition: Calendar month grain for premium reporting.
+    synonyms: [month, monthly, period, year]
+    category: Time
+    maps_to_dimension: Accounting Month
+  Reported Date:
+    definition: Date on which a claim was reported.
+    synonyms: [claim date, reported month, claims period]
+    category: Time
+    maps_to_dimension: Reported Date
+
+domain_rules:
+  always_rules:
+    - SQL is the source of truth for numerical results.
+    - Sales defaults to Gross Written Premium.
+    - Claims use reported_date; premium uses accounting_month.
+  never_rules:
+    - Never sum premium from claim rows.

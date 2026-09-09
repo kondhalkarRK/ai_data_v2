@@ -1,0 +1,156 @@
+version: "2.0"
+domain: Automotive Sales
+description: India passenger-vehicle sales analytics across orders, vehicles, people, regions, targets and dealers.
+
+tables:
+  fact_sales:
+    type: fact
+    physical_name: automotive.fact_sales
+    display_name: Sales Transactions
+    grain: One row per sales order
+    primary_key: order_id
+    columns:
+      order_id: {display_name: Order ID, type: bigint, role: key}
+      carline_id: {display_name: Car Line ID, type: integer, role: foreign_key, references: dim_carline.carline_id}
+      colour_id: {display_name: Colour ID, type: integer, role: foreign_key, references: dim_color.colour_id}
+      sales_person_id: {display_name: Salesperson ID, type: integer, role: foreign_key, references: dim_salesman.sales_person_id}
+      region_id: {display_name: Region ID, type: integer, role: foreign_key, references: dim_region.region_id}
+      dealer_id: {display_name: Dealer ID, type: integer, role: foreign_key, references: dim_dealer.dealer_id}
+      sales_date: {display_name: Sales Date, type: date, role: date}
+      order_qty: {display_name: Order Quantity, type: integer, role: measure}
+      price_per_unit: {display_name: Price Per Unit, type: decimal, role: measure}
+      total_sales: {display_name: Total Sales Value, type: decimal, role: measure}
+
+  dim_carline:
+    type: dimension
+    physical_name: automotive.dim_carline
+    display_name: Vehicle / Car Line
+    description: Vehicle catalogue and powertrain.
+    grain: One row per vehicle car line
+    primary_key: carline_id
+    columns:
+      carline_id: {display_name: Car Line ID, type: integer, role: key}
+      carline_name: {display_name: Car Line Name, type: string, role: attribute}
+      model: {display_name: Model, type: string, role: attribute}
+      make: {display_name: Make / Brand, type: string, role: attribute}
+      car_type: {display_name: Car Type, type: string, role: attribute}
+      engine_capacity: {display_name: Engine Capacity, type: decimal, role: attribute}
+      engine_type: {display_name: Engine Type, type: string, role: attribute}
+
+  dim_color:
+    type: dimension
+    physical_name: automotive.dim_color
+    display_name: Colour / Paint
+    grain: One row per paint option
+    primary_key: colour_id
+    columns:
+      colour_id: {display_name: Colour ID, type: integer, role: key}
+      colour_name: {display_name: Colour Name, type: string, role: attribute}
+      rcg_combination: {display_name: RCG Combination, type: string, role: attribute}
+      patent_number: {display_name: Patent Number, type: string, role: attribute}
+
+  dim_salesman:
+    type: dimension
+    physical_name: automotive.dim_salesman
+    display_name: Salesperson
+    grain: One row per salesperson
+    primary_key: sales_person_id
+    columns:
+      sales_person_id: {display_name: Salesperson ID, type: integer, role: key}
+      first_name: {display_name: First Name, type: string, role: attribute}
+      last_name: {display_name: Last Name, type: string, role: attribute}
+      email: {display_name: Email, type: string, role: attribute}
+      corp_id: {display_name: Corporate ID, type: string, role: attribute}
+      active: {display_name: Active, type: boolean, role: attribute}
+
+  dim_region:
+    type: dimension
+    physical_name: automotive.dim_region
+    display_name: Region / Geography
+    grain: One row per sales territory
+    primary_key: region_id
+    columns:
+      region_id: {display_name: Region ID, type: integer, role: key}
+      region_name: {display_name: Region Name, type: string, role: attribute}
+      city: {display_name: City, type: string, role: attribute}
+      state_code: {display_name: State Code, type: string, role: attribute}
+      country: {display_name: Country, type: string, role: attribute}
+
+  dim_targets:
+    type: dimension
+    physical_name: automotive.dim_targets
+    display_name: Sales Targets by Make
+    grain: One row per make per month
+    primary_key: target_id
+    columns:
+      target_id: {display_name: Target ID, type: bigint, role: key}
+      year_month: {display_name: Target Month, type: date, role: date}
+      make: {display_name: Make / Brand, type: string, role: attribute}
+      target_units: {display_name: Target Units, type: integer, role: measure}
+      target_revenue: {display_name: Target Revenue, type: decimal, role: measure}
+
+  dim_dealer:
+    type: dimension
+    physical_name: automotive.dim_dealer
+    display_name: Dealer Network
+    grain: One row per authorized dealer outlet
+    primary_key: dealer_id
+    columns:
+      dealer_id: {display_name: Dealer ID, type: integer, role: key}
+      dealer_code: {display_name: Dealer Code, type: string, role: attribute}
+      dealer_name: {display_name: Dealer Name, type: string, role: attribute}
+      region_id: {display_name: Region ID, type: integer, role: foreign_key, references: dim_region.region_id}
+      city: {display_name: City, type: string, role: attribute}
+      dealer_grade: {display_name: Dealer Grade, type: string, role: attribute}
+      active: {display_name: Active, type: boolean, role: attribute}
+
+relationships:
+  - {name: sales_to_carline, display_name: Sales to Vehicle, from_table: fact_sales, from_column: carline_id, to_table: dim_carline, to_column: carline_id, type: many_to_one}
+  - {name: sales_to_colour, display_name: Sales to Colour, from_table: fact_sales, from_column: colour_id, to_table: dim_color, to_column: colour_id, type: many_to_one}
+  - {name: sales_to_salesman, display_name: Sales to Salesperson, from_table: fact_sales, from_column: sales_person_id, to_table: dim_salesman, to_column: sales_person_id, type: many_to_one}
+  - {name: sales_to_region, display_name: Sales to Region, from_table: fact_sales, from_column: region_id, to_table: dim_region, to_column: region_id, type: many_to_one}
+  - {name: sales_to_dealer, display_name: Sales to Dealer, from_table: fact_sales, from_column: dealer_id, to_table: dim_dealer, to_column: dealer_id, type: many_to_one}
+  - {name: dealer_to_region, display_name: Dealer to Region, from_table: dim_dealer, from_column: region_id, to_table: dim_region, to_column: region_id, type: many_to_one}
+
+measures:
+  revenue:
+    {display_name: Revenue, description: Total vehicle sales value, expression: "SUM(total_sales)", source_table: fact_sales, source_column: total_sales, aggregation: sum, format: currency, synonyms: [sales, turnover, total revenue, sales value]}
+  orders:
+    {display_name: Orders, expression: "COUNT(DISTINCT order_id)", source_table: fact_sales, source_column: order_id, aggregation: count_distinct, format: integer, synonyms: [order count, transactions]}
+  units_sold:
+    {display_name: Units Sold, expression: "SUM(order_qty)", source_table: fact_sales, source_column: order_qty, aggregation: sum, format: integer, synonyms: [vehicles sold, cars sold, sales volume, top selling]}
+  average_selling_price:
+    {display_name: Average Selling Price, expression: "SUM(total_sales) / NULLIF(SUM(order_qty), 0)", source_table: fact_sales, aggregation: ratio, format: currency, synonyms: [ASP, average price]}
+  active_salespeople:
+    {display_name: Active Salespeople, expression: "COUNT(DISTINCT sales_person_id)", source_table: fact_sales, source_column: sales_person_id, aggregation: count_distinct, format: integer}
+  target_units:
+    {display_name: Target Units, expression: "SUM(target_units)", source_table: dim_targets, source_column: target_units, aggregation: sum, format: integer}
+  target_revenue:
+    {display_name: Target Revenue, expression: "SUM(target_revenue)", source_table: dim_targets, source_column: target_revenue, aggregation: sum, format: currency}
+
+dimensions:
+  Date: {display_name: Date, source_table: fact_sales, source_column: sales_date, type: date, synonyms: [time, month, year, quarter]}
+  Car: {display_name: Vehicle, source_table: dim_carline, attributes: [carline_name, model, make, car_type, engine_type], synonyms: [car, automobile, model, brand, EV]}
+  Colour: {display_name: Colour, source_table: dim_color, attributes: [colour_name, rcg_combination], synonyms: [color, paint, finish]}
+  Salesperson: {display_name: Salesperson, source_table: dim_salesman, attributes: [first_name, last_name, email, active], synonyms: [sales rep, seller, agent]}
+  Region: {display_name: Region, source_table: dim_region, attributes: [region_name, city, state_code, country], synonyms: [geography, area, territory, location]}
+  Dealer: {display_name: Dealer, source_table: dim_dealer, attributes: [dealer_name, dealer_code, city, dealer_grade, active], synonyms: [dealership, outlet, showroom]}
+
+business_entities:
+  - {name: Sales Transaction, table: fact_sales, description: A single vehicle sale event}
+  - {name: Vehicle, table: dim_carline, description: A vehicle product in the catalogue}
+  - {name: Salesperson, table: dim_salesman, description: A member of the sales team}
+  - {name: Colour Variant, table: dim_color, description: A paint option for a vehicle}
+  - {name: Region, table: dim_region, description: A geographic sales territory}
+  - {name: Sales Target, table: dim_targets, description: Monthly unit and revenue plan by make}
+  - {name: Dealer, table: dim_dealer, description: An authorized dealer outlet}
+
+domain_rules:
+  always_rules:
+    - Revenue is SUM(total_sales); never use price_per_unit as revenue.
+    - Units sold is SUM(order_qty), not order count.
+    - Top selling defaults to units sold unless the user explicitly asks for revenue.
+    - Protect every ratio denominator with NULLIF.
+  never_rules:
+    - Never show a raw identifier without its business label.
+    - Never return more than the configured row cap.
