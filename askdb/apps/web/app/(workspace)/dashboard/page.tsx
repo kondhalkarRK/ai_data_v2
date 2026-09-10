@@ -115,7 +115,7 @@ export default function DashboardPage() {
   }
 
   function exportCsv() {
-    const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+    const base = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
     const url = `${base}/api/v1/kpis/export?${qs}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
@@ -206,10 +206,11 @@ export default function DashboardPage() {
                 "Migrate and seed the analytics database, then retry."}
             </p>
             <p className="text-xs text-muted-foreground">
-              From <code className="text-2xs">askdb/</code> run:{" "}
-              <code className="text-2xs">python scripts\migrate.py insurance upgrade head</code> then{" "}
-              <code className="text-2xs">python scripts\seed_insurance.py --claims 10000 --replace</code>{" "}
-              (or automotive equivalents), and restart the API.
+              1) Confirm API is running (`http://localhost:8000/health`). 2) Open the app at{" "}
+              <code className="text-2xs">http://localhost:3000</code>. 3) Restart both with{" "}
+              <code className="text-2xs">.\scripts\dev.ps1</code> after env changes. 4) If needed:{" "}
+              <code className="text-2xs">python scripts\migrate.py automotive upgrade head</code> +
+              seed, then refresh.
             </p>
           </CardContent>
         </Card>

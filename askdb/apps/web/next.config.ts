@@ -1,25 +1,27 @@
 import type { NextConfig } from "next";
 
 /**
- * The API base URL is the only backend detail the browser needs. Every credential —
- * database DSNs, the LLM key, JWT signing material — stays in the FastAPI process.
+ * Browser calls stay same-origin (relative `/api`, `/ready`) via rewrites so local
+ * CORS / localhost-vs-127.0.0.1 mismatches do not break the dashboard.
+ * The rewrite target is the FastAPI process.
  */
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const rewriteTarget =
+  process.env.API_REWRITE_TARGET ??
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  "http://localhost:8000";
 
 const isProduction = process.env.NODE_ENV === "production";
 
-// 'unsafe-eval' is required by the Next.js dev overlay and React refresh; it is not
-// present in a production build.
 const scriptSrc = isProduction ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline' 'unsafe-eval'";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src ${scriptSrc}`,
-  // Tailwind injects styles at runtime, which requires inline styles.
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src 'self' ${apiBaseUrl}`,
+  // Same-origin in dev (rewrites). Keep absolute API hosts for production/direct mode.
+  `connect-src 'self' ${rewriteTarget} http://127.0.0.1:8000 http://localhost:8000`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -31,11 +33,20 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 
   typescript: {
-    // A type error must fail the build rather than ship.
     ignoreBuildErrors: false,
   },
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion", "@tanstack/react-query"],
+  },
+
+  async rewrites() {
+    return [
+      { source: "/api/:path*", destination: `${rewriteTarget}/api/:path*` },
+      { source: "/ready", destination: `${rewriteTarget}/ready` },
+      { source: "/health", destination: `${rewriteTarget}/health` },
+      { source: "/docs", destination: `${rewriteTarget}/docs` },
+      { source: "/openapi.json", destination: `${rewriteTarget}/openapi.json` },
+    ];
   },
 
   async headers() {

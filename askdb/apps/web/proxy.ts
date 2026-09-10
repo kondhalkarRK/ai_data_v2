@@ -8,13 +8,23 @@ import { NextResponse, type NextRequest } from "next/server";
  *
  * TEMPORARY: set NEXT_PUBLIC_AUTH_BYPASS=true (with API AUTH_BYPASS=true) to skip the
  * login gate while debugging local setup. Never enable in production builds.
+ *
+ * API/health paths are always passed through — they are rewritten to FastAPI and must
+ * never be redirected to the HTML login page (that caused opaque Failed to fetch / KPI errors).
  */
 const REFRESH_COOKIE = "nql_refresh";
 const PUBLIC_PATHS = ["/login"];
+const API_PASSTHROUGH = ["/api", "/ready", "/health", "/docs", "/openapi.json"];
 const AUTH_BYPASS = process.env.NEXT_PUBLIC_AUTH_BYPASS === "true";
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  if (
+    API_PASSTHROUGH.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+  ) {
+    return NextResponse.next();
+  }
 
   if (AUTH_BYPASS) {
     if (pathname === "/login" || pathname.startsWith("/login/")) {

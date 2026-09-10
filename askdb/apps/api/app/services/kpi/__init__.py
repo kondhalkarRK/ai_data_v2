@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.core.config import Industry
-from app.core.exceptions import ValidationError
+from app.core.exceptions import DependencyUnavailableError, ValidationError
 from app.schemas.kpi import (
     KpiCard,
     KpiFilterOptions,
@@ -108,6 +108,34 @@ class KpiService:
         )
 
     async def summary(
+        self,
+        *,
+        window: WindowId = "ytd",
+        lob: str | None = None,
+        region: str | None = None,
+        make: str | None = None,
+        as_of: date | None = None,
+        compare: bool = True,
+    ) -> KpiSummaryResponse:
+        try:
+            return await self._summary_impl(
+                window=window,
+                lob=lob,
+                region=region,
+                make=make,
+                as_of=as_of,
+                compare=compare,
+            )
+        except ValidationError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - surface warehouse failures to the UI
+            raise DependencyUnavailableError(
+                "KPI query failed against the analytics warehouse. "
+                "Confirm migrate + seed for this industry, then retry. "
+                f"({type(exc).__name__}: {exc})"
+            ) from exc
+
+    async def _summary_impl(
         self,
         *,
         window: WindowId = "ytd",

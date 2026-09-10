@@ -175,6 +175,17 @@ class Settings(BaseSettings):
         resolved = primary or fallback
         object.__setattr__(self, "llm_api_key", SecretStr(resolved))
 
+        # Local convenience: accept both localhost and 127.0.0.1 frontends.
+        if self.environment is not Environment.PRODUCTION:
+            origins = list(self.cors_allowed_origins)
+            for origin in (
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+            ):
+                if origin not in origins:
+                    origins.append(origin)
+            object.__setattr__(self, "cors_allowed_origins", origins)
+
         secret = self.jwt_secret_key.get_secret_value()
 
         if self.environment is Environment.PRODUCTION:

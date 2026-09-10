@@ -1,6 +1,6 @@
 import type { ApiErrorBody, ApiErrorResponse, Industry } from "@nql/shared-types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 const CSRF_COOKIE = "nql_csrf";
 const CSRF_HEADER = "x-csrf-token";
 
@@ -123,7 +123,21 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       body: body === undefined ? undefined : JSON.stringify(body),
     });
 
-  let response = await send();
+  let response: Response;
+  try {
+    response = await send();
+  } catch (error) {
+    const hint =
+      "Cannot reach the API (Failed to fetch). Start the API on :8000 " +
+      "(scripts/dev.ps1), confirm Data Sources loads, and use http://localhost:3000 " +
+      "rather than a mismatched host.";
+    throw new ApiError(0, {
+      code: "network_error",
+      message: hint,
+      requestId: "-",
+      details: { cause: error instanceof Error ? error.message : String(error) },
+    });
+  }
 
   if (response.status === 401 && !skipRefresh) {
     if (await refreshSession()) {
