@@ -151,8 +151,8 @@ def main() -> int:
             ),
             loop_factory=lambda: asyncio.SelectorEventLoop(
                 selectors.SelectSelector()
-        ),
-    )
+            ),
+        )
 
 
 
