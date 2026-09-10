@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Annotated, Any
 
 from fastapi import Depends, Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.cookies import read_access_token, read_csrf_cookie
@@ -27,6 +28,26 @@ from app.models.user import User
 from app.semantic.service import SemanticService
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+async def _bypass_user(session: AsyncSession) -> User:
+    """TEMPORARY: pick the first active admin (else any active user) when AUTH_BYPASS=true."""
+    admin = await session.scalar(
+        select(User)
+        .where(User.is_active.is_(True), User.role == Role.ADMIN)
+        .order_by(User.created_at.asc())
+        .limit(1)
+    )
+    if admin is not None:
+        return admin
+    any_user = await session.scalar(
+        select(User).where(User.is_active.is_(True)).order_by(User.created_at.asc()).limit(1)
+    )
+    if any_user is None:
+        raise AuthenticationError(
+            "AUTH_BYPASS is on but no active user exists. Run scripts/create_admin.py first."
+        )
+    return any_user
 
 
 def get_app_settings() -> Settings:
@@ -97,6 +118,9 @@ async def verify_csrf(
     Skipped for safe methods and for bearer-token callers, which are not subject to
     ambient cookie authority and therefore cannot be CSRF'd.
     """
+    if settings.auth_bypass and not settings.is_production:
+        return
+
     if request.method in SAFE_METHODS:
         return
 
@@ -118,6 +142,14 @@ async def get_current_user(
     session: Annotated[AsyncSession, Depends(get_app_session)],
     context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> User:
+    # TEMPORARY local testing: skip JWT and impersonate the first admin.
+    if settings.auth_bypass and not settings.is_production:
+        user = await _bypass_user(session)
+        context.user_id = user.id
+        context.role = user.role
+        context.email = user.email
+        return user
+
     token = read_access_token(request)
     if not token:
         raise AuthenticationError

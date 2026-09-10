@@ -63,6 +63,7 @@ export function useLogin() {
 export function useLogout() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const authBypass = process.env.NEXT_PUBLIC_AUTH_BYPASS === "true";
 
   return useMutation<void, Error, boolean>({
     mutationFn: (allSessions) =>
@@ -72,7 +73,8 @@ export function useLogout() {
     onSettled: () => {
       queryClient.clear();
       useUiStore.getState().setIndustryOverride(null);
-      router.replace("/login");
+      // TEMPORARY: bypass has no real session — stay in the app.
+      router.replace(authBypass ? "/data-preview" : "/login");
     },
   });
 }

@@ -108,6 +108,10 @@ COOKIE_SECURE=false
 
 3. Leave `LLM_API_KEY` empty until you have a key (chat templates still work).
 4. You can leave `MONGODB_URI` / `QDRANT_URL` as-is; `/ready` may report them as not configured.
+5. **Temporary auth bypass (local debugging):** set `AUTH_BYPASS=true` in `.env` and
+   `NEXT_PUBLIC_AUTH_BYPASS=true` in `apps/web/.env.local`. You still need an admin row
+   from `create_admin.py`, but the UI skips the login form. Turn **both** flags off when
+   real login works. Bypass is refused when `ENVIRONMENT=production`.
 
 **Do not commit `.env`.**
 
@@ -119,6 +123,7 @@ COOKIE_SECURE=false
 @"
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 NEXT_PUBLIC_APP_NAME=NQL Insight
+NEXT_PUBLIC_AUTH_BYPASS=true
 "@ | Set-Content -Path apps\web\.env.local -Encoding utf8
 ```
 

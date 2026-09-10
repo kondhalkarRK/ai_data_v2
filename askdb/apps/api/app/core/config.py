@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     rate_limit_login_per_minute: int = Field(default=5, ge=1)
     rate_limit_api_per_minute: int = Field(default=120, ge=1)
 
+    # TEMPORARY local testing only. When true, API routes skip JWT/CSRF and act as the
+    # first active admin. Refused in production. Pair with NEXT_PUBLIC_AUTH_BYPASS on web.
+    auth_bypass: bool = False
+
     # --- databases ---------------------------------------------------------
     app_database_url: str = "postgresql+psycopg://askdb_app:askdb_app@localhost:5432/askdb_app"
     # Runtime analytics URLs must stay SELECT-only (askdb_reader).
@@ -166,6 +170,8 @@ class Settings(BaseSettings):
 
         if self.environment is Environment.PRODUCTION:
             problems: list[str] = []
+            if self.auth_bypass:
+                problems.append("AUTH_BYPASS must be false")
             if len(secret) < 32:
                 problems.append("JWT_SECRET_KEY must be at least 32 characters")
             if not self.cookie_secure:
