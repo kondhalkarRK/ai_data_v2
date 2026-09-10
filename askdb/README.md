@@ -180,6 +180,7 @@ persistent top bar, and three main workspace tabs.
 
 ## Documents
 
+- [**End-to-end local setup**](docs/08-end-to-end-setup.md) — install Postgres, create DBs/schemas, seed, connect frontend, run and test (no Docker required)
 - [Migration inventory](docs/01-migration-inventory.md) — every legacy file marked keep, adapt or retire
 - [Architecture](docs/02-architecture.md) — boundaries, request context, industry switching, security
 - [Phased plan](docs/03-phased-plan.md) — scope and acceptance criteria per phase
