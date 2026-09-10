@@ -10,6 +10,9 @@ Targets are selected with ``-x target=<name>``:
 from __future__ import annotations
 
 import asyncio
+
+import selectors
+
 from logging.config import fileConfig
 from pathlib import Path
 
@@ -98,8 +101,16 @@ async def run_async_migrations() -> None:
     await engine.dispose()
 
 
+# def run_migrations_online() -> None:
+#     asyncio.run(run_async_migrations())
+
 def run_migrations_online() -> None:
-    asyncio.run(run_async_migrations())
+    asyncio.run(
+        run_async_migrations(),
+        loop_factory=lambda: asyncio.SelectorEventLoop(
+            selectors.SelectSelector()
+        ),
+    )
 
 
 if context.is_offline_mode():

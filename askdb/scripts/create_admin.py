@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import selectors
 import getpass
 import os
 import secrets
@@ -128,6 +129,17 @@ def main() -> int:
             print(f"  - {problem}", file=sys.stderr)
         return 2
 
+    # try:
+    #     asyncio.run(
+    #         create_admin(
+    #             email=args.email,
+    #             full_name=args.full_name,
+    #             password=password,
+    #             industry=Industry(args.industry),
+    #             role=Role(args.role),
+    #         )
+    #     )
+
     try:
         asyncio.run(
             create_admin(
@@ -136,8 +148,14 @@ def main() -> int:
                 password=password,
                 industry=Industry(args.industry),
                 role=Role(args.role),
-            )
-        )
+            ),
+            loop_factory=lambda: asyncio.SelectorEventLoop(
+                selectors.SelectSelector()
+        ),
+    )
+
+
+
     except (ConflictError, ValidationError) as exc:
         print(f"Failed: {exc.message}", file=sys.stderr)
         return 1
