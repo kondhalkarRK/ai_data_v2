@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
+import logging
+import secrets
 import time
 import uuid
+from asyncio import Event
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.analytics.sql_guardrails import sql_is_safe
@@ -18,9 +21,22 @@ from app.core.config import Industry, Settings
 from app.core.exceptions import GuardrailViolationError, ValidationError
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuestion
 from app.models.user import User
-from app.services.chat.templates import resolve_template
+from app.services.chat.intents import (
+    is_followup,
+    is_out_of_bounds,
+    is_surprise_me,
+    is_whatif,
+    needs_clarification,
+    parse_whatif,
+    suggested_followups,
+)
+from app.services.chat.templates import list_templates, resolve_template
 from app.services.chat.trust import compute_trust_score
+from app.services.knowledge import KnowledgeService
 from app.services.llm import complete_chat
+from app.services.web_retrieval import WebRetrievalService
+
+logger = logging.getLogger(__name__)
 
 
 def _jsonable(value: Any) -> Any:
@@ -52,7 +68,13 @@ class ChatService:
         self._industry = industry
 
     async def ask_stream(
-        self, question: str, conversation_id: uuid.UUID | None
+        self,
+        question: str,
+        conversation_id: uuid.UUID | None,
+        *,
+        cancel_event: Event | None = None,
+        cancel_requested: set[uuid.UUID] | None = None,
+        web_retrieval: bool = False,
     ) -> AsyncIterator[str]:
         started = time.perf_counter()
         question = (question or "").strip()
@@ -63,6 +85,79 @@ class ChatService:
         yield _sse("stage", {"stage": "accepted", "historyId": str(history_id)})
 
         conversation = await self._ensure_conversation(conversation_id, question)
+        history = await self._create_running_history(history_id, conversation.id, question)
+        await self._app.flush()
+        # Make the running row visible to the independent cancellation request.
+        await self._app.commit()
+
+        async def cancelled() -> bool:
+            if (cancel_event is not None and cancel_event.is_set()) or (
+                cancel_requested is not None and history_id in cancel_requested
+            ):
+                history.status = "cancelled"
+                history.latency_ms = int((time.perf_counter() - started) * 1000)
+                await self._app.flush()
+                await self._app.commit()
+                if cancel_requested is not None:
+                    cancel_requested.discard(history_id)
+                return True
+            return False
+
+        async def finish_without_sql(
+            *, path: str, narrative: str, event: str | None = None, payload: dict[str, Any] | None = None
+        ) -> AsyncIterator[str]:
+            if event:
+                yield _sse(event, payload or {})
+            for token in narrative.split():
+                yield _sse("token", {"token": token + " "})
+            history.status = "completed"
+            history.row_count = 0
+            history.trust_score = 0
+            history.trust_breakdown = {"path": path}
+            history.latency_ms = int((time.perf_counter() - started) * 1000)
+            await self._app.flush()
+            yield _sse(
+                "followups",
+                {"items": suggested_followups(self._industry, path)},
+            )
+            yield _sse(
+                "done",
+                {
+                    "historyId": str(history_id),
+                    "conversationId": str(conversation.id),
+                    "latencyMs": history.latency_ms,
+                    "trustScore": 0,
+                },
+            )
+
+        if is_out_of_bounds(question, self._industry):
+            yield _sse("badge", {"path": "out_of_bounds", "label": "Out of scope"})
+            async for frame in finish_without_sql(
+                path="out_of_bounds",
+                narrative=(
+                    f"I can only answer governed {self._industry.value} analytics questions. "
+                    "Try asking about a business metric in the available data."
+                ),
+            ):
+                yield frame
+            return
+
+        clarification = needs_clarification(question)
+        if clarification is not None:
+            options = suggested_followups(self._industry, "clarification")
+            async for frame in finish_without_sql(
+                path="clarification",
+                narrative=clarification,
+                event="clarification",
+                payload={"question": clarification, "options": options},
+            ):
+                yield frame
+            return
+
+        if await cancelled():
+            yield _sse("cancelled", {"historyId": str(history_id)})
+            return
+
         yield _sse(
             "stage",
             {
@@ -71,17 +166,31 @@ class ChatService:
             },
         )
 
-        hit = resolve_template(self._industry, question)
+        prior_sql: str | None = None
+        followup_note = ""
+        if is_followup(question):
+            prior_sql = await self._prior_sql(conversation.id, history_id)
+            if prior_sql:
+                yield _sse("stage", {"stage": "followup"})
+                followup_note = "Using the previous query as conversational context. "
+
+        if is_surprise_me(question):
+            templates = list_templates(self._industry)
+            hit = secrets.choice(templates) if templates else None
+            yield _sse("stage", {"stage": "surprise"})
+        else:
+            hit = resolve_template(self._industry, question)
         sql_text: str | None = None
         path = "fallback"
         glossary_matches = 0
-        narrative = ""
+        narrative = followup_note
+        scenario = parse_whatif(question) if is_whatif(question) else None
 
         if hit is not None:
             sql_text = hit.sql
             path = hit.path
             glossary_matches = hit.glossary_matches
-            narrative = f"Answered with governed template: {hit.title}."
+            narrative += f"Answered with governed template: {hit.title}."
             yield _sse("stage", {"stage": "template", "title": hit.title})
         else:
             yield _sse("stage", {"stage": "llm"})
@@ -94,15 +203,29 @@ class ChatService:
                 sql_text = llm.sql
                 path = "semantic_llm"
                 glossary_matches = 1
-                narrative = llm.narrative or "Generated with the configured language model."
+                narrative += llm.narrative or "Generated with the configured language model."
                 await self._record_usage(llm.model, llm.prompt_tokens, llm.completion_tokens)
             else:
-                narrative = llm.narrative or (
+                narrative += llm.narrative or (
                     "No matching governed template and no LLM key is configured. "
                     "Try questions like 'loss ratio', 'claims by status', "
                     "'revenue by month', or 'top models'."
                 )
                 path = "fallback"
+
+        if scenario is not None:
+            direction = str(scenario["direction"])
+            raw_value = scenario["change_value"]
+            value = float(raw_value) if isinstance(raw_value, (int, float, str)) else 0.0
+            unit = "%" if scenario["change_type"] == "percent" else " units"
+            narrative += (
+                f" Scenario: an illustrative {direction} change of {value:g}{unit} "
+                "is applied conceptually; source data is not modified."
+            )
+
+        if await cancelled():
+            yield _sse("cancelled", {"historyId": str(history_id)})
+            return
 
         if sql_text:
             ok, reason = sql_is_safe(sql_text)
@@ -149,22 +272,59 @@ class ChatService:
                 row_count=0,
             )
 
+        if await cancelled():
+            yield _sse("cancelled", {"historyId": str(history_id)})
+            return
+
+        try:
+            citations = KnowledgeService(self._settings, self._industry).search(
+                question, top_k=min(3, self._settings.rag_top_k), user_id=str(self._user.id)
+            )
+            for citation in citations:
+                yield _sse(
+                    "citation",
+                    {
+                        "documentId": citation.document_id,
+                        "title": citation.title,
+                        "chunkId": citation.chunk_id,
+                        "snippet": citation.snippet,
+                        "locator": citation.locator,
+                        "untrusted": citation.untrusted,
+                    },
+                )
+            if web_retrieval and question.startswith(("http://", "https://")):
+                web_hits = await WebRetrievalService(self._settings).retrieve(
+                    question, opted_in=True
+                )
+                for citation in web_hits:
+                    yield _sse(
+                        "citation",
+                        {
+                            "documentId": citation.document_id,
+                            "title": citation.title,
+                            "chunkId": citation.chunk_id,
+                            "snippet": citation.snippet,
+                            "locator": citation.locator,
+                            "untrusted": True,
+                        },
+                    )
+        except Exception:
+            # Retrieval is supplementary and must not fail an analytics response.
+            logger.debug("Supplementary knowledge retrieval failed", exc_info=True)
+
         for token in narrative.split(" "):
             yield _sse("token", {"token": token + " "})
 
         yield _sse("trust", {"score": score, "breakdown": breakdown})
         latency_ms = int((time.perf_counter() - started) * 1000)
-        await self._persist_history(
-            history_id=history_id,
-            conversation_id=conversation.id,
-            question=question,
-            sql_text=sql_text,
-            row_count=len(rows),
-            trust_score=score,
-            trust_breakdown=breakdown,
-            latency_ms=latency_ms,
-            status="completed",
-        )
+        history.sql_text = sql_text
+        history.row_count = len(rows)
+        history.trust_score = score
+        history.trust_breakdown = {**breakdown, "path": path}
+        history.latency_ms = latency_ms
+        history.status = "completed"
+        await self._app.flush()
+        yield _sse("followups", {"items": suggested_followups(self._industry, path)})
         yield _sse(
             "done",
             {
@@ -174,6 +334,29 @@ class ChatService:
                 "trustScore": score,
             },
         )
+
+    async def cancel(self, history_id: uuid.UUID) -> bool:
+        result = await self._app.execute(
+            update(QueryHistory)
+            .where(QueryHistory.id == history_id)
+            .where(QueryHistory.user_id == self._user.id)
+            .values(status="cancelled")
+        )
+        await self._app.flush()
+        return bool(getattr(result, "rowcount", 0))
+
+    async def _prior_sql(
+        self, conversation_id: uuid.UUID, current_history_id: uuid.UUID
+    ) -> str | None:
+        result = await self._app.execute(
+            select(QueryHistory.sql_text)
+            .where(QueryHistory.conversation_id == conversation_id)
+            .where(QueryHistory.id != current_history_id)
+            .where(QueryHistory.sql_text.is_not(None))
+            .order_by(QueryHistory.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
     async def list_history(self, *, limit: int = 50) -> list[QueryHistory]:
         result = await self._app.execute(
@@ -254,22 +437,24 @@ class ChatService:
         await self._app.flush()
         return conversation
 
-    async def _persist_history(self, **kwargs: Any) -> None:
+    async def _create_running_history(
+        self, history_id: uuid.UUID, conversation_id: uuid.UUID, question: str
+    ) -> QueryHistory:
         row = QueryHistory(
-            id=kwargs["history_id"],
+            id=history_id,
             user_id=self._user.id,
-            conversation_id=kwargs["conversation_id"],
+            conversation_id=conversation_id,
             industry=self._industry.value,
-            question=kwargs["question"],
-            sql_text=kwargs["sql_text"],
-            status=kwargs["status"],
-            row_count=kwargs["row_count"],
-            trust_score=kwargs["trust_score"],
-            trust_breakdown=kwargs["trust_breakdown"],
-            latency_ms=kwargs["latency_ms"],
+            question=question,
+            sql_text=None,
+            status="running",
+            row_count=None,
+            trust_score=None,
+            trust_breakdown=None,
+            latency_ms=None,
         )
         self._app.add(row)
-        await self._app.flush()
+        return row
 
     async def _record_usage(self, model: str, prompt_tokens: int, completion_tokens: int) -> None:
         total = prompt_tokens + completion_tokens

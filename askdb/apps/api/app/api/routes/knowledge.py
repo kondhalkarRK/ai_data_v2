@@ -9,9 +9,9 @@ from pydantic import Field
 
 from app.api.deps import ActiveIndustry, RequireAnalyst, RequireViewer, get_app_settings
 from app.core.config import Settings
-from app.core.exceptions import ValidationError
 from app.schemas.common import ApiModel
 from app.services.knowledge import KnowledgeService
+from app.services.web_retrieval import WebRetrievalService
 
 router = APIRouter(prefix="/documents", tags=["knowledge"])
 
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/documents", tags=["knowledge"])
 class SearchRequest(ApiModel):
     query: str = Field(min_length=1, max_length=2000)
     top_k: int | None = Field(default=None, ge=1, le=20)
+    web_retrieval: bool = False
 
 
 @router.get("")
@@ -39,19 +40,21 @@ async def upload_document(
     title: str | None = Form(default=None),
 ) -> dict[str, Any]:
     raw = await file.read()
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise ValidationError(
-            "Only UTF-8 text, Markdown or HTML uploads are supported in this build. "
-            "PDF/DOCX parsers land with the full RAG package."
-        ) from exc
     service = KnowledgeService(settings, industry)
-    return service.ingest_text(
+    return service.ingest_bytes(
         title=title or (file.filename or "Untitled"),
-        text=text,
+        raw=raw,
         filename=file.filename or "upload.txt",
     )
+
+
+@router.post("/reindex")
+async def reindex_documents(
+    user: RequireAnalyst,
+    industry: ActiveIndustry,
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> dict[str, int]:
+    return KnowledgeService(settings, industry).reindex_all()
 
 
 @router.delete("/{document_id}")
@@ -73,6 +76,12 @@ async def search_documents(
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> list[dict[str, Any]]:
     hits = KnowledgeService(settings, industry).search(body.query, top_k=body.top_k)
+    if body.web_retrieval:
+        hits.extend(
+            await WebRetrievalService(settings).retrieve(
+                body.query, opted_in=body.web_retrieval
+            )
+        )
     return [
         {
             "documentId": hit.document_id,
@@ -80,7 +89,7 @@ async def search_documents(
             "chunkId": hit.chunk_id,
             "snippet": hit.snippet,
             "locator": hit.locator,
-            "untrusted": False,
+            "untrusted": hit.untrusted,
         }
         for hit in hits
     ]

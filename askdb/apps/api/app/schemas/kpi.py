@@ -52,6 +52,7 @@ class KpiSummaryResponse(ApiModel):
     series: list[KpiSeriesPoint]
     breakdowns: dict[str, list[NamedValue]]
     scenario_available: bool = False
+    compare_enabled: bool = True
 
 
 class ScenarioRequest(ApiModel):

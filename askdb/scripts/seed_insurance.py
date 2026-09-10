@@ -296,6 +296,43 @@ def seed(
                 )
         conn.commit()
 
+        # Forecast baseline for Scenario Mode (requires migration 0002).
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM insurance.fact_forecast_monthly")
+                cur.execute(
+                    """
+                    INSERT INTO insurance.fact_forecast_monthly (
+                        accounting_month, product_id, region_id,
+                        forecast_written_premium, forecast_earned_premium, forecast_claims_incurred
+                    )
+                    SELECT
+                        date_trunc('month', pm.accounting_month)::date,
+                        pm.product_id,
+                        pm.region_id,
+                        SUM(pm.written_premium) * 1.05,
+                        SUM(pm.earned_premium) * 1.05,
+                        COALESCE((
+                            SELECT SUM(c.incurred_amount) * 1.05
+                            FROM insurance.fact_claims c
+                            WHERE c.product_id = pm.product_id
+                              AND c.region_id IS NOT DISTINCT FROM pm.region_id
+                              AND date_trunc('month', c.reported_date)
+                                  = date_trunc('month', pm.accounting_month)
+                        ), 0)
+                    FROM insurance.fact_policy_monthly pm
+                    GROUP BY 1, 2, 3
+                    """
+                )
+                cur.execute("REFRESH MATERIALIZED VIEW insurance.mv_claims_monthly")
+            conn.commit()
+            print("Forecast rows + MV refresh applied.", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"Forecast/MV seed skipped ({exc}). Apply migrate insurance upgrade head.",
+                flush=True,
+            )
+
     print(f"Done. fact_claims rows = {claim_count:,}", flush=True)
 
 

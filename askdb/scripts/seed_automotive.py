@@ -247,8 +247,38 @@ def seed(*, rows: int, replace: bool, database_url: str | None) -> None:
             mismatches = cur.fetchone()[0]
         conn.commit()
 
-    if mismatches:
-        raise SystemExit(f"Seed integrity failed: {mismatches:,} sales have region/dealer mismatch")
+        if mismatches:
+            raise SystemExit(
+                f"Seed integrity failed: {mismatches:,} sales have region/dealer mismatch"
+            )
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM automotive.fact_forecast_monthly")
+                cur.execute(
+                    """
+                    INSERT INTO automotive.fact_forecast_monthly (
+                        sales_month, carline_id, region_id, forecast_revenue, forecast_units
+                    )
+                    SELECT
+                        date_trunc('month', f.sales_date)::date,
+                        f.carline_id,
+                        f.region_id,
+                        SUM(f.total_sales) * 1.05,
+                        SUM(f.order_qty) * 1.05
+                    FROM automotive.fact_sales f
+                    GROUP BY 1, 2, 3
+                    """
+                )
+                cur.execute("REFRESH MATERIALIZED VIEW automotive.mv_sales_monthly")
+            conn.commit()
+            print("Forecast rows + MV refresh applied.", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"Forecast/MV seed skipped ({exc}). Apply migrate automotive upgrade head.",
+                flush=True,
+            )
+
     print(f"Done. fact_sales rows = {fact_count:,}", flush=True)
 
 

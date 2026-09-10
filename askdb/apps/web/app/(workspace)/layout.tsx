@@ -7,6 +7,7 @@ import { AppBootLoading } from "@/components/loading/loading-state";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 import { useSession } from "@/hooks/use-session";
+import { useUiStore } from "@/stores/ui-store";
 
 /**
  * The authenticated shell.
@@ -23,11 +24,17 @@ const AUTH_BYPASS = process.env.NEXT_PUBLIC_AUTH_BYPASS === "true";
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { data: user, isPending, isError } = useSession();
+  const presenterMode = useUiStore((state) => state.presenterMode);
+  const setSidebarCollapsed = useUiStore((state) => state.setSidebarCollapsed);
 
   React.useEffect(() => {
     if (AUTH_BYPASS) return;
     if (!isPending && !user) router.replace("/login");
   }, [isPending, user, router]);
+
+  React.useEffect(() => {
+    if (presenterMode) setSidebarCollapsed(true);
+  }, [presenterMode, setSidebarCollapsed]);
 
   if (isPending) return <AppBootLoading />;
 
@@ -64,11 +71,14 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-dvh">
-      <Sidebar user={user} />
+    <div className={presenterMode ? "flex min-h-dvh presenter-mode" : "flex min-h-dvh"}>
+      {presenterMode ? null : <Sidebar user={user} />}
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main id="main-content" className="min-w-0 flex-1 p-4 lg:p-6">
+        <main
+          id="main-content"
+          className={presenterMode ? "min-w-0 flex-1 p-6 lg:p-10" : "min-w-0 flex-1 p-4 lg:p-6"}
+        >
           {children}
         </main>
       </div>

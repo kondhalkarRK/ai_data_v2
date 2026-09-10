@@ -16,6 +16,20 @@ class TemplateHit:
     path: str = "template"
 
 
+def list_templates(industry: Industry) -> list[TemplateHit]:
+    """Return every governed template available for an industry."""
+    examples = (
+        ["loss ratio", "claim count", "written premium", "top region"]
+        if industry is Industry.INSURANCE
+        else ["revenue", "top model", "electric share", "dealer"]
+    )
+    return [
+        hit
+        for question in examples
+        if (hit := resolve_template(industry, question)) is not None
+    ]
+
+
 def resolve_template(industry: Industry, question: str) -> TemplateHit | None:
     q = question.strip().lower()
     if not q:

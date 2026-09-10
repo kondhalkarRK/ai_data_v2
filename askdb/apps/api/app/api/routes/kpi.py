@@ -7,6 +7,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.api.deps import (
@@ -57,6 +58,7 @@ async def kpi_summary(
     region: str | None = Query(default=None),
     make: str | None = Query(default=None),
     as_of: date | None = Query(default=None),
+    compare: bool = Query(default=True),
 ) -> KpiSummaryResponse:
     return await KpiService(connection, industry).summary(
         window=window,
@@ -64,6 +66,29 @@ async def kpi_summary(
         region=region,
         make=make,
         as_of=as_of,
+        compare=compare,
+    )
+
+
+@router.get("/export")
+async def kpi_export(
+    user: RequireViewer,
+    industry: ActiveIndustry,
+    connection: AnalyticsConnection,
+    window: WindowId = Query(default="ytd"),
+    lob: str | None = Query(default=None),
+    region: str | None = Query(default=None),
+    make: str | None = Query(default=None),
+    as_of: date | None = Query(default=None),
+) -> PlainTextResponse:
+    csv_text = await KpiService(connection, industry).export_csv(
+        window=window, lob=lob, region=region, make=make, as_of=as_of
+    )
+    filename = f"nql-{industry.value}-kpis-{window}.csv"
+    return PlainTextResponse(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

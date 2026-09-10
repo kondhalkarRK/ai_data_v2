@@ -1,18 +1,17 @@
-"""Knowledge / RAG: parse, chunk, hash-embed, store, retrieve with citations."""
+"""Knowledge ingestion, chunking, retrieval, and citations."""
 
 from __future__ import annotations
 
 import hashlib
-import json
 import re
-import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from app.core.config import APP_ROOT, Industry, Settings
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.config import Industry, Settings
+from app.core.exceptions import ValidationError
+from app.rag.parsers import extract_text
+from app.rag.store import KnowledgeStore
 
 
 @dataclass(slots=True)
@@ -22,6 +21,7 @@ class Citation:
     chunk_id: str
     snippet: str
     locator: str
+    untrusted: bool = False
 
 
 def _hash_embed(text: str, dims: int) -> list[float]:
@@ -40,9 +40,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b, strict=True))
     na = sum(x * x for x in a) ** 0.5
     nb = sum(y * y for y in b) ** 0.5
-    if na == 0 or nb == 0:
-        return 0.0
-    return dot / (na * nb)
+    return dot / (na * nb) if na and nb else 0.0
 
 
 def chunk_text(text: str, *, max_chars: int, min_chars: int, overlap: int) -> list[str]:
@@ -67,88 +65,124 @@ def chunk_text(text: str, *, max_chars: int, min_chars: int, overlap: int) -> li
 class KnowledgeService:
     def __init__(self, settings: Settings, industry: Industry) -> None:
         self._settings = settings
-        self._industry = industry
-        self._root = APP_ROOT / "data" / "knowledge" / industry.value
-        self._root.mkdir(parents=True, exist_ok=True)
+        self._store = KnowledgeStore(settings, industry)
 
     def list_documents(self) -> list[dict[str, Any]]:
-        docs = []
-        for path in sorted(self._root.glob("*.meta.json")):
-            docs.append(json.loads(path.read_text(encoding="utf-8")))
-        return docs
+        return self._store.list_documents()
 
     def ingest_text(self, *, title: str, text: str, filename: str) -> dict[str, Any]:
-        allowed = {ext.lower() for ext in self._settings.upload_allowed_extensions}
         suffix = Path(filename).suffix.lower() or ".txt"
+        allowed = {ext.lower() for ext in self._settings.upload_allowed_extensions}
         if suffix not in allowed and suffix not in {".txt", ".md", ".html"}:
             raise ValidationError(f"Unsupported upload type '{suffix}'.")
         if len(text.encode("utf-8")) > self._settings.upload_max_bytes:
             raise ValidationError("Upload exceeds the configured size limit.")
-
-        doc_id = str(uuid.uuid4())
-        chunks = chunk_text(
+        content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        existing = self._store.find_by_hash(content_hash)
+        if existing is not None:
+            return {**existing, "deduped": True}
+        doc_id = content_hash[:16]
+        pieces = chunk_text(
             text,
             max_chars=self._settings.rag_chunk_max_chars,
             min_chars=self._settings.rag_chunk_min_chars,
             overlap=self._settings.rag_chunk_overlap_chars,
         )
-        embedded = [
+        chunks = [
             {
                 "id": f"{doc_id}:{index}",
-                "text": chunk,
-                "embedding": _hash_embed(chunk, self._settings.qdrant_vector_size),
+                "text": piece,
+                "embedding": _hash_embed(piece, self._settings.qdrant_vector_size),
                 "locator": f"chunk-{index + 1}",
             }
-            for index, chunk in enumerate(chunks)
+            for index, piece in enumerate(pieces)
         ]
-        meta = {
-            "id": doc_id,
-            "title": title or filename,
-            "filename": filename,
-            "industry": self._industry.value,
-            "chunkCount": len(embedded),
-            "createdAt": datetime.now(UTC).isoformat(),
-            "bytes": len(text.encode("utf-8")),
-        }
-        (self._root / f"{doc_id}.meta.json").write_text(
-            json.dumps(meta, indent=2), encoding="utf-8"
+        return self._store.save_document(
+            title=title or filename,
+            filename=filename,
+            content_hash=content_hash,
+            raw_text=text,
+            chunks=chunks,
         )
-        (self._root / f"{doc_id}.chunks.json").write_text(json.dumps(embedded), encoding="utf-8")
-        return meta
+
+    def ingest_bytes(self, *, title: str, raw: bytes, filename: str) -> dict[str, Any]:
+        if len(raw) > self._settings.upload_max_bytes:
+            raise ValidationError("Upload exceeds the configured size limit.")
+        suffix = Path(filename).suffix.lower()
+        if suffix not in {ext.lower() for ext in self._settings.upload_allowed_extensions}:
+            raise ValidationError(f"Unsupported upload type '{suffix or '(none)'}'.")
+        return self.ingest_text(
+            title=title, text=extract_text(filename, raw), filename=filename
+        )
 
     def delete_document(self, document_id: str) -> None:
-        meta = self._root / f"{document_id}.meta.json"
-        chunks = self._root / f"{document_id}.chunks.json"
-        if not meta.exists():
-            raise NotFoundError("Document not found.")
-        meta.unlink(missing_ok=True)
-        chunks.unlink(missing_ok=True)
+        self._store.delete_document(document_id)
 
-    def search(self, query: str, *, top_k: int | None = None) -> list[Citation]:
+    def search(
+        self, query: str, *, top_k: int | None = None, user_id: str | None = None
+    ) -> list[Citation]:
         query = query.strip()
         if not query:
             raise ValidationError("Query is required.")
-        q_vec = _hash_embed(query, self._settings.qdrant_vector_size)
+        query_vector = _hash_embed(query, self._settings.qdrant_vector_size)
         scored: list[tuple[float, Citation]] = []
-        for meta_path in self._root.glob("*.meta.json"):
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            chunk_path = self._root / f"{meta['id']}.chunks.json"
-            if not chunk_path.exists():
-                continue
-            for chunk in json.loads(chunk_path.read_text(encoding="utf-8")):
-                score = _cosine(q_vec, chunk["embedding"])
-                scored.append(
-                    (
-                        score,
-                        Citation(
-                            document_id=meta["id"],
-                            title=meta["title"],
-                            chunk_id=chunk["id"],
-                            snippet=chunk["text"][:280],
-                            locator=chunk["locator"],
-                        ),
-                    )
+        for meta, chunk in self._store.iter_chunks():
+            scored.append(
+                (
+                    _cosine(query_vector, chunk["embedding"]),
+                    Citation(
+                        document_id=meta["id"],
+                        title=meta["title"],
+                        chunk_id=chunk["id"],
+                        snippet=chunk["text"][:280],
+                        locator=chunk["locator"],
+                    ),
                 )
+            )
         scored.sort(key=lambda item: item[0], reverse=True)
-        limit = top_k or self._settings.rag_top_k
-        return [citation for _, citation in scored[:limit]]
+        hits = [citation for _, citation in scored[: top_k or self._settings.rag_top_k]]
+        self._store.append_retrieval_audit(
+            query,
+            [
+                {
+                    "documentId": hit.document_id,
+                    "chunkId": hit.chunk_id,
+                    "locator": hit.locator,
+                }
+                for hit in hits
+            ],
+            user_id,
+        )
+        return hits
+
+    def reindex(self) -> dict[str, int]:
+        count = 0
+        for meta in self._store.list_documents():
+            text = self._store.read_text(meta["id"])
+            if not text:
+                continue
+            pieces = chunk_text(
+                text,
+                max_chars=self._settings.rag_chunk_max_chars,
+                min_chars=self._settings.rag_chunk_min_chars,
+                overlap=self._settings.rag_chunk_overlap_chars,
+            )
+            self._store.replace_chunks(
+                meta["id"],
+                [
+                    {
+                        "id": f"{meta['id']}:{index}",
+                        "text": piece,
+                        "embedding": _hash_embed(
+                            piece, self._settings.qdrant_vector_size
+                        ),
+                        "locator": f"chunk-{index + 1}",
+                    }
+                    for index, piece in enumerate(pieces)
+                ],
+            )
+            count += 1
+        return {"documents": count}
+
+    def reindex_all(self) -> dict[str, int]:
+        return self.reindex()

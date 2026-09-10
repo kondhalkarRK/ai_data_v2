@@ -118,19 +118,13 @@ checklist signed off. Only then may the legacy application be retired.
 
 These are reported rather than guessed, per §24.
 
-1. **Logo asset.** Spec §8 requires replacing the ASK-DB logo with the logo attached to the
-   implementation request and says to stop before branding implementation if it is absent.
-   No logo file is attached. The only images in the repository are
-   `assets/ask_db_logo.png` (the old ASK-DB mark) and `1.png` (a screenshot of the existing
-   Streamlit LLMOps panel). Nothing will be invented or redrawn.
+1. **Logo asset.** Resolved — supplied mark is under `apps/web/public/brand/` with
+   `HAS_BRAND_ASSETS = true`.
 2. **RAISE screenshots.** Spec §9 and §11 reference attached RAISE screenshots as alignment
-   references. They are not attached. The shell is being built to the written specification —
-   sidebar items, top bar, main tabs, spacing and card treatment — and can be realigned once
-   the screenshots arrive.
-3. **Automotive analytics data.** Implemented: schema `automotive`, required `dealer_id`,
-   1M-row deterministic seed. Insurance schema and 1M-claim seed are also in place.
-4. **Infrastructure.** `docker`, `psql` and `git` may not be on PATH on every machine, so
-   migrations, seeds and container builds need a reachable PostgreSQL (and later MongoDB /
-   Qdrant). Everything is written to be runnable with Windows scripts.
-5. **LLM credentials.** No `LLM_API_KEY` is available in this environment. Phases 5 and 6
-   need one to run end to end; no credential will be fabricated or hard-coded.
+   references. They are not attached. The shell follows the written specification.
+3. **Automotive / insurance analytics data.** Schema + seed scripts are implemented; apply
+   migrations (`0001` + `0002` forecast/MVs) and seed on the target Postgres.
+4. **Infrastructure.** Local Postgres (or Docker) is required to run migrate/seed. MongoDB and
+   Qdrant are optional; RAG falls back to filesystem until they are configured.
+5. **LLM credentials.** `LLM_API_KEY` is still required for full NLQ beyond governed templates.
+   No credential is fabricated.

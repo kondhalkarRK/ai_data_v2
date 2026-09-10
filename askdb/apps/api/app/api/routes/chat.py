@@ -26,11 +26,13 @@ from app.schemas.common import ApiModel
 from app.services.chat.service import ChatService
 
 router = APIRouter(tags=["chat"])
+_cancel_requested: set[uuid.UUID] = set()
 
 
 class AskRequest(ApiModel):
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
+    web_retrieval: bool = False
 
 
 class SaveQuestionRequest(ApiModel):
@@ -66,7 +68,12 @@ async def chat_ask(
 
     async def event_stream() -> AsyncIterator[bytes]:
         try:
-            async for frame in service.ask_stream(body.question, body.conversation_id):
+            async for frame in service.ask_stream(
+                body.question,
+                body.conversation_id,
+                cancel_requested=_cancel_requested,
+                web_retrieval=body.web_retrieval,
+            ):
                 yield frame.encode("utf-8")
         except NqlError as exc:
             payload = (
@@ -76,6 +83,27 @@ async def chat_ask(
             yield payload.encode("utf-8")
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/chat/cancel/{history_id}")
+async def cancel_chat(
+    history_id: uuid.UUID,
+    user: RequireAnalyst,
+    industry: ActiveIndustry,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+) -> dict[str, Any]:
+    _cancel_requested.add(history_id)
+    service = ChatService(
+        app_session=session,
+        analytics=analytics,
+        settings=settings,
+        user=user,
+        industry=industry,
+    )
+    updated = await service.cancel(history_id)
+    return {"historyId": str(history_id), "status": "cancelled", "updated": updated}
 
 
 def json_quote(value: str) -> str:
