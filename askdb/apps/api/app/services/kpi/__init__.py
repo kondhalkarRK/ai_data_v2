@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Callable
 from datetime import date
 
 from sqlalchemy import text
@@ -64,29 +65,33 @@ class KpiService:
         schema = self._industry.value
         table = "fact_forecast_monthly"
         try:
-            row = (
-                await self._connection.execute(
-                    text(
-                        f"""
-                        SELECT EXISTS (
-                          SELECT 1
-                          FROM information_schema.tables
-                          WHERE table_schema = :schema AND table_name = :table
-                        ) AS ok
-                        """
-                    ),
-                    {"schema": schema, "table": table},
-                )
-            ).mappings().first()
-            if not row or not row["ok"]:
-                return False
-            count = (
-                await self._connection.execute(
-                    text(f"SELECT COUNT(*) AS n FROM {schema}.{table}")  # noqa: S608
-                )
-            ).scalar_one()
-            return int(count) > 0
-        except Exception:  # noqa: BLE001 - treat missing catalog as unavailable
+            # Scenario data is optional. Isolate its probe in a savepoint so a missing
+            # table or stale grant cannot poison the surrounding read-only transaction
+            # and make otherwise-valid KPI queries fail with InFailedSqlTransaction.
+            async with self._connection.begin_nested():
+                row = (
+                    await self._connection.execute(
+                        text(
+                            """
+                            SELECT EXISTS (
+                              SELECT 1
+                              FROM information_schema.tables
+                              WHERE table_schema = :schema AND table_name = :table
+                            ) AS ok
+                            """
+                        ),
+                        {"schema": schema, "table": table},
+                    )
+                ).mappings().first()
+                if not row or not row["ok"]:
+                    return False
+                count = (
+                    await self._connection.execute(
+                        text(f"SELECT COUNT(*) AS n FROM {schema}.{table}")
+                    )
+                ).scalar_one()
+                return int(count) > 0
+        except Exception:
             return False
 
     async def filter_options(self) -> KpiFilterOptions:
@@ -128,7 +133,7 @@ class KpiService:
             )
         except ValidationError:
             raise
-        except Exception as exc:  # noqa: BLE001 - surface warehouse failures to the UI
+        except Exception as exc:
             raise DependencyUnavailableError(
                 "KPI query failed against the analytics warehouse. "
                 "Confirm migrate + seed for this industry, then retry. "
@@ -246,7 +251,18 @@ class KpiService:
         buffer = io.StringIO()
         writer = csv.writer(buffer)
         writer.writerow(
-            ["industry", "window", "window_label", "start_date", "end_date", "kpi_id", "label", "value", "formatted", "delta"]
+            [
+                "industry",
+                "window",
+                "window_label",
+                "start_date",
+                "end_date",
+                "kpi_id",
+                "label",
+                "value",
+                "formatted",
+                "delta",
+            ]
         )
         for card in summary.cards:
             writer.writerow(
@@ -311,7 +327,9 @@ class KpiService:
         if request.direction == "down":
             delta = -delta
         scenario_value = actual + delta
-        fmt = format_currency if card.format == "currency" else format_number
+        fmt: Callable[[float | None], str] = (
+            format_currency if card.format == "currency" else format_number
+        )
         if card.format == "percent":
             fmt = format_percent
         narrative = (

@@ -23,7 +23,7 @@ async def fetch_insurance_summary(
     sql = text(
         """
         SELECT
-            :end_date AS data_through,
+            CAST(:end_date AS date) AS data_through,
             p.written_premium,
             p.earned_premium,
             c.claims_incurred,
@@ -45,10 +45,14 @@ async def fetch_insurance_summary(
             FROM insurance.fact_claims c
             JOIN insurance.dim_product pr ON pr.product_id = c.product_id
             LEFT JOIN insurance.dim_region r ON r.region_id = c.region_id
-            WHERE (:start_date IS NULL OR c.reported_date >= :start_date)
-              AND (:end_date IS NULL OR c.reported_date <= :end_date)
-              AND (:lob IS NULL OR pr.line_of_business = :lob)
-              AND (:region IS NULL OR r.region_name = :region)
+            WHERE (CAST(:start_date AS date) IS NULL
+                   OR c.reported_date >= CAST(:start_date AS date))
+              AND (CAST(:end_date AS date) IS NULL
+                   OR c.reported_date <= CAST(:end_date AS date))
+              AND (CAST(:lob AS text) IS NULL
+                   OR pr.line_of_business = CAST(:lob AS text))
+              AND (CAST(:region AS text) IS NULL
+                   OR r.region_name = CAST(:region AS text))
         ) c
         CROSS JOIN (
             SELECT
@@ -59,10 +63,14 @@ async def fetch_insurance_summary(
             FROM insurance.fact_policy_monthly pm
             JOIN insurance.dim_product pr ON pr.product_id = pm.product_id
             LEFT JOIN insurance.dim_region r ON r.region_id = pm.region_id
-            WHERE (:start_date IS NULL OR pm.accounting_month >= :start_date)
-              AND (:end_date IS NULL OR pm.accounting_month <= :end_date)
-              AND (:lob IS NULL OR pr.line_of_business = :lob)
-              AND (:region IS NULL OR r.region_name = :region)
+            WHERE (CAST(:start_date AS date) IS NULL
+                   OR pm.accounting_month >= CAST(:start_date AS date))
+              AND (CAST(:end_date AS date) IS NULL
+                   OR pm.accounting_month <= CAST(:end_date AS date))
+              AND (CAST(:lob AS text) IS NULL
+                   OR pr.line_of_business = CAST(:lob AS text))
+              AND (CAST(:region AS text) IS NULL
+                   OR r.region_name = CAST(:region AS text))
         ) p
         """
     )
@@ -180,10 +188,14 @@ async def fetch_insurance_series(
             FROM insurance.fact_policy_monthly pm
             JOIN insurance.dim_product pr ON pr.product_id = pm.product_id
             LEFT JOIN insurance.dim_region r ON r.region_id = pm.region_id
-            WHERE (:start_date IS NULL OR pm.accounting_month >= :start_date)
-              AND (:end_date IS NULL OR pm.accounting_month <= :end_date)
-              AND (:lob IS NULL OR pr.line_of_business = :lob)
-              AND (:region IS NULL OR r.region_name = :region)
+            WHERE (CAST(:start_date AS date) IS NULL
+                   OR pm.accounting_month >= CAST(:start_date AS date))
+              AND (CAST(:end_date AS date) IS NULL
+                   OR pm.accounting_month <= CAST(:end_date AS date))
+              AND (CAST(:lob AS text) IS NULL
+                   OR pr.line_of_business = CAST(:lob AS text))
+              AND (CAST(:region AS text) IS NULL
+                   OR r.region_name = CAST(:region AS text))
             GROUP BY 1
         ),
         claims AS (
@@ -193,10 +205,14 @@ async def fetch_insurance_series(
             FROM insurance.fact_claims c
             JOIN insurance.dim_product pr ON pr.product_id = c.product_id
             LEFT JOIN insurance.dim_region r ON r.region_id = c.region_id
-            WHERE (:start_date IS NULL OR c.reported_date >= :start_date)
-              AND (:end_date IS NULL OR c.reported_date <= :end_date)
-              AND (:lob IS NULL OR pr.line_of_business = :lob)
-              AND (:region IS NULL OR r.region_name = :region)
+            WHERE (CAST(:start_date AS date) IS NULL
+                   OR c.reported_date >= CAST(:start_date AS date))
+              AND (CAST(:end_date AS date) IS NULL
+                   OR c.reported_date <= CAST(:end_date AS date))
+              AND (CAST(:lob AS text) IS NULL
+                   OR pr.line_of_business = CAST(:lob AS text))
+              AND (CAST(:region AS text) IS NULL
+                   OR r.region_name = CAST(:region AS text))
             GROUP BY 1
         )
         SELECT COALESCE(p.accounting_month, c.accounting_month) AS period,
@@ -264,10 +280,14 @@ async def fetch_insurance_breakdown(
         FROM insurance.fact_claims c
         JOIN insurance.dim_product pr ON pr.product_id = c.product_id
         LEFT JOIN insurance.dim_region r ON r.region_id = c.region_id
-        WHERE (:start_date IS NULL OR c.reported_date >= :start_date)
-          AND (:end_date IS NULL OR c.reported_date <= :end_date)
-          AND (:lob IS NULL OR pr.line_of_business = :lob)
-          AND (:region IS NULL OR r.region_name = :region)
+        WHERE (CAST(:start_date AS date) IS NULL
+               OR c.reported_date >= CAST(:start_date AS date))
+          AND (CAST(:end_date AS date) IS NULL
+               OR c.reported_date <= CAST(:end_date AS date))
+          AND (CAST(:lob AS text) IS NULL
+               OR pr.line_of_business = CAST(:lob AS text))
+          AND (CAST(:region AS text) IS NULL
+               OR r.region_name = CAST(:region AS text))
         GROUP BY 1
         ORDER BY 2 DESC NULLS LAST
         LIMIT 20

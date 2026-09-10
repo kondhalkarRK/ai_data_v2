@@ -31,10 +31,12 @@ async def fetch_automotive_summary(
         FROM automotive.fact_sales f
         JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
         JOIN automotive.dim_region r ON r.region_id = f.region_id
-        WHERE (:start_date IS NULL OR f.sales_date >= :start_date)
-          AND (:end_date IS NULL OR f.sales_date <= :end_date)
-          AND (:make IS NULL OR c.make = :make)
-          AND (:region IS NULL OR r.region_name = :region)
+        WHERE (CAST(:start_date AS date) IS NULL
+               OR f.sales_date >= CAST(:start_date AS date))
+          AND (CAST(:end_date AS date) IS NULL
+               OR f.sales_date <= CAST(:end_date AS date))
+          AND (CAST(:make AS text) IS NULL OR c.make = CAST(:make AS text))
+          AND (CAST(:region AS text) IS NULL OR r.region_name = CAST(:region AS text))
         """
     )
     params = {
@@ -43,7 +45,7 @@ async def fetch_automotive_summary(
         "make": make,
         "region": region,
     }
-    row = (await connection.execute(sql, params)).mappings().first() or {}
+    row = (await connection.execute(sql, params)).mappings().first()
 
     top_model = (
         (
@@ -54,10 +56,12 @@ async def fetch_automotive_summary(
                 FROM automotive.fact_sales f
                 JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
                 JOIN automotive.dim_region r ON r.region_id = f.region_id
-                WHERE (:start_date IS NULL OR f.sales_date >= :start_date)
-                  AND (:end_date IS NULL OR f.sales_date <= :end_date)
-                  AND (:make IS NULL OR c.make = :make)
-                  AND (:region IS NULL OR r.region_name = :region)
+                WHERE (CAST(:start_date AS date) IS NULL
+                       OR f.sales_date >= CAST(:start_date AS date))
+                  AND (CAST(:end_date AS date) IS NULL
+                       OR f.sales_date <= CAST(:end_date AS date))
+                  AND (CAST(:make AS text) IS NULL OR c.make = CAST(:make AS text))
+                  AND (CAST(:region AS text) IS NULL OR r.region_name = CAST(:region AS text))
                 GROUP BY 1
                 ORDER BY 2 DESC
                 LIMIT 1
@@ -79,10 +83,12 @@ async def fetch_automotive_summary(
                 FROM automotive.fact_sales f
                 JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
                 JOIN automotive.dim_region r ON r.region_id = f.region_id
-                WHERE (:start_date IS NULL OR f.sales_date >= :start_date)
-                  AND (:end_date IS NULL OR f.sales_date <= :end_date)
-                  AND (:make IS NULL OR c.make = :make)
-                  AND (:region IS NULL OR r.region_name = :region)
+                WHERE (CAST(:start_date AS date) IS NULL
+                       OR f.sales_date >= CAST(:start_date AS date))
+                  AND (CAST(:end_date AS date) IS NULL
+                       OR f.sales_date <= CAST(:end_date AS date))
+                  AND (CAST(:make AS text) IS NULL OR c.make = CAST(:make AS text))
+                  AND (CAST(:region AS text) IS NULL OR r.region_name = CAST(:region AS text))
                 GROUP BY 1
                 ORDER BY 2 DESC
                 LIMIT 1
@@ -96,7 +102,7 @@ async def fetch_automotive_summary(
     )
 
     def f(key: str) -> float | None:
-        value = row.get(key)
+        value = row.get(key) if row is not None else None
         return float(value) if value is not None else None
 
     cards = [
@@ -195,10 +201,12 @@ async def fetch_automotive_series(
                 FROM automotive.fact_sales f
                 JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
                 JOIN automotive.dim_region r ON r.region_id = f.region_id
-                WHERE (:start_date IS NULL OR f.sales_date >= :start_date)
-                  AND (:end_date IS NULL OR f.sales_date <= :end_date)
-                  AND (:make IS NULL OR c.make = :make)
-                  AND (:region IS NULL OR r.region_name = :region)
+                WHERE (CAST(:start_date AS date) IS NULL
+                       OR f.sales_date >= CAST(:start_date AS date))
+                  AND (CAST(:end_date AS date) IS NULL
+                       OR f.sales_date <= CAST(:end_date AS date))
+                  AND (CAST(:make AS text) IS NULL OR c.make = CAST(:make AS text))
+                  AND (CAST(:region AS text) IS NULL OR r.region_name = CAST(:region AS text))
                 GROUP BY 1
                 ORDER BY 1
                 LIMIT 60
@@ -249,10 +257,12 @@ async def fetch_automotive_breakdown(
                 FROM automotive.fact_sales f
                 JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
                 JOIN automotive.dim_region r ON r.region_id = f.region_id
-                WHERE (:start_date IS NULL OR f.sales_date >= :start_date)
-                  AND (:end_date IS NULL OR f.sales_date <= :end_date)
-                  AND (:make IS NULL OR c.make = :make)
-                  AND (:region IS NULL OR r.region_name = :region)
+                WHERE (CAST(:start_date AS date) IS NULL
+                       OR f.sales_date >= CAST(:start_date AS date))
+                  AND (CAST(:end_date AS date) IS NULL
+                       OR f.sales_date <= CAST(:end_date AS date))
+                  AND (CAST(:make AS text) IS NULL OR c.make = CAST(:make AS text))
+                  AND (CAST(:region AS text) IS NULL OR r.region_name = CAST(:region AS text))
                 GROUP BY 1
                 ORDER BY 2 DESC
                 LIMIT 20

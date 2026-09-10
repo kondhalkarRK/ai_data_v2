@@ -5,7 +5,9 @@ These assert the same algebraic definitions as the SQL ports of the legacy engin
 
 from __future__ import annotations
 
+import re
 from datetime import date
+from pathlib import Path
 
 from app.services.kpi.windows import (
     format_currency,
@@ -44,7 +46,6 @@ def test_insurance_kpi_formulas_fixed_window() -> None:
     written = 12_500_000.0
     earned = 10_000_000.0
     incurred = 6_500_000.0
-    paid = 5_200_000.0
     claims = 1300.0
 
     assert loss_ratio(incurred, earned) == 0.65
@@ -71,7 +72,7 @@ def test_period_comparison_ytd_prior_bounds() -> None:
     assert prior is not None
     p_start, p_end, _ = prior
     assert p_start == date(2025, 1, 1)
-    assert p_end == date(2025, 9, 10) or p_end == date(2025, 9, 10)
+    assert p_end == date(2025, 9, 10)
 
 
 def test_delta_ratio_parity() -> None:
@@ -82,3 +83,24 @@ def test_delta_ratio_parity() -> None:
 
 def test_full_history_has_no_prior() -> None:
     assert prior_comparable_window("full", date(2026, 1, 1)) is None
+
+
+def test_nullable_kpi_bind_parameters_are_explicitly_typed() -> None:
+    """PostgreSQL cannot infer the type of ``NULL`` in ``:param IS NULL``.
+
+    This regression test guards every KPI query against psycopg's
+    ``AmbiguousParameter`` error when optional dashboard filters are unset.
+    """
+    kpi_dir = Path(__file__).parents[1] / "app" / "services" / "kpi"
+    sources = "\n".join(
+        (kpi_dir / filename).read_text(encoding="utf-8")
+        for filename in ("automotive.py", "insurance.py")
+    )
+    ambiguous = re.compile(
+        r":(?:start_date|end_date|make|region|lob)\s+IS\s+NULL",
+        re.IGNORECASE,
+    )
+    assert ambiguous.search(sources) is None
+    assert "CAST(:make AS text)" in sources
+    assert "CAST(:lob AS text)" in sources
+    assert "CAST(:start_date AS date)" in sources
