@@ -193,9 +193,11 @@ function OntologyBrowserInner({ snapshot }: { snapshot: OntologySnapshot }) {
   }, [nodes, snapshot]);
 
   React.useEffect(() => {
-    const timer = window.setTimeout(() => flow.fitView({ padding: 0.16, duration: 250 }), 0);
+    const timer = window.setTimeout(() => {
+      flow.fitView({ padding: 0.2, duration: 250 });
+    }, 50);
     return () => window.clearTimeout(timer);
-  }, [flow, layout, snapshot]);
+  }, [flow, layout, snapshot, nodes.length]);
 
   function toggleCluster(cluster: string) {
     setActiveClusters((current) => {
@@ -275,7 +277,7 @@ function OntologyBrowserInner({ snapshot }: { snapshot: OntologySnapshot }) {
         })}
       </div>
 
-      <div className="relative min-h-0 flex-1">
+      <div className="relative h-[min(70vh,40rem)] min-h-[28rem] w-full">
         <div className="absolute left-3 top-3 z-10 rounded-[var(--radius-control)] border border-border bg-background/90 p-3 font-mono text-2xs leading-5 shadow-[var(--shadow-card)] backdrop-blur">
           <p><span className="mr-2 inline-block size-1.5 rounded-full bg-success" />live</p>
           <p>nodes {visibleCount}/{snapshot.metadata.nodeCount}</p>
@@ -285,7 +287,7 @@ function OntologyBrowserInner({ snapshot }: { snapshot: OntologySnapshot }) {
         </div>
 
         {zones && layout !== "hierarchy" ? (
-          <div className="pointer-events-none absolute inset-0 opacity-40" aria-hidden="true">
+          <div className="pointer-events-none absolute inset-0 z-0 opacity-40" aria-hidden="true">
             {snapshot.clusters.map((cluster, index) => (
               <div
                 key={cluster.id}
@@ -303,26 +305,35 @@ function OntologyBrowserInner({ snapshot }: { snapshot: OntologySnapshot }) {
           </div>
         ) : null}
 
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={NODE_TYPES}
-          nodesDraggable
-          nodesConnectable={false}
-          elementsSelectable
-          minZoom={0.18}
-          maxZoom={2.5}
-          fitView
-          onNodeClick={(_, node) => {
-            if (!node.data.dimmed) setSelected(node.data);
-          }}
-          onPaneClick={() => setSelected(null)}
-          proOptions={{ hideAttribution: true }}
-          aria-label="Semantic ontology graph"
-        >
-          <Background color="#94a3b8" gap={24} size={0.5} />
-          <Controls showInteractive={false} position="top-left" />
-        </ReactFlow>
+        <div className="absolute inset-0 z-[1]">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={NODE_TYPES}
+            nodesDraggable
+            nodesConnectable={false}
+            elementsSelectable
+            minZoom={0.18}
+            maxZoom={2.5}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            onNodeClick={(_, node) => {
+              if (!node.data.dimmed) setSelected(node.data);
+            }}
+            onPaneClick={() => setSelected(null)}
+            onInit={(instance) => {
+              window.requestAnimationFrame(() => {
+                instance.fitView({ padding: 0.2, duration: 200 });
+              });
+            }}
+            proOptions={{ hideAttribution: true }}
+            aria-label="Semantic ontology graph"
+            className="h-full w-full bg-transparent"
+          >
+            <Background color="#94a3b8" gap={24} size={0.5} />
+            <Controls showInteractive={false} position="bottom-left" />
+          </ReactFlow>
+        </div>
 
         <p className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
           Click a node to inspect · scroll to zoom · drag to pan

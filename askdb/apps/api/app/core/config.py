@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     llm_max_completion_tokens: int = Field(default=600, ge=1)
     llm_timeout_seconds: int = Field(default=55, ge=1)
 
+    # Optional alias — some setups only export OPENAI_API_KEY.
+    openai_api_key: SecretStr = SecretStr("")
+
     # --- rag ---------------------------------------------------------------
     upload_max_bytes: int = Field(default=26_214_400, ge=1)
     upload_allowed_extensions: CsvList
@@ -166,6 +169,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _enforce_production_hardening(self) -> Settings:
+        # Prefer LLM_API_KEY; fall back to OPENAI_API_KEY. Strip accidental whitespace/quotes.
+        primary = self.llm_api_key.get_secret_value().strip().strip('"').strip("'")
+        fallback = self.openai_api_key.get_secret_value().strip().strip('"').strip("'")
+        resolved = primary or fallback
+        object.__setattr__(self, "llm_api_key", SecretStr(resolved))
+
         secret = self.jwt_secret_key.get_secret_value()
 
         if self.environment is Environment.PRODUCTION:

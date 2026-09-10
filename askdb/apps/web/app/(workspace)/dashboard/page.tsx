@@ -199,8 +199,18 @@ export default function DashboardPage() {
         <LoadingState title="Computing KPIs" />
       ) : summary.isError ? (
         <Card>
-          <CardContent className="pt-5 text-sm text-danger">
-            Could not load KPIs. Migrate and seed the analytics database, then retry.
+          <CardContent className="space-y-2 pt-5 text-sm text-danger">
+            <p>Could not load KPIs.</p>
+            <p className="text-xs text-muted-foreground">
+              {(summary.error as Error)?.message ||
+                "Migrate and seed the analytics database, then retry."}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              From <code className="text-2xs">askdb/</code> run:{" "}
+              <code className="text-2xs">python scripts\migrate.py insurance upgrade head</code> then{" "}
+              <code className="text-2xs">python scripts\seed_insurance.py --claims 10000 --replace</code>{" "}
+              (or automotive equivalents), and restart the API.
+            </p>
           </CardContent>
         </Card>
       ) : summary.data ? (

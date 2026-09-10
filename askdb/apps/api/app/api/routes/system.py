@@ -116,7 +116,14 @@ async def _dependency_reports(
         DependencyReport(
             name="llm",
             status="ok" if settings.llm_api_key.get_secret_value() else "not_configured",
-            detail=f"model={settings.llm_default_model}",
+            detail=(
+                f"model={settings.llm_default_model}"
+                if settings.llm_api_key.get_secret_value()
+                else (
+                    f"model={settings.llm_default_model}; "
+                    "set LLM_API_KEY in askdb/.env (not apps/web) and restart the API"
+                )
+            ),
         )
     )
     return reports
