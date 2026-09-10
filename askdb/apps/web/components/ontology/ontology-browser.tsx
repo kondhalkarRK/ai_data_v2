@@ -1,144 +1,69 @@
 "use client";
 
-import type { OntologyNode as OntologyNodeContract, OntologySnapshot } from "@nql/shared-types";
+import type { OntologySnapshot } from "@nql/shared-types";
 import {
   Background,
   Controls,
-  MarkerType,
+  MiniMap,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
-  type Edge,
-  type Node,
-  type NodeProps,
+  type NodeTypes,
+  type EdgeTypes,
 } from "@xyflow/react";
-import dagre from "dagre";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Eye,
-  EyeOff,
+  Binary,
   GitBranch,
   Network,
   Orbit,
   Search,
+  Share2,
+  Sparkles,
+  Target,
+  Waypoints,
 } from "lucide-react";
 import * as React from "react";
 
+import { ClusterLayer } from "@/components/ontology/cluster-layer";
+import { GalaxyEdge, EDGE_STYLES, type GalaxyFlowEdge } from "@/components/ontology/galaxy-edge";
+import { GalaxyNode, type GalaxyFlowNode } from "@/components/ontology/galaxy-node";
+import "@/components/ontology/galaxy-styles.css";
 import { NodeDrawer } from "@/components/ontology/node-drawer";
+import { ParticleField } from "@/components/ontology/particle-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { hopNeighborhood } from "@/lib/ontology/graph-metrics";
+import {
+  edgeVisualKind,
+  layoutGalaxy,
+  type CentralityMetric,
+  type GalaxyMode,
+  type PositionedNode,
+} from "@/lib/ontology/layouts";
 import { cn } from "@/lib/utils";
 
-type LayoutMode = "force" | "centrality" | "hierarchy";
-type GraphNode = Node<OntologyNodeContract, "ontology">;
+const nodeTypes: NodeTypes = { galaxy: GalaxyNode };
+const edgeTypes: EdgeTypes = { galaxy: GalaxyEdge };
 
-const NODE_WIDTH = 132;
-const NODE_HEIGHT = 64;
+const MODES: ReadonlyArray<{
+  id: GalaxyMode;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: "network", label: "Network", icon: Network },
+  { id: "centrality", label: "Centrality", icon: Target },
+  { id: "hierarchy", label: "Hierarchy", icon: GitBranch },
+  { id: "lineage", label: "Lineage", icon: Waypoints },
+  { id: "constellation", label: "Constellation", icon: Orbit },
+];
 
-const CLUSTER_CENTRES: Record<string, { x: number; y: number }> = {
-  Domain: { x: 560, y: 50 },
-  Facts: { x: 280, y: 250 },
-  Dimensions: { x: 820, y: 250 },
-  Entities: { x: 250, y: 560 },
-  Measures: { x: 840, y: 560 },
-  Metrics: { x: 560, y: 740 },
-  Other: { x: 560, y: 400 },
-};
-
-function nodeRadius(node: OntologyNodeContract, centrality = false): number {
-  const base =
-    node.kind === "domain" ? 26 : node.kind === "entity" ? 21 : node.kind === "table" ? 19 : 16;
-  return Math.min(42, base + node.degree * (centrality ? 2.4 : 1.2));
-}
-
-function layoutClustered(snapshot: OntologySnapshot, centrality: boolean): GraphNode[] {
-  const groups = new Map<string, OntologyNodeContract[]>();
-  for (const node of snapshot.nodes) {
-    groups.set(node.cluster, [...(groups.get(node.cluster) ?? []), node]);
-  }
-
-  return snapshot.nodes.map((node) => {
-    const peers = groups.get(node.cluster) ?? [node];
-    const index = peers.findIndex((peer) => peer.id === node.id);
-    const angle = (index / peers.length) * Math.PI * 2 - Math.PI / 2;
-    const centre = CLUSTER_CENTRES[node.cluster] ?? { x: 560, y: 400 };
-    const orbit = Math.max(76, Math.min(180, 40 + peers.length * 17));
-    const radius = nodeRadius(node, centrality);
-    return {
-      id: node.id,
-      type: "ontology",
-      data: node,
-      position: {
-        x: centre.x + Math.cos(angle) * orbit - NODE_WIDTH / 2,
-        y: centre.y + Math.sin(angle) * orbit - NODE_HEIGHT / 2,
-      },
-      style: { width: NODE_WIDTH, height: NODE_HEIGHT + Math.max(0, radius - 18) },
-    };
-  });
-}
-
-function layoutHierarchy(snapshot: OntologySnapshot): GraphNode[] {
-  const graph = new dagre.graphlib.Graph();
-  graph.setDefaultEdgeLabel(() => ({}));
-  graph.setGraph({ rankdir: "TB", nodesep: 42, ranksep: 88, marginx: 36, marginy: 36 });
-  for (const node of snapshot.nodes) {
-    graph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-  }
-  for (const edge of snapshot.edges) graph.setEdge(edge.source, edge.target);
-  dagre.layout(graph);
-
-  return snapshot.nodes.map((node) => {
-    const position = graph.node(node.id) as { x: number; y: number };
-    return {
-      id: node.id,
-      type: "ontology",
-      data: node,
-      position: { x: position.x - NODE_WIDTH / 2, y: position.y - NODE_HEIGHT / 2 },
-      style: { width: NODE_WIDTH, height: NODE_HEIGHT },
-    };
-  });
-}
-
-function graphEdges(snapshot: OntologySnapshot): Edge[] {
-  return snapshot.edges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    label: edge.kind === "relationship" ? edge.label : undefined,
-    type: "straight",
-    markerEnd:
-      edge.kind === "relationship"
-        ? { type: MarkerType.ArrowClosed, width: 12, height: 12 }
-        : undefined,
-    style: {
-      stroke: "#94a3b8",
-      strokeWidth: edge.kind === "relationship" ? 1.4 : 1,
-      opacity: edge.kind === "dependency" ? 0.22 : 0.55,
-    },
-  }));
-}
-
-function OntologyGraphNode({ data, selected }: NodeProps<GraphNode>) {
-  const radius = nodeRadius(data);
-  return (
-    <div
-      className={cn(
-        "flex h-full w-full flex-col items-center justify-center rounded-full border bg-surface-raised px-2 text-center shadow-[var(--shadow-card)] transition-[opacity,transform,box-shadow]",
-        selected && "scale-105 shadow-[var(--shadow-raised)]",
-        data.dimmed && "opacity-15",
-      )}
-      style={{ borderColor: data.clusterColor, minWidth: radius * 2 }}
-    >
-      <span
-        className="mb-1 size-2 rounded-full"
-        style={{ backgroundColor: data.clusterColor }}
-        aria-hidden="true"
-      />
-      <span className="line-clamp-2 text-[10px] font-medium leading-tight">{data.label}</span>
-    </div>
-  );
-}
-
-const NODE_TYPES = { ontology: OntologyGraphNode };
+const METRICS: ReadonlyArray<{ id: CentralityMetric; label: string }> = [
+  { id: "degree", label: "Degree" },
+  { id: "betweenness", label: "Betweenness" },
+  { id: "pagerank", label: "PageRank" },
+];
 
 export function OntologyBrowser({ snapshot }: { snapshot: OntologySnapshot }) {
   return (
@@ -149,197 +74,348 @@ export function OntologyBrowser({ snapshot }: { snapshot: OntologySnapshot }) {
 }
 
 function OntologyBrowserInner({ snapshot }: { snapshot: OntologySnapshot }) {
-  const flow = useReactFlow();
-  const [layout, setLayout] = React.useState<LayoutMode>("force");
-  const [zones, setZones] = React.useState(true);
-  const [query, setQuery] = React.useState("");
-  const [activeClusters, setActiveClusters] = React.useState<Set<string>>(
-    () => new Set(snapshot.clusters.map((cluster) => cluster.id)),
+  const { fitView, setCenter, getNode } = useReactFlow();
+  const [mode, setMode] = React.useState<GalaxyMode>("constellation");
+  const [metric, setMetric] = React.useState<CentralityMetric>("pagerank");
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
+  const [pulseId, setPulseId] = React.useState<string | null>(null);
+  const [activeCluster, setActiveCluster] = React.useState<string | null>(null);
+  const [showClusters, setShowClusters] = React.useState(true);
+
+  const positioned = React.useMemo(
+    () => layoutGalaxy(snapshot, mode, metric),
+    [snapshot, mode, metric],
   );
-  const [selected, setSelected] = React.useState<OntologyNodeContract | null>(null);
 
-  const nodes = React.useMemo(() => {
-    const positioned =
-      layout === "hierarchy"
-        ? layoutHierarchy(snapshot)
-        : layoutClustered(snapshot, layout === "centrality");
-    const normalizedQuery = query.trim().toLowerCase();
-    return positioned.map((node) => {
-      const searchText = [
-        node.data.label,
-        node.data.id,
-        node.data.description,
-        ...node.data.synonyms,
-        ...node.data.tables,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const dimmed =
-        !activeClusters.has(node.data.cluster) ||
-        (normalizedQuery.length > 0 && !searchText.includes(normalizedQuery));
-      return { ...node, data: { ...node.data, dimmed } };
-    });
-  }, [activeClusters, layout, query, snapshot]);
+  const nodeById = React.useMemo(() => {
+    const map = new Map(snapshot.nodes.map((node) => [node.id, node]));
+    return map;
+  }, [snapshot.nodes]);
 
-  const edges = React.useMemo(() => {
-    const visible = new Set(
-      nodes.filter((node) => !node.data.dimmed).map((node) => node.id),
-    );
-    return graphEdges(snapshot).map((edge) => ({
-      ...edge,
-      hidden: !visible.has(edge.source) || !visible.has(edge.target),
+  const focus = React.useMemo(() => {
+    if (!selectedId) return null;
+    const links = snapshot.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
     }));
-  }, [nodes, snapshot]);
+    const one = hopNeighborhood(selectedId, links, 1);
+    const two = hopNeighborhood(selectedId, links, 2);
+    return { one, two };
+  }, [selectedId, snapshot.edges]);
+
+  const flowNodes: GalaxyFlowNode[] = React.useMemo(() => {
+    return positioned.map((node) => {
+      const size = Math.max(36, node.radius * 2) + 24;
+      let dimmed = false;
+      let focused = false;
+      let hop: 0 | 1 | 2 | null = null;
+      if (focus) {
+        if (node.id === selectedId) {
+          focused = true;
+          hop = 0;
+        } else if (focus.one.nodes.has(node.id)) {
+          hop = 1;
+        } else if (focus.two.nodes.has(node.id)) {
+          hop = 2;
+          dimmed = false;
+        } else {
+          dimmed = true;
+        }
+        if (hop === 2 && !focus.one.nodes.has(node.id)) {
+          // keep 2-hop visible but slightly quieter via opacity in CSS only when dimmed false
+        }
+      }
+      if (activeCluster && node.cluster !== activeCluster && node.id !== selectedId) {
+        dimmed = true;
+      }
+      return {
+        id: node.id,
+        type: "galaxy",
+        position: { x: node.x - size / 2, y: node.y - size / 2 },
+        data: {
+          ...node,
+          dimmed,
+          focused,
+          pulsing: pulseId === node.id,
+          hop,
+        },
+        style: { width: size, height: size + 4 },
+        zIndex: focused || pulseId === node.id ? 20 : dimmed ? 1 : 5,
+      };
+    });
+  }, [positioned, focus, selectedId, pulseId, activeCluster]);
+
+  const flowEdges: GalaxyFlowEdge[] = React.useMemo(() => {
+    return snapshot.edges.map((edge) => {
+      const visualKind = edgeVisualKind(edge, nodeById);
+      let dimmed = false;
+      let emphasized = false;
+      if (focus) {
+        emphasized = focus.two.edges.has(edge.id);
+        dimmed = !emphasized;
+        if (focus.one.edges.has(edge.id)) emphasized = true;
+      }
+      if (activeCluster) {
+        const source = nodeById.get(edge.source);
+        const target = nodeById.get(edge.target);
+        if (source?.cluster !== activeCluster && target?.cluster !== activeCluster) {
+          dimmed = true;
+          emphasized = false;
+        }
+      }
+      return {
+        id: edge.id,
+        type: "galaxy",
+        source: edge.source,
+        target: edge.target,
+        data: {
+          visualKind,
+          label: edge.label || EDGE_STYLES[visualKind].label,
+          dimmed,
+          emphasized,
+        },
+        animated: emphasized,
+        zIndex: emphasized ? 4 : 0,
+      };
+    });
+  }, [snapshot.edges, nodeById, focus, activeCluster]);
+
+  const selectedNode = selectedId ? (nodeById.get(selectedId) ?? null) : null;
+
+  const relationshipCount = focus?.one.edges.size ?? 0;
+
+  const searchHits = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return snapshot.nodes
+      .filter((node) => {
+        if (node.label.toLowerCase().includes(q) || node.id.toLowerCase().includes(q)) return true;
+        return node.columns.some(
+          (col) =>
+            col.name.toLowerCase().includes(q) || col.displayName.toLowerCase().includes(q),
+        );
+      })
+      .slice(0, 8);
+  }, [search, snapshot.nodes]);
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
-      flow.fitView({ padding: 0.2, duration: 250 });
-    }, 50);
+      void fitView({ padding: 0.22, duration: 650 });
+    }, 40);
     return () => window.clearTimeout(timer);
-  }, [flow, layout, snapshot, nodes.length]);
+  }, [mode, metric, snapshot, fitView]);
 
-  function toggleCluster(cluster: string) {
-    setActiveClusters((current) => {
-      const next = new Set(current);
-      if (next.has(cluster)) next.delete(cluster);
-      else next.add(cluster);
-      return next;
-    });
-  }
+  const focusNode = React.useCallback(
+    (nodeId: string) => {
+      setSelectedId(nodeId);
+      setPulseId(nodeId);
+      window.setTimeout(() => setPulseId(null), 2400);
+      requestAnimationFrame(() => {
+        const rfNode = getNode(nodeId);
+        if (!rfNode) return;
+        const width = Number(rfNode.style?.width ?? 80);
+        const height = Number(rfNode.style?.height ?? 80);
+        void setCenter(rfNode.position.x + width / 2, rfNode.position.y + height / 2, {
+          zoom: 1.35,
+          duration: 700,
+        });
+      });
+    },
+    [getNode, setCenter],
+  );
 
-  const visibleCount = nodes.filter((node) => !node.data.dimmed).length;
+  const positionedForClusters: PositionedNode[] = positioned;
 
   return (
-    <section className="relative flex min-h-[42rem] flex-col overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface-raised">
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2.5">
-        <div className="relative min-w-[15rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search ontology — try 'premium' or 'vehicle'"
-            aria-label="Search ontology"
-            className="pl-9"
-          />
-        </div>
-        <div className="flex rounded-[var(--radius-control)] border border-border p-0.5">
-          {(
-            [
-              ["force", "Force", Orbit],
-              ["centrality", "Centrality", Network],
-              ["hierarchy", "Hierarchy", GitBranch],
-            ] as const
-          ).map(([id, label, Icon]) => (
-            <Button
-              key={id}
-              variant={layout === id ? "primary" : "ghost"}
-              size="sm"
-              onClick={() => setLayout(id)}
-              aria-pressed={layout === id}
-            >
-              <Icon />
-              <span className="hidden sm:inline">{label}</span>
-            </Button>
-          ))}
-        </div>
-        <Button
-          variant={zones ? "secondary" : "ghost"}
-          size="sm"
-          onClick={() => setZones((value) => !value)}
-          aria-pressed={zones}
-        >
-          {zones ? <Eye /> : <EyeOff />}
-          Cluster zones
-        </Button>
-      </div>
+    <div className="semantic-galaxy relative flex h-[min(78vh,860px)] min-h-[560px] w-full flex-col">
+      <ParticleField />
 
-      <div className="flex flex-wrap gap-1.5 border-b border-border px-3 py-2">
-        {snapshot.clusters.map((cluster) => {
-          const active = activeClusters.has(cluster.id);
-          return (
-            <button
-              key={cluster.id}
-              type="button"
-              onClick={() => toggleCluster(cluster.id)}
-              aria-pressed={active}
-              className="rounded-full border px-3 py-1 text-xs font-medium transition-opacity"
-              style={{
-                color: cluster.color,
-                borderColor: `${cluster.color}66`,
-                backgroundColor: active ? `${cluster.color}12` : "transparent",
-                opacity: active ? 1 : 0.42,
-              }}
-            >
-              {cluster.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="relative h-[min(70vh,40rem)] min-h-[28rem] w-full">
-        <div className="absolute left-3 top-3 z-10 rounded-[var(--radius-control)] border border-border bg-background/90 p-3 font-mono text-2xs leading-5 shadow-[var(--shadow-card)] backdrop-blur">
-          <p><span className="mr-2 inline-block size-1.5 rounded-full bg-success" />live</p>
-          <p>nodes {visibleCount}/{snapshot.metadata.nodeCount}</p>
-          <p>edges {snapshot.metadata.edgeCount}</p>
-          <p>graph build {snapshot.metadata.buildMs}ms</p>
-          <p className="text-muted-foreground">source: semantic snapshot</p>
+      <div className="galaxy-toolbar relative z-20 flex flex-wrap items-center gap-2 px-3 py-2.5">
+        <div className="mr-1 flex items-center gap-2">
+          <Sparkles className="size-3.5 text-info" aria-hidden="true" />
+          <span className="text-xs font-semibold tracking-tight">Semantic Galaxy</span>
         </div>
 
-        {zones && layout !== "hierarchy" ? (
-          <div className="pointer-events-none absolute inset-0 z-0 opacity-40" aria-hidden="true">
-            {snapshot.clusters.map((cluster, index) => (
-              <div
-                key={cluster.id}
-                className="absolute rounded-[50%] border border-dashed"
-                style={{
-                  borderColor: cluster.color,
-                  backgroundColor: `${cluster.color}08`,
-                  width: "28%",
-                  height: "34%",
-                  left: `${12 + (index % 3) * 28}%`,
-                  top: `${12 + Math.floor(index / 3) * 42}%`,
-                }}
-              />
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Visualization mode">
+          {MODES.map((item) => {
+            const Icon = item.icon;
+            const active = mode === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={cn(
+                  "galaxy-chip inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium",
+                  active
+                    ? "border-primary/40 bg-primary/15 text-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                )}
+                data-active={active}
+                onClick={() => setMode(item.id)}
+              >
+                <Icon className="size-3" />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {mode === "centrality" ? (
+          <div className="flex gap-1">
+            {METRICS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={cn(
+                  "galaxy-chip rounded-full px-2.5 py-1 text-[11px] font-medium",
+                  metric === item.id
+                    ? "border-success/40 bg-success/15 text-foreground"
+                    : "text-muted-foreground hover:bg-muted/40",
+                )}
+                data-active={metric === item.id}
+                onClick={() => setMetric(item.id)}
+              >
+                {item.label}
+              </button>
             ))}
           </div>
         ) : null}
 
-        <div className="absolute inset-0 z-[1]">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={NODE_TYPES}
-            nodesDraggable
-            nodesConnectable={false}
-            elementsSelectable
-            minZoom={0.18}
-            maxZoom={2.5}
-            fitView
-            fitViewOptions={{ padding: 0.2 }}
-            onNodeClick={(_, node) => {
-              if (!node.data.dimmed) setSelected(node.data);
-            }}
-            onPaneClick={() => setSelected(null)}
-            onInit={(instance) => {
-              window.requestAnimationFrame(() => {
-                instance.fitView({ padding: 0.2, duration: 200 });
-              });
-            }}
-            proOptions={{ hideAttribution: true }}
-            aria-label="Semantic ontology graph"
-            className="h-full w-full bg-transparent"
+        <div className="ml-auto flex min-w-[220px] max-w-sm flex-1 items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search tables, columns…"
+              className="h-8 border-border/60 bg-surface-raised/70 pl-8 text-xs backdrop-blur"
+              aria-label="Semantic search"
+            />
+            <AnimatePresence>
+              {searchHits.length > 0 ? (
+                <motion.ul
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-xl border border-border/70 bg-surface-raised/95 shadow-[var(--shadow-overlay)] backdrop-blur-xl"
+                >
+                  {searchHits.map((hit) => (
+                    <li key={hit.id}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-muted/50"
+                        onClick={() => {
+                          setSearch("");
+                          focusNode(hit.id);
+                        }}
+                      >
+                        <span
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ background: hit.clusterColor }}
+                        />
+                        <span className="truncate font-medium">{hit.label}</span>
+                        <span className="ml-auto truncate font-mono text-[10px] text-muted-foreground">
+                          {hit.kind}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </motion.ul>
+              ) : null}
+            </AnimatePresence>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setShowClusters((value) => !value)}
           >
-            <Background color="#94a3b8" gap={24} size={0.5} />
-            <Controls showInteractive={false} position="bottom-left" />
-          </ReactFlow>
+            <Share2 className="size-3.5" />
+            {showClusters ? "Zones" : "Flat"}
+          </Button>
         </div>
-
-        <p className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
-          Click a node to inspect · scroll to zoom · drag to pan
-        </p>
-        <NodeDrawer node={selected} onClose={() => setSelected(null)} />
       </div>
-    </section>
+
+      <div className="relative z-10 min-h-0 flex-1">
+        <ReactFlow
+          nodes={flowNodes}
+          edges={flowEdges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          minZoom={0.2}
+          maxZoom={2.4}
+          proOptions={{ hideAttribution: true }}
+          onNodeClick={(_, node) => focusNode(node.id)}
+          onPaneClick={() => setSelectedId(null)}
+          nodesDraggable
+          nodesConnectable={false}
+          elementsSelectable
+          panOnScroll
+          zoomOnScroll
+          className="bg-transparent!"
+        >
+          <Background gap={28} size={1} color="color-mix(in oklab, hsl(var(--foreground)) 8%, transparent)" />
+          <Controls showInteractive={false} position="bottom-left" />
+          <MiniMap
+            pannable
+            zoomable
+            position="bottom-right"
+            maskColor="color-mix(in oklab, hsl(var(--surface-sunken)) 72%, transparent)"
+            nodeColor={(node) => (node.data as GalaxyFlowNode["data"]).clusterColor}
+            className="!overflow-hidden !rounded-xl !border !border-border/60 !bg-surface-raised/80 !shadow-lg !backdrop-blur"
+          />
+          {showClusters ? (
+            <ClusterLayer
+              clusters={snapshot.clusters}
+              nodes={positionedForClusters}
+              activeCluster={activeCluster}
+              onHover={setActiveCluster}
+            />
+          ) : null}
+          <Panel position="top-left" className="m-3">
+            <motion.div
+              layout
+              className="rounded-2xl border border-border/50 bg-surface-raised/75 px-3 py-2 text-[11px] shadow-lg backdrop-blur-xl"
+            >
+              <div className="flex items-center gap-2 font-semibold tracking-tight">
+                <Binary className="size-3.5 text-success" />
+                {snapshot.metadata.nodeCount} nodes · {snapshot.metadata.edgeCount} edges
+              </div>
+              {selectedId ? (
+                <p className="mt-1 text-muted-foreground">
+                  Focus · {relationshipCount} direct relations · 2-hop neighborhood
+                </p>
+              ) : (
+                <p className="mt-1 text-muted-foreground">Click a node to enter Focus Graph</p>
+              )}
+            </motion.div>
+          </Panel>
+          <Panel position="top-right" className="m-3">
+            <div className="flex flex-wrap gap-1.5 rounded-2xl border border-border/50 bg-surface-raised/75 p-2 shadow-lg backdrop-blur-xl">
+              {(Object.keys(EDGE_STYLES) as Array<keyof typeof EDGE_STYLES>).map((key) => (
+                <span
+                  key={key}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                >
+                  <span
+                    className="size-1.5 rounded-full"
+                    style={{ background: EDGE_STYLES[key].color, boxShadow: `0 0 8px ${EDGE_STYLES[key].color}` }}
+                  />
+                  {EDGE_STYLES[key].label}
+                </span>
+              ))}
+            </div>
+          </Panel>
+        </ReactFlow>
+
+        <NodeDrawer node={selectedNode} onClose={() => setSelectedId(null)} />
+      </div>
+    </div>
   );
 }

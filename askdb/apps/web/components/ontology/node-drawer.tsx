@@ -51,7 +51,7 @@ function DrawerContent({
   return (
     <motion.aside
       aria-label={`${node.label} details`}
-      className="absolute inset-y-0 right-0 z-20 flex w-full max-w-[31rem] flex-col border-l border-border bg-surface-raised shadow-[var(--shadow-overlay)]"
+      className="absolute inset-y-0 right-0 z-20 flex w-full max-w-[31rem] flex-col border-l border-border/60 bg-surface-raised/90 shadow-[var(--shadow-overlay)] backdrop-blur-xl"
       // Content is present on the first paint. The requirement is an immediate drawer,
       // so entrance animation must never delay visibility or accessibility.
       initial={false}

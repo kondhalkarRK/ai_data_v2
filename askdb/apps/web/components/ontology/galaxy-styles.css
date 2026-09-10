@@ -1,0 +1,223 @@
+/* Semantic Galaxy — premium ontology graph chrome */
+
+.semantic-galaxy {
+  --galaxy-ink: hsl(var(--foreground));
+  --galaxy-mute: hsl(var(--muted-foreground));
+  --galaxy-glass: color-mix(in oklab, hsl(var(--surface-raised)) 78%, transparent);
+  --galaxy-stroke: color-mix(in oklab, hsl(var(--border)) 80%, transparent);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: calc(var(--radius-card) + 2px);
+  border: 1px solid var(--galaxy-stroke);
+  background:
+    radial-gradient(1200px 600px at 15% -10%, color-mix(in oklab, hsl(var(--info)) 18%, transparent), transparent 55%),
+    radial-gradient(900px 500px at 90% 10%, color-mix(in oklab, hsl(var(--success)) 14%, transparent), transparent 50%),
+    radial-gradient(800px 700px at 50% 120%, color-mix(in oklab, hsl(var(--primary)) 12%, transparent), transparent 55%),
+    hsl(var(--surface-sunken));
+  box-shadow: var(--shadow-raised);
+}
+
+.semantic-galaxy .react-flow__background {
+  opacity: 0.35;
+}
+
+.semantic-galaxy .react-flow__controls {
+  border: 1px solid var(--galaxy-stroke);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  background: var(--galaxy-glass);
+  backdrop-filter: blur(14px);
+}
+
+.semantic-galaxy .react-flow__controls-button {
+  background: transparent;
+  border-bottom-color: var(--galaxy-stroke);
+  fill: var(--galaxy-ink);
+}
+
+.semantic-galaxy .react-flow__attribution {
+  display: none;
+}
+
+.galaxy-toolbar {
+  backdrop-filter: blur(16px);
+  background: color-mix(in oklab, hsl(var(--surface-raised)) 82%, transparent);
+  border-bottom: 1px solid var(--galaxy-stroke);
+}
+
+.galaxy-chip {
+  border: 1px solid transparent;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.galaxy-chip[data-active="true"] {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -12px color-mix(in oklab, hsl(var(--primary)) 55%, transparent);
+}
+
+.galaxy-node {
+  position: relative;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--node-color) 55%, white 20%);
+  background:
+    radial-gradient(circle at 30% 25%, color-mix(in oklab, white 35%, transparent), transparent 42%),
+    linear-gradient(
+      160deg,
+      color-mix(in oklab, var(--node-color) 38%, hsl(var(--surface-raised))),
+      color-mix(in oklab, hsl(var(--surface-raised)) 88%, transparent)
+    );
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--node-color) 18%, transparent),
+    0 10px 28px -14px color-mix(in oklab, var(--node-color) 65%, transparent),
+    inset 0 1px 0 color-mix(in oklab, white 35%, transparent);
+  backdrop-filter: blur(10px);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    filter 220ms ease;
+}
+
+.galaxy-node[data-fact="true"] {
+  border-radius: 28px;
+}
+
+.galaxy-node[data-focused="true"] {
+  transform: scale(1.08);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--node-color) 70%, transparent),
+    0 0 32px color-mix(in oklab, var(--node-color) 45%, transparent),
+    0 16px 36px -16px rgb(0 0 0 / 0.35);
+}
+
+.galaxy-node[data-dimmed="true"] {
+  opacity: 0.14;
+  filter: grayscale(0.35) blur(0.2px);
+  box-shadow: none;
+}
+
+.galaxy-node[data-pulse="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  border: 2px solid color-mix(in oklab, var(--node-color) 70%, transparent);
+  animation: galaxy-pulse 1.6s ease-out infinite;
+}
+
+.galaxy-node__label {
+  max-width: 92%;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--galaxy-ink);
+}
+
+.galaxy-edge-path {
+  fill: none;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px color-mix(in oklab, var(--edge-color) 45%, transparent));
+}
+
+.galaxy-edge-path--animated {
+  stroke-dasharray: 8 10;
+  animation: galaxy-dash 2.4s linear infinite;
+}
+
+.galaxy-edge-path--dimmed {
+  opacity: 0.08;
+  filter: none;
+  animation: none;
+}
+
+.galaxy-cluster-zone {
+  fill: color-mix(in oklab, var(--cluster-color) 8%, transparent);
+  stroke: color-mix(in oklab, var(--cluster-color) 55%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 9;
+  animation: galaxy-dash 18s linear infinite;
+  transition:
+    fill 200ms ease,
+    stroke 200ms ease,
+    opacity 200ms ease;
+}
+
+.galaxy-cluster-zone[data-active="true"] {
+  fill: color-mix(in oklab, var(--cluster-color) 16%, transparent);
+  stroke: color-mix(in oklab, var(--cluster-color) 80%, transparent);
+  stroke-width: 2.2;
+}
+
+.galaxy-cluster-label {
+  fill: color-mix(in oklab, var(--cluster-color) 92%, white);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.galaxy-particles {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.galaxy-particle {
+  position: absolute;
+  border-radius: 999px;
+  background: color-mix(in oklab, hsl(var(--info)) 55%, white);
+  opacity: 0.35;
+  animation: galaxy-float var(--duration, 12s) ease-in-out infinite;
+}
+
+@keyframes galaxy-dash {
+  to {
+    stroke-dashoffset: -120;
+  }
+}
+
+@keyframes galaxy-pulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+@keyframes galaxy-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(var(--dx, 12px), var(--dy, -18px), 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .galaxy-edge-path--animated,
+  .galaxy-cluster-zone,
+  .galaxy-node[data-pulse="true"]::after,
+  .galaxy-particle {
+    animation: none !important;
+  }
+}

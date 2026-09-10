@@ -21,9 +21,9 @@ export default function OntologyPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-lg font-semibold tracking-tight">Ontology Browser</h1>
+          <h1 className="text-lg font-semibold tracking-tight">Semantic Galaxy</h1>
           <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-            Semantic Core · Knowledge Graph
+            Ontology · Enterprise Knowledge Graph
           </p>
         </div>
       </div>
