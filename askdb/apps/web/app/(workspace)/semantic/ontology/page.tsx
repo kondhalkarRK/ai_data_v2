@@ -2,6 +2,8 @@
 
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 import { LoadingState } from "@/components/loading/loading-state";
 import { OntologyBrowser } from "@/components/ontology/ontology-browser";
@@ -10,7 +12,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useOntologySnapshot } from "@/hooks/use-semantic";
 
 export default function OntologyPage() {
+  return (
+    <Suspense fallback={<LoadingState title="Opening semantic graph" size="lg" />}>
+      <OntologyPageInner />
+    </Suspense>
+  );
+}
+
+function OntologyPageInner() {
   const snapshot = useOntologySnapshot();
+  const searchParams = useSearchParams();
+  const focus = searchParams.get("focus");
 
   return (
     <>
@@ -38,7 +50,7 @@ export default function OntologyPage() {
           </CardContent>
         </Card>
       ) : (
-        <OntologyBrowser snapshot={snapshot.data} />
+        <OntologyBrowser snapshot={snapshot.data} initialFocusId={focus} />
       )}
     </>
   );

@@ -65,7 +65,8 @@ export function IndustrySwitcher() {
         size="sm"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`Industry: ${current.label}. Change industry`}
+        aria-label={`Active domain: ${current.label}. Domain is admin-configured, not auto-detected.`}
+        title="Domain is an explicit configuration (not inferred from data)."
         onClick={() => setOpen((value) => !value)}
       >
         <CurrentIcon />

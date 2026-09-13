@@ -1,69 +1,42 @@
 "use client";
 
-import type { Industry } from "@nql/shared-types";
 import { useQuery } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { AiIntelligenceSection } from "@/components/executive/ai-intelligence";
+import { AskDashboardAi } from "@/components/executive/ask-dashboard-ai";
+import { BusinessHealthPanel } from "@/components/executive/business-health";
+import { KpiCardsGrid } from "@/components/executive/kpi-cards";
+import { PerformanceAnalytics } from "@/components/executive/performance-analytics";
+import type { ExecutiveIntelligence } from "@/components/executive/types";
+import { WhatIfPanel } from "@/components/executive/what-if-panel";
 import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useActiveIndustry } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-
-interface KpiCard {
-  id: string;
-  label: string;
-  value: number | null;
-  formatted: string;
-  format: string;
-  formula?: string;
-  delta?: number | null;
-}
-
-interface KpiSummary {
-  industry: Industry;
-  window: string;
-  windowLabel: string;
-  startDate: string | null;
-  endDate: string | null;
-  cards: KpiCard[];
-  series: Array<{ period: string; values: Record<string, number | null> }>;
-  breakdowns: Record<string, Array<{ name: string; value: number; formatted: string }>>;
-  scenarioAvailable: boolean;
-  compareEnabled?: boolean;
-}
 
 interface KpiFilters {
   windows: Array<{ id: string; label: string }>;
   lobs: string[];
   regions: string[];
   makes: string[];
-  scenarioAvailable: boolean;
-}
-
-interface ScenarioResponse {
-  available: boolean;
-  message: string;
-  actual?: number | null;
-  scenario?: number | null;
-  delta?: number | null;
-  narrative?: string | null;
 }
 
 export default function DashboardPage() {
   const industry = useActiveIndustry();
+  const router = useRouter();
   const presenterMode = useUiStore((state) => state.presenterMode);
   const [windowId, setWindowId] = useState("ytd");
   const [lob, setLob] = useState("");
   const [region, setRegion] = useState("");
   const [make, setMake] = useState("");
-  const [compare, setCompare] = useState(true);
-  const [scenarioChange, setScenarioChange] = useState(10);
-  const [scenarioResult, setScenarioResult] = useState<ScenarioResponse | null>(null);
-  const [scenarioBusy, setScenarioBusy] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(false);
 
   const filters = useQuery({
     queryKey: ["kpi-filters", industry],
@@ -71,16 +44,24 @@ export default function DashboardPage() {
   });
 
   const qs = useMemo(() => {
-    const params = new URLSearchParams({ window: windowId, compare: String(compare) });
+    const params = new URLSearchParams({ window: windowId });
     if (lob) params.set("lob", lob);
     if (region) params.set("region", region);
     if (make) params.set("make", make);
     return params.toString();
-  }, [windowId, lob, region, make, compare]);
+  }, [windowId, lob, region, make]);
 
-  const summary = useQuery({
-    queryKey: ["kpi-summary", industry, qs],
-    queryFn: () => apiClient.get<KpiSummary>(`/api/v1/kpis/summary?${qs}`, { industry }),
+  const bundle = useQuery({
+    queryKey: ["executive-intelligence", industry, qs],
+    queryFn: async () => {
+      const refresh = forceRefresh ? "&refresh=true" : "";
+      const data = await apiClient.get<ExecutiveIntelligence>(
+        `/api/v1/executive/intelligence?${qs}${refresh}`,
+        { industry },
+      );
+      setForceRefresh(false);
+      return data;
+    },
   });
 
   function applyCrossFilter(dimension: string, name: string) {
@@ -89,49 +70,39 @@ export default function DashboardPage() {
     else if (dimension === "make") setMake(name);
   }
 
-  async function runScenario() {
-    setScenarioBusy(true);
-    try {
-      const metric = industry === "insurance" ? "written_premium" : "revenue";
-      const result = await apiClient.post<ScenarioResponse>(
-        "/api/v1/kpis/scenario",
-        {
-          metric,
-          changeType: "percent",
-          changeValue: scenarioChange,
-          direction: "up",
-        },
-        { industry },
-      );
-      setScenarioResult(result);
-    } catch {
-      setScenarioResult({
-        available: false,
-        message: "Scenario request failed. Ensure forecast migration/seed is applied.",
-      });
-    } finally {
-      setScenarioBusy(false);
-    }
+  function explore(kpiId: string) {
+    router.push(`/semantic/ontology?focus=${encodeURIComponent(kpiId)}`);
   }
 
-  function exportCsv() {
-    const base = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
-    const url = `${base}/api/v1/kpis/export?${qs}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+  const data = bundle.data;
 
   return (
     <>
       <PageHeader
-        title="Executive Dashboard"
-        description="KPIs computed in SQL against the active industry warehouse."
-        className={presenterMode ? "scale-110 origin-left" : undefined}
+        title={data?.title ?? "Executive Intelligence"}
+        description={data?.tagline ?? "Domain-aware KPIs, grounded AI insights, and What-If analysis."}
+        className={presenterMode ? "origin-left scale-110" : undefined}
+        actions={
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => {
+              setForceRefresh(true);
+              void bundle.refetch();
+            }}
+          >
+            <RefreshCw className="size-3.5" />
+            Refresh
+          </Button>
+        }
       />
 
-      <Card className="mb-4">
+      <Card className="mb-4 border-border/70 shadow-sm">
         <CardContent className="flex flex-wrap items-end gap-3 pt-4">
           <FilterSelect
-            label="Window"
+            label="Period"
             value={windowId}
             options={(filters.data?.windows ?? []).map((w) => ({ value: w.id, label: w.label }))}
             onChange={setWindowId}
@@ -166,150 +137,102 @@ export default function DashboardPage() {
             ]}
             onChange={setRegion}
           />
-          <label className="flex items-center gap-2 pb-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={compare}
-              onChange={(event) => setCompare(event.target.checked)}
-            />
-            Period comparison
-          </label>
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             size="sm"
             onClick={() => {
               setLob("");
               setRegion("");
               setMake("");
               setWindowId("ytd");
-              setCompare(true);
-              setScenarioResult(null);
             }}
           >
             Reset
           </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={exportCsv}>
-            Export CSV
-          </Button>
         </CardContent>
       </Card>
 
-      {summary.isPending ? (
-        <LoadingState title="Computing KPIs" />
-      ) : summary.isError ? (
+      {bundle.isPending ? (
+        <LoadingState title="Building Executive Intelligence" />
+      ) : bundle.isError ? (
         <Card>
           <CardContent className="space-y-2 pt-5 text-sm text-danger">
-            <p>Could not load KPIs.</p>
+            <p>Could not load Executive Intelligence.</p>
             <p className="text-xs text-muted-foreground">
-              {(summary.error as Error)?.message ||
+              {(bundle.error as Error)?.message ||
                 "Migrate and seed the analytics database, then retry."}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              1) Confirm API is running (`http://localhost:8000/health`). 2) Open the app at{" "}
-              <code className="text-2xs">http://localhost:3000</code>. 3) Restart both with{" "}
-              <code className="text-2xs">.\scripts\dev.ps1</code> after env changes. 4) If needed:{" "}
-              <code className="text-2xs">python scripts\migrate.py automotive upgrade head</code> +
-              seed, then refresh.
             </p>
           </CardContent>
         </Card>
-      ) : summary.data ? (
-        <div className={cn("space-y-4", presenterMode && "text-base")}>
-          <p className="text-xs text-muted-foreground">
-            {summary.data.windowLabel}
-            {summary.data.startDate ? ` · ${summary.data.startDate}` : ""}
-            {summary.data.endDate ? ` → ${summary.data.endDate}` : ""}
-            {compare ? " · vs prior period" : ""}
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {summary.data.cards.map((card) => (
-              <Card key={card.id}>
-                <CardContent className={cn("pt-4", presenterMode && "pt-6")}>
-                  <CardDescription>{card.label}</CardDescription>
-                  <CardTitle
-                    className={cn(
-                      "mt-1 tabular-nums",
-                      presenterMode ? "text-4xl" : "text-2xl",
-                    )}
-                  >
-                    {card.formatted}
-                  </CardTitle>
-                  {card.delta != null ? (
-                    <p
-                      className={cn(
-                        "mt-1 text-xs tabular-nums",
-                        card.delta >= 0 ? "text-emerald-600" : "text-danger",
-                      )}
-                    >
-                      {card.delta >= 0 ? "+" : ""}
-                      {(card.delta * 100).toFixed(1)}% vs prior
-                    </p>
-                  ) : null}
-                  {card.formula && !presenterMode ? (
-                    <p className="mt-2 font-mono text-2xs text-muted-foreground">{card.formula}</p>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ))}
+      ) : data ? (
+        <div className={cn("space-y-6", presenterMode && "text-base")}>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <p>
+              {data.windowLabel}
+              {data.startDate ? ` · ${data.startDate}` : ""}
+              {data.endDate ? ` → ${data.endDate}` : ""}
+              {" · "}
+              {data.compareLabel}
+            </p>
+            <p>
+              Data as of {formatStamp(data.dataAsOf)} · Bundle computed{" "}
+              {formatStamp(data.computedAt)}
+            </p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <SeriesCard
-              title="Trend"
-              series={summary.data.series}
-              metric={industry === "insurance" ? "claims_incurred" : "revenue"}
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h2 className="text-sm font-semibold tracking-tight">Business Health</h2>
+              {data.dataQuality.healthyPct != null ? (
+                <p className="text-xs text-muted-foreground">
+                  Data Quality {data.dataQuality.healthyPct.toFixed(1)}% · {data.dataQuality.label}
+                </p>
+              ) : null}
+            </div>
+            <BusinessHealthPanel health={data.health} />
+            {data.dataQuality.notices.length ? (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
+                <p className="font-medium">Data Quality Notice</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-xs">
+                  {data.dataQuality.notices.map((notice) => (
+                    <li key={notice}>{notice}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <KpiCardsGrid
+              cards={data.cards}
+              compareLabel={data.compareLabel}
+              onExplore={explore}
               presenterMode={presenterMode}
             />
-            {Object.entries(summary.data.breakdowns).map(([key, items]) => (
-              <BreakdownCard
-                key={key}
-                title={key}
-                items={items}
-                onSelect={(name) => applyCrossFilter(key, name)}
-                presenterMode={presenterMode}
-              />
-            ))}
-          </div>
+          </section>
 
-          {summary.data.scenarioAvailable || filters.data?.scenarioAvailable ? (
-            <Card>
-              <CardContent className="space-y-3 pt-4">
-                <CardTitle className="text-sm">Scenario Mode</CardTitle>
-                <CardDescription>
-                  Applies a governed delta to the headline metric. Actual KPI cards stay unchanged.
-                </CardDescription>
-                <div className="flex flex-wrap items-end gap-3">
-                  <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                    Change %
-                    <input
-                      type="number"
-                      min={0}
-                      className="h-9 w-24 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                      value={scenarioChange}
-                      onChange={(event) => setScenarioChange(Number(event.target.value))}
-                    />
-                  </label>
-                  <Button type="button" size="sm" disabled={scenarioBusy} onClick={runScenario}>
-                    Run scenario
-                  </Button>
-                </div>
-                {scenarioResult ? (
-                  <p className="text-sm text-muted-foreground">
-                    {scenarioResult.narrative || scenarioResult.message}
-                  </p>
-                ) : null}
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="pt-4 text-sm text-muted-foreground">
-                Scenario Mode unlocks after forecast tables are migrated and seeded (
-                <code className="text-xs">0002_*_forecast_mvs</code>). Actual KPIs are never
-                overwritten.
-              </CardContent>
-            </Card>
-          )}
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold tracking-tight">AI Intelligence</h2>
+            <AiIntelligenceSection
+              insights={data.insights}
+              exploreBasePath={data.exploreBasePath}
+            />
+          </section>
+
+          <section>
+            <WhatIfPanel presets={data.whatIfPresets} />
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold tracking-tight">Performance Analytics</h2>
+            <PerformanceAnalytics
+              data={data}
+              presenterMode={presenterMode}
+              onFilter={applyCrossFilter}
+            />
+          </section>
+
+          <section>
+            <AskDashboardAi suggestions={data.suggestedQuestions} />
+          </section>
         </div>
       ) : null}
     </>
@@ -331,7 +254,7 @@ function FilterSelect({
     <label className="flex min-w-[160px] flex-col gap-1 text-xs text-muted-foreground">
       {label}
       <select
-        className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+        className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -345,85 +268,13 @@ function FilterSelect({
   );
 }
 
-function SeriesCard({
-  title,
-  series,
-  metric,
-  presenterMode,
-}: {
-  title: string;
-  series: KpiSummary["series"];
-  metric: string;
-  presenterMode: boolean;
-}) {
-  const max = Math.max(...series.map((point) => Number(point.values[metric] || 0)), 1);
-  return (
-    <Card>
-      <CardContent className="pt-4">
-        <CardTitle className={cn("mb-3", presenterMode ? "text-base" : "text-sm")}>{title}</CardTitle>
-        <div className={cn("flex items-end gap-1", presenterMode ? "h-56" : "h-40")}>
-          {series.slice(-18).map((point) => {
-            const value = Number(point.values[metric] || 0);
-            const height = `${Math.max((value / max) * 100, 2)}%`;
-            return (
-              <div
-                key={point.period}
-                className="flex-1 rounded-t bg-primary/70"
-                style={{ height }}
-                title={`${point.period}: ${value.toLocaleString()}`}
-              />
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function BreakdownCard({
-  title,
-  items,
-  onSelect,
-  presenterMode,
-}: {
-  title: string;
-  items: Array<{ name: string; value: number; formatted: string }>;
-  onSelect: (name: string) => void;
-  presenterMode: boolean;
-}) {
-  const max = Math.max(...items.map((item) => item.value), 1);
-  return (
-    <Card>
-      <CardContent className="pt-4">
-        <CardTitle className={cn("mb-3 capitalize", presenterMode ? "text-base" : "text-sm")}>
-          {title}
-          <span className="ml-2 font-normal text-muted-foreground">(click to filter)</span>
-        </CardTitle>
-        <ul className="space-y-2">
-          {items.slice(0, 8).map((item) => (
-            <li key={item.name}>
-              <button
-                type="button"
-                className="w-full text-left"
-                onClick={() => onSelect(item.name)}
-              >
-                <div className="mb-1 flex justify-between gap-2 text-xs">
-                  <span className="truncate text-foreground underline-offset-2 hover:underline">
-                    {item.name}
-                  </span>
-                  <span className="tabular-nums text-muted-foreground">{item.formatted}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted">
-                  <div
-                    className="h-1.5 rounded-full bg-primary/70"
-                    style={{ width: `${(item.value / max) * 100}%` }}
-                  />
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
+function formatStamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }

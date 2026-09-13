@@ -12,7 +12,7 @@ describe("sidebar visibility", () => {
     expect(labels).not.toContain("AI Chat");
     expect(labels).not.toContain("Cost Analytics");
     expect(labels).not.toContain("System Logs");
-    expect(labels).toContain("Executive Dashboard");
+    expect(labels).toContain("Executive Intelligence");
   });
 
   it("gives an analyst chat and cost, but not system logs", () => {

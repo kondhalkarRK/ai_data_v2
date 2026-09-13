@@ -30,6 +30,16 @@ from app.services.chat.intents import (
     parse_whatif,
     suggested_followups,
 )
+from app.services.chat.response_meta import (
+    QueryTimings,
+    build_insights,
+    detect_anomalies,
+    extract_query_meta,
+    resolve_grounded_on,
+    semantic_followups,
+    source_database_label,
+    sql_diff_lines,
+)
 from app.services.chat.templates import list_templates, resolve_template
 from app.services.chat.trust import compute_trust_score
 from app.services.knowledge import KnowledgeService
@@ -77,6 +87,7 @@ class ChatService:
         web_retrieval: bool = False,
     ) -> AsyncIterator[str]:
         started = time.perf_counter()
+        timings = QueryTimings()
         question = (question or "").strip()
         if not question:
             raise ValidationError("Question is required.")
@@ -104,16 +115,45 @@ class ChatService:
             return False
 
         async def finish_without_sql(
-            *, path: str, narrative: str, event: str | None = None, payload: dict[str, Any] | None = None
+            *,
+            path: str,
+            narrative: str,
+            event: str | None = None,
+            payload: dict[str, Any] | None = None,
+            ambiguity: bool = False,
+            alternates: list[str] | None = None,
         ) -> AsyncIterator[str]:
             if event:
                 yield _sse(event, payload or {})
+            insights = build_insights(narrative=narrative, columns=[], rows=[], path=path)
+            yield _sse(
+                "meta",
+                {
+                    "groundedOn": resolve_grounded_on(
+                        path=path,
+                        glossary_matches=0,
+                        has_sql=False,
+                        dq_checked=False,
+                    ),
+                    "ambiguityFlag": ambiguity,
+                    "validationStatus": "skipped",
+                    "rowCount": 0,
+                    "executionTimeMs": 0,
+                    "sourceDatabase": source_database_label(self._industry),
+                    "dataAsOf": None,
+                    "timings": timings.to_dict(),
+                    "queryMeta": extract_query_meta(None).to_dict(),
+                    "insights": insights,
+                    "anomalies": [],
+                    "alternateInterpretations": alternates or [],
+                },
+            )
             for token in narrative.split():
                 yield _sse("token", {"token": token + " "})
             history.status = "completed"
             history.row_count = 0
             history.trust_score = 0
-            history.trust_breakdown = {"path": path}
+            history.trust_breakdown = {"path": path, "ambiguityFlag": ambiguity}
             history.latency_ms = int((time.perf_counter() - started) * 1000)
             await self._app.flush()
             yield _sse(
@@ -127,6 +167,7 @@ class ChatService:
                     "conversationId": str(conversation.id),
                     "latencyMs": history.latency_ms,
                     "trustScore": 0,
+                    "ambiguityFlag": ambiguity,
                 },
             )
 
@@ -150,6 +191,8 @@ class ChatService:
                 narrative=clarification,
                 event="clarification",
                 payload={"question": clarification, "options": options},
+                ambiguity=True,
+                alternates=options,
             ):
                 yield frame
             return
@@ -174,17 +217,22 @@ class ChatService:
                 yield _sse("stage", {"stage": "followup"})
                 followup_note = "Using the previous query as conversational context. "
 
+        semantic_t0 = time.perf_counter()
         if is_surprise_me(question):
             templates = list_templates(self._industry)
             hit = secrets.choice(templates) if templates else None
             yield _sse("stage", {"stage": "surprise"})
         else:
             hit = resolve_template(self._industry, question)
+        timings.semantic_lookup_ms = int((time.perf_counter() - semantic_t0) * 1000)
+
         sql_text: str | None = None
         path = "fallback"
         glossary_matches = 0
         narrative = followup_note
         scenario = parse_whatif(question) if is_whatif(question) else None
+        ambiguity_flag = False
+        alternate_interpretations: list[str] = []
 
         if hit is not None:
             sql_text = hit.sql
@@ -192,18 +240,27 @@ class ChatService:
             glossary_matches = hit.glossary_matches
             narrative += f"Answered with governed template: {hit.title}."
             yield _sse("stage", {"stage": "template", "title": hit.title})
+            # Templates are governed mappings — not ambiguous guesses.
         else:
             yield _sse("stage", {"stage": "llm"})
+            llm_t0 = time.perf_counter()
             llm = await complete_chat(
                 settings=self._settings,
                 industry=self._industry,
                 question=question,
             )
+            timings.llm_generation_ms = int((time.perf_counter() - llm_t0) * 1000)
             if llm.sql:
                 sql_text = llm.sql
                 path = "semantic_llm"
                 glossary_matches = 1
                 narrative += llm.narrative or "Generated with the configured language model."
+                # LLM path without a governed template is inherently less certain.
+                ambiguity_flag = True
+                alternate_interpretations = [
+                    "Rephrase with an explicit metric name from the glossary",
+                    "Ask for a monthly trend of a known KPI",
+                ]
                 await self._record_usage(llm.model, llm.prompt_tokens, llm.completion_tokens)
             else:
                 narrative += llm.narrative or (
@@ -227,26 +284,76 @@ class ChatService:
             yield _sse("cancelled", {"historyId": str(history_id)})
             return
 
+        rows: list[dict[str, Any]] = []
+        columns: list[str] = []
+        validation_status = "skipped"
+        data_as_of: str | None = None
+        dq_failed = False
+        execution_error: str | None = None
+
         if sql_text:
+            val_t0 = time.perf_counter()
             ok, reason = sql_is_safe(sql_text)
             if not ok:
+                timings.sql_validation_ms = int((time.perf_counter() - val_t0) * 1000)
                 raise GuardrailViolationError(reason)
-            yield _sse("sql", {"sql": sql_text, "path": path})
 
-            result = await self._analytics.execute(text(sql_text))
-            mappings = result.mappings().all()
-            capped = mappings[: self._settings.sql_max_result_rows]
-            columns = list(capped[0].keys()) if capped else list(result.keys())
-            rows = [{key: _jsonable(value) for key, value in row.items()} for row in capped]
-            yield _sse("columns", {"columns": columns})
+            validation_status = "passed"
+            # Dry-run via EXPLAIN; one soft repair attempt (strip trailing noise).
+            try:
+                await self._analytics.execute(text(f"EXPLAIN {sql_text}"))
+            except Exception as exc:
+                repair_t0 = time.perf_counter()
+                repaired = sql_text.strip().rstrip(";")
+                try:
+                    await self._analytics.execute(text(f"EXPLAIN {repaired}"))
+                    sql_text = repaired
+                    validation_status = "auto_repaired"
+                    timings.sql_auto_repair_ms = int((time.perf_counter() - repair_t0) * 1000)
+                except Exception:
+                    timings.sql_auto_repair_ms = int((time.perf_counter() - repair_t0) * 1000)
+                    validation_status = "failed"
+                    execution_error = str(exc)[:240]
+            timings.sql_validation_ms = int((time.perf_counter() - val_t0) * 1000)
+
             yield _sse(
-                "rows",
+                "sql",
                 {
-                    "rows": rows,
-                    "rowCount": len(rows),
-                    "truncated": len(mappings) > len(rows),
+                    "sql": sql_text,
+                    "path": path,
+                    "priorSql": prior_sql,
+                    "diff": sql_diff_lines(prior_sql, sql_text),
+                    "validationStatus": validation_status,
                 },
             )
+
+            if validation_status != "failed":
+                exec_t0 = time.perf_counter()
+                try:
+                    result = await self._analytics.execute(text(sql_text))
+                    mappings = result.mappings().all()
+                    capped = mappings[: self._settings.sql_max_result_rows]
+                    columns = list(capped[0].keys()) if capped else list(result.keys())
+                    rows = [{key: _jsonable(value) for key, value in row.items()} for row in capped]
+                    timings.execution_ms = int((time.perf_counter() - exec_t0) * 1000)
+                    data_as_of = await self._probe_data_as_of(sql_text)
+                except Exception as exc:
+                    timings.execution_ms = int((time.perf_counter() - exec_t0) * 1000)
+                    validation_status = "failed"
+                    execution_error = str(exc)[:240]
+                    rows = []
+                    columns = []
+
+            if rows or columns:
+                yield _sse("columns", {"columns": columns})
+                yield _sse(
+                    "rows",
+                    {
+                        "rows": rows,
+                        "rowCount": len(rows),
+                        "truncated": False,
+                    },
+                )
             if rows and len(columns) >= 2:
                 yield _sse(
                     "chart",
@@ -254,17 +361,18 @@ class ChatService:
                         "type": "bar",
                         "x": columns[0],
                         "y": columns[1],
-                        "points": rows[:20],
+                        "points": rows[:40],
+                        "anomalies": detect_anomalies(columns, rows),
                     },
                 )
+
             score, breakdown = compute_trust_score(
                 glossary_matches=glossary_matches,
                 glossary_hints_are_sql=True,
-                resolution_path=path,
+                resolution_path=path if validation_status != "failed" else "error",
                 row_count=len(rows),
             )
         else:
-            rows = []
             score, breakdown = compute_trust_score(
                 glossary_matches=0,
                 glossary_hints_are_sql=False,
@@ -312,19 +420,71 @@ class ChatService:
             # Retrieval is supplementary and must not fail an analytics response.
             logger.debug("Supplementary knowledge retrieval failed", exc_info=True)
 
+        query_meta = extract_query_meta(sql_text)
+        insights = build_insights(
+            narrative=narrative,
+            columns=columns,
+            rows=rows,
+            path=path,
+        )
+        render_t0 = time.perf_counter()
+        grounded = resolve_grounded_on(
+            path=path,
+            glossary_matches=glossary_matches,
+            has_sql=bool(sql_text),
+            dq_checked=False,
+        )
+        timings.render_ms = int((time.perf_counter() - render_t0) * 1000)
+
+        yield _sse(
+            "meta",
+            {
+                "groundedOn": grounded,
+                "ambiguityFlag": ambiguity_flag,
+                "validationStatus": validation_status,
+                "rowCount": len(rows),
+                "executionTimeMs": timings.execution_ms,
+                "sourceDatabase": source_database_label(self._industry),
+                "dataAsOf": data_as_of,
+                "timings": timings.to_dict(),
+                "queryMeta": query_meta.to_dict(),
+                "insights": insights,
+                "anomalies": detect_anomalies(columns, rows) if rows else [],
+                "alternateInterpretations": alternate_interpretations,
+                "dqFailed": dq_failed,
+                "executionError": execution_error,
+                "autoRepaired": validation_status == "auto_repaired",
+            },
+        )
+
         for token in narrative.split(" "):
             yield _sse("token", {"token": token + " "})
 
+        # Keep emitting trust for backwards compatibility; UI no longer shows the number.
         yield _sse("trust", {"score": score, "breakdown": breakdown})
         latency_ms = int((time.perf_counter() - started) * 1000)
         history.sql_text = sql_text
         history.row_count = len(rows)
         history.trust_score = score
-        history.trust_breakdown = {**breakdown, "path": path}
+        history.trust_breakdown = {
+            **breakdown,
+            "path": path,
+            "groundedOn": grounded,
+            "ambiguityFlag": ambiguity_flag,
+            "validationStatus": validation_status,
+        }
         history.latency_ms = latency_ms
-        history.status = "completed"
+        history.status = "completed" if not execution_error else "failed"
         await self._app.flush()
-        yield _sse("followups", {"items": suggested_followups(self._industry, path)})
+
+        followups = semantic_followups(
+            self._industry,
+            dimensions=query_meta.dimensions_used,
+            metrics=query_meta.metrics_used,
+            tables=query_meta.tables_used,
+            path=path,
+        )
+        yield _sse("followups", {"items": followups})
         yield _sse(
             "done",
             {
@@ -332,8 +492,38 @@ class ChatService:
                 "conversationId": str(conversation.id),
                 "latencyMs": latency_ms,
                 "trustScore": score,
+                "ambiguityFlag": ambiguity_flag,
+                "validationStatus": validation_status,
+                "rowCount": len(rows),
+                "timings": timings.to_dict(),
             },
         )
+
+    async def _probe_data_as_of(self, sql: str) -> str | None:
+        """Best-effort freshness from fact tables referenced in SQL — not query run time."""
+        meta = extract_query_meta(sql)
+        date_cols = {
+            "insurance.fact_claims": "reported_date",
+            "fact_claims": "reported_date",
+            "insurance.fact_policy_monthly": "accounting_month",
+            "fact_policy_monthly": "accounting_month",
+            "automotive.fact_sales": "sales_date",
+            "fact_sales": "sales_date",
+        }
+        for table in meta.tables_used:
+            col = date_cols.get(table.lower()) or date_cols.get(table.split(".")[-1].lower())
+            if not col:
+                continue
+            try:
+                result = await self._analytics.execute(
+                    text(f"SELECT MAX({col}) AS as_of FROM {table}")
+                )
+                value = result.scalar_one_or_none()
+                if value is not None:
+                    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+            except Exception:
+                continue
+        return None
 
     async def cancel(self, history_id: uuid.UUID) -> bool:
         result = await self._app.execute(

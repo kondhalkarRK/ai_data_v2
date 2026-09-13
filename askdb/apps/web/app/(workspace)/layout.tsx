@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { AppBootLoading } from "@/components/loading/loading-state";
+import { CommandPalette } from "@/components/shell/command-palette";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 import { useSession } from "@/hooks/use-session";
@@ -82,6 +83,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+      <CommandPalette />
     </div>
   );
 }

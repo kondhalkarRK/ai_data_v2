@@ -91,5 +91,25 @@ class LlmUsage(Base):
     )
 
 
+class InsightFeedback(Base):
+    """Thumbs feedback on Executive Intelligence AI insight cards."""
+
+    __tablename__ = "insight_feedback"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    industry: Mapped[str] = mapped_column(String(20), nullable=False)
+    insight_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    vote: Mapped[str] = mapped_column(String(8), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    grounded_on: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
+    body_preview: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 # Keep Industry import referenced for type checkers reading this module.
 _ = Industry

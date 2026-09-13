@@ -95,21 +95,21 @@ class KpiService:
             return False
 
     async def filter_options(self) -> KpiFilterOptions:
-        scenario = await self._forecast_available()
+        # What-If uses live actuals; forecast tables are not required for Executive Intelligence.
         if self._industry is Industry.INSURANCE:
             opts = await ins_kpi.fetch_insurance_filter_options(self._connection)
             return KpiFilterOptions(
                 windows=WINDOWS,
                 lobs=opts["lobs"],
                 regions=opts["regions"],
-                scenario_available=scenario,
+                scenario_available=True,
             )
         opts = await auto_kpi.fetch_automotive_filter_options(self._connection)
         return KpiFilterOptions(
             windows=WINDOWS,
             makes=opts["makes"],
             regions=opts["regions"],
-            scenario_available=scenario,
+            scenario_available=True,
         )
 
     async def summary(
@@ -232,7 +232,7 @@ class KpiService:
             cards=cards,
             series=series,
             breakdowns=breakdowns,
-            scenario_available=await self._forecast_available(),
+            scenario_available=True,
             compare_enabled=compare,
         )
 
@@ -298,25 +298,21 @@ class KpiService:
         return buffer.getvalue()
 
     async def scenario(self, request: ScenarioRequest) -> ScenarioResponse:
+        """What-If on actual KPI values — no forecast dependency and no invented math."""
         if request.change_value < 0:
             raise ValidationError("changeValue must be non-negative.")
-        if not await self._forecast_available():
-            return ScenarioResponse(
-                available=False,
-                message=(
-                    "Scenario Mode stays hidden until forecast data is loaded. "
-                    "Run analytics migrations (0002) and re-seed, then retry."
-                ),
-            )
 
         summary = await self.summary(window="ytd", compare=False)
         card = next((c for c in summary.cards if c.id == request.metric), None)
-        if card is None or card.value is None:
-            # Default metric aliases
+        if card is None or card.value is None or card.format == "text":
             fallback_id = "revenue" if self._industry is Industry.AUTOMOTIVE else "written_premium"
-            card = next((c for c in summary.cards if c.id == fallback_id), None)
-        if card is None or card.value is None:
-            raise ValidationError(f"Unknown or empty metric '{request.metric}'.")
+            if request.metric != fallback_id:
+                card = next((c for c in summary.cards if c.id == fallback_id), None)
+        if card is None or card.value is None or card.format == "text":
+            return ScenarioResponse(
+                available=False,
+                message="This scenario can't be calculated from currently available metrics.",
+            )
 
         actual = float(card.value)
         if request.change_type == "percent":
@@ -333,14 +329,15 @@ class KpiService:
         if card.format == "percent":
             fmt = format_percent
         narrative = (
-            f"Actual {card.label}: {card.formatted}. "
+            f"Current {card.label}: {card.formatted}. "
             f"Scenario ({request.direction} {request.change_value}"
-            f"{'%' if request.change_type == 'percent' else ''}): {fmt(scenario_value)}. "
-            "Forecast-backed Scenario Mode applies a governed delta; actual KPIs are unchanged."
+            f"{'%' if request.change_type == 'percent' else ''}): {fmt(scenario_value)} "
+            f"(impact {fmt(delta)}). "
+            "Simulated only — source KPIs are unchanged."
         )
         return ScenarioResponse(
             available=True,
-            message="Scenario computed from actuals against loaded forecast baseline.",
+            message="Scenario computed from live actuals.",
             actual=actual,
             scenario=scenario_value,
             delta=delta,

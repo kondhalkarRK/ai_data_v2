@@ -44,10 +44,10 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         href: "/dashboard",
-        label: "Executive Dashboard",
+        label: "Executive Intelligence",
         icon: BarChart3,
         minRole: "viewer",
-        description: "Industry KPIs, trends and scenario analysis.",
+        description: "Domain-aware KPIs, grounded AI insights, and What-If analysis.",
       },
       {
         href: "/data-quality",
@@ -124,7 +124,7 @@ export const NAV_SECTIONS: NavSection[] = [
 /** The three main tabs above the workspace (spec section 9). */
 export const MAIN_TABS = [
   { href: "/data-preview", label: "Data Preview", icon: Boxes },
-  { href: "/dashboard", label: "Executive Dashboard", icon: BarChart3 },
+  { href: "/dashboard", label: "Executive Intelligence", icon: BarChart3 },
   { href: "/chat", label: "AI Chat", icon: MessageSquare },
 ] as const;
 

@@ -65,15 +65,27 @@ const METRICS: ReadonlyArray<{ id: CentralityMetric; label: string }> = [
   { id: "pagerank", label: "PageRank" },
 ];
 
-export function OntologyBrowser({ snapshot }: { snapshot: OntologySnapshot }) {
+export function OntologyBrowser({
+  snapshot,
+  initialFocusId,
+}: {
+  snapshot: OntologySnapshot;
+  initialFocusId?: string | null;
+}) {
   return (
     <ReactFlowProvider>
-      <OntologyBrowserInner snapshot={snapshot} />
+      <OntologyBrowserInner snapshot={snapshot} initialFocusId={initialFocusId} />
     </ReactFlowProvider>
   );
 }
 
-function OntologyBrowserInner({ snapshot }: { snapshot: OntologySnapshot }) {
+function OntologyBrowserInner({
+  snapshot,
+  initialFocusId,
+}: {
+  snapshot: OntologySnapshot;
+  initialFocusId?: string | null;
+}) {
   const { fitView, setCenter, getNode } = useReactFlow();
   const [mode, setMode] = React.useState<GalaxyMode>("constellation");
   const [metric, setMetric] = React.useState<CentralityMetric>("pagerank");
@@ -225,6 +237,20 @@ function OntologyBrowserInner({ snapshot }: { snapshot: OntologySnapshot }) {
     },
     [getNode, setCenter],
   );
+
+  React.useEffect(() => {
+    if (!initialFocusId) return;
+    const match =
+      snapshot.nodes.find((node) => node.id === initialFocusId) ??
+      snapshot.nodes.find(
+        (node) =>
+          node.id.toLowerCase().includes(initialFocusId.toLowerCase()) ||
+          node.label.toLowerCase().includes(initialFocusId.toLowerCase()),
+      );
+    if (!match) return;
+    const timer = window.setTimeout(() => focusNode(match.id), 500);
+    return () => window.clearTimeout(timer);
+  }, [initialFocusId, snapshot.nodes, focusNode]);
 
   const positionedForClusters: PositionedNode[] = positioned;
 
