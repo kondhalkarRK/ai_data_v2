@@ -5,14 +5,8 @@ import { useSearchParams } from "next/navigation";
 
 import { type ActionKey } from "@/components/chat/action-toolbar";
 import { ResponseCard } from "@/components/chat/response-card";
-import type {
-  ChatMessage,
-  FailurePayload,
-  ProgressState,
-  ResponseMeta,
-  ChartPayload,
-  SqlDiffLine,
-} from "@/components/chat/types";
+import { applyChatSseEvent, consumeSseBuffer } from "@/components/chat/sse";
+import type { ChatMessage } from "@/components/chat/types";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
@@ -86,123 +80,46 @@ export function ChatWorkspace() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let currentEvent = "message";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-        for (const part of parts) {
-          const lines = part.split("\n");
-          let dataLine = "";
-          for (const line of lines) {
-            if (line.startsWith("event:")) currentEvent = line.slice(6).trim();
-            if (line.startsWith("data:")) dataLine += line.slice(5).trim();
-          }
-          if (!dataLine) continue;
-          const data = JSON.parse(dataLine) as Record<string, unknown>;
-          if (currentEvent === "stage" && data.historyId) {
+        const { frames, rest } = consumeSseBuffer(buffer);
+        buffer = rest;
+        for (const frame of frames) {
+          // Capture per-frame — do not close over a mutable event name (React batches updaters).
+          const eventName = frame.event;
+          const data = frame.data;
+          if (eventName === "stage" && data.historyId) {
             historyIdRef.current = String(data.historyId);
           }
-          if (currentEvent === "done" && data.conversationId) {
+          if (eventName === "done" && data.conversationId) {
             setConversationId(String(data.conversationId));
           }
           setMessages((prev) =>
-            prev.map((message) => {
-              if (message.id !== assistantId) return message;
-              if (currentEvent === "progress") {
-                return {
-                  ...message,
-                  progress: data as unknown as ProgressState,
-                };
-              }
-              if (currentEvent === "stage" && data.historyId) {
-                return { ...message, historyId: String(data.historyId), path: String(data.stage ?? "") };
-              }
-              if (currentEvent === "sql") {
-                return {
-                  ...message,
-                  sql: String(data.sql ?? ""),
-                  path: String(data.path ?? ""),
-                  priorSql: data.priorSql ? String(data.priorSql) : undefined,
-                  sqlDiff: (data.diff as SqlDiffLine[] | null | undefined) ?? null,
-                };
-              }
-              if (currentEvent === "columns") {
-                return { ...message, columns: (data.columns as string[]) ?? [] };
-              }
-              if (currentEvent === "rows") {
-                return { ...message, rows: (data.rows as Array<Record<string, unknown>>) ?? [] };
-              }
-              if (currentEvent === "chart") {
-                return { ...message, chart: data as unknown as ChartPayload };
-              }
-              if (currentEvent === "meta") {
-                return { ...message, meta: data as unknown as ResponseMeta, progress: null };
-              }
-              if (currentEvent === "token") {
-                return {
-                  ...message,
-                  narrative: `${message.narrative ?? ""}${String(data.token ?? "")}`,
-                };
-              }
-              if (currentEvent === "clarification") {
-                return {
-                  ...message,
-                  clarification: String(data.question ?? data.message ?? ""),
-                  options: (data.options as string[]) ?? [],
-                  progress: null,
-                };
-              }
-              if (currentEvent === "followups") {
-                return {
-                  ...message,
-                  followups: (data.items as string[]) ?? (data.followups as string[]) ?? [],
-                };
-              }
-              if (currentEvent === "citation") {
-                const citation = {
-                  title: String(data.title ?? ""),
-                  snippet: String(data.snippet ?? ""),
-                  locator: String(data.locator ?? ""),
-                  untrusted: Boolean(data.untrusted),
-                };
-                return {
-                  ...message,
-                  citations: [...(message.citations ?? []), citation],
-                };
-              }
-              if (currentEvent === "cancelled") {
-                return { ...message, cancelled: true, narrative: "Cancelled.", progress: null };
-              }
-              if (currentEvent === "error") {
-                const failure: FailurePayload = {
-                  category: data.category ? String(data.category) : undefined,
-                  title: data.title ? String(data.title) : undefined,
-                  reason: data.reason ? String(data.reason) : undefined,
-                  retryable: data.retryable !== false,
-                  message: data.message ? String(data.message) : undefined,
-                  sql: data.sql ? String(data.sql) : undefined,
-                };
-                return {
-                  ...message,
-                  error: String(data.message ?? data.reason ?? "Chat failed"),
-                  failure,
-                  progress: null,
-                  sql: failure.sql || message.sql,
-                };
-              }
-              if (currentEvent === "done") {
-                return {
-                  ...message,
-                  latencyMs: Number(data.latencyMs ?? message.latencyMs ?? 0),
-                  historyId: String(data.historyId ?? message.historyId ?? ""),
-                  progress: null,
-                };
-              }
-              return message;
-            }),
+            prev.map((message) =>
+              message.id === assistantId
+                ? applyChatSseEvent(message, eventName, data)
+                : message,
+            ),
+          );
+        }
+      }
+      // Flush any trailing frame without a final blank line.
+      if (buffer.trim()) {
+        const { frames } = consumeSseBuffer(`${buffer}\n\n`);
+        for (const frame of frames) {
+          const eventName = frame.event;
+          const data = frame.data;
+          if (eventName === "done" && data.conversationId) {
+            setConversationId(String(data.conversationId));
+          }
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId
+                ? applyChatSseEvent(message, eventName, data)
+                : message,
+            ),
           );
         }
       }

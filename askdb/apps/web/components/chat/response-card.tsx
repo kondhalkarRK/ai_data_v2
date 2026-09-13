@@ -170,8 +170,8 @@ export function ResponseCard({
 
         {meta ? (
           <InsightSummary
-            executive={meta.insights.executive || message.narrative || ""}
-            analyst={meta.insights.analyst || message.narrative || ""}
+            executive={meta.insights?.executive || message.narrative || ""}
+            analyst={meta.insights?.analyst || message.narrative || ""}
             depth={depth}
             onDepthChange={setDepth}
           />
@@ -181,8 +181,8 @@ export function ResponseCard({
 
         {meta ? (
           <TrustIndicators
-            groundedOn={meta.groundedOn}
-            ambiguityFlag={meta.ambiguityFlag}
+            groundedOn={meta.groundedOn ?? []}
+            ambiguityFlag={Boolean(meta.ambiguityFlag)}
             alternates={meta.alternateInterpretations}
             onClarify={onAsk}
           />

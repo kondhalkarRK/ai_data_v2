@@ -3,7 +3,8 @@
 import * as React from "react";
 
 import { ResponseCard } from "@/components/chat/response-card";
-import type { ChatMessage, ChartPayload, ResponseMeta, SqlDiffLine } from "@/components/chat/types";
+import { applyChatSseEvent, consumeSseBuffer } from "@/components/chat/sse";
+import type { ChatMessage } from "@/components/chat/types";
 import { Button } from "@/components/ui/button";
 import { useActiveIndustry } from "@/hooks/use-session";
 
@@ -52,67 +53,38 @@ export function AskDashboardAi({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let currentEvent = "message";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-        for (const part of parts) {
-          const lines = part.split("\n");
-          let dataLine = "";
-          for (const line of lines) {
-            if (line.startsWith("event:")) currentEvent = line.slice(6).trim();
-            if (line.startsWith("data:")) dataLine += line.slice(5).trim();
-          }
-          if (!dataLine) continue;
-          const data = JSON.parse(dataLine) as Record<string, unknown>;
-          if (currentEvent === "done" && data.conversationId) {
+        const { frames, rest } = consumeSseBuffer(buffer);
+        buffer = rest;
+        for (const frame of frames) {
+          const eventName = frame.event;
+          const data = frame.data;
+          if (eventName === "done" && data.conversationId) {
             setConversationId(String(data.conversationId));
           }
-          setMessage((prev) => {
-            if (!prev || prev.id !== assistantId) return prev;
-            if (currentEvent === "sql") {
-              return {
-                ...prev,
-                sql: String(data.sql ?? ""),
-                sqlDiff: (data.diff as SqlDiffLine[] | null | undefined) ?? null,
-              };
-            }
-            if (currentEvent === "columns") {
-              return { ...prev, columns: (data.columns as string[]) ?? [] };
-            }
-            if (currentEvent === "rows") {
-              return { ...prev, rows: (data.rows as Array<Record<string, unknown>>) ?? [] };
-            }
-            if (currentEvent === "chart") {
-              return { ...prev, chart: data as unknown as ChartPayload };
-            }
-            if (currentEvent === "meta") {
-              return { ...prev, meta: data as unknown as ResponseMeta };
-            }
-            if (currentEvent === "token") {
-              return { ...prev, narrative: `${prev.narrative ?? ""}${String(data.token ?? "")}` };
-            }
-            if (currentEvent === "followups") {
-              return { ...prev, followups: (data.items as string[]) ?? [] };
-            }
-            if (currentEvent === "clarification") {
-              return {
-                ...prev,
-                clarification: String(data.question ?? ""),
-                options: (data.options as string[]) ?? [],
-              };
-            }
-            if (currentEvent === "error") {
-              return { ...prev, error: String(data.message ?? "Chat failed") };
-            }
-            if (currentEvent === "done") {
-              return { ...prev, latencyMs: Number(data.latencyMs ?? 0) };
-            }
-            return prev;
-          });
+          setMessage((prev) =>
+            !prev || prev.id !== assistantId
+              ? prev
+              : applyChatSseEvent(prev, eventName, data),
+          );
+        }
+      }
+      if (buffer.trim()) {
+        const { frames } = consumeSseBuffer(`${buffer}\n\n`);
+        for (const frame of frames) {
+          const eventName = frame.event;
+          const data = frame.data;
+          if (eventName === "done" && data.conversationId) {
+            setConversationId(String(data.conversationId));
+          }
+          setMessage((prev) =>
+            !prev || prev.id !== assistantId
+              ? prev
+              : applyChatSseEvent(prev, eventName, data),
+          );
         }
       }
     } catch (error) {

@@ -64,7 +64,7 @@ export function TrustIndicators({
     );
   }
 
-  const active = new Set(groundedOn);
+  const active = new Set(groundedOn ?? []);
   const snapshot = trust.data;
 
   return (
