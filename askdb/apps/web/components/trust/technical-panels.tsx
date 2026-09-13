@@ -267,8 +267,11 @@ export function RuleManagement({
 
 function Empty({ label }: { label: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
-      {label}
+    <div className="rounded-[var(--radius-card)] border border-dashed border-border/80 bg-surface/60 px-4 py-8 text-center">
+      <p className="text-sm font-medium text-foreground">{label}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Your datasets have remained stable — nothing needs attention here right now.
+      </p>
     </div>
   );
 }

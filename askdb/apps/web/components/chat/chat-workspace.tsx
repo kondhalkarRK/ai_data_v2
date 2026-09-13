@@ -5,10 +5,18 @@ import { useSearchParams } from "next/navigation";
 
 import { type ActionKey } from "@/components/chat/action-toolbar";
 import { ResponseCard } from "@/components/chat/response-card";
-import type { ChatMessage, ResponseMeta, ChartPayload, SqlDiffLine } from "@/components/chat/types";
+import type {
+  ChatMessage,
+  FailurePayload,
+  ProgressState,
+  ResponseMeta,
+  ChartPayload,
+  SqlDiffLine,
+} from "@/components/chat/types";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
+import { PageShell } from "@/components/ui/page-shell";
 import { useActiveIndustry } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
 
@@ -103,6 +111,12 @@ export function ChatWorkspace() {
           setMessages((prev) =>
             prev.map((message) => {
               if (message.id !== assistantId) return message;
+              if (currentEvent === "progress") {
+                return {
+                  ...message,
+                  progress: data as unknown as ProgressState,
+                };
+              }
               if (currentEvent === "stage" && data.historyId) {
                 return { ...message, historyId: String(data.historyId), path: String(data.stage ?? "") };
               }
@@ -125,7 +139,7 @@ export function ChatWorkspace() {
                 return { ...message, chart: data as unknown as ChartPayload };
               }
               if (currentEvent === "meta") {
-                return { ...message, meta: data as unknown as ResponseMeta };
+                return { ...message, meta: data as unknown as ResponseMeta, progress: null };
               }
               if (currentEvent === "token") {
                 return {
@@ -138,6 +152,7 @@ export function ChatWorkspace() {
                   ...message,
                   clarification: String(data.question ?? data.message ?? ""),
                   options: (data.options as string[]) ?? [],
+                  progress: null,
                 };
               }
               if (currentEvent === "followups") {
@@ -159,16 +174,31 @@ export function ChatWorkspace() {
                 };
               }
               if (currentEvent === "cancelled") {
-                return { ...message, cancelled: true, narrative: "Cancelled." };
+                return { ...message, cancelled: true, narrative: "Cancelled.", progress: null };
               }
               if (currentEvent === "error") {
-                return { ...message, error: String(data.message ?? "Chat failed") };
+                const failure: FailurePayload = {
+                  category: data.category ? String(data.category) : undefined,
+                  title: data.title ? String(data.title) : undefined,
+                  reason: data.reason ? String(data.reason) : undefined,
+                  retryable: data.retryable !== false,
+                  message: data.message ? String(data.message) : undefined,
+                  sql: data.sql ? String(data.sql) : undefined,
+                };
+                return {
+                  ...message,
+                  error: String(data.message ?? data.reason ?? "Chat failed"),
+                  failure,
+                  progress: null,
+                  sql: failure.sql || message.sql,
+                };
               }
               if (currentEvent === "done") {
                 return {
                   ...message,
                   latencyMs: Number(data.latencyMs ?? message.latencyMs ?? 0),
                   historyId: String(data.historyId ?? message.historyId ?? ""),
+                  progress: null,
                 };
               }
               return message;
@@ -272,17 +302,17 @@ export function ChatWorkspace() {
     [...messages].reverse().find((message) => message.role === "user")?.question ?? "";
 
   return (
-    <>
+    <PageShell>
       <PageHeader
         title="AI Chat"
-        description="Enterprise NLQ with honest grounding, execution timelines, and governed SQL — not a confidence theatre."
+        description="Enterprise NLQ with honest grounding, execution timelines, and governed SQL."
       />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <Card className="min-h-[520px] border-border/70 shadow-sm">
+        <Card className="min-h-[520px]">
           <CardContent className="flex h-full flex-col gap-3 pt-4">
             <div className="flex-1 space-y-4 overflow-auto pr-1">
               {messages.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
+                <div className="card-supporting border border-dashed border-border/80 px-4 py-8 text-center">
                   <p className="text-sm text-muted-foreground">
                     Try “loss ratio”, “claims by status”, “revenue by month”, “surprise me”, or a
                     what-if like “what if revenue increased 10%”.
@@ -296,7 +326,7 @@ export function ChatWorkspace() {
                 message.role === "user" ? (
                   <div
                     key={message.id}
-                    className="ml-auto max-w-[85%] rounded-2xl bg-foreground px-4 py-2.5 text-sm text-background"
+                    className="ml-auto max-w-[85%] rounded-[var(--radius-card)] bg-primary px-4 py-2.5 text-sm text-primary-foreground"
                   >
                     {message.question}
                   </div>
@@ -323,7 +353,7 @@ export function ChatWorkspace() {
               </label>
               <div className="flex gap-2">
                 <input
-                  className="h-11 flex-1 rounded-xl border border-border bg-background px-3 text-sm shadow-sm outline-none ring-foreground/10 focus:ring-2"
+                  className="h-11 flex-1 rounded-[var(--radius-control)] border border-border bg-background px-3 text-sm outline-none ring-primary/20 focus:ring-2"
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
                   placeholder="Ask a governed analytics question"
@@ -333,7 +363,7 @@ export function ChatWorkspace() {
                     Cancel
                   </Button>
                 ) : (
-                  <Button type="submit" className="rounded-xl px-5">
+                  <Button type="submit" className="px-5">
                     Ask
                   </Button>
                 )}
@@ -341,7 +371,7 @@ export function ChatWorkspace() {
             </form>
           </CardContent>
         </Card>
-        <Card className="border-border/70 shadow-sm">
+        <Card>
           <CardContent className="space-y-3 pt-4">
             <CardTitle className="text-sm">How answers stay honest</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
@@ -359,7 +389,7 @@ export function ChatWorkspace() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </PageShell>
   );
 }
 

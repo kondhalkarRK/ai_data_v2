@@ -78,7 +78,11 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         <Topbar />
         <main
           id="main-content"
-          className={presenterMode ? "min-w-0 flex-1 p-6 lg:p-10" : "min-w-0 flex-1 p-4 lg:p-6"}
+          className={
+            presenterMode
+              ? "min-w-0 flex-1 bg-surface/40 p-6 lg:p-10"
+              : "min-w-0 flex-1 bg-surface/40 p-4 lg:p-6"
+          }
         >
           {children}
         </main>

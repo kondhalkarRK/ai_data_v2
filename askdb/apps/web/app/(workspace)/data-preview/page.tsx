@@ -8,9 +8,24 @@ import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
+import { PageShell } from "@/components/ui/page-shell";
 import { useActiveIndustry } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+
+function typeGlyph(dataType: string | undefined): string {
+  const t = (dataType || "").toLowerCase();
+  if (t.includes("int") || t.includes("numeric") || t.includes("decimal") || t.includes("float") || t.includes("double")) {
+    return "123";
+  }
+  if (t.includes("date") || t.includes("time") || t.includes("timestamp")) {
+    return "◷";
+  }
+  if (t.includes("bool")) {
+    return "01";
+  }
+  return "ABC";
+}
 
 export default function DataPreviewPage() {
   const industry = useActiveIndustry();
@@ -46,7 +61,7 @@ export default function DataPreviewPage() {
   );
 
   return (
-    <>
+    <PageShell>
       <PageHeader
         title="Data Preview"
         description="Browse semantic tables for the active industry with server-side keyset pagination."
@@ -71,7 +86,7 @@ export default function DataPreviewPage() {
                   type="button"
                   onClick={() => setSelected(table.name)}
                   className={cn(
-                    "flex w-full flex-col rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+                    "flex w-full flex-col rounded-[var(--radius-control)] px-2.5 py-2 text-left text-sm transition-colors",
                     activeTable === table.name
                       ? "bg-primary/10 text-foreground"
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
@@ -98,11 +113,15 @@ export default function DataPreviewPage() {
                 <LoadingState size="sm" title="Loading rows" />
               ) : preview.isError ? (
                 <p className="text-sm text-danger">Preview failed for {activeTable}.</p>
+              ) : rows.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  This table returned no rows. Try another table or check seed data.
+                </p>
               ) : (
                 <>
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <CardTitle className="text-sm">{activeTable}</CardTitle>
+                    <div className="min-w-0">
+                      <CardTitle className="truncate text-sm">{activeTable}</CardTitle>
                       <CardDescription className="font-mono text-2xs">
                         {preview.data?.pages[0]?.physicalName}
                       </CardDescription>
@@ -117,15 +136,21 @@ export default function DataPreviewPage() {
                       {preview.isFetchingNextPage ? "Loading…" : "Load more"}
                     </Button>
                   </div>
-                  <div className="overflow-auto rounded-md border border-border">
+                  <div className="overflow-auto rounded-[var(--radius-control)] border border-border">
                     <table className="min-w-full border-collapse text-left text-xs">
-                      <thead className="bg-muted/40">
+                      <thead className="bg-muted/50">
                         <tr>
                           {columns.map((column) => (
                             <th
                               key={column.name}
-                              className="whitespace-nowrap px-3 py-2 font-medium text-muted-foreground"
+                              className="whitespace-nowrap border-b border-border px-3 py-2.5 font-medium text-muted-foreground"
                             >
+                              <span className="mr-1.5 font-mono text-[10px] text-teal">
+                                {typeGlyph(
+                                  (column as { dataType?: string; type?: string }).dataType ||
+                                    (column as { type?: string }).type,
+                                )}
+                              </span>
                               {column.displayName}
                             </th>
                           ))}
@@ -133,11 +158,14 @@ export default function DataPreviewPage() {
                       </thead>
                       <tbody>
                         {rows.map((row, index) => (
-                          <tr key={index} className="border-t border-border/70">
+                          <tr
+                            key={index}
+                            className="border-t border-border/60 transition-colors hover:bg-muted/30"
+                          >
                             {columns.map((column) => (
                               <td
                                 key={column.name}
-                                className="max-w-[220px] truncate px-3 py-1.5 font-mono text-foreground"
+                                className="max-w-[220px] truncate px-3 py-2 font-mono text-foreground"
                                 title={String(row.values[column.name] ?? "")}
                               >
                                 {formatCell(row.values[column.name])}
@@ -158,7 +186,7 @@ export default function DataPreviewPage() {
           </Card>
         </div>
       )}
-    </>
+    </PageShell>
   );
 }
 

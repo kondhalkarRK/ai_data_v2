@@ -18,9 +18,17 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.analytics.sql_guardrails import sql_is_safe
 from app.core.config import Industry, Settings
-from app.core.exceptions import GuardrailViolationError, ValidationError
+from app.core.exceptions import ValidationError
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuestion
 from app.models.user import User
+from app.services.chat.entity_match import match_entities, resolve_with_entity_match
+from app.services.chat.failures import (
+    FailureInfo,
+    classify_database,
+    classify_llm_failure,
+    classify_semantic,
+    classify_sql_validation,
+)
 from app.services.chat.intents import (
     is_followup,
     is_out_of_bounds,
@@ -30,6 +38,8 @@ from app.services.chat.intents import (
     parse_whatif,
     suggested_followups,
 )
+from app.services.chat.profiler import PROFILER, QueryProfile
+from app.services.chat.query_cache import QUERY_CACHE, CachedAnswer
 from app.services.chat.response_meta import (
     QueryTimings,
     build_insights,
@@ -40,6 +50,7 @@ from app.services.chat.response_meta import (
     source_database_label,
     sql_diff_lines,
 )
+from app.services.chat.sql_limits import ensure_result_limit
 from app.services.chat.templates import list_templates, resolve_template
 from app.services.chat.trust import compute_trust_score
 from app.services.knowledge import KnowledgeService
@@ -47,6 +58,14 @@ from app.services.llm import complete_chat
 from app.services.web_retrieval import WebRetrievalService
 
 logger = logging.getLogger(__name__)
+
+PROGRESS_STEPS = [
+    {"id": "understanding", "label": "Understanding Question"},
+    {"id": "metrics", "label": "Identifying Business Metrics"},
+    {"id": "sql", "label": "Generating SQL"},
+    {"id": "execute", "label": "Executing Query"},
+    {"id": "visualize", "label": "Building Visualization"},
+]
 
 
 def _jsonable(value: Any) -> Any:
@@ -59,6 +78,22 @@ def _jsonable(value: Any) -> Any:
 
 def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+def _progress(current: str, completed: list[str], *, slow: bool = False) -> str:
+    label = next((s["label"] for s in PROGRESS_STEPS if s["id"] == current), current)
+    payload: dict[str, Any] = {
+        "steps": PROGRESS_STEPS,
+        "current": current,
+        "currentLabel": label,
+        "completed": completed,
+    }
+    if slow:
+        payload["slowWarning"] = True
+        payload["message"] = (
+            f"This query is taking longer than expected. Current Stage: {label}"
+        )
+    return _sse("progress", payload)
 
 
 class ChatService:
@@ -87,18 +122,27 @@ class ChatService:
         web_retrieval: bool = False,
     ) -> AsyncIterator[str]:
         started = time.perf_counter()
+        wall_started = time.time()
         timings = QueryTimings()
         question = (question or "").strip()
         if not question:
             raise ValidationError("Question is required.")
 
+        profile = QueryProfile(
+            question=question,
+            industry=self._industry.value,
+            started_at=wall_started,
+        )
         history_id = uuid.uuid4()
+        profile.history_id = str(history_id)
+        completed_steps: list[str] = []
+
         yield _sse("stage", {"stage": "accepted", "historyId": str(history_id)})
+        yield _progress("understanding", completed_steps)
 
         conversation = await self._ensure_conversation(conversation_id, question)
         history = await self._create_running_history(history_id, conversation.id, question)
         await self._app.flush()
-        # Make the running row visible to the independent cancellation request.
         await self._app.commit()
 
         async def cancelled() -> bool:
@@ -111,8 +155,44 @@ class ChatService:
                 await self._app.commit()
                 if cancel_requested is not None:
                     cancel_requested.discard(history_id)
+                profile.error_category = "cancelled"
+                profile.error_reason = "Cancelled"
+                profile.timings = timings.to_dict()
+                PROFILER.record(profile)
                 return True
             return False
+
+        def maybe_slow() -> bool:
+            return (time.perf_counter() - started) > 15.0
+
+        async def emit_failure(info: FailureInfo, *, sql: str | None = None) -> AsyncIterator[str]:
+            profile.error_category = info.category
+            profile.error_reason = info.reason
+            profile.sql = sql
+            profile.timings = timings.to_dict()
+            PROFILER.record(profile)
+            history.status = "failed"
+            history.sql_text = sql
+            history.latency_ms = int((time.perf_counter() - started) * 1000)
+            history.trust_breakdown = {"failure": info.to_dict()}
+            await self._app.flush()
+            await self._app.commit()
+            payload = info.to_dict()
+            if sql:
+                payload["sql"] = sql
+            payload["historyId"] = str(history_id)
+            payload["timings"] = timings.to_dict()
+            yield _sse("error", payload)
+            yield _sse(
+                "done",
+                {
+                    "historyId": str(history_id),
+                    "conversationId": str(conversation.id),
+                    "latencyMs": history.latency_ms,
+                    "failed": True,
+                    "failureCategory": info.category,
+                },
+            )
 
         async def finish_without_sql(
             *,
@@ -146,6 +226,7 @@ class ChatService:
                     "insights": insights,
                     "anomalies": [],
                     "alternateInterpretations": alternates or [],
+                    "cacheHit": False,
                 },
             )
             for token in narrative.split():
@@ -156,6 +237,9 @@ class ChatService:
             history.trust_breakdown = {"path": path, "ambiguityFlag": ambiguity}
             history.latency_ms = int((time.perf_counter() - started) * 1000)
             await self._app.flush()
+            profile.path = path
+            profile.timings = timings.to_dict()
+            PROFILER.record(profile)
             yield _sse(
                 "followups",
                 {"items": suggested_followups(self._industry, path)},
@@ -197,8 +281,88 @@ class ChatService:
                 yield frame
             return
 
+        entity_msg, entity_opts = resolve_with_entity_match(self._industry, question)
+        if entity_msg and entity_opts:
+            async for frame in finish_without_sql(
+                path="clarification",
+                narrative=entity_msg,
+                event="clarification",
+                payload={"question": entity_msg, "options": entity_opts},
+                ambiguity=True,
+                alternates=entity_opts,
+            ):
+                yield frame
+            return
+
         if await cancelled():
             yield _sse("cancelled", {"historyId": str(history_id)})
+            return
+
+        completed_steps.append("understanding")
+        yield _progress("metrics", completed_steps, slow=maybe_slow())
+
+        data_as_of_hint = await self._industry_data_as_of()
+
+        cached = QUERY_CACHE.get(
+            industry=self._industry.value,
+            question=question,
+            current_data_as_of=data_as_of_hint,
+        )
+        if cached is not None:
+            profile.cache_hit = True
+            profile.path = cached.path
+            profile.sql = cached.sql
+            profile.row_count = len(cached.rows)
+            profile.tables = list(cached.tables)
+            profile.timings = timings.to_dict()
+            PROFILER.record(profile)
+            yield _sse("stage", {"stage": "cache_hit"})
+            for step in ("metrics", "sql", "execute", "visualize"):
+                if step not in completed_steps:
+                    completed_steps.append(step)
+            yield _progress("visualize", completed_steps)
+            if cached.sql:
+                yield _sse(
+                    "sql",
+                    {
+                        "sql": cached.sql,
+                        "path": cached.path,
+                        "priorSql": None,
+                        "diff": [],
+                        "validationStatus": "passed",
+                        "cacheHit": True,
+                    },
+                )
+            if cached.columns:
+                yield _sse("columns", {"columns": cached.columns})
+                yield _sse(
+                    "rows",
+                    {"rows": cached.rows, "rowCount": len(cached.rows), "truncated": False},
+                )
+            if cached.chart:
+                yield _sse("chart", cached.chart)
+            meta = {**cached.meta, "cacheHit": True, "timings": timings.to_dict()}
+            yield _sse("meta", meta)
+            for token in cached.narrative.split(" "):
+                yield _sse("token", {"token": token + " "})
+            yield _sse("followups", {"items": cached.followups})
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            history.sql_text = cached.sql
+            history.row_count = len(cached.rows)
+            history.status = "completed"
+            history.latency_ms = latency_ms
+            history.trust_breakdown = {"path": cached.path, "cacheHit": True}
+            await self._app.flush()
+            yield _sse(
+                "done",
+                {
+                    "historyId": str(history_id),
+                    "conversationId": str(conversation.id),
+                    "latencyMs": latency_ms,
+                    "cacheHit": True,
+                    "rowCount": len(cached.rows),
+                },
+            )
             return
 
         yield _sse(
@@ -218,6 +382,7 @@ class ChatService:
                 followup_note = "Using the previous query as conversational context. "
 
         semantic_t0 = time.perf_counter()
+        entity = match_entities(self._industry, question)
         if is_surprise_me(question):
             templates = list_templates(self._industry)
             hit = secrets.choice(templates) if templates else None
@@ -225,6 +390,8 @@ class ChatService:
         else:
             hit = resolve_template(self._industry, question)
         timings.semantic_lookup_ms = int((time.perf_counter() - semantic_t0) * 1000)
+        completed_steps.append("metrics")
+        yield _progress("sql", completed_steps, slow=maybe_slow())
 
         sql_text: str | None = None
         path = "fallback"
@@ -240,22 +407,31 @@ class ChatService:
             glossary_matches = hit.glossary_matches
             narrative += f"Answered with governed template: {hit.title}."
             yield _sse("stage", {"stage": "template", "title": hit.title})
-            # Templates are governed mappings — not ambiguous guesses.
         else:
+            if entity and entity.entity:
+                logger.info("Entity matched (%s) but no template; trying LLM", entity.entity)
             yield _sse("stage", {"stage": "llm"})
             llm_t0 = time.perf_counter()
             llm = await complete_chat(
                 settings=self._settings,
                 industry=self._industry,
                 question=question,
+                schema_hints=self._schema_hints(),
             )
             timings.llm_generation_ms = int((time.perf_counter() - llm_t0) * 1000)
+            profile.llm_calls = 1
+            profile.prompt_tokens = llm.prompt_tokens
+            profile.completion_tokens = llm.completion_tokens
+
+            if llm.circuit_open:
+                async for frame in emit_failure(classify_llm_failure(llm.error or "degraded")):
+                    yield frame
+                return
             if llm.sql:
                 sql_text = llm.sql
                 path = "semantic_llm"
                 glossary_matches = 1
                 narrative += llm.narrative or "Generated with the configured language model."
-                # LLM path without a governed template is inherently less certain.
                 ambiguity_flag = True
                 alternate_interpretations = [
                     "Rephrase with an explicit metric name from the glossary",
@@ -263,10 +439,18 @@ class ChatService:
                 ]
                 await self._record_usage(llm.model, llm.prompt_tokens, llm.completion_tokens)
             else:
+                if llm.error and self._settings.llm_api_key.get_secret_value():
+                    async for frame in emit_failure(classify_llm_failure(llm.error)):
+                        yield frame
+                    return
+                if entity and entity.entity == "vehicle":
+                    async for frame in emit_failure(classify_semantic(question)):
+                        yield frame
+                    return
                 narrative += llm.narrative or (
                     "No matching governed template and no LLM key is configured. "
                     "Try questions like 'loss ratio', 'claims by status', "
-                    "'revenue by month', or 'top models'."
+                    "'revenue by month', or 'top selling car by units'."
                 )
                 path = "fallback"
 
@@ -287,19 +471,23 @@ class ChatService:
         rows: list[dict[str, Any]] = []
         columns: list[str] = []
         validation_status = "skipped"
-        data_as_of: str | None = None
+        data_as_of: str | None = data_as_of_hint
         dq_failed = False
         execution_error: str | None = None
+        explain_plan: str | None = None
+        chart_payload: dict[str, Any] | None = None
 
         if sql_text:
+            sql_text = ensure_result_limit(sql_text, self._settings.nlq_default_result_limit)
             val_t0 = time.perf_counter()
             ok, reason = sql_is_safe(sql_text)
             if not ok:
                 timings.sql_validation_ms = int((time.perf_counter() - val_t0) * 1000)
-                raise GuardrailViolationError(reason)
+                async for frame in emit_failure(classify_sql_validation(reason), sql=sql_text):
+                    yield frame
+                return
 
             validation_status = "passed"
-            # Dry-run via EXPLAIN; one soft repair attempt (strip trailing noise).
             try:
                 await self._analytics.execute(text(f"EXPLAIN {sql_text}"))
             except Exception as exc:
@@ -313,8 +501,16 @@ class ChatService:
                 except Exception:
                     timings.sql_auto_repair_ms = int((time.perf_counter() - repair_t0) * 1000)
                     validation_status = "failed"
-                    execution_error = str(exc)[:240]
+                    timings.sql_validation_ms = int((time.perf_counter() - val_t0) * 1000)
+                    async for frame in emit_failure(
+                        classify_sql_validation(str(exc)[:240]),
+                        sql=sql_text,
+                    ):
+                        yield frame
+                    return
             timings.sql_validation_ms = int((time.perf_counter() - val_t0) * 1000)
+            completed_steps.append("sql")
+            yield _progress("execute", completed_steps, slow=maybe_slow())
 
             yield _sse(
                 "sql",
@@ -327,22 +523,43 @@ class ChatService:
                 },
             )
 
-            if validation_status != "failed":
-                exec_t0 = time.perf_counter()
-                try:
-                    result = await self._analytics.execute(text(sql_text))
-                    mappings = result.mappings().all()
-                    capped = mappings[: self._settings.sql_max_result_rows]
-                    columns = list(capped[0].keys()) if capped else list(result.keys())
-                    rows = [{key: _jsonable(value) for key, value in row.items()} for row in capped]
-                    timings.execution_ms = int((time.perf_counter() - exec_t0) * 1000)
-                    data_as_of = await self._probe_data_as_of(sql_text)
-                except Exception as exc:
-                    timings.execution_ms = int((time.perf_counter() - exec_t0) * 1000)
-                    validation_status = "failed"
-                    execution_error = str(exc)[:240]
-                    rows = []
-                    columns = []
+            try:
+                plan_result = await self._analytics.execute(
+                    text(f"EXPLAIN (FORMAT TEXT) {sql_text}")
+                )
+                explain_plan = "\n".join(str(row[0]) for row in plan_result.fetchall())
+            except Exception:
+                explain_plan = None
+
+            exec_t0 = time.perf_counter()
+            try:
+                timeout_ms = int(self._settings.nlq_sql_timeout_seconds * 1000)
+                await self._analytics.execute(
+                    text(f"SET LOCAL statement_timeout = {timeout_ms}")
+                )
+                result = await self._analytics.execute(text(sql_text))
+                mappings = result.mappings().all()
+                cap = min(
+                    self._settings.nlq_default_result_limit,
+                    self._settings.sql_max_result_rows,
+                )
+                capped = mappings[:cap]
+                columns = list(capped[0].keys()) if capped else list(result.keys())
+                rows = [
+                    {key: _jsonable(value) for key, value in row.items()} for row in capped
+                ]
+                timings.execution_ms = int((time.perf_counter() - exec_t0) * 1000)
+                probed = await self._probe_data_as_of(sql_text)
+                if probed:
+                    data_as_of = probed
+            except Exception as exc:
+                timings.execution_ms = int((time.perf_counter() - exec_t0) * 1000)
+                async for frame in emit_failure(classify_database(str(exc)), sql=sql_text):
+                    yield frame
+                return
+
+            completed_steps.append("execute")
+            yield _progress("visualize", completed_steps, slow=maybe_slow())
 
             if rows or columns:
                 yield _sse("columns", {"columns": columns})
@@ -354,22 +571,22 @@ class ChatService:
                         "truncated": False,
                     },
                 )
+            render_t0 = time.perf_counter()
             if rows and len(columns) >= 2:
-                yield _sse(
-                    "chart",
-                    {
-                        "type": "bar",
-                        "x": columns[0],
-                        "y": columns[1],
-                        "points": rows[:40],
-                        "anomalies": detect_anomalies(columns, rows),
-                    },
-                )
+                chart_payload = {
+                    "type": "bar",
+                    "x": columns[0],
+                    "y": columns[1],
+                    "points": rows[:40],
+                    "anomalies": detect_anomalies(columns, rows),
+                }
+                yield _sse("chart", chart_payload)
+            timings.render_ms = int((time.perf_counter() - render_t0) * 1000)
 
             score, breakdown = compute_trust_score(
                 glossary_matches=glossary_matches,
                 glossary_hints_are_sql=True,
-                resolution_path=path if validation_status != "failed" else "error",
+                resolution_path=path,
                 row_count=len(rows),
             )
         else:
@@ -379,6 +596,8 @@ class ChatService:
                 resolution_path=path,
                 row_count=0,
             )
+            completed_steps.extend(["sql", "execute", "visualize"])
+            yield _progress("visualize", completed_steps, slow=maybe_slow())
 
         if await cancelled():
             yield _sse("cancelled", {"historyId": str(history_id)})
@@ -417,7 +636,6 @@ class ChatService:
                         },
                     )
         except Exception:
-            # Retrieval is supplementary and must not fail an analytics response.
             logger.debug("Supplementary knowledge retrieval failed", exc_info=True)
 
         query_meta = extract_query_meta(sql_text)
@@ -427,40 +645,38 @@ class ChatService:
             rows=rows,
             path=path,
         )
-        render_t0 = time.perf_counter()
         grounded = resolve_grounded_on(
             path=path,
             glossary_matches=glossary_matches,
             has_sql=bool(sql_text),
             dq_checked=False,
         )
-        timings.render_ms = int((time.perf_counter() - render_t0) * 1000)
+        if "visualize" not in completed_steps:
+            completed_steps.append("visualize")
 
-        yield _sse(
-            "meta",
-            {
-                "groundedOn": grounded,
-                "ambiguityFlag": ambiguity_flag,
-                "validationStatus": validation_status,
-                "rowCount": len(rows),
-                "executionTimeMs": timings.execution_ms,
-                "sourceDatabase": source_database_label(self._industry),
-                "dataAsOf": data_as_of,
-                "timings": timings.to_dict(),
-                "queryMeta": query_meta.to_dict(),
-                "insights": insights,
-                "anomalies": detect_anomalies(columns, rows) if rows else [],
-                "alternateInterpretations": alternate_interpretations,
-                "dqFailed": dq_failed,
-                "executionError": execution_error,
-                "autoRepaired": validation_status == "auto_repaired",
-            },
-        )
+        meta_payload = {
+            "groundedOn": grounded,
+            "ambiguityFlag": ambiguity_flag,
+            "validationStatus": validation_status,
+            "rowCount": len(rows),
+            "executionTimeMs": timings.execution_ms,
+            "sourceDatabase": source_database_label(self._industry),
+            "dataAsOf": data_as_of,
+            "timings": timings.to_dict(),
+            "queryMeta": query_meta.to_dict(),
+            "insights": insights,
+            "anomalies": detect_anomalies(columns, rows) if rows else [],
+            "alternateInterpretations": alternate_interpretations,
+            "dqFailed": dq_failed,
+            "executionError": execution_error,
+            "autoRepaired": validation_status == "auto_repaired",
+            "cacheHit": False,
+        }
+        yield _sse("meta", meta_payload)
 
         for token in narrative.split(" "):
             yield _sse("token", {"token": token + " "})
 
-        # Keep emitting trust for backwards compatibility; UI no longer shows the number.
         yield _sse("trust", {"score": score, "breakdown": breakdown})
         latency_ms = int((time.perf_counter() - started) * 1000)
         history.sql_text = sql_text
@@ -474,7 +690,7 @@ class ChatService:
             "validationStatus": validation_status,
         }
         history.latency_ms = latency_ms
-        history.status = "completed" if not execution_error else "failed"
+        history.status = "completed"
         await self._app.flush()
 
         followups = semantic_followups(
@@ -485,6 +701,34 @@ class ChatService:
             path=path,
         )
         yield _sse("followups", {"items": followups})
+
+        if sql_text and path != "fallback":
+            QUERY_CACHE.put(
+                industry=self._industry.value,
+                question=question,
+                answer=CachedAnswer(
+                    sql=sql_text,
+                    columns=columns,
+                    rows=rows,
+                    chart=chart_payload,
+                    meta=meta_payload,
+                    narrative=narrative,
+                    followups=followups,
+                    path=path,
+                    data_as_of=data_as_of,
+                    created_at=time.time(),
+                    tables=query_meta.tables_used,
+                ),
+            )
+
+        profile.sql = sql_text
+        profile.tables = query_meta.tables_used
+        profile.row_count = len(rows)
+        profile.path = path
+        profile.timings = timings.to_dict()
+        profile.explain_plan = explain_plan
+        PROFILER.record(profile)
+
         yield _sse(
             "done",
             {
@@ -499,8 +743,38 @@ class ChatService:
             },
         )
 
+    def _schema_hints(self) -> str:
+        if self._industry is Industry.AUTOMOTIVE:
+            return (
+                "- automotive.fact_sales (order_qty, total_sales, sales_date, carline_id, dealer_id, region_id)\n"
+                "- automotive.dim_carline (model, make, engine_type)\n"
+                "- automotive.dim_dealer (dealer_name, dealer_grade)\n"
+                "- automotive.dim_region (region_name)"
+            )
+        return (
+            "- insurance.fact_claims (incurred_amount, reported_date, claim_status, region_id)\n"
+            "- insurance.fact_policy_monthly (written_premium, earned_premium, accounting_month)\n"
+            "- insurance.dim_region (region_name)"
+        )
+
+    async def _industry_data_as_of(self) -> str | None:
+        probes = {
+            Industry.AUTOMOTIVE: ("automotive.fact_sales", "sales_date"),
+            Industry.INSURANCE: ("insurance.fact_claims", "reported_date"),
+        }
+        table, col = probes[self._industry]
+        try:
+            result = await self._analytics.execute(
+                text(f"SELECT MAX({col}) AS as_of FROM {table}")
+            )
+            value = result.scalar_one_or_none()
+            if value is not None:
+                return value.isoformat() if hasattr(value, "isoformat") else str(value)
+        except Exception:
+            return None
+        return None
+
     async def _probe_data_as_of(self, sql: str) -> str | None:
-        """Best-effort freshness from fact tables referenced in SQL — not query run time."""
         meta = extract_query_meta(sql)
         date_cols = {
             "insurance.fact_claims": "reported_date",
@@ -648,7 +922,6 @@ class ChatService:
 
     async def _record_usage(self, model: str, prompt_tokens: int, completion_tokens: int) -> None:
         total = prompt_tokens + completion_tokens
-        # Rough placeholder pricing for analytics; replaced when provider billing is wired.
         cost = total * 0.000002
         self._app.add(
             LlmUsage(

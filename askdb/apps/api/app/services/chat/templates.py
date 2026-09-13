@@ -120,9 +120,44 @@ ORDER BY 1
 LIMIT 36
 """.strip(),
             )
-        if re.search(r"top\s+model|best\s+selling|units\s+sold", q):
+        # Entity synonyms: car / vehicle / model / automobile → carline.
+        if re.search(
+            r"(top|best|highest|leading).{0,24}(car|cars|vehicle|vehicles|model|models|automobile)s?"
+            r"|best\s+selling|units\s+sold|top\s+selling",
+            q,
+        ):
+            by_revenue = bool(re.search(r"revenue|dollar|sales\s+value|amount", q))
+            by_region = bool(re.search(r"region|geo|market", q))
+            if by_region:
+                return TemplateHit(
+                    title="Top vehicles by region",
+                    glossary_matches=2,
+                    sql="""
+SELECT COALESCE(r.region_name, 'Unknown') AS region_name,
+       SUM(f.order_qty) AS units_sold,
+       SUM(f.total_sales) AS revenue
+FROM automotive.fact_sales f
+LEFT JOIN automotive.dim_region r ON r.region_id = f.region_id
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 20
+""".strip(),
+                )
+            if by_revenue:
+                return TemplateHit(
+                    title="Top vehicles by revenue",
+                    glossary_matches=2,
+                    sql="""
+SELECT c.model, c.make, SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold
+FROM automotive.fact_sales f
+JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
+GROUP BY 1, 2
+ORDER BY 3 DESC
+LIMIT 20
+""".strip(),
+                )
             return TemplateHit(
-                title="Top models by units",
+                title="Top vehicles by units",
                 glossary_matches=2,
                 sql="""
 SELECT c.model, c.make, SUM(f.order_qty) AS units_sold, SUM(f.total_sales) AS revenue
@@ -130,7 +165,7 @@ FROM automotive.fact_sales f
 JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
 GROUP BY 1, 2
 ORDER BY 3 DESC
-LIMIT 15
+LIMIT 20
 """.strip(),
             )
         if re.search(r"electric|ev\s+share|engine_type", q):
@@ -145,6 +180,7 @@ FROM automotive.fact_sales f
 JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
 GROUP BY 1
 ORDER BY 1
+LIMIT 20
 """.strip(),
             )
         if re.search(r"dealer", q):

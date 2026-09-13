@@ -1,12 +1,31 @@
 "use client";
 
-import { AlertCircle, Ban, DatabaseZap, HelpCircle } from "lucide-react";
+import { AlertCircle, Ban, Bot, DatabaseZap, HelpCircle, Layers } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type ResponseErrorKind = "zero_rows" | "execution" | "dq" | "ambiguous" | "generic";
+export type ResponseErrorKind =
+  | "zero_rows"
+  | "execution"
+  | "dq"
+  | "ambiguous"
+  | "llm"
+  | "sql_generation"
+  | "semantic"
+  | "generic";
+
+const KIND_ICON: Record<ResponseErrorKind, typeof AlertCircle> = {
+  zero_rows: Ban,
+  execution: DatabaseZap,
+  dq: DatabaseZap,
+  ambiguous: HelpCircle,
+  llm: Bot,
+  sql_generation: AlertCircle,
+  semantic: Layers,
+  generic: HelpCircle,
+};
 
 export function ResponseErrorState({
   kind,
@@ -27,14 +46,7 @@ export function ResponseErrorState({
   onRetry?: () => void;
   className?: string;
 }) {
-  const Icon =
-    kind === "zero_rows"
-      ? Ban
-      : kind === "execution"
-        ? AlertCircle
-        : kind === "dq"
-          ? DatabaseZap
-          : HelpCircle;
+  const Icon = KIND_ICON[kind] ?? HelpCircle;
 
   return (
     <div
@@ -61,7 +73,7 @@ export function ResponseErrorState({
           <div className="flex flex-wrap gap-2 pt-1">
             {onRetry ? (
               <Button type="button" size="sm" variant="secondary" onClick={onRetry}>
-                Retry
+                Try Again
               </Button>
             ) : null}
             {suggestions?.map((item) => (
@@ -80,4 +92,23 @@ export function ResponseErrorState({
       </div>
     </div>
   );
+}
+
+export function failureKindFromCategory(category?: string): ResponseErrorKind {
+  switch (category) {
+    case "llm":
+    case "circuit_open":
+    case "timeout":
+      return "llm";
+    case "sql_generation":
+      return "sql_generation";
+    case "database":
+      return "execution";
+    case "semantic":
+      return "semantic";
+    case "ambiguous":
+      return "ambiguous";
+    default:
+      return "generic";
+  }
 }

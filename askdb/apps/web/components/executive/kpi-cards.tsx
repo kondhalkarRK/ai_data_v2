@@ -1,9 +1,23 @@
 "use client";
 
+import {
+  Activity,
+  Car,
+  CircleDollarSign,
+  Gauge,
+  Percent,
+  Shield,
+  TrendingDown,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import * as React from "react";
 
 import type { ExecKpiCard } from "@/components/executive/types";
+import { EmptyState } from "@/components/ui/status-pill";
 import { cn } from "@/lib/utils";
+
+const KPI_ICONS: LucideIcon[] = [CircleDollarSign, Gauge, Percent, Car, Shield, Activity];
 
 export function KpiCardsGrid({
   cards,
@@ -18,42 +32,76 @@ export function KpiCardsGrid({
 }) {
   if (!cards.length) {
     return (
-      <p className="rounded-2xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
-        No KPIs available for this domain and window. Connect data or widen filters.
-      </p>
+      <EmptyState
+        title="No KPIs for this window"
+        detail="Connect analytics data or widen filters to populate executive metrics."
+      />
     );
   }
 
+  const cols =
+    cards.length === 1
+      ? "sm:grid-cols-1 max-w-sm"
+      : cards.length === 2
+        ? "sm:grid-cols-2"
+        : cards.length === 3
+          ? "sm:grid-cols-2 xl:grid-cols-3"
+          : "sm:grid-cols-2 xl:grid-cols-4";
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map((card) => (
-        <button
-          key={card.id}
-          type="button"
-          className="rounded-2xl border border-border/70 bg-background p-4 text-left shadow-sm transition-colors hover:border-border"
-          onClick={() => onExplore?.(card.id)}
-        >
-          <p className="text-xs text-muted-foreground">{card.label}</p>
-          <p
+    <div className={cn("grid gap-3", cols)}>
+      {cards.map((card, index) => {
+        const Icon = KPI_ICONS[index % KPI_ICONS.length]!;
+        const featured = index === 0;
+        const up = card.delta != null && card.delta >= 0;
+        return (
+          <button
+            key={card.id}
+            type="button"
             className={cn(
-              "mt-1 font-semibold tracking-tight tabular-nums",
-              presenterMode ? "text-3xl" : "text-2xl",
+              "group p-4 text-left transition-colors",
+              featured
+                ? "card-primary hover:border-primary/35"
+                : "card-secondary hover:border-border hover:bg-muted/20",
             )}
+            onClick={() => onExplore?.(card.id)}
           >
-            {card.formatted}
-          </p>
-          {card.delta != null ? (
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-xs text-muted-foreground">{card.label}</p>
+              {featured ? (
+                <span className="icon-well bg-primary/10 text-primary" aria-hidden="true">
+                  <Icon className="size-3.5" />
+                </span>
+              ) : null}
+            </div>
             <p
               className={cn(
-                "mt-1 text-xs tabular-nums",
-                card.delta >= 0 ? "text-emerald-600" : "text-danger",
+                "mt-2 font-semibold tracking-tight tabular-nums text-foreground",
+                presenterMode ? "text-3xl" : featured ? "text-3xl" : "text-2xl",
               )}
             >
-              {card.delta >= 0 ? "↑" : "↓"} {(Math.abs(card.delta) * 100).toFixed(1)}% {compareLabel}
+              {card.formatted}
             </p>
-          ) : null}
-        </button>
-      ))}
+            {card.delta != null ? (
+              <p
+                className={cn(
+                  "mt-1.5 inline-flex items-center gap-1 text-xs tabular-nums",
+                  up ? "text-success" : "text-danger",
+                )}
+              >
+                {up ? (
+                  <TrendingUp className="size-3.5" aria-hidden="true" />
+                ) : (
+                  <TrendingDown className="size-3.5" aria-hidden="true" />
+                )}
+                <span>
+                  {(Math.abs(card.delta) * 100).toFixed(1)}% {compareLabel}
+                </span>
+              </p>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }

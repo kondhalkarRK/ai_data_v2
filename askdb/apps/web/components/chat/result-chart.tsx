@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import type { AnomalyMarker } from "@/components/chat/types";
+import { CHART_SERIES } from "@/lib/design";
 import { cn } from "@/lib/utils";
 
 export function ResultChart({
@@ -33,7 +34,9 @@ export function ResultChart({
 
   if (!points.length) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">No chartable rows in this result.</p>
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        No chartable rows in this result.
+      </p>
     );
   }
 
@@ -74,9 +77,7 @@ export function ResultChart({
         {points.map((point, index) => {
           const h = (point.y / maxY) * (height - pad.top - pad.bottom);
           const x =
-            pad.left +
-            index * ((width - pad.left - pad.right) / points.length) +
-            2;
+            pad.left + index * ((width - pad.left - pad.right) / points.length) + 2;
           const y = height - pad.bottom - h;
           const anomaly = anomalyByIndex.get(point.index);
           return (
@@ -91,14 +92,16 @@ export function ResultChart({
                 width={barW}
                 height={Math.max(2, h)}
                 rx={4}
-                className={anomaly ? "fill-amber-500/80" : "fill-foreground/75"}
+                fill={anomaly ? CHART_SERIES.attention : CHART_SERIES.primary}
+                opacity={hover === point.index ? 1 : 0.88}
               />
               {anomaly ? (
                 <circle
                   cx={x + barW / 2}
                   cy={y - 8}
                   r={4}
-                  className="fill-amber-500 stroke-background"
+                  fill={CHART_SERIES.attention}
+                  stroke="hsl(var(--background))"
                   strokeWidth={2}
                 >
                   <title>{anomaly.label}</title>
@@ -119,15 +122,13 @@ export function ResultChart({
         })}
       </svg>
       {hover != null ? (
-        <div className="pointer-events-none absolute right-3 top-3 rounded-lg border border-border/70 bg-background/95 px-2.5 py-1.5 text-[11px] shadow-sm">
+        <div className="pointer-events-none absolute right-3 top-3 rounded-[var(--radius-control)] border border-border/70 bg-background/95 px-2.5 py-1.5 text-[11px] shadow-[var(--shadow-raised)]">
           <p className="font-medium">{points[hover]?.x}</p>
           <p className="text-muted-foreground">
             {yKey}: {points[hover]?.y.toLocaleString()}
           </p>
           {anomalyByIndex.get(hover) ? (
-            <p className="text-amber-700 dark:text-amber-300">
-              {anomalyByIndex.get(hover)?.label}
-            </p>
+            <p className="text-orange">{anomalyByIndex.get(hover)?.label}</p>
           ) : null}
         </div>
       ) : null}

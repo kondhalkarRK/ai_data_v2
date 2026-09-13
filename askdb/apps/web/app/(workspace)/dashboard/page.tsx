@@ -16,6 +16,7 @@ import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageShell, Section } from "@/components/ui/page-shell";
 import { useActiveIndustry } from "@/hooks/use-session";
 import { useTrustSnapshot } from "@/hooks/use-trust-snapshot";
 import { apiClient } from "@/lib/api-client";
@@ -83,7 +84,7 @@ export default function DashboardPage() {
   const data = bundle.data;
 
   return (
-    <>
+    <PageShell>
       <PageHeader
         title={data?.title ?? "Executive Intelligence"}
         description={data?.tagline ?? "Domain-aware KPIs, grounded AI insights, and What-If analysis."}
@@ -105,7 +106,7 @@ export default function DashboardPage() {
         }
       />
 
-      <Card className="mb-4 border-border/70 shadow-sm">
+      <Card className="mb-6 card-secondary shadow-none">
         <CardContent className="flex flex-wrap items-end gap-3 pt-4">
           <FilterSelect
             label="Period"
@@ -172,7 +173,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       ) : data ? (
-        <div className={cn("space-y-6", presenterMode && "text-base")}>
+        <div className={cn("space-y-8", presenterMode && "text-base")}>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p>
               {data.windowLabel}
@@ -182,14 +183,14 @@ export default function DashboardPage() {
               {data.compareLabel}
             </p>
             <p>
-              Data as of {formatStamp(data.dataAsOf)} · Bundle computed{" "}
-              {formatStamp(data.computedAt)}
+              Data as of {formatStamp(data.dataAsOf)}
+              {" · "}
+              Bundle computed {formatStamp(data.computedAt)}
             </p>
           </div>
 
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <h2 className="text-sm font-semibold tracking-tight">Business Health</h2>
+          <Section title="Business Health" description="Primary score for this domain and window.">
+            <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
               {trustSnapshot.data?.available && trustSnapshot.data.score != null ? (
                 <button
                   type="button"
@@ -207,7 +208,7 @@ export default function DashboardPage() {
               ) : null}
             </div>
             {trustOpen && trustSnapshot.data?.components?.length ? (
-              <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-xs">
+              <div className="mb-3 card-supporting px-3 py-2 text-xs">
                 <p className="mb-2 text-muted-foreground">
                   {trustSnapshot.data.formulaNote ||
                     "Sourced from Data Trust Center — same breakdown as the Trust Score hero."}
@@ -224,7 +225,7 @@ export default function DashboardPage() {
                 </ul>
                 <Link
                   href="/data-quality"
-                  className="mt-2 inline-block font-medium underline-offset-2 hover:underline"
+                  className="mt-2 inline-block font-medium text-teal underline-offset-2 hover:underline"
                 >
                   Open Data Trust Center
                 </Link>
@@ -232,50 +233,50 @@ export default function DashboardPage() {
             ) : null}
             <BusinessHealthPanel health={data.health} />
             {data.dataQuality.notices.length ? (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
-                <p className="font-medium">Data Quality Notice</p>
-                <ul className="mt-1 list-disc space-y-1 pl-4 text-xs">
+              <div className="mt-3 rounded-[var(--radius-card)] border border-warning/30 bg-warning/8 px-3 py-2 text-sm">
+                <p className="font-medium">Data quality notice</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
                   {data.dataQuality.notices.map((notice) => (
                     <li key={notice}>{notice}</li>
                   ))}
                 </ul>
               </div>
             ) : null}
-            <KpiCardsGrid
-              cards={data.cards}
-              compareLabel={data.compareLabel}
-              onExplore={explore}
-              presenterMode={presenterMode}
-            />
-          </section>
+            <div className="mt-4">
+              <KpiCardsGrid
+                cards={data.cards}
+                compareLabel={data.compareLabel}
+                onExplore={explore}
+                presenterMode={presenterMode}
+              />
+            </div>
+          </Section>
 
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold tracking-tight">AI Intelligence</h2>
+          <Section title="AI Intelligence" description="Grounded risks, opportunities, and recommendations.">
             <AiIntelligenceSection
               insights={data.insights}
               exploreBasePath={data.exploreBasePath}
             />
-          </section>
+          </Section>
 
-          <section>
+          <Section title="What-If">
             <WhatIfPanel presets={data.whatIfPresets} />
-          </section>
+          </Section>
 
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold tracking-tight">Performance Analytics</h2>
+          <Section title="Performance Analytics">
             <PerformanceAnalytics
               data={data}
               presenterMode={presenterMode}
               onFilter={applyCrossFilter}
             />
-          </section>
+          </Section>
 
-          <section>
+          <Section title="Ask the dashboard">
             <AskDashboardAi suggestions={data.suggestedQuestions} />
-          </section>
+          </Section>
         </div>
       ) : null}
-    </>
+    </PageShell>
   );
 }
 

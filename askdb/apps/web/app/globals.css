@@ -37,6 +37,10 @@
   --danger: 0 72% 51%;
   --danger-foreground: 0 0% 100%;
   --info: 199 89% 48%;
+  --teal: 173 80% 32%;
+  --teal-foreground: 0 0% 100%;
+  --orange: 21 90% 48%;
+  --orange-foreground: 0 0% 100%;
 
   /* Chrome */
   --border: 214 25% 90%;
@@ -45,27 +49,30 @@
   --sidebar: 213 30% 99%;
   --sidebar-border: 214 25% 91%;
 
-  /* Charts. Ordered for categorical use; distinguishable in both themes. */
+  /* Charts — Phase 7 global palette: Blue / Teal / Green / Orange / Purple / muted */
   --chart-1: 221 83% 53%;
-  --chart-2: 162 84% 33%;
-  --chart-3: 258 90% 66%;
-  --chart-4: 38 92% 50%;
-  --chart-5: 199 89% 48%;
-  --chart-6: 340 75% 55%;
+  --chart-2: 173 80% 32%;
+  --chart-3: 162 84% 33%;
+  --chart-4: 21 90% 48%;
+  --chart-5: 258 90% 66%;
+  --chart-6: 215 16% 55%;
 
-  /* Shape. One radius scale so every card, input and button agree. */
+  /* Shape — primary surfaces slightly tighter than generic soft cards */
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
 
-  /* Elevation */
+  /* Elevation hierarchy (Phase 17) */
   --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06);
   --shadow-raised: 0 4px 12px -2px rgb(16 24 40 / 0.08), 0 2px 6px -2px rgb(16 24 40 / 0.05);
   --shadow-overlay: 0 16px 40px -8px rgb(16 24 40 / 0.18);
+  --shadow-none: 0 0 #0000;
 
   /* Layout */
   --sidebar-width: 15rem;
   --sidebar-width-collapsed: 3.75rem;
   --topbar-height: 3.5rem;
+  --page-max: 80rem;
+  --section-gap: 1.5rem;
 }
 
 .dark {
@@ -89,6 +96,10 @@
   --danger: 0 91% 80%;
   --danger-foreground: 222 47% 11%;
   --info: 199 89% 60%;
+  --teal: 173 58% 52%;
+  --teal-foreground: 222 47% 11%;
+  --orange: 24 95% 68%;
+  --orange-foreground: 222 47% 11%;
 
   --border: 215 30% 18%;
   --input: 215 30% 18%;
@@ -97,15 +108,16 @@
   --sidebar-border: 215 30% 16%;
 
   --chart-1: 234 89% 74%;
-  --chart-2: 158 64% 67%;
-  --chart-3: 255 92% 76%;
-  --chart-4: 45 96% 74%;
-  --chart-5: 199 89% 60%;
-  --chart-6: 340 82% 72%;
+  --chart-2: 173 58% 52%;
+  --chart-3: 158 64% 67%;
+  --chart-4: 24 95% 68%;
+  --chart-5: 255 92% 76%;
+  --chart-6: 215 20% 55%;
 
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --shadow-raised: 0 4px 14px -2px rgb(0 0 0 / 0.5);
   --shadow-overlay: 0 16px 44px -8px rgb(0 0 0 / 0.65);
+  --shadow-none: 0 0 #0000;
 }
 
 @theme inline {
@@ -127,6 +139,10 @@
   --color-danger: hsl(var(--danger));
   --color-danger-foreground: hsl(var(--danger-foreground));
   --color-info: hsl(var(--info));
+  --color-teal: hsl(var(--teal));
+  --color-teal-foreground: hsl(var(--teal-foreground));
+  --color-orange: hsl(var(--orange));
+  --color-orange-foreground: hsl(var(--orange-foreground));
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -160,10 +176,12 @@
   --text-lg--line-height: 1.5rem;
   --text-xl: 1.125rem;
   --text-xl--line-height: 1.625rem;
-  --text-2xl: 1.375rem;
+  --text-2xl: 1.5rem;
   --text-2xl--line-height: 1.875rem;
-  --text-3xl: 1.75rem;
-  --text-3xl--line-height: 2.125rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
 
   /* next/font injects Inter as --font-inter; the fallback chain lives here. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
@@ -207,11 +225,62 @@
 }
 
 @layer utilities {
+  /* Card visual weight hierarchy — most UI should be secondary/supporting */
   .card-surface {
     background-color: hsl(var(--surface-raised));
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
+  }
+
+  .card-primary {
+    background-color: hsl(var(--surface-raised));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .card-secondary {
+    background-color: hsl(var(--surface-raised));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-none);
+  }
+
+  .card-supporting {
+    background-color: hsl(var(--surface) / 0.7);
+    border: 1px solid transparent;
+    border-radius: var(--radius-card);
+  }
+
+  .icon-well {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .page-grid {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .page-grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .page-grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .page-grid-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
   }
 
   /* Truncates to a fixed number of lines without a plugin. */

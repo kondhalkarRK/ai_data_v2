@@ -1,10 +1,14 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 
 import { ActionToolbar, type ActionKey } from "@/components/chat/action-toolbar";
+import { ExecutionTimeline } from "@/components/chat/execution-timeline";
 import { InsightSummary } from "@/components/chat/insight-summary";
-import { ResponseErrorState } from "@/components/chat/response-error-state";
+import {
+  failureKindFromCategory,
+  ResponseErrorState,
+} from "@/components/chat/response-error-state";
 import { ResponseHeader } from "@/components/chat/response-header";
 import { ResponseTabs } from "@/components/chat/response-tabs";
 import { ResultChart } from "@/components/chat/result-chart";
@@ -49,14 +53,20 @@ export function ResponseCard({
     );
   }
 
-  if (message.error && !meta) {
+  if (message.failure || (message.error && !meta)) {
+    const failure = message.failure;
+    const kind = failureKindFromCategory(failure?.category);
     return (
       <ResponseErrorState
-        kind="execution"
-        title="Couldn't run this query"
-        detail={message.error}
-        sql={message.sql}
-        onRetry={onRetry}
+        kind={kind}
+        title={failure?.title || "Couldn't run this query"}
+        detail={
+          failure?.reason
+            ? `Reason: ${failure.reason}`
+            : failure?.message || message.error || "Something went wrong."
+        }
+        sql={failure?.sql || message.sql}
+        onRetry={failure?.retryable !== false ? onRetry : undefined}
         className={className}
       />
     );
@@ -67,7 +77,7 @@ export function ResponseCard({
       <div className={cn("space-y-3 rounded-2xl border border-border/70 bg-background p-4 shadow-sm", className)}>
         <ResponseErrorState
           kind="ambiguous"
-          title="Need a bit more detail"
+          title="Your question is ambiguous"
           detail={message.clarification}
           suggestions={message.options}
           onAsk={onAsk}
@@ -79,10 +89,18 @@ export function ResponseCard({
     );
   }
 
-  if (!meta && !message.narrative && !message.sql) {
+  if (!meta && !message.narrative && !message.sql && !message.rows?.length) {
     return (
-      <div className={cn("rounded-2xl border border-border/70 bg-background p-4 text-sm text-muted-foreground shadow-sm", className)}>
-        Thinking…
+      <div
+        className={cn(
+          "rounded-2xl border border-border/70 bg-background p-4 shadow-sm",
+          className,
+        )}
+      >
+        <ExecutionTimeline progress={message.progress ?? undefined} />
+        {!message.progress ? (
+          <p className="mt-2 text-sm text-muted-foreground">Understanding your question…</p>
+        ) : null}
       </div>
     );
   }
@@ -94,18 +112,62 @@ export function ResponseCard({
   return (
     <article
       className={cn(
-        "overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm",
+        "overflow-hidden rounded-[var(--radius-card)] border border-border/70 bg-background",
         className,
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/60 px-4 py-3">
         <div className="min-w-0 flex-1">
           {meta ? <ResponseHeader meta={meta} latencyMs={message.latencyMs} /> : null}
+          {!meta && message.progress ? (
+            <ExecutionTimeline progress={message.progress} />
+          ) : null}
         </div>
         <ActionToolbar onAction={(key) => onAction(key, message)} />
       </div>
 
       <div className="space-y-4 px-4 py-4">
+        {!meta && (message.rows?.length || message.sql) ? (
+          <div className="min-h-[120px]">
+            {message.columns && message.rows ? (
+              <div className="overflow-auto rounded-xl border border-border/60">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      {message.columns.map((column) => (
+                        <th key={column} className="px-3 py-2 font-medium text-muted-foreground">
+                          {column}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {message.rows.slice(0, 50).map((row, index) => (
+                      <tr key={index} className="border-t border-border/50">
+                        {message.columns?.map((column) => (
+                          <td key={column} className="px-3 py-2 font-mono">
+                            {String(row[column] ?? "—")}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            {message.chart && message.columns && message.columns.length >= 2 ? (
+              <div className="mt-3">
+                <ResultChart
+                  xKey={message.chart.x}
+                  yKey={message.chart.y}
+                  rows={message.chart.points}
+                  anomalies={message.chart.anomalies ?? []}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {meta ? (
           <InsightSummary
             executive={meta.insights.executive || message.narrative || ""}
@@ -137,8 +199,12 @@ export function ResponseCard({
         {execFailed ? (
           <ResponseErrorState
             kind="execution"
-            title="Couldn't run this query"
-            detail={meta?.executionError || message.error || "SQL execution failed after validation."}
+            title="Database Execution Failed"
+            detail={
+              meta?.executionError
+                ? `Reason: ${meta.executionError}`
+                : message.error || "SQL execution failed after validation."
+            }
             sql={message.sql}
             onRetry={onRetry}
           />
@@ -155,7 +221,7 @@ export function ResponseCard({
           />
         ) : null}
 
-        {!execFailed && (message.sql || message.rows?.length) ? (
+        {!execFailed && meta && (message.sql || message.rows?.length) ? (
           <>
             <ResponseTabs value={tab} onChange={setTab} />
             <div className="min-h-[180px]">

@@ -11,9 +11,9 @@
   border-radius: calc(var(--radius-card) + 2px);
   border: 1px solid var(--galaxy-stroke);
   background:
-    radial-gradient(1200px 600px at 15% -10%, color-mix(in oklab, hsl(var(--info)) 18%, transparent), transparent 55%),
-    radial-gradient(900px 500px at 90% 10%, color-mix(in oklab, hsl(var(--success)) 14%, transparent), transparent 50%),
-    radial-gradient(800px 700px at 50% 120%, color-mix(in oklab, hsl(var(--primary)) 12%, transparent), transparent 55%),
+    radial-gradient(1200px 600px at 15% -10%, color-mix(in oklab, hsl(var(--primary)) 14%, transparent), transparent 55%),
+    radial-gradient(900px 500px at 90% 10%, color-mix(in oklab, hsl(var(--teal)) 12%, transparent), transparent 50%),
+    radial-gradient(800px 700px at 50% 120%, color-mix(in oklab, hsl(var(--accent)) 10%, transparent), transparent 55%),
     hsl(var(--surface-sunken));
   box-shadow: var(--shadow-raised);
 }

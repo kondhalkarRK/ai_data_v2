@@ -23,7 +23,10 @@ from app.core.config import Settings
 from app.core.exceptions import NqlError
 from app.db.session import DatabaseRegistry
 from app.schemas.common import ApiModel
+from app.services.chat.profiler import PROFILER
+from app.services.chat.query_cache import QUERY_CACHE
 from app.services.chat.service import ChatService
+from app.services.llm import circuit_stats
 
 router = APIRouter(tags=["chat"])
 _cancel_requested: set[uuid.UUID] = set()
@@ -192,6 +195,26 @@ async def save_question(
         title=body.title, question=body.question, sql_text=body.sql_text
     )
     return {"id": str(row.id), "title": row.title}
+
+
+@router.get("/chat/profiler")
+async def chat_profiler(
+    user: RequireAnalyst,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """Last N NLQ executions + stage percentiles (POC ring buffer)."""
+    del user
+    return {
+        "recent": PROFILER.recent(limit=min(limit, 100)),
+        "stagePercentiles": PROFILER.stage_percentiles(),
+        "errorRates": PROFILER.error_rates(),
+        "queryCache": QUERY_CACHE.stats(),
+        "llmCircuit": circuit_stats(),
+        "note": (
+            "Process-local POC store. Production should export p50/p95/p99 "
+            "and error rates to a durable metrics backend."
+        ),
+    }
 
 
 @router.get("/cost")

@@ -21,6 +21,29 @@ export interface QueryTimings {
   renderMs: number;
 }
 
+export interface ProgressStep {
+  id: string;
+  label: string;
+}
+
+export interface ProgressState {
+  steps: ProgressStep[];
+  current: string;
+  currentLabel: string;
+  completed: string[];
+  slowWarning?: boolean;
+  message?: string;
+}
+
+export interface FailurePayload {
+  category?: string;
+  title?: string;
+  reason?: string;
+  retryable?: boolean;
+  message?: string;
+  sql?: string;
+}
+
 export interface QueryMeta {
   tablesUsed: string[];
   metricsUsed: string[];
@@ -75,6 +98,7 @@ export interface ResponseMeta {
   dqFailed?: boolean;
   executionError?: string | null;
   autoRepaired?: boolean;
+  cacheHit?: boolean;
 }
 
 export interface ChatMessage {
@@ -96,6 +120,8 @@ export interface ChatMessage {
   citations?: ChatCitation[];
   cancelled?: boolean;
   error?: string;
+  failure?: FailurePayload;
+  progress?: ProgressState | null;
   meta?: ResponseMeta;
   latencyMs?: number;
 }

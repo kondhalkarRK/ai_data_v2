@@ -21,6 +21,7 @@ import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageShell, Section } from "@/components/ui/page-shell";
 import { useActiveIndustry } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -43,20 +44,22 @@ export default function DataTrustCenterPage() {
   });
 
   return (
-    <>
+    <PageShell>
       <PageHeader
         title="Data Trust Center"
         description="Observability, quality, and governance — the source of truth for trust signals across NQL Insight."
         actions={
           <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-full border border-border/70 bg-muted/30 p-0.5 text-[11px]">
+            <div className="inline-flex rounded-[var(--radius-control)] border border-border bg-muted/30 p-0.5 text-[11px]">
               {(["overview", "technical"] as const).map((option) => (
                 <button
                   key={option}
                   type="button"
                   className={cn(
-                    "rounded-full px-3 py-1 capitalize",
-                    view === option ? "bg-background font-medium shadow-sm" : "text-muted-foreground",
+                    "rounded-[var(--radius-control)] px-3 py-1 capitalize",
+                    view === option
+                      ? "bg-background font-medium text-foreground shadow-sm"
+                      : "text-muted-foreground",
                   )}
                   onClick={() => setView(option)}
                 >
@@ -90,7 +93,7 @@ export default function DataTrustCenterPage() {
           </CardContent>
         </Card>
       ) : center.data ? (
-        <div className="space-y-6">
+        <div className="space-y-8">
           <p className="text-xs text-muted-foreground">
             Computed {new Date(center.data.computedAt).toLocaleString()}
             {center.data.dataAsOf
@@ -102,59 +105,49 @@ export default function DataTrustCenterPage() {
 
           {view === "overview" ? (
             <>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Active Incidents</h2>
+              <Section title="Active Incidents">
                 <IncidentFeed
                   incidents={center.data.incidents}
                   history={center.data.incidentHistory}
                 />
-              </section>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">AI Data Steward</h2>
+              </Section>
+              <Section title="AI Data Steward" description="Purple marks AI-assisted stewardship.">
                 <AiDataSteward steward={center.data.steward} />
-              </section>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Dataset Health</h2>
+              </Section>
+              <Section title="Dataset Health">
                 <DatasetHealthGrid datasets={center.data.datasets} />
-              </section>
+              </Section>
             </>
           ) : (
             <>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Trends</h2>
+              <Section title="Trends">
                 <QualityTrends trends={center.data.trends} />
-              </section>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Schema Drift</h2>
+              </Section>
+              <Section title="Schema Drift">
                 <SchemaDriftMonitor changes={center.data.schemaChanges} />
-              </section>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Data Profiling</h2>
+              </Section>
+              <Section title="Data Profiling">
                 <ProfilingWorkspace profiles={center.data.profiles} />
-              </section>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Governance</h2>
+              </Section>
+              <Section title="Governance">
                 <GovernanceCenter records={center.data.governance} />
-              </section>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Lineage Impact</h2>
+              </Section>
+              <Section title="Lineage Impact">
                 <LineageImpactExplorer lineage={center.data.lineage} />
-              </section>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Rule Management</h2>
+              </Section>
+              <Section title="Rule Management">
                 <RuleManagement
                   rules={center.data.rules}
                   notifications={center.data.notificationRules}
                 />
-              </section>
-              <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Dataset Health</h2>
+              </Section>
+              <Section title="Dataset Health">
                 <DatasetHealthGrid datasets={center.data.datasets} />
-              </section>
+              </Section>
             </>
           )}
         </div>
       ) : null}
-    </>
+    </PageShell>
   );
 }

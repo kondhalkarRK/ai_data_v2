@@ -67,7 +67,7 @@ export function Sidebar({ user }: { user: UserProfile }) {
         {sections.map((section) => (
           <div key={section.id} className="mb-4 last:mb-0">
             {section.label && !collapsed ? (
-              <p className="px-2.5 pb-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="px-2.5 pb-1.5 text-2xs font-medium text-muted-foreground">
                 {section.label}
               </p>
             ) : null}

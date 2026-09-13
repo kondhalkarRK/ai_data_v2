@@ -112,6 +112,13 @@ class Settings(BaseSettings):
     sql_statement_timeout_seconds: int = Field(default=30, ge=1, le=300)
     sql_max_result_rows: int = Field(default=1000, ge=1, le=100_000)
     sql_preview_page_size: int = Field(default=50, ge=1, le=500)
+    # Interactive NLQ budgets (Chat Window) — tighter than warehouse batch jobs.
+    nlq_sql_timeout_seconds: int = Field(default=10, ge=1, le=120)
+    nlq_llm_timeout_seconds: int = Field(default=8, ge=1, le=60)
+    nlq_default_result_limit: int = Field(default=20, ge=1, le=200)
+    nlq_llm_max_retries: int = Field(default=1, ge=0, le=3)
+    llm_fallback_model: str = ""
+    query_cache_ttl_seconds: int = Field(default=300, ge=30, le=3600)
 
     # --- mongo / qdrant ----------------------------------------------------
     mongodb_uri: str = "mongodb://localhost:27017"
@@ -129,7 +136,7 @@ class Settings(BaseSettings):
     llm_default_model: str = "openai.gpt-5.1"
     llm_temperature: float = Field(default=0.2, ge=0.0, le=1.5)
     llm_max_completion_tokens: int = Field(default=600, ge=1)
-    llm_timeout_seconds: int = Field(default=55, ge=1)
+    llm_timeout_seconds: int = Field(default=55, ge=1)  # Non-NLQ callers; NLQ uses nlq_llm_timeout_seconds
 
     # Optional alias — some setups only export OPENAI_API_KEY.
     openai_api_key: SecretStr = SecretStr("")
