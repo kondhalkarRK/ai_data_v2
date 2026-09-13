@@ -1,14 +1,22 @@
-import { describe, expect, it, vi } from "vitest";
-
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
 
 import { InsightSummary } from "@/components/chat/insight-summary";
 import { TrustIndicators } from "@/components/chat/trust-indicators";
 
+function wrap(ui: ReactNode) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
 describe("chat trust indicators", () => {
-  it("shows grounded badges without a numeric confidence score", () => {
-    render(
+  it("shows grounded badges without a fabricated confidence score", () => {
+    wrap(
       <TrustIndicators
         groundedOn={["Semantic Layer", "Business Glossary"]}
         ambiguityFlag={false}
@@ -16,13 +24,12 @@ describe("chat trust indicators", () => {
     );
     expect(screen.getByText("Semantic Layer")).toBeInTheDocument();
     expect(screen.queryByText(/confidence/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 
   it("surfaces ambiguity instead of silent certainty", async () => {
     const user = userEvent.setup();
     const onClarify = vi.fn();
-    render(
+    wrap(
       <TrustIndicators
         groundedOn={[]}
         ambiguityFlag

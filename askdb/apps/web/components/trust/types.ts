@@ -33,6 +33,9 @@ export interface TrustIncident {
   status: "open" | "resolved" | "recovering";
   dataset: string;
   detectedAt: string;
+  resolvedAt?: string | null;
+  timeToDetectHours?: number | null;
+  timeToResolveHours?: number | null;
   impactedAssets: string[];
   rootCauseHint?: string | null;
   blastRadius: BlastRadius;
