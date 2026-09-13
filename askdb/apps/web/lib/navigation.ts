@@ -51,10 +51,10 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         href: "/data-quality",
-        label: "Data Quality",
+        label: "Data Trust Center",
         icon: ShieldCheck,
         minRole: "viewer",
-        description: "Rules, scores, issues and evaluation history.",
+        description: "Observability, quality, governance, and trust scoring.",
       },
       {
         href: "/chat",

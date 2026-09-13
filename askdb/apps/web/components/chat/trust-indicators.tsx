@@ -1,10 +1,12 @@
 "use client";
 
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 
 import type { GroundedSource } from "@/components/chat/types";
 import { Button } from "@/components/ui/button";
+import { useTrustSnapshot } from "@/hooks/use-trust-snapshot";
 import { cn } from "@/lib/utils";
 
 const ALL_SOURCES: GroundedSource[] = [
@@ -27,6 +29,9 @@ export function TrustIndicators({
   onClarify?: (text: string) => void;
   className?: string;
 }) {
+  const trust = useTrustSnapshot(!ambiguityFlag);
+  const [open, setOpen] = React.useState(false);
+
   if (ambiguityFlag) {
     return (
       <div
@@ -60,8 +65,54 @@ export function TrustIndicators({
   }
 
   const active = new Set(groundedOn);
+  const snapshot = trust.data;
+
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn("space-y-2", className)}>
+      {snapshot?.available && snapshot.score != null ? (
+        <div className="rounded-xl border border-border/60 bg-muted/20">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <span>
+              Dataset Trust:{" "}
+              <span className="font-semibold tabular-nums text-foreground">
+                {snapshot.score.toFixed(0)}%
+              </span>{" "}
+              <span className="text-muted-foreground">({snapshot.label})</span>
+            </span>
+            <ChevronDown className={cn("size-3.5 text-muted-foreground", open && "rotate-180")} />
+          </button>
+          {open ? (
+            <div className="space-y-2 border-t border-border/50 px-3 py-2">
+              <p className="text-[11px] text-muted-foreground">
+                {snapshot.formulaNote ||
+                  "Sourced from Data Trust Center — not a local confidence estimate."}
+              </p>
+              <ul className="space-y-1">
+                {(snapshot.components ?? []).map((c) => (
+                  <li key={c.id} className="flex justify-between gap-2 text-[11px]">
+                    <span>{c.label}</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {c.score.toFixed(0)} · w {(c.weight * 100).toFixed(0)}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/data-quality"
+                className="inline-block text-[11px] font-medium underline-offset-2 hover:underline"
+              >
+                Open Data Trust Center
+              </Link>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
         Grounded on
       </p>

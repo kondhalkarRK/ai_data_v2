@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.routes import auth, chat, data, executive, knowledge, kpi, semantic
+from app.api.routes import auth, chat, data, executive, knowledge, kpi, semantic, trust
 
 api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(auth.router)
@@ -16,5 +16,6 @@ api_v1_router.include_router(semantic.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(kpi.router)
 api_v1_router.include_router(executive.router)
+api_v1_router.include_router(trust.router)
 api_v1_router.include_router(chat.router)
 api_v1_router.include_router(knowledge.router)

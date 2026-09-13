@@ -17,9 +17,13 @@ import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useActiveIndustry } from "@/hooks/use-session";
+import { useTrustSnapshot } from "@/hooks/use-trust-snapshot";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
+import Link from "next/link";
+import { ChevronDown } from "lucide-react";
+import * as React from "react";
 
 interface KpiFilters {
   windows: Array<{ id: string; label: string }>;
@@ -32,6 +36,8 @@ export default function DashboardPage() {
   const industry = useActiveIndustry();
   const router = useRouter();
   const presenterMode = useUiStore((state) => state.presenterMode);
+  const trustSnapshot = useTrustSnapshot();
+  const [trustOpen, setTrustOpen] = React.useState(false);
   const [windowId, setWindowId] = useState("ytd");
   const [lob, setLob] = useState("");
   const [region, setRegion] = useState("");
@@ -184,12 +190,46 @@ export default function DashboardPage() {
           <section className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <h2 className="text-sm font-semibold tracking-tight">Business Health</h2>
-              {data.dataQuality.healthyPct != null ? (
+              {trustSnapshot.data?.available && trustSnapshot.data.score != null ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  aria-expanded={trustOpen}
+                  onClick={() => setTrustOpen((v) => !v)}
+                >
+                  Data Trust: {trustSnapshot.data.label} — {trustSnapshot.data.score.toFixed(0)}/100
+                  <ChevronDown className={cn("size-3.5", trustOpen && "rotate-180")} />
+                </button>
+              ) : data.dataQuality.healthyPct != null ? (
                 <p className="text-xs text-muted-foreground">
                   Data Quality {data.dataQuality.healthyPct.toFixed(1)}% · {data.dataQuality.label}
                 </p>
               ) : null}
             </div>
+            {trustOpen && trustSnapshot.data?.components?.length ? (
+              <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-xs">
+                <p className="mb-2 text-muted-foreground">
+                  {trustSnapshot.data.formulaNote ||
+                    "Sourced from Data Trust Center — same breakdown as the Trust Score hero."}
+                </p>
+                <ul className="space-y-1">
+                  {trustSnapshot.data.components.map((c) => (
+                    <li key={c.id} className="flex justify-between gap-2">
+                      <span>{c.label}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {c.score.toFixed(0)} · w {(c.weight * 100).toFixed(0)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/data-quality"
+                  className="mt-2 inline-block font-medium underline-offset-2 hover:underline"
+                >
+                  Open Data Trust Center
+                </Link>
+              </div>
+            ) : null}
             <BusinessHealthPanel health={data.health} />
             {data.dataQuality.notices.length ? (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
