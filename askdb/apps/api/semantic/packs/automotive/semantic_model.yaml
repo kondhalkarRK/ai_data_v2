@@ -132,18 +132,18 @@ dimensions:
   Date: {display_name: Date, source_table: fact_sales, source_column: sales_date, type: date, synonyms: [time, month, year, quarter]}
   Car: {display_name: Vehicle, source_table: dim_carline, attributes: [carline_name, model, make, car_type, engine_type], synonyms: [car, automobile, model, brand, EV]}
   Colour: {display_name: Colour, source_table: dim_color, attributes: [colour_name, rcg_combination], synonyms: [color, paint, finish]}
-  Salesperson: {display_name: Salesperson, source_table: dim_salesman, attributes: [first_name, last_name, email, active], synonyms: [sales rep, seller, agent]}
-  Region: {display_name: Region, source_table: dim_region, attributes: [region_name, city, state_code, country], synonyms: [geography, area, territory, location]}
-  Dealer: {display_name: Dealer, source_table: dim_dealer, attributes: [dealer_name, dealer_code, city, dealer_grade, active], synonyms: [dealership, outlet, showroom]}
+  Salesperson: {display_name: Salesperson, source_table: dim_salesman, attributes: [first_name, last_name, email, active], synonyms: [sales rep, sales executive, sales consultant, sales advisor, seller, agent, salesman, salespeople], display_expression: "first_name || ' ' || last_name"}
+  Region: {display_name: Region, source_table: dim_region, attributes: [region_name, city, state_code, country], synonyms: [geography, area, territory, location, city, market]}
+  Dealer: {display_name: Dealer, source_table: dim_dealer, attributes: [dealer_name, dealer_code, city, dealer_grade, active], synonyms: [dealership, outlet, showroom, dealer network]}
 
 business_entities:
   - {name: Sales Transaction, table: fact_sales, description: A single vehicle sale event}
-  - {name: Vehicle, table: dim_carline, description: A vehicle product in the catalogue}
-  - {name: Salesperson, table: dim_salesman, description: A member of the sales team}
+  - {name: Vehicle, table: dim_carline, description: A vehicle product in the catalogue (Sedan, SUV, Hatchback, …)}
+  - {name: Salesperson, table: dim_salesman, description: A member of the sales team (person — not a dealer)}
   - {name: Colour Variant, table: dim_color, description: A paint option for a vehicle}
   - {name: Region, table: dim_region, description: A geographic sales territory}
   - {name: Sales Target, table: dim_targets, description: Monthly unit and revenue plan by make}
-  - {name: Dealer, table: dim_dealer, description: An authorized dealer outlet}
+  - {name: Dealer, table: dim_dealer, description: An authorized dealer outlet (not a salesperson)}
 
 domain_rules:
   always_rules:
@@ -151,6 +151,11 @@ domain_rules:
     - Units sold is SUM(order_qty), not order count.
     - Top selling defaults to units sold unless the user explicitly asks for revenue.
     - Protect every ratio denominator with NULLIF.
+    - Salesperson questions join dim_salesman and return first_name || last_name AS salesperson_name.
+    - Dealer questions join dim_dealer and return dealer_name — never confuse with salesperson.
+    - Named body styles (Sedan, SUV, Hatchback, MUV, Coupe) require WHERE dim_carline.car_type = '<Type>'.
   never_rules:
     - Never show a raw identifier without its business label.
     - Never return more than the configured row cap.
+    - Never answer salesperson questions with dealer rows.
+    - Never omit an explicitly stated car_type filter.

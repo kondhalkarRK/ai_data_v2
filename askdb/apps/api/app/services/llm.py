@@ -59,11 +59,14 @@ _CIRCUIT = _CircuitBreaker()
 
 def _slim_system_prompt(industry: Industry, schema_hints: str | None) -> str:
     hints = (schema_hints or "").strip()
-    hint_block = f"\nRelevant tables/metrics:\n{hints}\n" if hints else "\n"
+    hint_block = f"\nDomain context (use only this):\n{hints}\n" if hints else "\n"
     return (
         f"You are NQL Insight for {industry.value} analytics. "
         "Return one PostgreSQL SELECT only — schema-qualified, read-only, "
-        "LIMIT <= 50. No markdown, no commentary."
+        "LIMIT <= 50. No markdown, no commentary. "
+        "Obey Resolved entity, Mandatory filters, ALWAYS/NEVER rules exactly. "
+        "Never invent tables or columns. Never confuse salesperson (dim_salesman) "
+        "with dealer (dim_dealer)."
         f"{hint_block}"
     )
 

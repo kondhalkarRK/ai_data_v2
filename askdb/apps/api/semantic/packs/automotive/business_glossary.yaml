@@ -4,66 +4,169 @@ terms:
   Revenue:
     definition: Total monetary value of completed vehicle sales.
     display_label: Revenue
-    synonyms: [sales, turnover, income, gross sales, sales value]
+    synonyms: [sales, turnover, income, gross sales, sales value, sales amount]
     category: Financial
     maps_to_measure: revenue
     sql_expression: "SUM(automotive.fact_sales.total_sales)"
     calculation_rules:
       - Use total_sales, never price_per_unit.
+    example_questions:
+      - Revenue by month
+      - Highest revenue dealer
+
   Units Sold:
     definition: Total vehicle quantity sold; one order may contain multiple units.
-    synonyms: [volume, cars sold, vehicles sold, top selling, best selling]
+    synonyms: [volume, cars sold, vehicles sold, top selling, best selling, most sold, units]
     category: Sales Volume
     maps_to_measure: units_sold
     sql_expression: "SUM(automotive.fact_sales.order_qty)"
     disambiguation:
       - Top selling means units sold unless revenue is named.
+    example_questions:
+      - Top selling sedan
+      - Best selling model
+
   Orders:
     definition: Number of distinct sales orders.
     synonyms: [order count, transactions, deals]
     category: Sales Activity
     maps_to_measure: orders
+
   Average Selling Price:
     definition: Revenue divided by units sold.
     synonyms: [ASP, average price, price achieved]
     category: Pricing
     maps_to_measure: average_selling_price
+
   Vehicle:
     definition: A vehicle product identified by make, model, body style and powertrain.
     synonyms: [car, automobile, carline, model, make, brand]
     category: Product
     maps_to_dimension: Car
+    calculation_rules:
+      - Prefer make/model/car_type labels over IDs.
+    related_terms: [Car Type, Electric Vehicle, Sedan, SUV, Hatchback]
+
+  Car Type:
+    definition: Body style / segment such as Sedan, SUV, Hatchback, MUV, Coupe.
+    synonyms: [body type, vehicle type, body style, segment, class]
+    category: Product
+    maps_to_attribute: dim_carline.car_type
+    sql_expression: "automotive.dim_carline.car_type"
+    calculation_rules:
+      - Filter with exact car_type values Sedan, SUV, Hatchback, MUV, Coupe.
+    example_questions:
+      - Top selling sedan
+      - Units sold by car type
+
+  Sedan:
+    definition: Passenger cars with a three-box body style (Sedan).
+    synonyms: [sedans, saloon, saloons]
+    category: Product Filter
+    maps_to_attribute: dim_carline.car_type
+    sql_expression: "automotive.dim_carline.car_type = 'Sedan'"
+    calculation_rules:
+      - Always apply WHERE car_type = 'Sedan' when the user says sedan.
+    related_terms: [Vehicle, Car Type, Units Sold]
+
+  SUV:
+    definition: Sport utility vehicles (SUV).
+    synonyms: [suvs, sport utility, crossover]
+    category: Product Filter
+    maps_to_attribute: dim_carline.car_type
+    sql_expression: "automotive.dim_carline.car_type = 'SUV'"
+    calculation_rules:
+      - Always apply WHERE car_type = 'SUV' when the user says SUV.
+
+  Hatchback:
+    definition: Hatchback body style vehicles.
+    synonyms: [hatchbacks, hatch]
+    category: Product Filter
+    maps_to_attribute: dim_carline.car_type
+    sql_expression: "automotive.dim_carline.car_type = 'Hatchback'"
+    calculation_rules:
+      - Always apply WHERE car_type = 'Hatchback' when the user says hatchback.
+
   Electric Vehicle:
     definition: A battery-electric passenger vehicle.
-    synonyms: [EV, electric car, BEV, battery electric]
+    synonyms: [EV, electric car, BEV, battery electric, electric]
     category: Product
     maps_to_dimension: Car
     sql_expression: "automotive.dim_carline.engine_type = 'Electric'"
+    calculation_rules:
+      - Filter engine_type = 'Electric'. Do not treat Hybrid as Electric.
+
   Colour:
     definition: Exterior paint colour or finish.
     synonyms: [color, paint, finish, shade]
     category: Product Attribute
     maps_to_dimension: Colour
+
   Salesperson:
-    definition: A member of the sales team responsible for vehicle sales.
-    synonyms: [sales rep, seller, agent, account manager]
+    definition: >
+      An individual member of the sales team who closes vehicle sales.
+      Not a dealer outlet — use dim_salesman (first_name + last_name).
+    display_label: Salesperson
+    synonyms:
+      - sales rep
+      - sales representative
+      - sales executive
+      - sales consultant
+      - sales advisor
+      - seller
+      - agent
+      - account manager
+      - sales person
+      - salespeople
+      - salesman
+      - salesmen
+      - who sold
     category: People
     maps_to_dimension: Salesperson
-  Region:
-    definition: A geographic sales territory.
-    synonyms: [geography, territory, city, state, location]
-    category: Geography
-    maps_to_dimension: Region
+    sql_expression: "s.first_name || ' ' || s.last_name"
+    calculation_rules:
+      - Join automotive.dim_salesman on sales_person_id.
+      - Rank by SUM(order_qty) unless revenue is explicit.
+      - Alias the name as salesperson_name.
+      - Never substitute dim_dealer for salesperson.
+    disambiguation:
+      - Salesperson is a person (dim_salesman), never a dealer outlet.
+      - Dealer / dealership / showroom means dim_dealer, not salesperson.
+    related_terms: [Dealer, Units Sold, Revenue]
+    example_questions:
+      - What is the top salesperson?
+      - Top 10 salespeople by revenue
+      - Who sold the most units?
+
   Dealer:
-    definition: An authorized vehicle sales outlet.
-    synonyms: [dealership, outlet, showroom, dealer network]
+    definition: >
+      An authorized vehicle sales outlet / dealership (dim_dealer).
+      Not an individual salesperson.
+    synonyms: [dealership, outlet, showroom, dealer network, authorized dealer]
     category: Network
     maps_to_dimension: Dealer
+    calculation_rules:
+      - Join automotive.dim_dealer on dealer_id.
+      - Never substitute dim_salesman for dealer.
+    disambiguation:
+      - Dealer is an outlet; salesperson is a person on the sales team.
+    related_terms: [Salesperson, Region, Revenue]
+    example_questions:
+      - Top dealer by revenue
+      - Best performing dealer
+
+  Region:
+    definition: A geographic sales territory.
+    synonyms: [geography, territory, city, state, location, market]
+    category: Geography
+    maps_to_dimension: Region
+
   Target Units:
     definition: Planned monthly unit volume by vehicle make.
     synonyms: [target volume, plan units, budget units]
     category: Planning
     maps_to_measure: target_units
+
   Target Revenue:
     definition: Planned monthly sales value by vehicle make.
     synonyms: [plan revenue, budget revenue, sales target value]
@@ -73,7 +176,23 @@ terms:
 domain_rules:
   always_rules:
     - SQL is the source of truth for numerical results.
-    - Top selling defaults to SUM(order_qty).
+    - Top selling defaults to SUM(order_qty) unless revenue is explicit.
     - Electric vehicle means engine_type = 'Electric'.
+    - Sedan / SUV / Hatchback / MUV / Coupe must filter dim_carline.car_type exactly.
+    - Top salesperson uses dim_salesman (person name), never dim_dealer.
+    - Top dealer uses dim_dealer (outlet name), never dim_salesman.
+    - Concatenate first_name and last_name as salesperson_name.
   never_rules:
     - Never rank top selling vehicles by revenue unless revenue is explicit.
+    - Never confuse salesperson with dealer.
+    - Never drop a stated body-style filter (Sedan, SUV, Hatchback, etc.).
+    - Never invent columns or tables outside the active industry pack.
+
+sql_patterns:
+  top_n_query:
+    description: Top / best / highest N ranking
+    default_limit: 10
+    trigger_words: [top, best, highest, most, leading]
+  body_style_filter:
+    description: Mandatory car_type filter when body style is named
+    trigger_words: [sedan, suv, hatchback, muv, coupe]

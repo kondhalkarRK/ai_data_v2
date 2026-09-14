@@ -4,6 +4,7 @@ import pytest
 
 from app.core.config import Industry
 from app.services.chat.intents import is_out_of_bounds, needs_clarification
+from app.services.chat.question_understanding import understand_question
 from app.services.chat.templates import resolve_template
 
 
@@ -30,11 +31,15 @@ from app.services.chat.templates import resolve_template
         (Industry.AUTOMOTIVE, "Dealer performance"),
         (Industry.AUTOMOTIVE, "Who won the football match?"),
         (Industry.AUTOMOTIVE, "Give me a recipe"),
+        (Industry.AUTOMOTIVE, "What is the top salesperson?"),
+        (Industry.AUTOMOTIVE, "Top selling sedan"),
     ],
 )
 def test_golden_question_has_known_path(industry: Industry, question: str) -> None:
+    plan = understand_question(industry, question)
     assert (
         resolve_template(industry, question) is not None
         or is_out_of_bounds(question, industry)
         or needs_clarification(question) is not None
+        or plan.is_ambiguous
     )

@@ -21,7 +21,11 @@ from app.core.config import Industry, Settings
 from app.core.exceptions import ValidationError
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuestion
 from app.models.user import User
-from app.services.chat.entity_match import match_entities, resolve_with_entity_match
+from app.services.chat.question_understanding import QuestionPlan, understand_question
+from app.services.chat.semantic_context import (
+    build_domain_sql_hints,
+    validate_sql_against_plan,
+)
 from app.services.chat.failures import (
     FailureInfo,
     classify_database,
@@ -281,15 +285,16 @@ class ChatService:
                 yield frame
             return
 
-        entity_msg, entity_opts = resolve_with_entity_match(self._industry, question)
-        if entity_msg and entity_opts:
+        plan = understand_question(self._industry, question)
+        if plan.is_ambiguous and plan.ambiguity_options:
+            msg = "Your question is ambiguous. Did you mean one of these?"
             async for frame in finish_without_sql(
                 path="clarification",
-                narrative=entity_msg,
+                narrative=msg,
                 event="clarification",
-                payload={"question": entity_msg, "options": entity_opts},
+                payload={"question": msg, "options": plan.ambiguity_options},
                 ambiguity=True,
-                alternates=entity_opts,
+                alternates=plan.ambiguity_options,
             ):
                 yield frame
             return
@@ -382,7 +387,6 @@ class ChatService:
                 followup_note = "Using the previous query as conversational context. "
 
         semantic_t0 = time.perf_counter()
-        entity = match_entities(self._industry, question)
         if is_surprise_me(question):
             templates = list_templates(self._industry)
             hit = secrets.choice(templates) if templates else None
@@ -402,21 +406,37 @@ class ChatService:
         alternate_interpretations: list[str] = []
 
         if hit is not None:
+            if not is_surprise_me(question):
+                ok, reason = validate_sql_against_plan(hit.sql, plan)
+                if not ok:
+                    logger.warning("Template SQL failed plan validation: %s", reason)
+                    async for frame in emit_failure(
+                        classify_sql_validation(
+                            reason or "Template SQL did not match the question plan"
+                        )
+                    ):
+                        yield frame
+                    return
             sql_text = hit.sql
             path = hit.path
             glossary_matches = hit.glossary_matches
             narrative += f"Answered with governed template: {hit.title}."
             yield _sse("stage", {"stage": "template", "title": hit.title})
         else:
-            if entity and entity.entity:
-                logger.info("Entity matched (%s) but no template; trying LLM", entity.entity)
+            if plan.entity:
+                logger.info(
+                    "Question plan entity=%s metric=%s filters=%s; trying LLM",
+                    plan.entity,
+                    plan.metric,
+                    [f.value for f in plan.filters],
+                )
             yield _sse("stage", {"stage": "llm"})
             llm_t0 = time.perf_counter()
             llm = await complete_chat(
                 settings=self._settings,
                 industry=self._industry,
                 question=question,
-                schema_hints=self._schema_hints(),
+                schema_hints=await self._domain_sql_hints(question, plan),
             )
             timings.llm_generation_ms = int((time.perf_counter() - llm_t0) * 1000)
             profile.llm_calls = 1
@@ -428,6 +448,14 @@ class ChatService:
                     yield frame
                 return
             if llm.sql:
+                ok, reason = validate_sql_against_plan(llm.sql, plan)
+                if not ok:
+                    logger.warning("LLM SQL failed plan validation: %s", reason)
+                    async for frame in emit_failure(
+                        classify_sql_validation(reason or "SQL did not match the question plan")
+                    ):
+                        yield frame
+                    return
                 sql_text = llm.sql
                 path = "semantic_llm"
                 glossary_matches = 1
@@ -443,14 +471,14 @@ class ChatService:
                     async for frame in emit_failure(classify_llm_failure(llm.error)):
                         yield frame
                     return
-                if entity and entity.entity == "vehicle":
+                if plan.entity in {"vehicle", "salesperson", "dealer"}:
                     async for frame in emit_failure(classify_semantic(question)):
                         yield frame
                     return
                 narrative += llm.narrative or (
                     "No matching governed template and no LLM key is configured. "
                     "Try questions like 'loss ratio', 'claims by status', "
-                    "'revenue by month', or 'top selling car by units'."
+                    "'revenue by month', or 'top selling sedan by units'."
                 )
                 path = "fallback"
 
@@ -743,18 +771,19 @@ class ChatService:
             },
         )
 
-    def _schema_hints(self) -> str:
-        if self._industry is Industry.AUTOMOTIVE:
-            return (
-                "- automotive.fact_sales (order_qty, total_sales, sales_date, carline_id, dealer_id, region_id)\n"
-                "- automotive.dim_carline (model, make, engine_type)\n"
-                "- automotive.dim_dealer (dealer_name, dealer_grade)\n"
-                "- automotive.dim_region (region_name)"
-            )
-        return (
-            "- insurance.fact_claims (incurred_amount, reported_date, claim_status, region_id)\n"
-            "- insurance.fact_policy_monthly (written_premium, earned_premium, accounting_month)\n"
-            "- insurance.dim_region (region_name)"
+    async def _domain_sql_hints(self, question: str, plan: QuestionPlan) -> str:
+        pack = None
+        try:
+            from app.semantic.service import SemanticService
+
+            pack = await SemanticService(self._settings).get_pack(self._industry)
+        except Exception:
+            logger.debug("Semantic pack unavailable; using fallback schema hints", exc_info=True)
+        return build_domain_sql_hints(
+            industry=self._industry,
+            question=question,
+            plan=plan,
+            pack=pack,
         )
 
     async def _industry_data_as_of(self) -> str | None:
