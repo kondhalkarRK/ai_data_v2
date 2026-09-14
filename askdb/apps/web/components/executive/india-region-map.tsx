@@ -9,48 +9,54 @@ import { CHART_SERIES } from "@/lib/design";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
+/** API returns camelCase via ApiModel aliases — keep types aligned. */
 type RegionPoint = {
-  region_id: number;
-  region_name: string;
+  regionId: number;
+  regionName: string;
   city: string | null;
-  state_code: string | null;
-  units_sold: number;
+  stateCode: string | null;
+  unitsSold: number;
   revenue: number;
-  units_formatted: string;
-  revenue_formatted: string;
-  top_make: string | null;
-  top_model: string | null;
-  dealer_count: number;
-  x_pct: number;
-  y_pct: number;
+  unitsFormatted: string;
+  revenueFormatted: string;
+  topMake: string | null;
+  topModel: string | null;
+  dealerCount: number;
+  xPct: number;
+  yPct: number;
 };
 
 type DealerRow = {
-  dealer_id: number;
-  dealer_name: string;
+  dealerId: number;
+  dealerName: string;
   city: string | null;
-  dealer_grade: string | null;
-  units_sold: number;
+  dealerGrade: string | null;
+  unitsSold: number;
   revenue: number;
-  units_formatted: string;
-  revenue_formatted: string;
-  top_model: string | null;
-  top_make: string | null;
+  unitsFormatted: string;
+  revenueFormatted: string;
+  topModel: string | null;
+  topMake: string | null;
 };
 
 type ModelRow = {
   make: string;
   model: string;
-  car_type: string | null;
-  units_sold: number;
+  carType: string | null;
+  unitsSold: number;
   revenue: number;
-  units_formatted: string;
-  revenue_formatted: string;
+  unitsFormatted: string;
+  revenueFormatted: string;
 };
 
 type MetricMode = "units" | "revenue";
 /** panel = inline beside map; modal = full-width overlay sheet under the map */
 export type RegionMapDisplayMode = "panel" | "modal";
+
+function finite(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
 
 export function IndiaRegionMap({
   industry,
@@ -74,20 +80,20 @@ export function IndiaRegionMap({
   });
 
   const dealers = useQuery({
-    queryKey: ["executive-region-dealers", industry, selectedRegion?.region_id],
+    queryKey: ["executive-region-dealers", industry, selectedRegion?.regionId],
     queryFn: () =>
       apiClient.get<DealerRow[]>(
-        `/api/v1/executive/region-map/${selectedRegion!.region_id}/dealers`,
+        `/api/v1/executive/region-map/${selectedRegion!.regionId}/dealers`,
         { industry },
       ),
     enabled: Boolean(selectedRegion),
   });
 
   const models = useQuery({
-    queryKey: ["executive-dealer-models", industry, selectedDealer?.dealer_id],
+    queryKey: ["executive-dealer-models", industry, selectedDealer?.dealerId],
     queryFn: () =>
       apiClient.get<ModelRow[]>(
-        `/api/v1/executive/dealers/${selectedDealer!.dealer_id}/models`,
+        `/api/v1/executive/dealers/${selectedDealer!.dealerId}/models`,
         { industry },
       ),
     enabled: Boolean(selectedDealer),
@@ -95,8 +101,9 @@ export function IndiaRegionMap({
 
   const maxMetric = useMemo(() => {
     const list = regions.data ?? [];
+    if (!list.length) return 1;
     return Math.max(
-      ...list.map((r) => (metric === "units" ? r.units_sold : r.revenue)),
+      ...list.map((r) => (metric === "units" ? finite(r.unitsSold) : finite(r.revenue))),
       1,
     );
   }, [regions.data, metric]);
@@ -113,6 +120,7 @@ export function IndiaRegionMap({
       selectedDealer={selectedDealer}
       dealers={dealers.data}
       dealersLoading={dealers.isLoading}
+      dealersError={dealers.isError}
       models={models.data}
       modelsLoading={models.isLoading}
       onBackToRegions={() => {
@@ -126,6 +134,9 @@ export function IndiaRegionMap({
 
   const showDetailBeside = displayMode === "panel" && selectedRegion;
   const showDetailModal = displayMode === "modal" && selectedRegion;
+  const regionError = regions.isError
+    ? ((regions.error as Error)?.message ?? "Could not load regional map data.")
+    : null;
 
   return (
     <div className="card-secondary p-4">
@@ -170,16 +181,19 @@ export function IndiaRegionMap({
         <div className="relative overflow-hidden rounded-lg border border-border/70 bg-muted/20">
           {regions.isLoading ? (
             <p className="py-20 text-center text-sm text-muted-foreground">Loading map…</p>
+          ) : regionError ? (
+            <p className="px-4 py-20 text-center text-sm text-danger">{regionError}</p>
           ) : !(regions.data ?? []).length ? (
             <p className="py-20 text-center text-sm text-muted-foreground">
-              No regional sales data for this domain yet.
+              No regional sales data for this domain yet. Seed the analytics database if this
+              environment is empty.
             </p>
           ) : (
             <IndiaSvg
               points={regions.data ?? []}
               metric={metric}
               maxMetric={maxMetric}
-              selectedId={selectedRegion?.region_id ?? null}
+              selectedId={selectedRegion?.regionId ?? null}
               onSelect={selectRegion}
             />
           )}
@@ -215,6 +229,8 @@ function IndiaSvg({
   selectedId: number | null;
   onSelect: (point: RegionPoint) => void;
 }) {
+  const safeMax = Math.max(finite(maxMetric, 1), 1);
+
   return (
     <svg viewBox="0 0 80 90" className="mx-auto h-[320px] w-full max-w-md" role="img">
       <title>India regional performance</title>
@@ -225,36 +241,40 @@ function IndiaSvg({
         strokeWidth="0.6"
         opacity="0.85"
       />
-      {points.map((point) => {
-        const value = metric === "units" ? point.units_sold : point.revenue;
-        const intensity = Math.max(0.25, value / maxMetric);
+      {points.map((point, index) => {
+        const value =
+          metric === "units" ? finite(point.unitsSold) : finite(point.revenue);
+        const intensity = Math.min(1, Math.max(0.25, value / safeMax));
         const r = 1.6 + intensity * 2.2;
-        const selected = point.region_id === selectedId;
+        const cx = finite(point.xPct, 18 + (index % 8) * 8);
+        const cy = finite(point.yPct, 24 + Math.floor(index / 8) * 10);
+        const regionKey = point.regionId ?? `region-${index}`;
+        const selected = point.regionId === selectedId;
         return (
           <g
-            key={point.region_id}
+            key={regionKey}
             className="cursor-pointer"
             onClick={() => onSelect(point)}
           >
             <circle
-              cx={point.x_pct}
-              cy={point.y_pct}
+              cx={cx}
+              cy={cy}
               r={r}
               fill={CHART_SERIES.primary}
               fillOpacity={0.25 + intensity * 0.55}
               stroke={selected ? CHART_SERIES.secondary : CHART_SERIES.primary}
               strokeWidth={selected ? 0.7 : 0.35}
             />
-            {point.top_make ? (
+            {point.topMake ? (
               <text
-                x={point.x_pct}
-                y={point.y_pct - r - 0.8}
+                x={cx}
+                y={cy - r - 0.8}
                 textAnchor="middle"
                 fontSize="2.2"
                 fill="hsl(var(--foreground))"
                 className="pointer-events-none"
               >
-                {point.top_make.slice(0, 8)}
+                {String(point.topMake).slice(0, 8)}
               </text>
             ) : null}
           </g>
@@ -270,6 +290,7 @@ function DrillDetail({
   selectedDealer,
   dealers,
   dealersLoading,
+  dealersError,
   models,
   modelsLoading,
   onBackToRegions,
@@ -281,6 +302,7 @@ function DrillDetail({
   selectedDealer: DealerRow | null;
   dealers?: DealerRow[];
   dealersLoading: boolean;
+  dealersError?: boolean;
   models?: ModelRow[];
   modelsLoading: boolean;
   onBackToRegions: () => void;
@@ -294,12 +316,12 @@ function DrillDetail({
       <div className="space-y-3">
         <Button type="button" variant="ghost" size="sm" onClick={onBackToDealers}>
           <ArrowLeft className="mr-1 h-3.5 w-3.5" />
-          Dealers in {selectedRegion.region_name}
+          Dealers in {selectedRegion.regionName}
         </Button>
         <div>
-          <h4 className="text-sm font-semibold">{selectedDealer.dealer_name}</h4>
+          <h4 className="text-sm font-semibold">{selectedDealer.dealerName}</h4>
           <p className="text-xs text-muted-foreground">
-            {selectedDealer.units_formatted} units · {selectedDealer.revenue_formatted}
+            {selectedDealer.unitsFormatted} units · {selectedDealer.revenueFormatted}
           </p>
         </div>
         {modelsLoading ? (
@@ -318,12 +340,12 @@ function DrillDetail({
                     {row.make} {row.model}
                   </span>
                   <span className="tabular-nums text-muted-foreground">
-                    {row.units_formatted}
+                    {row.unitsFormatted}
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  {row.revenue_formatted}
-                  {row.car_type ? ` · ${row.car_type}` : ""}
+                  {row.revenueFormatted}
+                  {row.carType ? ` · ${row.carType}` : ""}
                 </div>
               </li>
             ))}
@@ -342,12 +364,12 @@ function DrillDetail({
       <div className="flex items-start gap-2">
         <MapPin className="mt-0.5 h-4 w-4 text-primary" />
         <div>
-          <h4 className="text-sm font-semibold">{selectedRegion.region_name}</h4>
+          <h4 className="text-sm font-semibold">{selectedRegion.regionName}</h4>
           <p className="text-xs text-muted-foreground">
-            {selectedRegion.units_formatted} units · {selectedRegion.revenue_formatted}
-            {selectedRegion.top_make
-              ? ` · Top make ${selectedRegion.top_make}${
-                  selectedRegion.top_model ? ` ${selectedRegion.top_model}` : ""
+            {selectedRegion.unitsFormatted} units · {selectedRegion.revenueFormatted}
+            {selectedRegion.topMake
+              ? ` · Top make ${selectedRegion.topMake}${
+                  selectedRegion.topModel ? ` ${selectedRegion.topModel}` : ""
                 }`
               : ""}
           </p>
@@ -357,27 +379,29 @@ function DrillDetail({
         <EmptyState message="Dealer drill-down is available for Automotive. Insurance shows regional claim intensity on the map." />
       ) : dealersLoading ? (
         <p className="text-sm text-muted-foreground">Loading dealers…</p>
+      ) : dealersError ? (
+        <EmptyState message="Could not load dealers for this region." />
       ) : !(dealers ?? []).length ? (
         <EmptyState message="No dealer data available for this region." />
       ) : (
         <ul className="max-h-72 space-y-2 overflow-auto">
           {(dealers ?? []).map((row) => (
-            <li key={row.dealer_id}>
+            <li key={row.dealerId}>
               <button
                 type="button"
                 className="w-full rounded-md border border-border/60 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50"
                 onClick={() => onSelectDealer(row)}
               >
                 <div className="flex justify-between gap-2">
-                  <span className="font-medium">{row.dealer_name}</span>
+                  <span className="font-medium">{row.dealerName}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {row.units_formatted}
+                    {row.unitsFormatted}
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  {row.revenue_formatted}
-                  {row.top_make
-                    ? ` · Top ${row.top_make}${row.top_model ? ` ${row.top_model}` : ""}`
+                  {row.revenueFormatted}
+                  {row.topMake
+                    ? ` · Top ${row.topMake}${row.topModel ? ` ${row.topModel}` : ""}`
                     : ""}
                 </div>
               </button>
