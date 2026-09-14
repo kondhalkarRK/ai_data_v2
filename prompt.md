@@ -31,3 +31,15 @@ user can have choose the llm model and based on that user can able to see how mu
 2026-09-14 12:25:43,253 INFO    [-] uvicorn.error: Finished server process [25956]
 
 
+which regions has highest suv selling
+SQL Generation Failed
+Reason: Missing mandatory filter value 'SUV' in SQL
+
+Try Again
+
+
+Top selling car in mumbai not answered
+
+top selling car in mumbai region it shown - the different answer
+
+
