@@ -132,6 +132,19 @@ class ChatService:
         self._industry = industry
         self._semantic = semantic_service or SemanticService(settings)
 
+    async def _recover_analytics(self) -> None:
+        """Clear an aborted Postgres transaction so later statements can run.
+
+        Read-only analytics work shares one connection for the request. A failed
+        EXPLAIN/probe leaves the transaction in ``InFailedSqlTransaction`` until
+        rollback — without this, valid SQL looks broken.
+        """
+        try:
+            await self._analytics.rollback()
+            await self._analytics.execute(text("SET TRANSACTION READ ONLY"))
+        except Exception:
+            logger.debug("Analytics connection recovery failed", exc_info=True)
+
     async def ask_stream(
         self,
         question: str,
@@ -317,6 +330,7 @@ class ChatService:
                 pack=semantic_pack,
             )
         except Exception:
+            await self._recover_analytics()
             logger.warning(
                 "Value dictionary unavailable; continuing with semantic rules", exc_info=True
             )
@@ -586,6 +600,7 @@ class ChatService:
             try:
                 await self._analytics.execute(text(f"EXPLAIN {sql_text}"))
             except Exception as exc:
+                await self._recover_analytics()
                 repair_t0 = time.perf_counter()
                 repaired = sql_text.strip().rstrip(";")
                 try:
@@ -593,12 +608,17 @@ class ChatService:
                     sql_text = repaired
                     validation_status = "auto_repaired"
                     timings.sql_auto_repair_ms = int((time.perf_counter() - repair_t0) * 1000)
-                except Exception:
+                except Exception as repair_exc:
+                    await self._recover_analytics()
                     timings.sql_auto_repair_ms = int((time.perf_counter() - repair_t0) * 1000)
                     validation_status = "failed"
                     timings.sql_validation_ms = int((time.perf_counter() - val_t0) * 1000)
+                    detail = str(repair_exc)[:240]
+                    # Prefer the original EXPLAIN error when repair only hit an aborted txn.
+                    if "InFailedSqlTransaction" in detail:
+                        detail = str(exc)[:240]
                     async for frame in emit_failure(
-                        classify_sql_validation(str(exc)[:240]),
+                        classify_sql_validation(detail),
                         sql=sql_text,
                     ):
                         yield frame
@@ -624,6 +644,7 @@ class ChatService:
                 )
                 explain_plan = "\n".join(str(row[0]) for row in plan_result.fetchall())
             except Exception:
+                await self._recover_analytics()
                 explain_plan = None
 
             exec_t0 = time.perf_counter()
@@ -644,6 +665,7 @@ class ChatService:
                 if probed:
                     data_as_of = probed
             except Exception as exc:
+                await self._recover_analytics()
                 timings.execution_ms = int((time.perf_counter() - exec_t0) * 1000)
                 async for frame in emit_failure(classify_database(str(exc)), sql=sql_text):
                     yield frame
@@ -859,6 +881,7 @@ class ChatService:
             if value is not None:
                 return value.isoformat() if hasattr(value, "isoformat") else str(value)
         except Exception:
+            await self._recover_analytics()
             return None
         return None
 
@@ -884,6 +907,7 @@ class ChatService:
                 if value is not None:
                     return value.isoformat() if hasattr(value, "isoformat") else str(value)
             except Exception:
+                await self._recover_analytics()
                 logger.debug("Could not probe data freshness for %s", table, exc_info=True)
                 continue
         return None

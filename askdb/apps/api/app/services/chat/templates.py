@@ -265,11 +265,11 @@ LIMIT 20
             title="Revenue by month",
             glossary_matches=2,
             sql="""
-SELECT date_trunc('month', sales_date)::date AS month,
-       SUM(total_sales) AS revenue,
-       SUM(order_qty) AS units_sold
-FROM automotive.fact_sales
-WHERE sales_date >= DATE '2024-01-01'
+SELECT date_trunc('month', f.sales_date)::date AS month,
+       SUM(f.total_sales) AS revenue,
+       SUM(f.order_qty) AS units_sold
+FROM automotive.fact_sales f
+WHERE f.sales_date >= DATE '2024-01-01'
 GROUP BY 1
 ORDER BY 1
 LIMIT 36
