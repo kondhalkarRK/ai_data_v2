@@ -22,3 +22,12 @@ which should have two tab, Cost Analytics & LLM Controls
 under LLM controls - unlike we give under stremlit 
 ai_data_v2\config\llm_catalog
 user can have choose the llm model and based on that user can able to see how much question can they asked and all stuff, also add controls like temperture, p & t index (not sure what if doable add them) also add i icon and should what is use of those controls
+
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> 2026-09-14 12:25:43,133 INFO    [-] uvicorn.error: Shutting down
+2026-09-14 12:25:43,243 INFO    [-] uvicorn.error: Waiting for application shutdown.
+2026-09-14 12:25:43,249 INFO    [-] app.db.session: database registry stopped
+2026-09-14 12:25:43,249 INFO    [-] app.main: api stopped
+2026-09-14 12:25:43,250 INFO    [-] uvicorn.error: Application shutdown complete.
+2026-09-14 12:25:43,253 INFO    [-] uvicorn.error: Finished server process [25956]
+
+
