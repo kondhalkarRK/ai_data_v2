@@ -1,0 +1,100 @@
+error1
+Console Error
+
+
+Each child in a list should have a unique "key" prop.
+
+Check the render method of `svg`. It was passed a child from IndiaSvg. See https://react.dev/link/warning-keys for more information.
+components/executive/india-region-map.tsx (234:11) @ <unknown>
+
+
+  232 |         const selected = point.region_id === selectedId;
+  233 |         return (
+> 234 |           <g
+      |           ^
+  235 |             key={point.region_id}
+  236 |             className="cursor-pointer"
+  237 |             onClick={() => onSelect(point)}
+Call Stack
+29
+
+Show 22 ignore-listed frame(s)
+g
+<anonymous>
+<unknown>
+components/executive/india-region-map.tsx (234:11)
+Array.map
+<anonymous>
+IndiaSvg
+components/executive/india-region-map.tsx (228:15)
+IndiaRegionMap
+components/executive/india-region-map.tsx (178:13)
+PerformanceAnalytics
+components/executive/performance-analytics.tsx (42:7)
+DashboardPage
+app/(workspace)/dashboard/page.tsx (264:13)
+
+
+error2
+Received NaN for the `r` attribute. If this is expected, cast the value to a string.
+components/executive/india-region-map.tsx (239:13) @ <unknown>
+
+
+  237 |             onClick={() => onSelect(point)}
+  238 |           >
+> 239 |             <circle
+      |             ^
+  240 |               cx={point.x_pct}
+  241 |               cy={point.y_pct}
+  242 |               r={r}
+Call Stack
+26
+
+Show 19 ignore-listed frame(s)
+circle
+<anonymous>
+<unknown>
+components/executive/india-region-map.tsx (239:13)
+Array.map
+<anonymous>
+IndiaSvg
+components/executive/india-region-map.tsx (228:15)
+IndiaRegionMap
+components/executive/india-region-map.tsx (178:13)
+PerformanceAnalytics
+components/executive/performance-analytics.tsx (42:7)
+DashboardPage
+app/(workspace)/dashboard/page.tsx (264:13)
+
+
+error3
+
+Received NaN for the `fillOpacity` attribute. If this is expected, cast the value to a string.
+components/executive/india-region-map.tsx (239:13) @ <unknown>
+
+
+  237 |             onClick={() => onSelect(point)}
+  238 |           >
+> 239 |             <circle
+      |             ^
+  240 |               cx={point.x_pct}
+  241 |               cy={point.y_pct}
+  242 |               r={r}
+Call Stack
+26
+
+Show 19 ignore-listed frame(s)
+circle
+<anonymous>
+<unknown>
+components/executive/india-region-map.tsx (239:13)
+Array.map
+<anonymous>
+IndiaSvg
+components/executive/india-region-map.tsx (228:15)
+IndiaRegionMap
+components/executive/india-region-map.tsx (178:13)
+PerformanceAnalytics
+components/executive/performance-analytics.tsx (42:7)
+DashboardPage
+app/(workspace)/dashboard/page.tsx (264:13)
