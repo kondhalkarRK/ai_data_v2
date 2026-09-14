@@ -36,3 +36,24 @@ Prefer domain routing + strong YAML + entity validation over dumping full YAML i
 | Benchmarks | `tests/test_nlq_benchmark_suite.py` | Salesperson / sedan / dealer / ambiguity cases |
 
 **Note:** askdb now uses **exact** `car_type = 'Sedan'` (stronger than Streamlit’s soft ILIKE for these cases). Streamlit’s unused deterministic compiler remains a future option, not a dependency.
+
+## Phase 0–6 implementation status
+
+- Live, industry-scoped categorical values are declared by `value_domains` in
+  each semantic model and loaded into a bounded 30-minute cache.
+- Question matching uses canonical database spelling and configured aliases
+  (for example Delhi → New Delhi and Bangalore → Bengaluru).
+- Automotive plans preserve city, region, make, model, colour, engine and
+  dealer-grade filters. Insurance plans preserve product/LOB, claim status/type,
+  policy status/tier, channel, branch and geography filters.
+- Ranking direction is explicit: lowest/worst/least/bottom uses ASC; top/best/
+  highest/most uses DESC.
+- Follow-up LLM calls receive prior successful SQL so grain, joins and existing
+  filters are not silently discarded.
+- SQL validation checks required entity tables, filter columns and values,
+  ranking direction, and the active pack's table/column whitelist.
+- Insurance loss ratio now aggregates claims and premium separately by month
+  before joining compatible grains.
+- Regression coverage includes domain isolation, value aliases, prompt size,
+  Mumbai, colour plus body-style, lowest SUV, insurance agent/policy/customer,
+  status and LOB filters, and invented-column rejection.

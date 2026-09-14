@@ -137,6 +137,7 @@ class Settings(BaseSettings):
     llm_temperature: float = Field(default=0.2, ge=0.0, le=1.5)
     llm_max_completion_tokens: int = Field(default=600, ge=1)
     llm_timeout_seconds: int = Field(default=55, ge=1)  # Non-NLQ callers; NLQ uses nlq_llm_timeout_seconds
+    llm_monthly_budget_usd: float = Field(default=50.0, ge=0.0)
 
     # Optional alias — some setups only export OPENAI_API_KEY.
     openai_api_key: SecretStr = SecretStr("")

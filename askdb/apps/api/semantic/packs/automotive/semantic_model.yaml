@@ -136,6 +136,30 @@ dimensions:
   Region: {display_name: Region, source_table: dim_region, attributes: [region_name, city, state_code, country], synonyms: [geography, area, territory, location, city, market]}
   Dealer: {display_name: Dealer, source_table: dim_dealer, attributes: [dealer_name, dealer_code, city, dealer_grade, active], synonyms: [dealership, outlet, showroom, dealer network]}
 
+hierarchies:
+  Vehicle: [make, car_type, model, carline_name]
+  Geography: [country, state_code, city, region_name]
+  Sales Organization: [region_name, city, dealer_name, salesperson]
+
+value_domains:
+  car_type: {table: dim_carline, column: car_type, label: Car Type, max_values: 30, aliases: [body style, vehicle type, segment]}
+  make: {table: dim_carline, column: make, label: Make, max_values: 100, aliases: [brand, manufacturer]}
+  model: {table: dim_carline, column: model, label: Model, max_values: 150}
+  engine_type: {table: dim_carline, column: engine_type, label: Engine Type, max_values: 30, aliases: [powertrain, fuel type]}
+  colour: {table: dim_color, column: colour_name, label: Colour, max_values: 100, aliases: [color, paint]}
+  city:
+    table: dim_region
+    column: city
+    label: City
+    max_values: 100
+    value_aliases:
+      New Delhi: [Delhi, Delhi NCR]
+      Gurugram: [Gurgaon]
+      Bengaluru: [Bangalore]
+  region: {table: dim_region, column: region_name, label: Region, max_values: 100, aliases: [territory, geography]}
+  state: {table: dim_region, column: state_code, label: State, max_values: 100}
+  dealer_grade: {table: dim_dealer, column: dealer_grade, label: Dealer Grade, max_values: 10}
+
 business_entities:
   - {name: Sales Transaction, table: fact_sales, description: A single vehicle sale event}
   - {name: Vehicle, table: dim_carline, description: A vehicle product in the catalogue (Sedan, SUV, Hatchback, …)}

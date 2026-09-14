@@ -57,9 +57,19 @@ class _CircuitBreaker:
 _CIRCUIT = _CircuitBreaker()
 
 
-def _slim_system_prompt(industry: Industry, schema_hints: str | None) -> str:
+def _slim_system_prompt(
+    industry: Industry,
+    schema_hints: str | None,
+    prior_sql: str | None = None,
+) -> str:
     hints = (schema_hints or "").strip()
     hint_block = f"\nDomain context (use only this):\n{hints}\n" if hints else "\n"
+    prior_block = ""
+    if prior_sql:
+        prior_block = (
+            "\nPRIOR SUCCESSFUL SQL (preserve its intent, joins, and filters unless "
+            f"the user explicitly changes them):\n{prior_sql[:1800]}\n"
+        )
     return (
         f"You are NQL Insight for {industry.value} analytics. "
         "Return one PostgreSQL SELECT only — schema-qualified, read-only, "
@@ -67,7 +77,7 @@ def _slim_system_prompt(industry: Industry, schema_hints: str | None) -> str:
         "Obey Resolved entity, Mandatory filters, ALWAYS/NEVER rules exactly. "
         "Never invent tables or columns. Never confuse salesperson (dim_salesman) "
         "with dealer (dim_dealer)."
-        f"{hint_block}"
+        f"{hint_block}{prior_block}"
     )
 
 
@@ -89,17 +99,25 @@ async def _one_completion(
     system: str,
     question: str,
     timeout: float,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    top_k: int | None = None,
 ) -> LlmResult:
     api_key = settings.llm_api_key.get_secret_value()
-    payload = {
+    payload: dict[str, object] = {
         "model": model,
-        "temperature": settings.llm_temperature,
+        "temperature": settings.llm_temperature if temperature is None else temperature,
         "max_tokens": min(settings.llm_max_completion_tokens, 400),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": question},
         ],
     }
+    if top_p is not None:
+        payload["top_p"] = top_p
+    # Top-K is provider-specific; only send when the selected model advertises support.
+    if top_k is not None and _model_supports_top_k(model):
+        payload["top_k"] = top_k
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -140,12 +158,43 @@ async def _one_completion(
     )
 
 
+def _model_supports_top_k(model: str) -> bool:
+    lowered = model.casefold()
+    # OpenAI chat-completions style models generally do not accept top_k.
+    if "openai" in lowered or "gpt-" in lowered:
+        return False
+    return True
+
+
+def model_catalog(settings: Settings) -> list[dict[str, object]]:
+    primary = settings.llm_default_model
+    fallback = (settings.llm_fallback_model or "").strip()
+    models = [primary]
+    if fallback and fallback not in models:
+        models.append(fallback)
+    return [
+        {
+            "id": model,
+            "label": model,
+            "supportsTopP": True,
+            "supportsTopK": _model_supports_top_k(model),
+            "typicalCostPerQueryUsd": 0.002 if "gpt-5" in model else 0.0015,
+        }
+        for model in models
+    ]
+
+
 async def complete_chat(
     *,
     settings: Settings,
     industry: Industry,
     question: str,
     schema_hints: str | None = None,
+    prior_sql: str | None = None,
+    model_override: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    top_k: int | None = None,
 ) -> LlmResult:
     api_key = settings.llm_api_key.get_secret_value()
     if not api_key:
@@ -166,8 +215,8 @@ async def complete_chat(
         )
 
     timeout = float(settings.nlq_llm_timeout_seconds)
-    system = _slim_system_prompt(industry, schema_hints)
-    primary = settings.llm_default_model
+    system = _slim_system_prompt(industry, schema_hints, prior_sql)
+    primary = (model_override or "").strip() or settings.llm_default_model
     fallback = (settings.llm_fallback_model or "").strip() or None
 
     attempts: list[str] = [primary]
@@ -184,6 +233,9 @@ async def complete_chat(
                 system=system,
                 question=question,
                 timeout=timeout,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
             )
             last = result
             if result.sql:
@@ -191,7 +243,10 @@ async def complete_chat(
                 return result
             transient = result.timed_out or (
                 result.error
-                and any(token in result.error.lower() for token in ("5", "timeout", "unavailable", "connect"))
+                and any(
+                    token in result.error.lower()
+                    for token in ("5", "timeout", "unavailable", "connect")
+                )
             )
             if not transient:
                 break
@@ -206,8 +261,7 @@ async def complete_chat(
         return last
     return LlmResult(
         sql=None,
-        narrative=last.narrative
-        or f"The language model call failed: {last.error or 'unknown'}.",
+        narrative=last.narrative or f"The language model call failed: {last.error or 'unknown'}.",
         model=last.model,
         prompt_tokens=last.prompt_tokens,
         completion_tokens=last.completion_tokens,

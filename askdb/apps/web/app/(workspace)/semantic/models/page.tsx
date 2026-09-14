@@ -13,8 +13,8 @@ export default function SemanticModelsPage() {
   return (
     <>
       <PageHeader
-        title="Semantic Models"
-        description="Validated tables, grains, keys, columns and join contracts from the active YAML pack."
+        title="Semantic Model"
+        description="Validated tables, grains, keys, columns and join contracts with explicit cardinality."
       />
       {pack.isPending ? (
         <LoadingState size="sm" title="Loading model contracts" />
@@ -67,24 +67,60 @@ export default function SemanticModelsPage() {
           <section id="relationships" className="mt-8">
             <h2 className="mb-3 text-base font-semibold">Relationship contracts</h2>
             <div className="card-surface divide-y divide-border">
-              {pack.data.model.relationships.map((relationship) => (
-                <div key={relationship.name} className="flex gap-3 px-4 py-3 text-sm">
-                  <Link2 className="mt-0.5 size-4 shrink-0 text-primary" />
-                  <div>
-                    <p className="font-medium">
-                      {relationship.displayName ?? relationship.name}
-                    </p>
-                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                      {relationship.fromTable}.{relationship.fromColumn} →{" "}
-                      {relationship.toTable}.{relationship.toColumn} · {relationship.type}
-                    </p>
+              {pack.data.model.relationships.map((relationship) => {
+                const cardinality = cardinalityLabel(relationship.type);
+                return (
+                  <div key={relationship.name} className="flex gap-3 px-4 py-3 text-sm">
+                    <Link2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">
+                          {relationship.displayName ?? relationship.name}
+                        </p>
+                        <span
+                          className="rounded-full border border-border bg-muted/40 px-2 py-0.5 font-mono text-2xs font-semibold tracking-wide text-foreground"
+                          title={`Join type: ${relationship.type}`}
+                        >
+                          {cardinality}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                        {relationship.fromTable}.{relationship.fromColumn} →{" "}
+                        {relationship.toTable}.{relationship.toColumn}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         </>
       )}
     </>
   );
+}
+
+function cardinalityLabel(type: string): string {
+  const normalized = type.trim().toLowerCase().replace(/[-\s]/g, "_");
+  if (normalized.includes("one_to_one") || normalized === "1:1") return "1:1";
+  if (
+    normalized.includes("many_to_one") ||
+    normalized.includes("n_to_1") ||
+    normalized === "n:1" ||
+    normalized === "m:1"
+  ) {
+    return "M:1";
+  }
+  if (
+    normalized.includes("one_to_many") ||
+    normalized.includes("1_to_n") ||
+    normalized === "1:n" ||
+    normalized === "1:m"
+  ) {
+    return "1:M";
+  }
+  if (normalized.includes("many_to_many") || normalized === "m:n" || normalized === "n:n") {
+    return "M:N";
+  }
+  return type || "join";
 }

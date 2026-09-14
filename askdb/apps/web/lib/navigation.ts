@@ -8,7 +8,7 @@ import {
   type LucideIcon,
   MessageSquare,
   Network,
-  ReceiptIndianRupee,
+  Activity,
   ScrollText,
   ShieldCheck,
   Star,
@@ -47,7 +47,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Executive Intelligence",
         icon: BarChart3,
         minRole: "viewer",
-        description: "Domain-aware KPIs, grounded AI insights, and What-If analysis.",
+        description: "Domain-aware KPIs, grounded AI insights, and performance analytics.",
       },
       {
         href: "/data-quality",
@@ -71,10 +71,10 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       {
         href: "/semantic",
-        label: "Semantic Core",
+        label: "Semantic Atlas",
         icon: Network,
         minRole: "viewer",
-        description: "Models, relationships, joins, glossary and ontology.",
+        description: "Ontology browser, semantic model, and business glossary.",
       },
       {
         href: "/knowledge",
@@ -104,11 +104,11 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Every executed question with SQL, cost and status.",
       },
       {
-        href: "/cost-analytics",
-        label: "Cost Analytics",
-        icon: ReceiptIndianRupee,
+        href: "/llm-observability",
+        label: "LLM Observability",
+        icon: Activity,
         minRole: "analyst",
-        description: "Token usage and estimated spend by model and user.",
+        description: "Cost analytics and LLM sampling controls.",
       },
       {
         href: "/system-logs",

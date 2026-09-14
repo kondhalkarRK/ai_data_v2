@@ -11,7 +11,6 @@ import {
   GovernanceCenter,
   LineageImpactExplorer,
   ProfilingWorkspace,
-  QualityTrends,
   RuleManagement,
   SchemaDriftMonitor,
 } from "@/components/trust/technical-panels";
@@ -120,9 +119,9 @@ export default function DataTrustCenterPage() {
             </>
           ) : (
             <>
-              <Section title="Trends">
-                <QualityTrends trends={center.data.trends} />
-              </Section>
+              {/* Data Quality Trends removed (Round 2). Aggregate series was
+                  redundant with Dataset Health per-dataset sparklines below;
+                  unique lost: org-wide trust score over time as a single chart. */}
               <Section title="Schema Drift">
                 <SchemaDriftMonitor changes={center.data.schemaChanges} />
               </Section>

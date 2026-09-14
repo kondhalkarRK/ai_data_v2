@@ -26,11 +26,31 @@ EntityKind = Literal[
     "dealer",
     "vehicle",
     "region",
+    "agent",
+    "product",
+    "policy",
+    "customer",
+    "claim",
     "metric_only",
     "unknown",
 ]
 
-MetricKind = Literal["units", "revenue", "orders", "unknown"]
+MetricKind = Literal[
+    "units",
+    "revenue",
+    "orders",
+    "premium",
+    "earned_premium",
+    "claims_incurred",
+    "claim_count",
+    "severity",
+    "frequency",
+    "approval_rate",
+    "renewal_rate",
+    "loss_ratio",
+    "unknown",
+]
+OrderDirection = Literal["asc", "desc"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +59,7 @@ class ExtractedFilter:
     operator: str
     value: str
     label: str
+    source: str = "question"
 
 
 @dataclass(slots=True)
@@ -49,6 +70,7 @@ class QuestionPlan:
     metric: MetricKind
     filters: list[ExtractedFilter] = field(default_factory=list)
     limit: int = 10
+    order_direction: OrderDirection = "desc"
     ambiguity_options: list[str] = field(default_factory=list)
     glossary_hits: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -59,6 +81,7 @@ class QuestionPlan:
 
 
 _TOP = re.compile(r"\b(top|best|highest|leading|most|lowest|worst)\b", re.I)
+_LOWEST = re.compile(r"\b(lowest|worst|least|bottom|minimum|smallest)\b", re.I)
 _TREND = re.compile(r"\b(trend|by\s+month|monthly|over\s+time|time\s+series)\b", re.I)
 _REVENUE = re.compile(r"\b(revenue|sales\s+value|dollar|amount|turnover)\b", re.I)
 _UNITS = re.compile(r"\b(unit|units|volume|qty|quantity)\b", re.I)
@@ -130,12 +153,17 @@ def _limit_from_question(q: str) -> int:
     match = re.search(r"\btop\s+(\d{1,3})\b", q, re.I)
     if match:
         return max(1, min(int(match.group(1)), 50))
-    if re.search(r"\b(the\s+)?top\b|\bbest\b|\bhighest\b", q, re.I):
+    if re.search(r"\b(the\s+)?top\b|\bbest\b|\bhighest\b|\blowest\b|\bworst\b", q, re.I):
         return 10
     return 20
 
 
-def understand_question(industry: Industry, question: str) -> QuestionPlan:
+def understand_question(
+    industry: Industry,
+    question: str,
+    *,
+    value_filters: list[ExtractedFilter] | None = None,
+) -> QuestionPlan:
     q = (question or "").strip()
     if not q:
         return QuestionPlan(
@@ -146,15 +174,57 @@ def understand_question(industry: Industry, question: str) -> QuestionPlan:
         )
 
     if industry is Industry.AUTOMOTIVE:
-        return _understand_automotive(q)
-    if industry is Industry.INSURANCE:
-        return _understand_insurance(q)
-    return QuestionPlan(
-        industry=industry,
-        intent="unknown",
-        entity="unknown",
-        metric="unknown",
-    )
+        plan = _understand_automotive(q)
+    else:
+        plan = _understand_insurance(q)
+    plan.order_direction = "asc" if _LOWEST.search(q) else "desc"
+    plan.filters = _merge_filters(plan.filters, value_filters or [])
+    _apply_value_inference(plan, q)
+    return plan
+
+
+def _merge_filters(
+    primary: list[ExtractedFilter],
+    additional: list[ExtractedFilter],
+) -> list[ExtractedFilter]:
+    merged: list[ExtractedFilter] = []
+    seen: set[tuple[str, str]] = set()
+    for filt in [*primary, *additional]:
+        key = (filt.column.casefold(), filt.value.casefold())
+        if key not in seen:
+            merged.append(filt)
+            seen.add(key)
+    return merged
+
+
+def _apply_value_inference(plan: QuestionPlan, question: str) -> None:
+    """Promote a plan when a live dictionary value supplies the missing entity."""
+    columns = {f.column.casefold() for f in plan.filters}
+    if plan.industry is Industry.AUTOMOTIVE:
+        if any("dim_carline" in col for col in columns) and plan.entity == "unknown":
+            plan.entity = "vehicle"
+        elif any("dim_region" in col for col in columns) and plan.entity == "unknown":
+            plan.entity = "region"
+        if plan.entity != "unknown" and plan.intent == "unknown":
+            plan.intent = "ranking" if _TOP.search(question) else "aggregation"
+        if plan.metric == "unknown" and plan.entity in {
+            "vehicle",
+            "region",
+            "salesperson",
+            "dealer",
+        }:
+            plan.metric = "units" if _SELLING.search(question) else "revenue"
+    else:
+        if any("dim_agent" in col for col in columns) and plan.entity == "unknown":
+            plan.entity = "agent"
+        elif any("dim_product" in col for col in columns) and plan.entity == "unknown":
+            plan.entity = "product"
+        elif any("dim_policy" in col for col in columns) and plan.entity == "unknown":
+            plan.entity = "policy"
+        elif any("dim_region" in col for col in columns) and plan.entity == "unknown":
+            plan.entity = "region"
+        if plan.entity != "unknown" and plan.intent == "unknown":
+            plan.intent = "ranking" if _TOP.search(question) else "aggregation"
 
 
 def _understand_automotive(q: str) -> QuestionPlan:
@@ -291,37 +361,112 @@ def _understand_automotive(q: str) -> QuestionPlan:
 
 
 def _understand_insurance(q: str) -> QuestionPlan:
+    limit = _limit_from_question(q)
+    intent: IntentKind = "ranking" if _TOP.search(q) else "aggregation"
+    entity: EntityKind = "metric_only"
+    if re.search(r"\b(agent|agents|broker|brokers|intermediar(?:y|ies)|advisor)\b", q, re.I):
+        entity = "agent"
+    elif re.search(r"\b(customer|customers|policyholder|policyholders)\b", q, re.I):
+        entity = "customer"
+    elif re.search(r"\b(policy|policies|contract|contracts)\b", q, re.I):
+        entity = "policy"
+    elif re.search(r"\b(product|products|lob|line\s+of\s+business|business\s+line)\b", q, re.I):
+        entity = "product"
+    elif re.search(r"\b(region|regions|territory|territories|state|states)\b", q, re.I):
+        entity = "region"
+    elif re.search(r"\b(claim|claims)\b", q, re.I):
+        entity = "claim"
+
     if re.search(r"loss\s*ratio", q, re.I):
         return QuestionPlan(
             industry=Industry.INSURANCE,
-            intent="trend",
-            entity="metric_only",
-            metric="unknown",
+            intent="trend" if _TREND.search(q) else intent,
+            entity=entity,
+            metric="loss_ratio",
+            limit=limit,
             glossary_hits=["Loss Ratio"],
+        )
+    if re.search(r"\b(severity|average\s+(claim|loss))\b", q, re.I):
+        return QuestionPlan(
+            industry=Industry.INSURANCE,
+            intent=intent,
+            entity=entity,
+            metric="severity",
+            limit=limit,
+            glossary_hits=["Average Claim Severity"],
+        )
+    if re.search(r"\b(frequency|claims?\s+per\s+exposure)\b", q, re.I):
+        return QuestionPlan(
+            industry=Industry.INSURANCE,
+            intent=intent,
+            entity=entity,
+            metric="frequency",
+            limit=limit,
+            glossary_hits=["Claim Frequency"],
+        )
+    if re.search(r"\b(approval\s+rate|approved\s+(percentage|rate))\b", q, re.I):
+        return QuestionPlan(
+            industry=Industry.INSURANCE,
+            intent=intent,
+            entity=entity,
+            metric="approval_rate",
+            limit=limit,
+            glossary_hits=["Approval Rate"],
+        )
+    if re.search(r"\b(renewal\s+rate|persistency|retention\s+rate)\b", q, re.I):
+        return QuestionPlan(
+            industry=Industry.INSURANCE,
+            intent=intent,
+            entity=entity,
+            metric="renewal_rate",
+            limit=limit,
+            glossary_hits=["Renewal Rate"],
+        )
+    if re.search(r"\b(earned\s+premium|premium\s+earned)\b", q, re.I):
+        return QuestionPlan(
+            industry=Industry.INSURANCE,
+            intent="trend" if _TREND.search(q) else intent,
+            entity=entity,
+            metric="earned_premium",
+            limit=limit,
+            glossary_hits=["Earned Premium"],
+        )
+    if re.search(r"\b(premium|gwp|business\s+written)\b", q, re.I):
+        return QuestionPlan(
+            industry=Industry.INSURANCE,
+            intent="trend" if _TREND.search(q) else intent,
+            entity=entity,
+            metric="premium",
+            limit=limit,
+            glossary_hits=["Gross Written Premium"],
+        )
+    if re.search(r"\b(incurred|claims?\s+cost|loss(?:es)?)\b", q, re.I):
+        return QuestionPlan(
+            industry=Industry.INSURANCE,
+            intent=intent,
+            entity=entity,
+            metric="claims_incurred",
+            limit=limit,
+            glossary_hits=["Claims Incurred"],
         )
     if re.search(r"\b(claim|claims)\b", q, re.I):
         return QuestionPlan(
             industry=Industry.INSURANCE,
-            intent="aggregation",
-            entity="metric_only",
-            metric="orders",
-            glossary_hits=["Claims"],
+            intent=intent,
+            entity=entity,
+            metric="claim_count",
+            limit=limit,
+            glossary_hits=["Claim Count"],
         )
-    if re.search(r"premium|gwp", q, re.I):
+    if entity != "metric_only":
         return QuestionPlan(
             industry=Industry.INSURANCE,
-            intent="trend",
-            entity="metric_only",
-            metric="revenue",
-            glossary_hits=["Premium"],
-        )
-    if re.search(r"\bregion\b", q, re.I) and _TOP.search(q):
-        return QuestionPlan(
-            industry=Industry.INSURANCE,
-            intent="ranking",
-            entity="region",
-            metric="unknown",
-            limit=15,
+            intent=intent,
+            entity=entity,
+            metric="premium"
+            if entity in {"agent", "product", "policy", "customer"}
+            else "claim_count",
+            limit=limit,
         )
     return QuestionPlan(
         industry=Industry.INSURANCE,

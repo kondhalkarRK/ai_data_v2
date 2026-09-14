@@ -141,6 +141,38 @@ dimensions:
   Agent: {display_name: Agent, source_table: dim_agent, attributes: [agent_name, channel_name, branch_name], synonyms: [broker, intermediary, advisor]}
   Policy: {display_name: Policy, source_table: dim_policy, attributes: [policy_number, customer_key, policy_status, coverage_tier], synonyms: [coverage, contract, customer, policyholder]}
 
+hierarchies:
+  Product: [line_of_business, product_family, product_name, coverage_type]
+  Geography: [country_name, state_name, region_name]
+  Distribution: [channel_name, branch_name, agent_name]
+  Policy: [policy_status, coverage_tier, policy_number]
+  Claim: [claim_status, claim_type, claim_number]
+
+value_domains:
+  claim_status: {table: fact_claims, column: claim_status, label: Claim Status, max_values: 30}
+  claim_type: {table: fact_claims, column: claim_type, label: Claim Type, max_values: 50}
+  policy_status: {table: dim_policy, column: policy_status, label: Policy Status, max_values: 20}
+  coverage_tier: {table: dim_policy, column: coverage_tier, label: Coverage Tier, max_values: 20}
+  product: {table: dim_product, column: product_name, label: Product, max_values: 100}
+  line_of_business: {table: dim_product, column: line_of_business, label: Line of Business, max_values: 50, aliases: [LOB, business line]}
+  product_family: {table: dim_product, column: product_family, label: Product Family, max_values: 50}
+  coverage_type: {table: dim_product, column: coverage_type, label: Coverage Type, max_values: 50}
+  channel: {table: dim_agent, column: channel_name, label: Channel, max_values: 30}
+  branch: {table: dim_agent, column: branch_name, label: Branch, max_values: 100}
+  region:
+    table: dim_region
+    column: region_name
+    label: Region
+    max_values: 100
+    value_aliases:
+      National Capital Region: [Delhi, NCR]
+      Mumbai Metro: [Mumbai]
+      Bengaluru Metro: [Bengaluru, Bangalore]
+      Hyderabad Metro: [Hyderabad]
+      Chennai Metro: [Chennai]
+      Kolkata Metro: [Kolkata]
+  state: {table: dim_region, column: state_name, label: State, max_values: 100}
+
 business_entities:
   - {name: Claim, table: fact_claims, description: A reported insurance loss}
   - {name: Premium Exposure, table: fact_policy_monthly, description: Monthly premium and exposure for a policy}

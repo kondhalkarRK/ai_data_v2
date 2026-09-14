@@ -13,16 +13,24 @@ export default function GlossaryPage() {
   const pack = useSemanticPack();
   const [query, setQuery] = React.useState("");
 
-  const terms = React.useMemo(() => {
-    if (!pack.data) return [];
+  const grouped = React.useMemo(() => {
+    if (!pack.data) return [] as Array<[string, Array<[string, (typeof pack.data.glossary.terms)[string]]>]>;
     const needle = query.trim().toLowerCase();
-    return Object.entries(pack.data.glossary.terms).filter(([name, term]) => {
+    const filtered = Object.entries(pack.data.glossary.terms).filter(([name, term]) => {
       if (!needle) return true;
       return [name, term.definition, term.category, ...term.synonyms]
         .join(" ")
         .toLowerCase()
         .includes(needle);
     });
+    const byCategory = new Map<string, Array<[string, (typeof pack.data.glossary.terms)[string]]>>();
+    for (const entry of filtered) {
+      const category = entry[1].category?.trim() || "General";
+      const list = byCategory.get(category) ?? [];
+      list.push(entry);
+      byCategory.set(category, list);
+    }
+    return [...byCategory.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [pack.data, query]);
 
   return (
@@ -47,40 +55,45 @@ export default function GlossaryPage() {
       ) : pack.isError ? (
         <p className="text-sm text-danger">The glossary is unavailable.</p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {terms.map(([name, term]) => (
-            <Card key={name}>
-              <CardContent className="pt-5">
-                <div className="flex items-start justify-between gap-3">
-                  <CardTitle className="text-base">{term.displayLabel ?? name}</CardTitle>
-                  <span className="rounded-full border border-border px-2 py-0.5 text-2xs text-muted-foreground">
-                    {term.category}
-                  </span>
-                </div>
-                <CardDescription className="mt-2 leading-relaxed">
-                  {term.definition}
-                </CardDescription>
-                {term.synonyms.length ? (
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {term.synonyms.map((synonym) => (
-                      <span
-                        key={synonym}
-                        className="rounded-full bg-surface-sunken px-2 py-0.5 text-2xs"
-                      >
-                        {synonym}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                {term.mapsToMeasure || term.mapsToDimension ? (
-                  <p className="mt-3 font-mono text-2xs text-primary">
-                    → {term.mapsToMeasure ?? term.mapsToDimension}
-                  </p>
-                ) : null}
-              </CardContent>
-            </Card>
+        <div className="space-y-8">
+          {grouped.map(([category, terms]) => (
+            <section key={category}>
+              <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground">
+                {category}
+                <span className="ml-2 font-normal tabular-nums">({terms.length})</span>
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {terms.map(([name, term]) => (
+                  <Card key={name} className="card-secondary">
+                    <CardContent className="pt-5">
+                      <CardTitle className="text-base">{term.displayLabel ?? name}</CardTitle>
+                      <CardDescription className="mt-2 leading-relaxed">
+                        {term.definition}
+                      </CardDescription>
+                      {term.synonyms.length ? (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {term.synonyms.map((synonym) => (
+                            <span
+                              key={synonym}
+                              className="rounded-full bg-surface-sunken px-2 py-0.5 text-2xs"
+                            >
+                              {synonym}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      {term.mapsToMeasure || term.mapsToDimension ? (
+                        <p className="mt-3 font-mono text-2xs text-primary">
+                          → {term.mapsToMeasure ?? term.mapsToDimension}
+                        </p>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
           ))}
-          {!terms.length ? (
+          {!grouped.length ? (
             <p className="text-sm text-muted-foreground">
               No glossary terms match “{query}”.
             </p>

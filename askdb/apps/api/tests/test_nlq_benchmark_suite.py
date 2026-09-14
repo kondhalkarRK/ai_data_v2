@@ -17,6 +17,23 @@ from app.services.chat.question_understanding import understand_question
 from app.services.chat.semantic_context import validate_sql_against_plan
 from app.services.chat.sql_limits import ensure_result_limit
 from app.services.chat.templates import resolve_template
+from app.services.chat.value_dictionary import (
+    BusinessValue,
+    ValueDictionarySnapshot,
+)
+
+
+def _plan_with_values(
+    industry: Industry,
+    question: str,
+    *values: BusinessValue,
+):
+    snapshot = ValueDictionarySnapshot(industry, values)
+    return understand_question(
+        industry,
+        question,
+        value_filters=snapshot.match(question),
+    )
 
 
 @pytest.mark.parametrize(
@@ -153,3 +170,120 @@ def test_complex_multi_join_template_exists() -> None:
     assert hit is not None
     assert "dim_carline" in hit.sql
     assert "fact_sales" in hit.sql
+
+
+def test_mumbai_is_a_mandatory_dealer_filter() -> None:
+    plan = _plan_with_values(
+        Industry.AUTOMOTIVE,
+        "Best performing dealer in Mumbai",
+        BusinessValue("City", "automotive.dim_region.city", "Mumbai", 2),
+        BusinessValue("Region", "automotive.dim_region.region_name", "Mumbai West", 1),
+    )
+    assert [(f.column, f.value) for f in plan.filters] == [("automotive.dim_region.city", "Mumbai")]
+    hit = resolve_template(
+        Industry.AUTOMOTIVE,
+        "Best performing dealer in Mumbai",
+        plan=plan,
+    )
+    assert hit is not None
+    assert "dim_dealer" in hit.sql
+    assert "dim_region" in hit.sql
+    assert "r.city = 'Mumbai'" in hit.sql
+
+
+def test_lowest_suv_sorts_ascending() -> None:
+    plan = understand_question(Industry.AUTOMOTIVE, "Lowest selling SUV")
+    assert plan.order_direction == "asc"
+    hit = resolve_template(Industry.AUTOMOTIVE, "Lowest selling SUV", plan=plan)
+    assert hit is not None
+    assert "car_type = 'SUV'" in hit.sql
+    assert "ORDER BY units_sold ASC" in hit.sql
+    ok, reason = validate_sql_against_plan(hit.sql, plan)
+    assert ok, reason
+
+
+def test_colour_and_body_style_filters_are_both_preserved() -> None:
+    question = "Top selling Fire Red sedan"
+    plan = _plan_with_values(
+        Industry.AUTOMOTIVE,
+        question,
+        BusinessValue("Colour", "automotive.dim_color.colour_name", "Fire Red", 50),
+    )
+    hit = resolve_template(Industry.AUTOMOTIVE, question, plan=plan)
+    assert hit is not None
+    assert "JOIN automotive.dim_color co" in hit.sql
+    assert "co.colour_name = 'Fire Red'" in hit.sql
+    assert "c.car_type = 'Sedan'" in hit.sql
+
+
+@pytest.mark.parametrize(
+    ("question", "entity", "required_table"),
+    [
+        ("Top agent by premium", "agent", "dim_agent"),
+        ("Top insurance policy by premium", "policy", "dim_policy"),
+        ("Highest premium customer", "customer", "dim_policy"),
+    ],
+)
+def test_insurance_entity_templates(
+    question: str,
+    entity: str,
+    required_table: str,
+) -> None:
+    plan = understand_question(Industry.INSURANCE, question)
+    assert plan.entity == entity
+    hit = resolve_template(Industry.INSURANCE, question, plan=plan)
+    assert hit is not None
+    assert required_table in hit.sql
+
+
+def test_insurance_status_and_lob_values_are_preserved() -> None:
+    status_question = "How many settled claims?"
+    status_plan = _plan_with_values(
+        Industry.INSURANCE,
+        status_question,
+        BusinessValue(
+            "Claim Status",
+            "insurance.fact_claims.claim_status",
+            "Settled",
+            100,
+        ),
+    )
+    status_hit = resolve_template(
+        Industry.INSURANCE,
+        status_question,
+        plan=status_plan,
+    )
+    assert status_hit is not None
+    assert "c.claim_status = 'Settled'" in status_hit.sql
+
+    lob_question = "Top product by premium for Motor"
+    lob_plan = _plan_with_values(
+        Industry.INSURANCE,
+        lob_question,
+        BusinessValue(
+            "Line of Business",
+            "insurance.dim_product.line_of_business",
+            "Motor",
+            100,
+        ),
+    )
+    lob_hit = resolve_template(Industry.INSURANCE, lob_question, plan=lob_plan)
+    assert lob_hit is not None
+    assert "p.line_of_business = 'Motor'" in lob_hit.sql
+
+
+def test_schema_validation_rejects_invented_column() -> None:
+    plan = understand_question(Industry.AUTOMOTIVE, "Top salesperson")
+    sql = """
+    SELECT s.imaginary_score, SUM(f.order_qty) AS units_sold
+    FROM automotive.fact_sales f
+    JOIN automotive.dim_salesman s ON s.sales_person_id = f.sales_person_id
+    GROUP BY 1 ORDER BY units_sold DESC LIMIT 10
+    """
+    allowed = {
+        "automotive.fact_sales": {"order_qty", "sales_person_id"},
+        "automotive.dim_salesman": {"sales_person_id", "first_name", "last_name"},
+    }
+    ok, reason = validate_sql_against_plan(sql, plan, allowed_schema=allowed)
+    assert not ok
+    assert reason and "imaginary_score" in reason

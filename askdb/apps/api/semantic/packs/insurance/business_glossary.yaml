@@ -74,6 +74,40 @@ terms:
     synonyms: [broker, intermediary, advisor, channel]
     category: People
     maps_to_dimension: Agent
+    disambiguation:
+      - Insurance agent means dim_agent; it is unrelated to automotive salesperson.
+  Claim Status:
+    definition: Workflow state of a claim, using the exact live fact_claims.claim_status value.
+    synonyms: [claim state, claims status, open claims, settled claims, repudiated claims]
+    category: Claims Filter
+    maps_to_attribute: fact_claims.claim_status
+    sql_expression: insurance.fact_claims.claim_status
+    calculation_rules:
+      - Preserve an explicitly named status as a mandatory filter.
+  Line of Business:
+    definition: Product portfolio category such as Motor, Health, Property, Travel, Commercial, or Liability.
+    synonyms: [LOB, business line, insurance line]
+    category: Product Filter
+    maps_to_attribute: dim_product.line_of_business
+    sql_expression: insurance.dim_product.line_of_business
+  Policy Status:
+    definition: Current policy lifecycle status using the exact live dim_policy.policy_status value.
+    synonyms: [policy state, active policies, lapsed policies, cancelled policies, expired policies]
+    category: Policy Filter
+    maps_to_attribute: dim_policy.policy_status
+    sql_expression: insurance.dim_policy.policy_status
+  Coverage Tier:
+    definition: Policy coverage service tier.
+    synonyms: [tier, plan tier, coverage level]
+    category: Policy Filter
+    maps_to_attribute: dim_policy.coverage_tier
+    sql_expression: insurance.dim_policy.coverage_tier
+  Distribution Channel:
+    definition: Channel through which an insurance agent distributes policies.
+    synonyms: [channel, sales channel, broker channel, agency channel]
+    category: Distribution Filter
+    maps_to_attribute: dim_agent.channel_name
+    sql_expression: insurance.dim_agent.channel_name
   Accounting Month:
     definition: Calendar month grain for premium reporting.
     synonyms: [month, monthly, period, year]
@@ -90,5 +124,9 @@ domain_rules:
     - SQL is the source of truth for numerical results.
     - Sales defaults to Gross Written Premium.
     - Claims use reported_date; premium uses accounting_month.
+    - Explicit product, LOB, status, tier, channel, branch, state and region values are mandatory filters.
+    - Agent questions use dim_agent; policyholder or customer questions use dim_policy.customer_key.
   never_rules:
     - Never sum premium from claim rows.
+    - Never apply claim-status filters to premium rows.
+    - Never mix automotive tables or terminology into insurance SQL.

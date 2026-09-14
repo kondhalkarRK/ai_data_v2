@@ -65,21 +65,24 @@ class ExecutiveIntelligenceService:
         compare_label = self._compare_label(window)
 
         available_ids = {card.id for card in summary.cards if _card_is_displayable(card)}
-        primary = [c for c in summary.cards if c.id in cfg["primaryKpis"] and c.id in available_ids]
-        # Preserve configured order
-        primary_ordered = sorted(
-            primary,
-            key=lambda c: cfg["primaryKpis"].index(c.id) if c.id in cfg["primaryKpis"] else 99,
-        )
-        if len(primary_ordered) < 4:
+        preferred = list(cfg.get("primaryKpis") or []) + list(cfg.get("secondaryKpis") or [])
+        by_id = {c.id: c for c in summary.cards if c.id in available_ids}
+        ordered: list[Any] = []
+        for kpi_id in preferred:
+            card = by_id.get(kpi_id)
+            if card is not None and card not in ordered:
+                ordered.append(card)
+            if len(ordered) >= 8:
+                break
+        # Fill incomplete grids only with real available metrics — never invent.
+        if len(ordered) < 8:
             for card in summary.cards:
-                if card.id in available_ids and card not in primary_ordered:
-                    primary_ordered.append(card)
-                if len(primary_ordered) >= 6:
+                if card.id in available_ids and card not in ordered:
+                    ordered.append(card)
+                if len(ordered) >= 8:
                     break
 
-        # Hide empty / N/A cards entirely
-        cards = [c for c in primary_ordered if _card_is_displayable(c)]
+        cards = [c for c in ordered if _card_is_displayable(c)][:8]
 
         dq = await self._data_quality_notice(cfg.get("dqTables") or [])
         glossary_terms = list(cfg.get("glossaryHints") or [])

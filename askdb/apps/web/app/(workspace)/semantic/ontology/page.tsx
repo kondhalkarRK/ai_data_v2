@@ -28,7 +28,7 @@ function OntologyPageInner() {
     <>
       <div className="mb-3 flex items-center gap-3">
         <Button asChild variant="ghost" size="icon-sm">
-          <Link href="/semantic" aria-label="Back to Semantic Core">
+          <Link href="/semantic" aria-label="Back to Semantic Atlas">
             <ChevronLeft />
           </Link>
         </Button>

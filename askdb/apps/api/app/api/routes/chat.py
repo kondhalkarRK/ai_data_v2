@@ -18,15 +18,17 @@ from app.api.deps import (
     get_app_session,
     get_app_settings,
     get_registry,
+    get_semantic_service,
 )
 from app.core.config import Settings
 from app.core.exceptions import NqlError
 from app.db.session import DatabaseRegistry
 from app.schemas.common import ApiModel
+from app.semantic.service import SemanticService
 from app.services.chat.profiler import PROFILER
 from app.services.chat.query_cache import QUERY_CACHE
 from app.services.chat.service import ChatService
-from app.services.llm import circuit_stats
+from app.services.llm import circuit_stats, model_catalog
 
 router = APIRouter(tags=["chat"])
 _cancel_requested: set[uuid.UUID] = set()
@@ -36,6 +38,10 @@ class AskRequest(ApiModel):
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
     web_retrieval: bool = False
+    model: str | None = None
+    temperature: float | None = Field(default=None, ge=0.0, le=1.5)
+    top_p: float | None = Field(default=None, ge=0.0, le=1.0)
+    top_k: int | None = Field(default=None, ge=1, le=200)
 
 
 class SaveQuestionRequest(ApiModel):
@@ -60,6 +66,7 @@ async def chat_ask(
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
     analytics: Annotated[AsyncConnection, Depends(_analytics)],
+    semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
 ) -> StreamingResponse:
     service = ChatService(
         app_session=session,
@@ -67,6 +74,7 @@ async def chat_ask(
         settings=settings,
         user=user,
         industry=industry,
+        semantic_service=semantic_service,
     )
 
     async def event_stream() -> AsyncIterator[bytes]:
@@ -76,6 +84,10 @@ async def chat_ask(
                 body.conversation_id,
                 cancel_requested=_cancel_requested,
                 web_retrieval=body.web_retrieval,
+                model_override=body.model,
+                temperature=body.temperature,
+                top_p=body.top_p,
+                top_k=body.top_k,
             ):
                 yield frame.encode("utf-8")
         except NqlError as exc:
@@ -214,6 +226,38 @@ async def chat_profiler(
             "Process-local POC store. Production should export p50/p95/p99 "
             "and error rates to a durable metrics backend."
         ),
+    }
+
+
+@router.get("/llm/controls")
+async def llm_controls(
+    user: RequireAnalyst,
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> dict[str, Any]:
+    del user
+    catalog = model_catalog(settings)
+    return {
+        "defaultModel": settings.llm_default_model,
+        "fallbackModel": (settings.llm_fallback_model or "").strip() or None,
+        "defaultTemperature": settings.llm_temperature,
+        "monthlyBudgetUsd": settings.llm_monthly_budget_usd,
+        "models": catalog,
+        "parameterHelp": {
+            "temperature": (
+                "Controls how predictable vs. varied the model's answers are. "
+                "Lower values (e.g. 0.1–0.3) make answers more consistent and literal — "
+                "recommended for SQL generation."
+            ),
+            "topP": (
+                "Limits how many possible next words the model considers, based on "
+                "cumulative probability. Most providers recommend adjusting either "
+                "Temperature or Top-P — not both at once."
+            ),
+            "topK": (
+                "Limits the model to choosing from only its K most likely next words. "
+                "Not all models support this parameter — it is disabled when unsupported."
+            ),
+        },
     }
 
 

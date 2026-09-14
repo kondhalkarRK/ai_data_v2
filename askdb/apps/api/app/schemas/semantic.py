@@ -76,6 +76,17 @@ class BusinessEntity(ApiModel):
     description: str | None = None
 
 
+class SemanticValueDomain(ApiModel):
+    """Bounded categorical column used for runtime business-value resolution."""
+
+    table: str
+    column: str
+    label: str
+    max_values: int = Field(default=100, ge=1, le=500)
+    aliases: list[str] = Field(default_factory=list)
+    value_aliases: dict[str, list[str]] = Field(default_factory=dict)
+
+
 class SemanticModel(ApiModel):
     version: str
     domain: str
@@ -89,6 +100,7 @@ class SemanticModel(ApiModel):
     business_entities: list[BusinessEntity] = Field(default_factory=list)
     join_paths: dict[str, Any] = Field(default_factory=dict)
     domain_rules: dict[str, list[str]] = Field(default_factory=dict)
+    value_domains: dict[str, SemanticValueDomain] = Field(default_factory=dict)
 
 
 class GlossaryTerm(ApiModel):

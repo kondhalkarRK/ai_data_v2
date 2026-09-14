@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/c
 import { PageShell } from "@/components/ui/page-shell";
 import { useActiveIndustry } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
+import { useUiStore } from "@/stores/ui-store";
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -28,6 +29,10 @@ export function ChatWorkspace() {
   const abortRef = useRef<AbortController | null>(null);
   const historyIdRef = useRef<string | null>(null);
   const bootstrapped = useRef(false);
+  const llmModel = useUiStore((s) => s.llmModel);
+  const llmTemperature = useUiStore((s) => s.llmTemperature);
+  const llmTopP = useUiStore((s) => s.llmTopP);
+  const llmTopK = useUiStore((s) => s.llmTopK);
 
   useEffect(() => {
     const seeded = searchParams.get("q");
@@ -72,6 +77,10 @@ export function ChatWorkspace() {
           question: userMessage.question,
           conversationId,
           webRetrieval,
+          model: llmModel || undefined,
+          temperature: llmTemperature,
+          topP: llmTopP,
+          topK: llmTopK,
         }),
       });
       if (!response.ok || !response.body) {

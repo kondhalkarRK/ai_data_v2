@@ -21,11 +21,7 @@ from app.core.config import Industry, Settings
 from app.core.exceptions import ValidationError
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuestion
 from app.models.user import User
-from app.services.chat.question_understanding import QuestionPlan, understand_question
-from app.services.chat.semantic_context import (
-    build_domain_sql_hints,
-    validate_sql_against_plan,
-)
+from app.semantic.service import SemanticService
 from app.services.chat.failures import (
     FailureInfo,
     classify_database,
@@ -44,6 +40,7 @@ from app.services.chat.intents import (
 )
 from app.services.chat.profiler import PROFILER, QueryProfile
 from app.services.chat.query_cache import QUERY_CACHE, CachedAnswer
+from app.services.chat.question_understanding import QuestionPlan, understand_question
 from app.services.chat.response_meta import (
     QueryTimings,
     build_insights,
@@ -54,9 +51,18 @@ from app.services.chat.response_meta import (
     source_database_label,
     sql_diff_lines,
 )
+from app.services.chat.semantic_context import (
+    build_allowed_schema,
+    build_domain_sql_hints,
+    validate_sql_against_plan,
+)
 from app.services.chat.sql_limits import ensure_result_limit
 from app.services.chat.templates import list_templates, resolve_template
 from app.services.chat.trust import compute_trust_score
+from app.services.chat.value_dictionary import (
+    ValueDictionarySnapshot,
+    get_value_dictionary,
+)
 from app.services.knowledge import KnowledgeService
 from app.services.llm import complete_chat
 from app.services.web_retrieval import WebRetrievalService
@@ -94,9 +100,7 @@ def _progress(current: str, completed: list[str], *, slow: bool = False) -> str:
     }
     if slow:
         payload["slowWarning"] = True
-        payload["message"] = (
-            f"This query is taking longer than expected. Current Stage: {label}"
-        )
+        payload["message"] = f"This query is taking longer than expected. Current Stage: {label}"
     return _sse("progress", payload)
 
 
@@ -109,12 +113,14 @@ class ChatService:
         settings: Settings,
         user: User,
         industry: Industry,
+        semantic_service: SemanticService | None = None,
     ) -> None:
         self._app = app_session
         self._analytics = analytics
         self._settings = settings
         self._user = user
         self._industry = industry
+        self._semantic = semantic_service or SemanticService(settings)
 
     async def ask_stream(
         self,
@@ -124,6 +130,10 @@ class ChatService:
         cancel_event: Event | None = None,
         cancel_requested: set[uuid.UUID] | None = None,
         web_retrieval: bool = False,
+        model_override: str | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
     ) -> AsyncIterator[str]:
         started = time.perf_counter()
         wall_started = time.time()
@@ -285,7 +295,29 @@ class ChatService:
                 yield frame
             return
 
-        plan = understand_question(self._industry, question)
+        try:
+            semantic_pack = await self._semantic.get_pack(self._industry)
+        except Exception:
+            logger.warning("Semantic pack unavailable; using fallback hints", exc_info=True)
+            semantic_pack = None
+        try:
+            value_dictionary = await get_value_dictionary(
+                self._analytics,
+                self._industry,
+                pack=semantic_pack,
+            )
+        except Exception:
+            logger.warning(
+                "Value dictionary unavailable; continuing with semantic rules", exc_info=True
+            )
+            value_dictionary = ValueDictionarySnapshot(self._industry, ())
+        value_filters = value_dictionary.match(question)
+        allowed_schema = build_allowed_schema(semantic_pack)
+        plan = understand_question(
+            self._industry,
+            question,
+            value_filters=value_filters,
+        )
         if plan.is_ambiguous and plan.ambiguity_options:
             msg = "Your question is ambiguous. Did you mean one of these?"
             async for frame in finish_without_sql(
@@ -391,8 +423,12 @@ class ChatService:
             templates = list_templates(self._industry)
             hit = secrets.choice(templates) if templates else None
             yield _sse("stage", {"stage": "surprise"})
+        elif prior_sql:
+            # Follow-ups must preserve the prior query's grain and joins. A fresh
+            # standalone template would silently discard that context.
+            hit = None
         else:
-            hit = resolve_template(self._industry, question)
+            hit = resolve_template(self._industry, question, plan=plan)
         timings.semantic_lookup_ms = int((time.perf_counter() - semantic_t0) * 1000)
         completed_steps.append("metrics")
         yield _progress("sql", completed_steps, slow=maybe_slow())
@@ -407,7 +443,11 @@ class ChatService:
 
         if hit is not None:
             if not is_surprise_me(question):
-                ok, reason = validate_sql_against_plan(hit.sql, plan)
+                ok, reason = validate_sql_against_plan(
+                    hit.sql,
+                    plan,
+                    allowed_schema=allowed_schema,
+                )
                 if not ok:
                     logger.warning("Template SQL failed plan validation: %s", reason)
                     async for frame in emit_failure(
@@ -437,6 +477,11 @@ class ChatService:
                 industry=self._industry,
                 question=question,
                 schema_hints=await self._domain_sql_hints(question, plan),
+                prior_sql=prior_sql,
+                model_override=model_override,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
             )
             timings.llm_generation_ms = int((time.perf_counter() - llm_t0) * 1000)
             profile.llm_calls = 1
@@ -448,7 +493,11 @@ class ChatService:
                     yield frame
                 return
             if llm.sql:
-                ok, reason = validate_sql_against_plan(llm.sql, plan)
+                ok, reason = validate_sql_against_plan(
+                    llm.sql,
+                    plan,
+                    allowed_schema=allowed_schema,
+                )
                 if not ok:
                     logger.warning("LLM SQL failed plan validation: %s", reason)
                     async for frame in emit_failure(
@@ -460,11 +509,12 @@ class ChatService:
                 path = "semantic_llm"
                 glossary_matches = 1
                 narrative += llm.narrative or "Generated with the configured language model."
-                ambiguity_flag = True
-                alternate_interpretations = [
-                    "Rephrase with an explicit metric name from the glossary",
-                    "Ask for a monthly trend of a known KPI",
-                ]
+                ambiguity_flag = plan.entity == "unknown" and not plan.filters
+                if ambiguity_flag:
+                    alternate_interpretations = [
+                        "Rephrase with an explicit metric name from the glossary",
+                        "Ask for a monthly trend of a known KPI",
+                    ]
                 await self._record_usage(llm.model, llm.prompt_tokens, llm.completion_tokens)
             else:
                 if llm.error and self._settings.llm_api_key.get_secret_value():
@@ -562,9 +612,7 @@ class ChatService:
             exec_t0 = time.perf_counter()
             try:
                 timeout_ms = int(self._settings.nlq_sql_timeout_seconds * 1000)
-                await self._analytics.execute(
-                    text(f"SET LOCAL statement_timeout = {timeout_ms}")
-                )
+                await self._analytics.execute(text(f"SET LOCAL statement_timeout = {timeout_ms}"))
                 result = await self._analytics.execute(text(sql_text))
                 mappings = result.mappings().all()
                 cap = min(
@@ -573,9 +621,7 @@ class ChatService:
                 )
                 capped = mappings[:cap]
                 columns = list(capped[0].keys()) if capped else list(result.keys())
-                rows = [
-                    {key: _jsonable(value) for key, value in row.items()} for row in capped
-                ]
+                rows = [{key: _jsonable(value) for key, value in row.items()} for row in capped]
                 timings.execution_ms = int((time.perf_counter() - exec_t0) * 1000)
                 probed = await self._probe_data_as_of(sql_text)
                 if probed:
@@ -774,9 +820,7 @@ class ChatService:
     async def _domain_sql_hints(self, question: str, plan: QuestionPlan) -> str:
         pack = None
         try:
-            from app.semantic.service import SemanticService
-
-            pack = await SemanticService(self._settings).get_pack(self._industry)
+            pack = await self._semantic.get_pack(self._industry)
         except Exception:
             logger.debug("Semantic pack unavailable; using fallback schema hints", exc_info=True)
         return build_domain_sql_hints(
@@ -793,9 +837,7 @@ class ChatService:
         }
         table, col = probes[self._industry]
         try:
-            result = await self._analytics.execute(
-                text(f"SELECT MAX({col}) AS as_of FROM {table}")
-            )
+            result = await self._analytics.execute(text(f"SELECT MAX({col}) AS as_of FROM {table}"))
             value = result.scalar_one_or_none()
             if value is not None:
                 return value.isoformat() if hasattr(value, "isoformat") else str(value)
@@ -825,6 +867,7 @@ class ChatService:
                 if value is not None:
                     return value.isoformat() if hasattr(value, "isoformat") else str(value)
             except Exception:
+                logger.debug("Could not probe data freshness for %s", table, exc_info=True)
                 continue
         return None
 
@@ -890,15 +933,75 @@ class ChatService:
             select(LlmUsage)
             .where(LlmUsage.user_id == self._user.id)
             .order_by(LlmUsage.created_at.desc())
-            .limit(200)
+            .limit(500)
         )
         rows = list(result.scalars().all())
         total_tokens = sum(row.total_tokens for row in rows)
         total_cost = float(sum(float(row.estimated_cost_usd) for row in rows))
+        avg_cost = (total_cost / len(rows)) if rows else 0.0
+
+        by_model: dict[str, dict[str, float | int]] = {}
+        by_domain: dict[str, dict[str, float | int]] = {}
+        daily: dict[str, float] = {}
+        for row in rows:
+            model_bucket = by_model.setdefault(
+                row.model, {"calls": 0, "tokens": 0, "costUsd": 0.0}
+            )
+            model_bucket["calls"] = int(model_bucket["calls"]) + 1
+            model_bucket["tokens"] = int(model_bucket["tokens"]) + row.total_tokens
+            model_bucket["costUsd"] = float(model_bucket["costUsd"]) + float(
+                row.estimated_cost_usd
+            )
+
+            domain = row.industry or "unknown"
+            domain_bucket = by_domain.setdefault(
+                domain, {"calls": 0, "tokens": 0, "costUsd": 0.0}
+            )
+            domain_bucket["calls"] = int(domain_bucket["calls"]) + 1
+            domain_bucket["tokens"] = int(domain_bucket["tokens"]) + row.total_tokens
+            domain_bucket["costUsd"] = float(domain_bucket["costUsd"]) + float(
+                row.estimated_cost_usd
+            )
+
+            day = row.created_at.date().isoformat() if row.created_at else "unknown"
+            daily[day] = daily.get(day, 0.0) + float(row.estimated_cost_usd)
+
+        budget = float(getattr(self._settings, "llm_monthly_budget_usd", 50.0) or 50.0)
+        spend_ratio = (total_cost / budget) if budget > 0 else 0.0
         return {
             "calls": len(rows),
             "totalTokens": total_tokens,
             "estimatedCostUsd": round(total_cost, 6),
+            "avgCostPerQueryUsd": round(avg_cost, 6),
+            "budgetUsd": budget,
+            "budgetUsedPct": round(min(spend_ratio * 100, 999), 1),
+            "budgetWarning": spend_ratio >= 0.8,
+            "byModel": [
+                {
+                    "model": model,
+                    "calls": int(stats["calls"]),
+                    "tokens": int(stats["tokens"]),
+                    "costUsd": round(float(stats["costUsd"]), 6),
+                }
+                for model, stats in sorted(
+                    by_model.items(), key=lambda item: float(item[1]["costUsd"]), reverse=True
+                )
+            ],
+            "byDomain": [
+                {
+                    "domain": domain,
+                    "calls": int(stats["calls"]),
+                    "tokens": int(stats["tokens"]),
+                    "costUsd": round(float(stats["costUsd"]), 6),
+                }
+                for domain, stats in sorted(
+                    by_domain.items(), key=lambda item: float(item[1]["costUsd"]), reverse=True
+                )
+            ],
+            "spendOverTime": [
+                {"date": day, "costUsd": round(cost, 6)}
+                for day, cost in sorted(daily.items())
+            ],
             "recent": [
                 {
                     "id": str(row.id),
@@ -907,6 +1010,7 @@ class ChatService:
                     "totalTokens": row.total_tokens,
                     "estimatedCostUsd": float(row.estimated_cost_usd),
                     "createdAt": row.created_at.isoformat(),
+                    "industry": row.industry,
                 }
                 for row in rows[:20]
             ],

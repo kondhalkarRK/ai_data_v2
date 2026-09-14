@@ -16,6 +16,7 @@ DOMAIN_CONFIG: dict[str, dict[str, Any]] = {
     "automotive": {
         "title": "Automotive Intelligence",
         "tagline": "Your business, explained by AI",
+        # Target 8 cards (4×2). Secondary fills only when primary metrics are unavailable.
         "primaryKpis": [
             "revenue",
             "units_sold",
@@ -23,8 +24,10 @@ DOMAIN_CONFIG: dict[str, dict[str, Any]] = {
             "rev_per_unit",
             "total_orders",
             "top_model",
+            "active_regions",
+            "top_make",
         ],
-        "secondaryKpis": ["active_regions", "top_make"],
+        "secondaryKpis": [],
         "insightCategories": ["risk", "opportunity", "insight", "recommendation"],
         "suggestedQuestionSeeds": [
             {"id": "models_revenue", "text": "Which vehicle models are driving revenue growth?", "requires": ["revenue", "model"]},
@@ -52,6 +55,8 @@ DOMAIN_CONFIG: dict[str, dict[str, Any]] = {
     "insurance": {
         "title": "Insurance Intelligence",
         "tagline": "Your business, explained by AI",
+        # Target 8 cards. Channel conversion is not in the semantic/KPI layer —
+        # use existing Risk/Profitability metrics instead of inventing one.
         "primaryKpis": [
             "written_premium",
             "earned_premium",
@@ -59,8 +64,10 @@ DOMAIN_CONFIG: dict[str, dict[str, Any]] = {
             "renewal_rate",
             "claim_count",
             "approval_rate",
+            "claims_incurred",
+            "average_severity",
         ],
-        "secondaryKpis": ["claims_incurred", "claims_paid", "average_severity"],
+        "secondaryKpis": ["claims_paid"],
         "insightCategories": ["risk", "opportunity", "insight", "recommendation"],
         "suggestedQuestionSeeds": [
             {"id": "claims_ratio", "text": "Why did claims ratio change this period?", "requires": ["loss_ratio"]},

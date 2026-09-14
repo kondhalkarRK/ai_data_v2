@@ -44,9 +44,7 @@ def _read_yaml(path: Path) -> dict[str, Any]:
         with path.open(encoding="utf-8") as stream:
             value = yaml.safe_load(stream)
     except FileNotFoundError as exc:
-        raise DependencyUnavailableError(
-            f"Semantic pack file is missing: {path.name}."
-        ) from exc
+        raise DependencyUnavailableError(f"Semantic pack file is missing: {path.name}.") from exc
     except (OSError, yaml.YAMLError) as exc:
         raise DependencyUnavailableError(
             f"Semantic pack file could not be read: {path.name}."
@@ -129,9 +127,7 @@ class SemanticService:
         return SemanticPackResponse(summary=summary, model=model, glossary=glossary)
 
     @staticmethod
-    def _validate_cross_references(
-        model: SemanticModel, glossary: BusinessGlossary
-    ) -> None:
+    def _validate_cross_references(model: SemanticModel, glossary: BusinessGlossary) -> None:
         errors: list[str] = []
         for relationship in model.relationships:
             source = model.tables.get(relationship.from_table)
@@ -165,8 +161,7 @@ class SemanticService:
                 target = model.tables.get(parts[0])
                 if len(parts) != 2 or target is None or parts[1] not in target.columns:
                     errors.append(
-                        f"column {table_name}.{column_name}: invalid reference "
-                        f"{column.references}"
+                        f"column {table_name}.{column_name}: invalid reference {column.references}"
                     )
 
         for measure_name, measure in model.measures.items():
@@ -177,14 +172,20 @@ class SemanticService:
         for dimension_name, dimension in model.dimensions.items():
             if dimension.source_table not in model.tables:
                 errors.append(
-                    f"dimension {dimension_name}: unknown source table "
-                    f"{dimension.source_table}"
+                    f"dimension {dimension_name}: unknown source table {dimension.source_table}"
+                )
+        for domain_name, value_domain in model.value_domains.items():
+            value_table = model.tables.get(value_domain.table)
+            if value_table is None:
+                errors.append(f"value domain {domain_name}: unknown table {value_domain.table}")
+            elif value_domain.column not in value_table.columns:
+                errors.append(
+                    f"value domain {domain_name}: unknown column "
+                    f"{value_domain.table}.{value_domain.column}"
                 )
         for term_name, term in glossary.terms.items():
             if term.maps_to_measure and term.maps_to_measure not in model.measures:
-                errors.append(
-                    f"glossary term {term_name}: unknown measure {term.maps_to_measure}"
-                )
+                errors.append(f"glossary term {term_name}: unknown measure {term.maps_to_measure}")
             if term.maps_to_dimension and term.maps_to_dimension not in model.dimensions:
                 errors.append(
                     f"glossary term {term_name}: unknown dimension {term.maps_to_dimension}"
@@ -195,9 +196,7 @@ class SemanticService:
             )
 
     @staticmethod
-    def _compile_snapshot(
-        industry: Industry, pack: SemanticPackResponse
-    ) -> OntologySnapshot:
+    def _compile_snapshot(industry: Industry, pack: SemanticPackResponse) -> OntologySnapshot:
         started = time.perf_counter()
         model = pack.model
         nodes: dict[str, OntologyNode] = {}
@@ -318,9 +317,7 @@ class SemanticService:
 
         for measure_name, measure in model.measures.items():
             node_id = f"measure:{measure_name}"
-            synonyms = list(
-                dict.fromkeys(measure.synonyms + glossary_by_measure[measure_name])
-            )
+            synonyms = list(dict.fromkeys(measure.synonyms + glossary_by_measure[measure_name]))
             add_node(
                 OntologyNode(
                     id=node_id,
@@ -373,9 +370,7 @@ class SemanticService:
                     kind="dimension",
                     domain=model.domain,
                     synonyms=list(
-                        dict.fromkeys(
-                            dimension.synonyms + glossary_by_dimension[dimension_name]
-                        )
+                        dict.fromkeys(dimension.synonyms + glossary_by_dimension[dimension_name])
                     ),
                     tables=[dimension.source_table],
                     columns=[
@@ -414,12 +409,8 @@ class SemanticService:
             valid_edges.append(edge)
             degrees[edge.source] += 1
             degrees[edge.target] += 1
-            relationship_labels[edge.source].append(
-                f"{edge.label} → {nodes[edge.target].label}"
-            )
-            relationship_labels[edge.target].append(
-                f"{edge.label} ← {nodes[edge.source].label}"
-            )
+            relationship_labels[edge.source].append(f"{edge.label} → {nodes[edge.target].label}")
+            relationship_labels[edge.target].append(f"{edge.label} ← {nodes[edge.source].label}")
 
         compiled_nodes: list[OntologyNode] = []
         for node in nodes.values():
@@ -434,8 +425,7 @@ class SemanticService:
 
         cluster_ids = list(dict.fromkeys(node.cluster for node in compiled_nodes))
         clusters = [
-            OntologyCluster(id=name, label=name, color=CLUSTER_COLORS[name])
-            for name in cluster_ids
+            OntologyCluster(id=name, label=name, color=CLUSTER_COLORS[name]) for name in cluster_ids
         ]
         build_ms = max(1, round((time.perf_counter() - started) * 1000))
         return OntologySnapshot(

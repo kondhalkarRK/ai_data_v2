@@ -24,6 +24,14 @@ from app.schemas.executive import (
 )
 from app.schemas.kpi import WindowId
 from app.services.executive import ExecutiveIntelligenceService, clear_executive_cache
+from app.services.executive.region_map import (
+    DealerMapRow,
+    ModelMapRow,
+    RegionMapPoint,
+    fetch_dealer_models,
+    fetch_region_dealers,
+    fetch_region_map,
+)
 
 router = APIRouter(prefix="/executive", tags=["executive"])
 
@@ -61,6 +69,39 @@ async def executive_intelligence(
         make=make,
         force_refresh=refresh,
     )
+
+
+@router.get("/region-map", response_model=list[RegionMapPoint])
+async def region_map(
+    user: RequireViewer,
+    industry: ActiveIndustry,
+    connection: AnalyticsConnection,
+    metric: str = Query(default="units"),
+) -> list[RegionMapPoint]:
+    del user
+    return await fetch_region_map(connection, industry, metric=metric)
+
+
+@router.get("/region-map/{region_id}/dealers", response_model=list[DealerMapRow])
+async def region_dealers(
+    region_id: int,
+    user: RequireViewer,
+    industry: ActiveIndustry,
+    connection: AnalyticsConnection,
+) -> list[DealerMapRow]:
+    del user
+    return await fetch_region_dealers(connection, industry, region_id=region_id)
+
+
+@router.get("/dealers/{dealer_id}/models", response_model=list[ModelMapRow])
+async def dealer_models(
+    dealer_id: int,
+    user: RequireViewer,
+    industry: ActiveIndustry,
+    connection: AnalyticsConnection,
+) -> list[ModelMapRow]:
+    del user
+    return await fetch_dealer_models(connection, industry, dealer_id=dealer_id)
 
 
 @router.post("/insights/feedback", response_model=InsightFeedbackResponse)

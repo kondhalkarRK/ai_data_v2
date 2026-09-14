@@ -160,6 +160,9 @@ terms:
     synonyms: [geography, territory, city, state, location, market]
     category: Geography
     maps_to_dimension: Region
+    calculation_rules:
+      - Resolve named cities and regions against live dim_region values.
+      - Preserve every explicitly named location as a mandatory SQL filter.
 
   Target Units:
     definition: Planned monthly unit volume by vehicle make.
@@ -182,11 +185,15 @@ domain_rules:
     - Top salesperson uses dim_salesman (person name), never dim_dealer.
     - Top dealer uses dim_dealer (outlet name), never dim_salesman.
     - Concatenate first_name and last_name as salesperson_name.
+    - Named make, model, colour, city, region, state, engine type and dealer grade values are mandatory filters.
+    - Lowest, worst, least and bottom rankings sort ascending; top, best, highest and most sort descending.
   never_rules:
     - Never rank top selling vehicles by revenue unless revenue is explicit.
     - Never confuse salesperson with dealer.
     - Never drop a stated body-style filter (Sedan, SUV, Hatchback, etc.).
     - Never invent columns or tables outside the active industry pack.
+    - Never drop an explicitly named city, make, model, colour or region.
+    - Never mix insurance tables or terminology into automotive SQL.
 
 sql_patterns:
   top_n_query:

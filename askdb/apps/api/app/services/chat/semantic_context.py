@@ -26,8 +26,10 @@ def build_domain_sql_hints(
         lines.append(f"Resolved entity: {plan.entity}")
     if plan.metric != "unknown":
         lines.append(f"Resolved metric: {plan.metric}")
+    if plan.intent == "ranking":
+        lines.append(f"Ranking direction: {plan.order_direction.upper()}")
     if plan.filters:
-        lines.append("Mandatory filters (must appear in SQL WHERE):")
+        lines.append("MATCHED BUSINESS VALUES — mandatory SQL filters:")
         for filt in plan.filters:
             lines.append(f"  - {filt.column} {filt.operator} '{filt.value}'")
     for note in plan.notes:
@@ -61,6 +63,39 @@ def build_domain_sql_hints(
                 for mname, measure in list(measures.items())[:8]:
                     expr = getattr(measure, "expression", "")
                     lines.append(f"  - {mname}: {expr}")
+            relationships = getattr(model, "relationships", None) or []
+            relevant_names = {
+                part
+                for filt in plan.filters
+                for part in filt.column.split(".")
+                if part.startswith(("dim_", "fact_"))
+            }
+            if plan.entity != "unknown":
+                relevant_names.add(
+                    {
+                        "salesperson": "dim_salesman",
+                        "dealer": "dim_dealer",
+                        "vehicle": "dim_carline",
+                        "region": "dim_region",
+                        "agent": "dim_agent",
+                        "product": "dim_product",
+                        "policy": "dim_policy",
+                        "customer": "dim_policy",
+                        "claim": "fact_claims",
+                    }.get(plan.entity, "")
+                )
+            join_hints: list[str] = []
+            for relationship in relationships:
+                from_table = getattr(relationship, "from_table", "")
+                to_table = getattr(relationship, "to_table", "")
+                if from_table in relevant_names or to_table in relevant_names:
+                    join_hints.append(
+                        f"  - {from_table}.{getattr(relationship, 'from_column', '')} = "
+                        f"{to_table}.{getattr(relationship, 'to_column', '')}"
+                    )
+            if join_hints:
+                lines.append("RELEVANT JOINS:")
+                lines.extend(join_hints[:8])
 
     # Hard industry fallbacks if pack missing.
     if pack is None:
@@ -113,8 +148,27 @@ def _fallback_schema(industry: Industry) -> str:
     )
 
 
-def validate_sql_against_plan(sql: str, plan: QuestionPlan) -> tuple[bool, str | None]:
-    """Light validation: required entities/filters must appear in SQL text."""
+def build_allowed_schema(pack: Any | None) -> dict[str, set[str]]:
+    """Compile physical table/column whitelist from one validated semantic pack."""
+    if pack is None:
+        return {}
+    model = getattr(pack, "model", None)
+    tables = getattr(model, "tables", {}) if model is not None else {}
+    return {
+        str(getattr(table, "physical_name", name)).lower(): {
+            str(column).lower() for column in (getattr(table, "columns", {}) or {})
+        }
+        for name, table in (tables or {}).items()
+    }
+
+
+def validate_sql_against_plan(
+    sql: str,
+    plan: QuestionPlan,
+    *,
+    allowed_schema: dict[str, set[str]] | None = None,
+) -> tuple[bool, str | None]:
+    """Validate entity, filters, ranking direction, and semantic schema."""
     if not sql:
         return False, "Empty SQL"
     lowered = sql.lower()
@@ -124,9 +178,61 @@ def validate_sql_against_plan(sql: str, plan: QuestionPlan) -> tuple[bool, str |
         return False, "Salesperson must not be answered with dealers only"
     if plan.entity == "dealer" and "dim_dealer" not in lowered:
         return False, "Dealer questions must join automotive.dim_dealer"
+    required_entities = {
+        "vehicle": "dim_carline",
+        "agent": "dim_agent",
+        "product": "dim_product",
+        "policy": "dim_policy",
+        "customer": "dim_policy",
+        "claim": "fact_claims",
+        "region": "dim_region",
+    }
+    required_table = required_entities.get(plan.entity)
+    if required_table and required_table not in lowered:
+        return False, f"{plan.entity.title()} questions must use {required_table}"
     for filt in plan.filters:
         if filt.value.lower() not in lowered:
             return False, f"Missing mandatory filter value '{filt.value}' in SQL"
-        if "car_type" in filt.column and "car_type" not in lowered:
-            return False, "Missing car_type filter in SQL"
+        column_name = filt.column.rsplit(".", 1)[-1].lower()
+        if column_name not in lowered:
+            return False, f"Missing mandatory filter column '{column_name}' in SQL"
+    if plan.intent == "ranking":
+        required_direction = plan.order_direction.lower()
+        if not re.search(rf"\border\s+by\b[\s\S]*?\b{required_direction}\b", lowered):
+            return False, f"Ranking SQL must order {required_direction.upper()}"
+
+    if allowed_schema:
+        alias_map: dict[str, str] = {}
+        table_pattern = re.compile(
+            r"\b(?:from|join)\s+([a-z_][\w]*\.[a-z_][\w]*)(?:\s+(?:as\s+)?([a-z_][\w]*))?",
+            re.I,
+        )
+        reserved = {
+            "where",
+            "join",
+            "left",
+            "right",
+            "inner",
+            "outer",
+            "full",
+            "group",
+            "order",
+            "limit",
+            "on",
+        }
+        for match in table_pattern.finditer(sql):
+            table = match.group(1).lower()
+            if table not in allowed_schema:
+                return False, f"Table '{table}' is outside the selected domain semantic pack"
+            alias = (match.group(2) or table.rsplit(".", 1)[-1]).lower()
+            if alias in reserved:
+                alias = table.rsplit(".", 1)[-1]
+            alias_map[alias] = table
+        for alias, column in re.findall(r"\b([a-z_][\w]*)\.([a-z_][\w]*)\b", lowered):
+            table = alias_map.get(alias)
+            if table and column not in allowed_schema[table]:
+                return (
+                    False,
+                    f"Column '{alias}.{column}' is not in the selected domain semantic pack",
+                )
     return True, None

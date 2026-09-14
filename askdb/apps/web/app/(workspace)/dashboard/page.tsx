@@ -11,7 +11,6 @@ import { BusinessHealthPanel } from "@/components/executive/business-health";
 import { KpiCardsGrid } from "@/components/executive/kpi-cards";
 import { PerformanceAnalytics } from "@/components/executive/performance-analytics";
 import type { ExecutiveIntelligence } from "@/components/executive/types";
-import { WhatIfPanel } from "@/components/executive/what-if-panel";
 import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
@@ -87,7 +86,7 @@ export default function DashboardPage() {
     <PageShell>
       <PageHeader
         title={data?.title ?? "Executive Intelligence"}
-        description={data?.tagline ?? "Domain-aware KPIs, grounded AI insights, and What-If analysis."}
+        description={data?.tagline ?? "Domain-aware KPIs, grounded AI insights, and performance analytics."}
         className={presenterMode ? "origin-left scale-110" : undefined}
         actions={
           <Button
@@ -259,15 +258,18 @@ export default function DashboardPage() {
             />
           </Section>
 
-          <Section title="What-If">
-            <WhatIfPanel presets={data.whatIfPresets} />
-          </Section>
-
+          {/* What-If Analysis is hidden for this release (Round 2). Backend
+              presets remain available on the bundle for a later return. */}
           <Section title="Performance Analytics">
             <PerformanceAnalytics
               data={data}
+              industry={industry}
               presenterMode={presenterMode}
               onFilter={applyCrossFilter}
+              windowId={windowId}
+              lob={lob}
+              region={region}
+              make={make}
             />
           </Section>
 
