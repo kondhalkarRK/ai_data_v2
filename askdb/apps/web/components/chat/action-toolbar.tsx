@@ -26,11 +26,11 @@ export function ActionToolbar({
   enabled?: Partial<Record<ActionKey, boolean>>;
 }) {
   const actions: ActionDef[] = [
-    { key: "pin", label: "Pin", icon: Pin, enabled: Boolean(enabled.pin) },
-    { key: "share", label: "Share", icon: Link2, enabled: Boolean(enabled.share) },
     { key: "copy", label: "Copy", icon: Copy, enabled: enabled.copy !== false },
-    { key: "export", label: "Export", icon: Download, enabled: enabled.export !== false },
-    { key: "save", label: "Save Insight", icon: Star, enabled: enabled.save !== false },
+    { key: "share", label: "Share", icon: Link2, enabled: Boolean(enabled.share) },
+    { key: "pin", label: "Pin", icon: Pin, enabled: Boolean(enabled.pin) },
+    { key: "export", label: "Download", icon: Download, enabled: enabled.export !== false },
+    { key: "save", label: "Save", icon: Star, enabled: enabled.save !== false },
   ];
 
   return (

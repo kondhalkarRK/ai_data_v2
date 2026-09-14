@@ -1,18 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
 import { type ActionKey } from "@/components/chat/action-toolbar";
 import { ResponseCard } from "@/components/chat/response-card";
 import { applyChatSseEvent, consumeSseBuffer } from "@/components/chat/sse";
 import type { ChatMessage } from "@/components/chat/types";
-import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
-import { PageShell } from "@/components/ui/page-shell";
 import { useActiveIndustry } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -26,9 +26,11 @@ export function ChatWorkspace() {
   const [webRetrieval, setWebRetrieval] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const historyIdRef = useRef<string | null>(null);
   const bootstrapped = useRef(false);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const llmModel = useUiStore((s) => s.llmModel);
   const llmTemperature = useUiStore((s) => s.llmTemperature);
   const llmTopP = useUiStore((s) => s.llmTopP);
@@ -43,6 +45,12 @@ export function ChatWorkspace() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep link
   }, [searchParams]);
+
+  useEffect(() => {
+    const node = scrollerRef.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+  }, [messages, busy]);
 
   async function runAsk(text: string) {
     if (!text.trim() || busy) return;
@@ -96,7 +104,6 @@ export function ChatWorkspace() {
         const { frames, rest } = consumeSseBuffer(buffer);
         buffer = rest;
         for (const frame of frames) {
-          // Capture per-frame — do not close over a mutable event name (React batches updaters).
           const eventName = frame.event;
           const data = frame.data;
           if (eventName === "stage" && data.historyId) {
@@ -114,7 +121,6 @@ export function ChatWorkspace() {
           );
         }
       }
-      // Flush any trailing frame without a final blank line.
       if (buffer.trim()) {
         const { frames } = consumeSseBuffer(`${buffer}\n\n`);
         for (const frame of frames) {
@@ -198,7 +204,7 @@ export function ChatWorkspace() {
           message.columns!.map((column) => csvEscape(String(row[column] ?? ""))).join(","),
         )
         .join("\n");
-      downloadText(`nql-insight-${message.id}.csv`, `${header}\n${body}`);
+      downloadText(`ask-db-${message.id}.csv`, `${header}\n${body}`);
       flash("CSV downloaded");
       return;
     }
@@ -228,15 +234,40 @@ export function ChatWorkspace() {
     [...messages].reverse().find((message) => message.role === "user")?.question ?? "";
 
   return (
-    <PageShell>
-      <PageHeader
-        title="AI Chat"
-        description="Enterprise NLQ with honest grounding, execution timelines, and governed SQL."
-      />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <Card className="min-h-[520px]">
-          <CardContent className="flex h-full flex-col gap-3 pt-4">
-            <div className="flex-1 space-y-4 overflow-auto pr-1">
+    <div className="flex h-[calc(100dvh-var(--topbar-height)-2rem)] min-h-[420px] flex-col gap-3 lg:h-[calc(100dvh-var(--topbar-height)-3rem)]">
+      <div className="flex shrink-0 items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">AI Chat</h1>
+          <p className="text-xs text-muted-foreground">
+            Grounded NLQ · table, chart, and SQL in one place
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="gap-1.5"
+          onClick={() => setPanelOpen((value) => !value)}
+          aria-pressed={panelOpen}
+        >
+          {panelOpen ? (
+            <PanelRightClose className="size-3.5" />
+          ) : (
+            <PanelRightOpen className="size-3.5" />
+          )}
+          {panelOpen ? "Hide panel" : "Show panel"}
+        </Button>
+      </div>
+
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-4",
+          panelOpen ? "lg:grid-cols-[minmax(0,1fr)_280px]" : "grid-cols-1",
+        )}
+      >
+        <Card className="flex min-h-0 flex-col overflow-hidden">
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-0 p-0">
+            <div ref={scrollerRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
               {messages.length === 0 ? (
                 <div className="card-supporting border border-dashed border-border/80 px-4 py-8 text-center">
                   <p className="text-sm text-muted-foreground">
@@ -244,7 +275,8 @@ export function ChatWorkspace() {
                     what-if like “what if revenue increased 10%”.
                   </p>
                   <p className="mt-2 text-[11px] text-muted-foreground">
-                    Press Ctrl/Cmd+K to jump to glossary terms, the semantic graph, or saved insights.
+                    Press Ctrl/Cmd+K to jump to glossary terms, the semantic graph, or saved
+                    insights.
                   </p>
                 </div>
               ) : null}
@@ -262,14 +294,20 @@ export function ChatWorkspace() {
                     message={message}
                     busy={busy}
                     onAsk={(text) => void runAsk(text)}
-                    onRetry={lastUserQuestion ? () => void runAsk(lastUserQuestion) : undefined}
+                    onRetry={
+                      lastUserQuestion ? () => void runAsk(lastUserQuestion) : undefined
+                    }
                     onAction={(key, msg) => void handleAction(key, msg)}
                   />
                 ),
               )}
             </div>
-            <form className="flex flex-col gap-2 border-t border-border/60 pt-3" onSubmit={onSubmit}>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+
+            <form
+              className="shrink-0 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur"
+              onSubmit={onSubmit}
+            >
+              <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={webRetrieval}
@@ -297,25 +335,34 @@ export function ChatWorkspace() {
             </form>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="space-y-3 pt-4">
-            <CardTitle className="text-sm">How answers stay honest</CardTitle>
-            <CardDescription className="text-xs leading-relaxed">
-              Grounding badges only list sources actually used. Ambiguous questions surface
-              clarifications instead of a fake confidence score. SQL validation and auto-repair are
-              disclosed in the response header.
-            </CardDescription>
-            <p className="text-xs text-muted-foreground">Industry: {industry}</p>
-            {conversationId ? (
-              <p className="text-2xs text-muted-foreground">Conversation {conversationId}</p>
-            ) : null}
-            {toast ? (
-              <p className="rounded-lg bg-muted/50 px-2 py-1.5 text-xs text-foreground">{toast}</p>
-            ) : null}
-          </CardContent>
-        </Card>
+
+        {panelOpen ? (
+          <Card className="hidden min-h-0 overflow-hidden lg:flex lg:flex-col">
+            <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto pt-4">
+              <CardTitle className="text-sm">How answers stay honest</CardTitle>
+              <CardDescription className="text-xs leading-relaxed">
+                Grounding badges only list sources actually used. Ambiguous questions surface
+                clarifications instead of a fake confidence score. SQL validation and auto-repair
+                are disclosed with the result.
+              </CardDescription>
+              <p className="text-xs text-muted-foreground">Industry: {industry}</p>
+              {conversationId ? (
+                <p className="text-2xs text-muted-foreground">Conversation {conversationId}</p>
+              ) : null}
+              {toast ? (
+                <p className="rounded-lg bg-muted/50 px-2 py-1.5 text-xs text-foreground">{toast}</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
-    </PageShell>
+
+      {toast && !panelOpen ? (
+        <p className="fixed bottom-4 right-4 z-40 rounded-lg border border-border bg-background px-3 py-2 text-xs shadow-[var(--shadow-raised)]">
+          {toast}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

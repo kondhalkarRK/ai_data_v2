@@ -72,16 +72,16 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className={presenterMode ? "flex min-h-dvh presenter-mode" : "flex min-h-dvh"}>
+    <div className={presenterMode ? "flex h-dvh presenter-mode" : "flex h-dvh overflow-hidden"}>
       {presenterMode ? null : <Sidebar user={user} />}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar />
         <main
           id="main-content"
           className={
             presenterMode
-              ? "min-w-0 flex-1 bg-surface/40 p-6 lg:p-10"
-              : "min-w-0 flex-1 bg-surface/40 p-4 lg:p-6"
+              ? "min-h-0 min-w-0 flex-1 overflow-auto bg-surface/40 p-6 lg:p-10"
+              : "min-h-0 min-w-0 flex-1 overflow-auto bg-surface/40 p-4 lg:p-6"
           }
         >
           {children}

@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import * as React from "react";
 
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
+import { BrandWordmark } from "@/components/brand/wordmark";
 import { cn } from "@/lib/utils";
 
 export { APP_NAME as BRAND_NAME, APP_TAGLINE as BRAND_TAGLINE };
@@ -115,18 +116,7 @@ export function Logo({
     >
       <span className="inline-flex items-center gap-2.5">
         <LogoMark size={size} animated={animated} />
-        {compact ? null : (
-          <span
-            className={cn(
-              "font-semibold tracking-tight text-foreground",
-              size === "sm" && "text-sm",
-              size === "md" && "text-lg",
-              size === "lg" && "text-2xl",
-            )}
-          >
-            Ask <span className="font-normal text-primary">DB</span>
-          </span>
-        )}
+        {compact ? null : <BrandWordmark size={size === "lg" ? "lg" : size === "sm" ? "sm" : "md"} />}
         <span className="sr-only">{APP_NAME}</span>
       </span>
       {withTagline && !compact ? (

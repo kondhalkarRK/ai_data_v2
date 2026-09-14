@@ -6,9 +6,13 @@ import * as React from "react";
 import type { ResponseTab } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 
-const TABS: Array<{ id: ResponseTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
-  { id: "chart", label: "Chart", icon: BarChart3 },
+const TABS: Array<{
+  id: ResponseTab;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
   { id: "table", label: "Table", icon: Table2 },
+  { id: "chart", label: "Chart", icon: BarChart3 },
   { id: "sql", label: "SQL", icon: Code2 },
 ];
 
@@ -24,7 +28,7 @@ export function ResponseTabs({
   return (
     <div
       className={cn(
-        "inline-flex max-w-full overflow-x-auto rounded-full border border-border/70 bg-muted/30 p-1",
+        "inline-flex max-w-full overflow-x-auto rounded-[var(--radius-control)] border border-border/70 bg-muted/30 p-0.5",
         className,
       )}
       role="tablist"
@@ -39,7 +43,7 @@ export function ResponseTabs({
             role="tab"
             aria-selected={active}
             className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+              "inline-flex shrink-0 items-center gap-1.5 rounded-[calc(var(--radius-control)-2px)] px-3 py-1.5 text-xs font-medium transition-colors",
               active
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",

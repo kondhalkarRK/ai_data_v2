@@ -2,6 +2,10 @@
 #
 # Both run in this window. Ctrl+C stops the frontend and the trap stops the API, so no
 # orphaned uvicorn is left holding port 8000.
+#
+# If the API keeps shutting down while you browse (especially on OneDrive / network
+# folders), start without reload:
+#   $env:ASKDB_API_RELOAD = "0"; .\scripts\dev.ps1
 
 #Requires -Version 5.1
 $ErrorActionPreference = "Stop"
@@ -18,12 +22,29 @@ if (-not (Test-Path $python)) {
     Write-Error "No API virtualenv. Run: cd apps/api; python -m venv .venv; .venv\Scripts\pip install -e `".[dev]`""
 }
 
+# Default: reload on. Set ASKDB_API_RELOAD=0 when file watchers flap (OneDrive, antivirus).
+$reloadEnabled = $env:ASKDB_API_RELOAD -ne "0"
+$uvicornArgs = @("-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000")
+if ($reloadEnabled) {
+    $uvicornArgs += @(
+        "--reload",
+        "--reload-dir", "app",
+        "--reload-exclude", "*.pyc",
+        "--reload-exclude", "__pycache__/*",
+        "--reload-exclude", ".venv/*",
+        "--reload-exclude", "*.log"
+    )
+    Write-Host "API reload is ON (watching apps/api/app only)." -ForegroundColor DarkGray
+} else {
+    Write-Host "API reload is OFF (ASKDB_API_RELOAD=0) — stable for OneDrive/synced folders." -ForegroundColor Yellow
+}
+
 $api = $null
 try {
-    Write-Host "Starting API on http://localhost:8000 ..." -ForegroundColor Cyan
+    Write-Host "Starting API on http://127.0.0.1:8000 ..." -ForegroundColor Cyan
     $api = Start-Process -PassThru -NoNewWindow -WorkingDirectory "$root\apps\api" `
         -FilePath $python `
-        -ArgumentList "-m", "uvicorn", "app.main:app", "--reload", "--port", "8000"
+        -ArgumentList $uvicornArgs
 
     # Wait for liveness rather than sleeping a fixed amount, so a slow start is not a
     # confusing connection-refused in the browser.
@@ -31,7 +52,7 @@ try {
     foreach ($attempt in 1..40) {
         Start-Sleep -Milliseconds 500
         try {
-            Invoke-RestMethod -Uri "http://localhost:8000/health" -TimeoutSec 2 | Out-Null
+            Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 2 | Out-Null
             $ready = $true
             break
         } catch {
@@ -46,6 +67,10 @@ try {
     if ($api -and -not $api.HasExited) {
         Write-Host "Stopping API ..." -ForegroundColor DarkGray
         Stop-Process -Id $api.Id -Force -ErrorAction SilentlyContinue
+        # uvicorn --reload spawns a child; kill the tree if the parent already exited.
+        Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -match "uvicorn app\.main:app" } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     }
     Pop-Location
 }
