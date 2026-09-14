@@ -36,7 +36,7 @@ if ($reloadEnabled) {
     )
     Write-Host "API reload is ON (watching apps/api/app only)." -ForegroundColor DarkGray
 } else {
-    Write-Host "API reload is OFF (ASKDB_API_RELOAD=0) — stable for OneDrive/synced folders." -ForegroundColor Yellow
+    Write-Host "API reload is OFF (ASKDB_API_RELOAD=0) - stable for OneDrive/synced folders." -ForegroundColor Yellow
 }
 
 $api = $null
