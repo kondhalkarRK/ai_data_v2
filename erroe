@@ -1,3 +1,6 @@
+SQL Generation Failed
+Reason: (psycopg.errors.InFailedSqlTransaction) current transaction is aborted, commands ignored until end of transaction block [SQL: EXPLAIN SELECT date_trunc('month', sales_date)::date AS month, SUM(total_sales) AS revenue, SUM(orde
+
 error1
 Console Error
 
