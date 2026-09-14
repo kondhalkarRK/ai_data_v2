@@ -17,7 +17,7 @@ export default function LoginPage() {
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <Logo size="lg" withTagline />
           <p className="text-sm text-muted-foreground">
-            Natural-language analytics over a governed semantic layer.
+            Ask your data anything — grounded in your semantic layer.
           </p>
         </div>
         {/* The form reads the `next` query parameter, which opts it out of static

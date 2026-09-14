@@ -14,6 +14,8 @@ describe("sidebar visibility", () => {
     expect(labels).not.toContain("System Logs");
     expect(labels).toContain("Executive Intelligence");
     expect(labels).toContain("Semantic Atlas");
+    expect(labels).toContain("Home");
+    expect(labels).not.toContain("Data Sources");
   });
 
   it("gives an analyst chat and LLM observability, but not system logs", () => {

@@ -13,7 +13,7 @@ export default function NotFound() {
         previous application.
       </p>
       <Button asChild>
-        <Link href="/data-preview">Back to Data Preview</Link>
+        <Link href="/home">Back to Home</Link>
       </Button>
     </main>
   );

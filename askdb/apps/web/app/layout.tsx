@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
 import { Providers } from "@/app/providers";
+import { APP_NAME } from "@/lib/brand";
 
 import "./globals.css";
 
@@ -13,12 +14,12 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "NQL Insight",
-    template: "%s · NQL Insight",
+    default: APP_NAME,
+    template: `%s · ${APP_NAME}`,
   },
   description:
-    "Enterprise natural-language analytics over a governed semantic layer. Numbers come from SQL; documents add context, always cited.",
-  applicationName: "NQL Insight",
+    "Ask your data anything in plain English. Every answer is grounded in your semantic layer and validated against data quality.",
+  applicationName: APP_NAME,
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

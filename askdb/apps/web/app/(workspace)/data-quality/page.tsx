@@ -46,7 +46,7 @@ export default function DataTrustCenterPage() {
     <PageShell>
       <PageHeader
         title="Data Trust Center"
-        description="Observability, quality, and governance — the source of truth for trust signals across NQL Insight."
+        description="Observability, quality, and governance — the source of truth for trust signals across Ask DB."
         actions={
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-[var(--radius-control)] border border-border bg-muted/30 p-0.5 text-[11px]">

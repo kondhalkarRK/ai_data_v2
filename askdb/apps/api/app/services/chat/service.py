@@ -70,11 +70,12 @@ from app.services.web_retrieval import WebRetrievalService
 logger = logging.getLogger(__name__)
 
 PROGRESS_STEPS = [
-    {"id": "understanding", "label": "Understanding Question"},
-    {"id": "metrics", "label": "Identifying Business Metrics"},
+    {"id": "understanding", "label": "Understanding your question"},
+    {"id": "metrics", "label": "Matching your semantic layer"},
     {"id": "sql", "label": "Generating SQL"},
-    {"id": "execute", "label": "Executing Query"},
-    {"id": "visualize", "label": "Building Visualization"},
+    {"id": "validate", "label": "Validating query"},
+    {"id": "execute", "label": "Crunching the data"},
+    {"id": "visualize", "label": "Building your answer"},
 ]
 
 
@@ -90,17 +91,26 @@ def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
 
 
-def _progress(current: str, completed: list[str], *, slow: bool = False) -> str:
-    label = next((s["label"] for s in PROGRESS_STEPS if s["id"] == current), current)
+def _progress(
+    current: str,
+    completed: list[str],
+    *,
+    slow: bool = False,
+    steps: list[dict[str, str]] | None = None,
+) -> str:
+    active = steps if steps is not None else PROGRESS_STEPS
+    label = next((s["label"] for s in active if s["id"] == current), current)
     payload: dict[str, Any] = {
-        "steps": PROGRESS_STEPS,
+        "steps": active,
         "current": current,
         "currentLabel": label,
-        "completed": completed,
+        "completed": [step for step in completed if any(s["id"] == step for s in active)],
     }
     if slow:
         payload["slowWarning"] = True
-        payload["message"] = f"This query is taking longer than expected. Current Stage: {label}"
+        payload["message"] = (
+            f"This query is taking longer than expected. Current stage: {label}"
+        )
     return _sse("progress", payload)
 
 
@@ -354,10 +364,15 @@ class ChatService:
             profile.timings = timings.to_dict()
             PROFILER.record(profile)
             yield _sse("stage", {"stage": "cache_hit"})
-            for step in ("metrics", "sql", "execute", "visualize"):
+            cache_steps = [
+                s
+                for s in PROGRESS_STEPS
+                if s["id"] in {"understanding", "metrics", "visualize"}
+            ]
+            for step in ("metrics", "visualize"):
                 if step not in completed_steps:
                     completed_steps.append(step)
-            yield _progress("visualize", completed_steps)
+            yield _progress("visualize", completed_steps, steps=cache_steps)
             if cached.sql:
                 yield _sse(
                     "sql",
@@ -557,6 +572,8 @@ class ChatService:
 
         if sql_text:
             sql_text = ensure_result_limit(sql_text, self._settings.nlq_default_result_limit)
+            completed_steps.append("sql")
+            yield _progress("validate", completed_steps, slow=maybe_slow())
             val_t0 = time.perf_counter()
             ok, reason = sql_is_safe(sql_text)
             if not ok:
@@ -587,7 +604,7 @@ class ChatService:
                         yield frame
                     return
             timings.sql_validation_ms = int((time.perf_counter() - val_t0) * 1000)
-            completed_steps.append("sql")
+            completed_steps.append("validate")
             yield _progress("execute", completed_steps, slow=maybe_slow())
 
             yield _sse(

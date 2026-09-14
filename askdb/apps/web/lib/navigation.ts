@@ -1,14 +1,14 @@
 import type { Role } from "@nql/shared-types";
 import {
+  Activity,
   BarChart3,
   BookOpen,
   Boxes,
-  Database,
   History,
+  Home,
   type LucideIcon,
   MessageSquare,
   Network,
-  Activity,
   ScrollText,
   ShieldCheck,
   Star,
@@ -36,11 +36,18 @@ export const NAV_SECTIONS: NavSection[] = [
     label: null,
     items: [
       {
-        href: "/data-sources",
-        label: "Data Sources",
-        icon: Database,
+        href: "/home",
+        label: "Home",
+        icon: Home,
         minRole: "viewer",
-        description: "Connected analytics databases and their status.",
+        description: "Ask DB hero, live demo, and connected data sources.",
+      },
+      {
+        href: "/data-preview",
+        label: "Data Preview",
+        icon: Boxes,
+        minRole: "viewer",
+        description: "Browse governed tables from the active industry pack.",
       },
       {
         href: "/dashboard",
@@ -123,7 +130,7 @@ export const NAV_SECTIONS: NavSection[] = [
 
 /** The three main tabs above the workspace (spec section 9). */
 export const MAIN_TABS = [
-  { href: "/data-preview", label: "Data Preview", icon: Boxes },
+  { href: "/home", label: "Home", icon: Home },
   { href: "/dashboard", label: "Executive Intelligence", icon: BarChart3 },
   { href: "/chat", label: "AI Chat", icon: MessageSquare },
 ] as const;

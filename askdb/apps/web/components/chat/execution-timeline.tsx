@@ -1,17 +1,18 @@
 "use client";
 
 import * as React from "react";
+import { Check, Loader2 } from "lucide-react";
 
 import type { ProgressState, QueryTimings } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 
 const COMPLETE_STAGES: Array<{ key: keyof QueryTimings; label: string }> = [
-  { key: "llmGenerationMs", label: "LLM Query Generation" },
-  { key: "semanticLookupMs", label: "Semantic Layer Lookup" },
-  { key: "sqlValidationMs", label: "SQL Validation" },
-  { key: "sqlAutoRepairMs", label: "SQL Auto-Repair" },
-  { key: "executionMs", label: "SQL Execution" },
-  { key: "renderMs", label: "Chart/Table Rendering" },
+  { key: "semanticLookupMs", label: "Matching your semantic layer" },
+  { key: "llmGenerationMs", label: "Generating SQL" },
+  { key: "sqlValidationMs", label: "Validating query" },
+  { key: "sqlAutoRepairMs", label: "SQL auto-repair" },
+  { key: "executionMs", label: "Crunching the data" },
+  { key: "renderMs", label: "Building your answer" },
 ];
 
 /**
@@ -31,35 +32,51 @@ export function ExecutionTimeline({
 }) {
   if (progress && !timings) {
     return (
-      <div className={cn("rounded-xl border border-border/60 bg-background/80 p-3", className)}>
+      <div
+        className={cn(
+          "rounded-xl border border-border/60 bg-muted/20 p-3 dark:bg-background/80",
+          className,
+        )}
+        role="status"
+        aria-live="polite"
+        aria-label={progress.currentLabel || "Working on your answer"}
+      >
         {progress.slowWarning ? (
           <p className="mb-2 text-xs text-amber-800 dark:text-amber-200">
             {progress.message ||
-              `This query is taking longer than expected. Current Stage: ${progress.currentLabel}`}
+              `This query is taking longer than expected. Current stage: ${progress.currentLabel}`}
           </p>
         ) : (
-          <p className="mb-2 text-xs font-medium text-foreground">Working…</p>
+          <p className="mb-2 text-xs font-medium text-foreground">
+            {progress.currentLabel || "Working on your answer"}
+          </p>
         )}
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {progress.steps.map((step) => {
             const done = progress.completed.includes(step.id);
-            const active = progress.current === step.id;
+            const active = progress.current === step.id && !done;
             return (
               <li
                 key={step.id}
                 className={cn(
-                  "flex items-center gap-2 text-[11px]",
+                  "flex items-center gap-2.5 text-[12px]",
                   done && "text-foreground",
-                  active && !done && "font-medium text-foreground",
+                  active && "font-medium text-foreground",
                   !done && !active && "text-muted-foreground",
                 )}
               >
-                <span className="w-3 shrink-0 text-center" aria-hidden="true">
-                  {done ? "✓" : active ? "…" : "○"}
+                <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
+                  {done ? (
+                    <Check className="size-3.5 text-success" />
+                  ) : active ? (
+                    <Loader2 className="size-3.5 animate-spin text-primary" />
+                  ) : (
+                    <span className="size-1.5 rounded-full bg-border" />
+                  )}
                 </span>
                 <span>
                   {step.label}
-                  {active && !done ? "…" : ""}
+                  {done ? " ✓" : active ? "…" : ""}
                 </span>
               </li>
             );

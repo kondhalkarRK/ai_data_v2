@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_host: str = "0.0.0.0"  # noqa: S104 - bound inside a container, not on a host
     api_port: int = 8000
-    app_name: str = "NQL Insight"
+    app_name: str = "Ask DB"
     api_v1_prefix: str = "/api/v1"
 
     # --- security ----------------------------------------------------------

@@ -102,7 +102,7 @@ async def create_admin(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create an NQL Insight administrator.")
+    parser = argparse.ArgumentParser(description="Create an Ask DB administrator.")
     parser.add_argument("--email", required=True)
     parser.add_argument("--name", required=True, dest="full_name")
     parser.add_argument(

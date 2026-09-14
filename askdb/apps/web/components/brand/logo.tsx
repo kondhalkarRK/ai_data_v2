@@ -4,16 +4,15 @@ import Image from "next/image";
 import { useTheme } from "next-themes";
 import * as React from "react";
 
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { cn } from "@/lib/utils";
+
+export { APP_NAME as BRAND_NAME, APP_TAGLINE as BRAND_TAGLINE };
 
 /**
  * Brand mark from the supplied logo (brain). White paper is stripped so the mark
- * works on light and dark surfaces. Wordmark uses the product name NQL Insight with
- * theme-specific assets (navy fails on dark; cyan accent matches the mark).
+ * works on light and dark surfaces. Wordmark text is Ask DB (mark asset unchanged).
  */
-
-export const BRAND_NAME = "NQL Insight";
-export const BRAND_TAGLINE = "Intelligence. Refined. Delivered.";
 
 const HAS_BRAND_ASSETS = true;
 
@@ -21,17 +20,10 @@ type LogoSize = "sm" | "md" | "lg";
 
 const MARK_PIXELS: Record<LogoSize, number> = { sm: 22, md: 28, lg: 44 };
 
-const WORDMARK_SIZE: Record<LogoSize, { width: number; height: number }> = {
-  sm: { width: 108, height: 18 },
-  md: { width: 128, height: 22 },
-  lg: { width: 168, height: 28 },
-};
-
 function useResolvedDark(): boolean {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
-  // Prefer light assets until mounted to avoid a flash of the wrong wordmark.
   if (!mounted) return false;
   return resolvedTheme === "dark";
 }
@@ -89,7 +81,7 @@ export function LogoMark({ size = "md", className, animated = false }: LogoMarkP
           className="relative flex size-full items-center justify-center rounded-[0.4rem] bg-primary font-semibold tracking-tight text-primary-foreground"
           style={{ fontSize: pixels * 0.42 }}
         >
-          NQ
+          AD
         </span>
       )}
     </span>
@@ -101,7 +93,7 @@ interface LogoProps {
   /** Mark only, for the collapsed sidebar. */
   compact?: boolean;
   animated?: boolean;
-  /** Show the supplied tagline under the wordmark (login / marketing). */
+  /** Show the tagline under the wordmark (login / marketing). */
   withTagline?: boolean;
   className?: string;
 }
@@ -113,10 +105,6 @@ export function Logo({
   withTagline = false,
   className,
 }: LogoProps) {
-  const dark = useResolvedDark();
-  const wordmark = dark ? "/brand/logo-wordmark-dark.svg" : "/brand/logo-wordmark.svg";
-  const dims = WORDMARK_SIZE[size];
-
   return (
     <span
       className={cn(
@@ -127,18 +115,7 @@ export function Logo({
     >
       <span className="inline-flex items-center gap-2.5">
         <LogoMark size={size} animated={animated} />
-        {compact ? null : HAS_BRAND_ASSETS ? (
-          <Image
-            key={wordmark}
-            src={wordmark}
-            alt={BRAND_NAME}
-            width={dims.width}
-            height={dims.height}
-            priority
-            unoptimized
-            className="relative"
-          />
-        ) : (
+        {compact ? null : (
           <span
             className={cn(
               "font-semibold tracking-tight text-foreground",
@@ -147,19 +124,19 @@ export function Logo({
               size === "lg" && "text-2xl",
             )}
           >
-            NQL <span className="font-normal text-cyan-700 dark:text-cyan-300">Insight</span>
+            Ask <span className="font-normal text-primary">DB</span>
           </span>
         )}
-        <span className="sr-only">{BRAND_NAME}</span>
+        <span className="sr-only">{APP_NAME}</span>
       </span>
       {withTagline && !compact ? (
         <span
           className={cn(
-            "font-serif text-muted-foreground",
+            "text-muted-foreground",
             size === "lg" ? "text-xs tracking-wide" : "text-[10px]",
           )}
         >
-          {BRAND_TAGLINE}
+          {APP_TAGLINE}
         </span>
       ) : null}
     </span>

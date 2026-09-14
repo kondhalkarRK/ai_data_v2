@@ -37,9 +37,9 @@ export function useSession() {
  * is an open-redirect waiting to happen, so it falls back to the landing tab.
  */
 function safeRedirectTarget(raw: string | null): string {
-  if (!raw) return "/data-preview";
-  if (!raw.startsWith("/") || raw.startsWith("//")) return "/data-preview";
-  if (raw.startsWith("/login")) return "/data-preview";
+  if (!raw) return "/home";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/home";
+  if (raw.startsWith("/login")) return "/home";
   return raw;
 }
 
@@ -74,7 +74,7 @@ export function useLogout() {
       queryClient.clear();
       useUiStore.getState().setIndustryOverride(null);
       // TEMPORARY: bypass has no real session — stay in the app.
-      router.replace(authBypass ? "/data-preview" : "/login");
+      router.replace(authBypass ? "/home" : "/login");
     },
   });
 }

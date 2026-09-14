@@ -225,6 +225,28 @@
 }
 
 @layer utilities {
+  .hero-ambient {
+    background:
+      radial-gradient(ellipse 70% 55% at 12% 18%, hsl(var(--primary) / 0.14), transparent 58%),
+      radial-gradient(ellipse 55% 45% at 88% 12%, hsl(var(--accent) / 0.12), transparent 55%),
+      linear-gradient(180deg, hsl(var(--surface-raised) / 0.9), hsl(var(--background) / 0.4));
+  }
+
+  .dark .hero-ambient {
+    background:
+      radial-gradient(ellipse 70% 55% at 12% 18%, hsl(var(--primary) / 0.22), transparent 60%),
+      radial-gradient(ellipse 55% 45% at 88% 12%, hsl(var(--accent) / 0.16), transparent 55%),
+      linear-gradient(180deg, hsl(var(--surface) / 0.55), transparent 70%);
+  }
+
+  .hero-demo-surface {
+    background-color: hsl(var(--surface-raised) / 0.92);
+  }
+
+  .dark .hero-demo-surface {
+    background-color: hsl(var(--surface-raised) / 0.75);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04);
+  }
   /* Card visual weight hierarchy — most UI should be secondary/supporting */
   .card-surface {
     background-color: hsl(var(--surface-raised));

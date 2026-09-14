@@ -29,7 +29,7 @@ export function proxy(request: NextRequest) {
   if (AUTH_BYPASS) {
     if (pathname === "/login" || pathname.startsWith("/login/")) {
       const url = request.nextUrl.clone();
-      url.pathname = "/data-preview";
+      url.pathname = "/home";
       url.search = "";
       return NextResponse.redirect(url);
     }
@@ -51,7 +51,7 @@ export function proxy(request: NextRequest) {
 
   if (hasSession && isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = "/data-preview";
+    url.pathname = "/home";
     url.search = "";
     return NextResponse.redirect(url);
   }

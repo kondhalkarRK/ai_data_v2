@@ -45,9 +45,9 @@ export function Sidebar({ user }: { user: UserProfile }) {
         )}
       >
         <Link
-          href="/data-preview"
+          href="/home"
           className="rounded-[var(--radius-control)]"
-          aria-label="NQL Insight home"
+          aria-label="Ask DB home"
         >
           <Logo compact={collapsed} size="sm" />
         </Link>

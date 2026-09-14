@@ -17,7 +17,7 @@ async function signIn(page: Page) {
   await page.getByLabel("Email").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/data-preview/);
+  await expect(page).toHaveURL(/\/home/);
 }
 
 test("an unauthenticated visitor is sent to the login page", async ({ page }) => {
@@ -31,7 +31,7 @@ test("signing in lands on the workspace and shows the shell", async ({ page }) =
   await signIn(page);
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Workspace" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Data Preview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask DB." })).toBeVisible();
 });
 
 test("a wrong password is rejected without saying which field was wrong", async ({ page }) => {

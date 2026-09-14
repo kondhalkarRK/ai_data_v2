@@ -67,7 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging(resolved.log_level, json_output=resolved.is_production)
 
     app = FastAPI(
-        title="NQL Insight API",
+        title="Ask DB API",
         version=system.SERVICE_VERSION,
         description=DESCRIPTION,
         lifespan=lifespan,

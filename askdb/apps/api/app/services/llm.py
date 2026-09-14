@@ -71,7 +71,7 @@ def _slim_system_prompt(
             f"the user explicitly changes them):\n{prior_sql[:1800]}\n"
         )
     return (
-        f"You are NQL Insight for {industry.value} analytics. "
+        f"You are Ask DB for {industry.value} analytics. "
         "Return one PostgreSQL SELECT only — schema-qualified, read-only, "
         "LIMIT <= 50. No markdown, no commentary. "
         "Obey Resolved entity, Mandatory filters, ALWAYS/NEVER rules exactly. "

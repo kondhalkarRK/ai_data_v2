@@ -68,20 +68,24 @@ export function SQLViewer({
   rowCount,
   sourceDatabase,
   diff,
+  compact = false,
   className,
 }: {
   sql: string;
-  queryMeta: QueryMeta;
-  executionTimeMs: number;
-  rowCount: number;
-  sourceDatabase: string;
+  queryMeta?: QueryMeta | null;
+  executionTimeMs?: number;
+  rowCount?: number;
+  sourceDatabase?: string;
   diff?: SqlDiffLine[] | null;
+  /** Demo / hero mode — SQL block only, no meta pills. */
+  compact?: boolean;
   className?: string;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const lines = sql.split("\n");
   const visible = expanded || lines.length <= 14 ? lines : lines.slice(0, 12);
+  const meta = queryMeta;
 
   async function copy() {
     await navigator.clipboard.writeText(sql);
@@ -91,29 +95,35 @@ export function SQLViewer({
 
   return (
     <div className={cn("space-y-3", className)}>
+      {!compact && meta ? (
       <div className="flex flex-wrap gap-1.5">
-        {queryMeta.tablesUsed.length ? (
-          <MetaPill label="Tables" value={queryMeta.tablesUsed.join(", ")} />
+        {meta.tablesUsed.length ? (
+          <MetaPill label="Tables" value={meta.tablesUsed.join(", ")} />
         ) : null}
-        {queryMeta.metricsUsed.length ? (
-          <MetaPill label="Metrics" value={queryMeta.metricsUsed.join(", ")} />
+        {meta.metricsUsed.length ? (
+          <MetaPill label="Metrics" value={meta.metricsUsed.join(", ")} />
         ) : null}
-        {queryMeta.dimensionsUsed.length ? (
-          <MetaPill label="Dimensions" value={queryMeta.dimensionsUsed.join(", ")} />
+        {meta.dimensionsUsed.length ? (
+          <MetaPill label="Dimensions" value={meta.dimensionsUsed.join(", ")} />
         ) : null}
-        {queryMeta.joinPath.length ? (
-          <MetaPill label="Join path" value={queryMeta.joinPath.join(" → ")} />
+        {meta.joinPath.length ? (
+          <MetaPill label="Join path" value={meta.joinPath.join(" → ")} />
         ) : null}
-        {queryMeta.filtersApplied.length ? (
-          <MetaPill label="Filters" value={queryMeta.filtersApplied.join("; ")} />
+        {meta.filtersApplied.length ? (
+          <MetaPill label="Filters" value={meta.filtersApplied.join("; ")} />
         ) : null}
-        {queryMeta.dateRange ? <MetaPill label="Date range" value={queryMeta.dateRange} /> : null}
-        <MetaPill label="Execution" value={`${(executionTimeMs / 1000).toFixed(2)}s`} />
-        <MetaPill label="Rows" value={rowCount.toLocaleString()} />
-        <MetaPill label="Source" value={sourceDatabase} />
+        {meta.dateRange ? <MetaPill label="Date range" value={meta.dateRange} /> : null}
+        {executionTimeMs != null ? (
+          <MetaPill label="Execution" value={`${(executionTimeMs / 1000).toFixed(2)}s`} />
+        ) : null}
+        {rowCount != null ? (
+          <MetaPill label="Rows" value={rowCount.toLocaleString()} />
+        ) : null}
+        {sourceDatabase ? <MetaPill label="Source" value={sourceDatabase} /> : null}
       </div>
+      ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-border/70 bg-[#0f1419] text-[#e7ecf3] shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border/70 bg-[#0f1419] text-[#e7ecf3] shadow-sm dark:border-white/10">
         <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/55">SQL</p>
           <div className="flex gap-1">
