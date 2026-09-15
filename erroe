@@ -1,3 +1,22 @@
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> python scripts\migrate.py insurance upgrade head
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> python scripts\migrate.py app upgrade head
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> python scripts\migrate.py automotive upgrade head
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> .\script\dev.ps1
+.\script\dev.ps1 : The term '.\script\dev.ps1' is not recognized as the name of a cmdlet, function, script file, or
+operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try
+again.
+At line:1 char:1
++ .\script\dev.ps1
++ ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (.\script\dev.ps1:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
 SQL Generation Failed
 Reason: (psycopg.errors.InFailedSqlTransaction) current transaction is aborted, commands ignored until end of transaction block [SQL: EXPLAIN SELECT date_trunc('month', sales_date)::date AS month, SUM(total_sales) AS revenue, SUM(orde
 
