@@ -24,7 +24,7 @@ const AUTH_BYPASS = process.env.NEXT_PUBLIC_AUTH_BYPASS === "true";
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { data: user, isPending, isError } = useSession();
+  const { data: user, isPending, isError, error } = useSession();
   const presenterMode = useUiStore((state) => state.presenterMode);
   const setSidebarCollapsed = useUiStore((state) => state.setSidebarCollapsed);
 
@@ -40,13 +40,26 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   if (isPending) return <AppBootLoading />;
 
   if (isError) {
+    const detail =
+      error instanceof Error && error.message
+        ? error.message
+        : "The API did not respond.";
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
         <div className="card-surface max-w-md p-6 text-center">
           <h1 className="text-lg font-semibold">Cannot reach the server</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            The API did not respond. This is a connectivity problem, not a sign-out — your
-            session is intact. Retry once the service is back.
+            This is a connectivity / backend problem, not a sign-out — your session is
+            intact. Retry once Postgres and the API are healthy.
+          </p>
+          <p className="mt-3 rounded-md bg-muted/60 px-3 py-2 text-left text-xs text-muted-foreground">
+            {detail}
+          </p>
+          <p className="mt-3 text-left text-xs text-muted-foreground">
+            Check <code className="text-[11px]">http://127.0.0.1:8000/ready</code> and
+            confirm <code className="text-[11px]">askdb/.env</code> DB passwords match
+            bootstrap (<code className="text-[11px]">askdb_app</code> /{" "}
+            <code className="text-[11px]">askdb_reader</code>).
           </p>
         </div>
       </div>

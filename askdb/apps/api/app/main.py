@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# Windows: must run before uvicorn creates the event loop / psycopg connects.
+import app.compat  # noqa: F401
+
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
