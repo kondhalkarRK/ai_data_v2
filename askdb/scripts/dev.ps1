@@ -1,12 +1,9 @@
 # Starts the API and the frontend together for local development.
+# Ctrl+C stops the frontend; the finally block stops the API.
 #
-# Both run in this window. Ctrl+C stops the frontend and the trap stops the API, so no
-# orphaned uvicorn is left holding port 8000.
-#
-# Reload is auto-disabled when the path contains OneDrive (file watchers flap). Override:
-#   $env:ASKDB_API_RELOAD = "1"; .\scripts\dev.ps1
-# Force reload off anywhere:
-#   $env:ASKDB_API_RELOAD = "0"; .\scripts\dev.ps1
+# Optional:
+#   $env:ASKDB_API_RELOAD = "1"   # enable uvicorn --reload
+#   $env:ASKDB_API_RELOAD = "0"   # force reload off (default)
 
 #Requires -Version 5.1
 $ErrorActionPreference = "Stop"
@@ -14,196 +11,89 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 
-$api = $null
-$reuseApi = $false
-$apiLogOut = Join-Path $env:TEMP "askdb-api-dev.out.log"
-$apiLogErr = Join-Path $env:TEMP "askdb-api-dev.err.log"
-
-function Stop-AskDbApi {
-    param([System.Diagnostics.Process]$Process)
-    if ($Process -and -not $Process.HasExited) {
-        Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
-    }
+function Stop-AskDbUvicorn {
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -and ($_.CommandLine -match "uvicorn app\.main:app") } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-    Start-Sleep -Milliseconds 400
+        ForEach-Object {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+    Start-Sleep -Milliseconds 500
 }
 
-function Test-AskDbHealth {
+function Test-ApiHealth {
     try {
-        $prev = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
-        $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 2 -ErrorAction Stop
-        $ErrorActionPreference = $prev
-        return ($null -ne $response -and "$($response.status)" -eq "ok")
+        $r = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 2
+        return ($r.status -eq "ok")
     } catch {
         return $false
     }
-}
-
-function Test-PortListening {
-    param([int]$Port)
-    try {
-        $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-        return [bool]$conn
-    } catch {
-        # Fallback when Get-NetTCPConnection is unavailable
-        try {
-            $client = New-Object System.Net.Sockets.TcpClient
-            $iar = $client.BeginConnect("127.0.0.1", $Port, $null, $null)
-            $ok = $iar.AsyncWaitHandle.WaitOne(300) -and $client.Connected
-            $client.Close()
-            return $ok
-        } catch {
-            return $false
-        }
-    }
-}
-
-function Show-AskDbApiLog {
-    param([string]$Title)
-    Write-Host "----- $Title -----" -ForegroundColor Red
-    foreach ($log in @($script:apiLogErr, $script:apiLogOut)) {
-        if (Test-Path $log) {
-            Write-Host "($log)" -ForegroundColor DarkGray
-            Get-Content $log -ErrorAction SilentlyContinue | Select-Object -Last 50
-        }
-    }
-}
-
-function Start-AskDbApiProcess {
-    param(
-        [string]$PythonPath,
-        [string]$WorkingDirectory,
-        [string]$ArgumentList,
-        [string]$StdOutLog,
-        [string]$StdErrLog
-    )
-    Remove-Item $StdOutLog, $StdErrLog -Force -ErrorAction SilentlyContinue
-    return Start-Process -PassThru -NoNewWindow `
-        -WorkingDirectory $WorkingDirectory `
-        -FilePath $PythonPath `
-        -ArgumentList $ArgumentList `
-        -RedirectStandardOutput $StdOutLog `
-        -RedirectStandardError $StdErrLog
 }
 
 try {
     if (-not (Test-Path ".env")) {
         if (Test-Path ".env.example") {
             Copy-Item ".env.example" ".env"
-            Write-Host "Created .env from .env.example - update DB passwords / JWT if needed." -ForegroundColor Yellow
+            Write-Host "Created .env from .env.example" -ForegroundColor Yellow
         } else {
-            throw "No .env found. Copy .env.example to .env and set JWT_SECRET_KEY first."
+            Write-Error "No .env found. Copy .env.example to .env first."
         }
     }
 
     $python = Join-Path $root "apps\api\.venv\Scripts\python.exe"
     if (-not (Test-Path $python)) {
-        throw "No API virtualenv. Run: cd apps/api; python -m venv .venv; .venv\Scripts\pip install -e `".[dev]`""
+        Write-Error "No API venv. Run: cd apps\api; python -m venv .venv; .\.venv\Scripts\pip install -e `".[dev]`""
     }
 
-    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-        throw "npm was not found on PATH. Install Node.js 20+ and retry."
-    }
+    # Default: reload OFF (stable). Set ASKDB_API_RELOAD=1 only if you need auto-reload.
+    $reloadOn = $env:ASKDB_API_RELOAD -eq "1"
 
-    # Fail fast if the package cannot import (clearer than a hung /health wait).
-    Write-Host "Checking API import ..." -ForegroundColor DarkGray
-    $apiDir = Join-Path $root "apps\api"
-    Push-Location $apiDir
-    try {
-        $importCheck = & $python -c "from app.main import app; print('ok')" 2>&1
-    } finally {
-        Pop-Location
-    }
-    if ($LASTEXITCODE -ne 0 -or ("$importCheck" -notmatch "ok")) {
-        Write-Host "$importCheck" -ForegroundColor Red
-        throw "API failed to import. Fix the error above, then retry."
-    }
-
-    $onOneDrive = $root -match "OneDrive"
-    if ($null -eq $env:ASKDB_API_RELOAD -or $env:ASKDB_API_RELOAD -eq "") {
-        $reloadEnabled = -not $onOneDrive
+    # IMPORTANT: do not put * globs in these args. PowerShell expands them and
+    # uvicorn then fails with "Got unexpected extra arguments (.venv\Lib ...)".
+    if ($reloadOn) {
+        $uvicornArgs = "-m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --reload-dir app --reload-exclude .venv --reload-exclude __pycache__"
+        Write-Host "API reload: ON" -ForegroundColor DarkGray
     } else {
-        $reloadEnabled = $env:ASKDB_API_RELOAD -ne "0"
+        $uvicornArgs = "-m uvicorn app.main:app --host 127.0.0.1 --port 8000"
+        Write-Host "API reload: OFF (set ASKDB_API_RELOAD=1 to enable)" -ForegroundColor DarkGray
     }
 
-    # Single ArgumentList string. Never use bare * globs - PowerShell expands them
-    # (e.g. .venv/* -> .venv\Lib ...) and uvicorn fails with "unexpected extra arguments".
-    $uvicornArgList = "-m uvicorn app.main:app --host 127.0.0.1 --port 8000"
-    if ($reloadEnabled) {
-        $uvicornArgList += " --reload --reload-dir app --reload-exclude .venv --reload-exclude __pycache__"
-        Write-Host "API reload is ON (watching apps/api/app only)." -ForegroundColor DarkGray
-    } else {
-        Write-Host "API reload is OFF - stable for OneDrive/synced folders. Set ASKDB_API_RELOAD=1 to force reload." -ForegroundColor Yellow
+    # Always start clean so a stale process cannot block :8000.
+    if (Test-ApiHealth) {
+        Write-Host "Stopping previous Ask DB API on :8000 ..." -ForegroundColor DarkGray
     }
+    Stop-AskDbUvicorn
 
-    if (Test-PortListening -Port 8000) {
-        Write-Host "Port 8000 already in use. Checking /health ..." -ForegroundColor Yellow
-        if (Test-AskDbHealth) {
-            Write-Host "Existing API on :8000 is healthy - reusing it." -ForegroundColor Green
-            $reuseApi = $true
-        } else {
-            Write-Host "Port 8000 is busy but unhealthy. Stopping stale Ask DB uvicorn processes ..." -ForegroundColor Yellow
-            Stop-AskDbApi -Process $null
-            if (Test-PortListening -Port 8000) {
-                throw "Port 8000 is still busy after clearing Ask DB uvicorn. Stop the other process manually, then retry."
-            }
+    Write-Host "Starting API on http://127.0.0.1:8000 ..." -ForegroundColor Cyan
+    $api = Start-Process -PassThru -NoNewWindow `
+        -WorkingDirectory (Join-Path $root "apps\api") `
+        -FilePath $python `
+        -ArgumentList $uvicornArgs
+
+    $ready = $false
+    foreach ($i in 1..60) {
+        Start-Sleep -Milliseconds 500
+        if ($api.HasExited) {
+            throw "The API exited during startup (exit $($api.ExitCode)). Check the uvicorn output above."
+        }
+        if (Test-ApiHealth) {
+            $ready = $true
+            Write-Host "API is ready." -ForegroundColor Green
+            break
         }
     }
-
-    if (-not $reuseApi) {
-        Write-Host "Starting API on http://127.0.0.1:8000 ..." -ForegroundColor Cyan
-        Write-Host "API logs: $apiLogOut | $apiLogErr" -ForegroundColor DarkGray
-
-        $api = Start-AskDbApiProcess `
-            -PythonPath $python `
-            -WorkingDirectory (Join-Path $root "apps\api") `
-            -ArgumentList $uvicornArgList `
-            -StdOutLog $apiLogOut `
-            -StdErrLog $apiLogErr
-
-        # OneDrive / cold venv can take well over 20s before the first request works.
-        $maxAttempts = if ($onOneDrive) { 90 } else { 60 }
-        $ready = $false
-        foreach ($attempt in 1..$maxAttempts) {
-            Start-Sleep -Milliseconds 500
-            if ($api.HasExited) {
-                Show-AskDbApiLog "API log (process exited)"
-                throw "The API exited during startup (exit $($api.ExitCode)). See log above."
-            }
-            if (Test-AskDbHealth) {
-                $ready = $true
-                Write-Host "API is healthy." -ForegroundColor Green
-                break
-            }
-            if ($attempt % 10 -eq 0) {
-                Write-Host "Waiting for API /health ... ($([math]::Round($attempt * 0.5))s)" -ForegroundColor DarkGray
-            }
-        }
-
-        if (-not $ready) {
-            Show-AskDbApiLog "API log (timed out waiting for /health)"
-            Stop-AskDbApi -Process $api
-            $api = $null
-            throw "API did not answer http://127.0.0.1:8000/health in $([math]::Round($maxAttempts * 0.5))s. Fix the error in the log above, then retry."
-        }
+    if (-not $ready) {
+        Stop-AskDbUvicorn
+        throw "API did not answer http://127.0.0.1:8000/health within 30s. Is Postgres running? Check uvicorn output above."
     }
 
     Write-Host "Starting frontend on http://localhost:3000 ..." -ForegroundColor Cyan
     npm run dev
-    if ($LASTEXITCODE -ne 0) {
-        throw "Frontend exited with code $LASTEXITCODE."
-    }
-} catch {
-    Write-Host ""
-    Write-Host "dev.ps1 failed: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
 } finally {
-    if (-not $reuseApi) {
-        Write-Host "Stopping API ..." -ForegroundColor DarkGray
-        Stop-AskDbApi -Process $api
+    Write-Host "Stopping API ..." -ForegroundColor DarkGray
+    if ($api -and -not $api.HasExited) {
+        Stop-Process -Id $api.Id -Force -ErrorAction SilentlyContinue
     }
+    Stop-AskDbUvicorn
     Pop-Location
 }
