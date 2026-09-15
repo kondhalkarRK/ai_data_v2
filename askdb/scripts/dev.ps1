@@ -13,7 +13,12 @@ Push-Location $root
 function Stop-AskDbApiOnPort {
     # Prefer command-line match; fall back to whatever owns :8000 (stale listeners).
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -and ($_.CommandLine -match "uvicorn app\.main:app") } |
+        Where-Object {
+            $_.CommandLine -and (
+                $_.CommandLine -match "uvicorn app\.main:app" -or
+                $_.CommandLine -match "run_dev\.py"
+            )
+        } |
         ForEach-Object {
             Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
         }
@@ -26,7 +31,7 @@ function Stop-AskDbApiOnPort {
             $cmd = if ($proc) { [string]$proc.CommandLine } else { "" }
             $name = if ($proc) { [string]$proc.Name } else { "" }
             # Only kill python/uvicorn-looking owners, never system pid 0/4.
-            if ($name -match "(?i)python|uvicorn" -or $cmd -match "(?i)uvicorn|app\.main:app") {
+            if ($name -match "(?i)python|uvicorn" -or $cmd -match "(?i)uvicorn|app\.main:app|run_dev\.py") {
                 Write-Host "Stopping PID $procId on :8000 ($name)" -ForegroundColor DarkGray
                 Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
             }
@@ -66,15 +71,16 @@ function Show-BackendStatus {
             Write-Host ("    - {0}: {1} {2}" -f $dep.name, $dep.status, $dep.detail) -ForegroundColor $color
         }
         if ($ready.status -eq "not_ready") {
+            $iface = @($ready.dependencies | Where-Object { $_.detail -match "InterfaceError" })
             Write-Host ""
-            Write-Host "Postgres is not reachable with the passwords in askdb/.env." -ForegroundColor Yellow
-            Write-Host "Fix: run database bootstrap (needs your postgres superuser password):" -ForegroundColor Yellow
-            Write-Host '  $env:PGPASSWORD = "YOUR_POSTGRES_PASSWORD"' -ForegroundColor White
-            Write-Host "  & `"C:\Program Files\PostgreSQL\18\bin\psql.exe`" -U postgres -h 127.0.0.1 -f database\app\00_bootstrap.sql" -ForegroundColor White
-            Write-Host "Then reset role passwords if roles already existed:" -ForegroundColor Yellow
-            Write-Host "  ALTER ROLE askdb_app WITH PASSWORD 'askdb_app';" -ForegroundColor White
-            Write-Host "  ALTER ROLE askdb_reader WITH PASSWORD 'askdb_reader';" -ForegroundColor White
-            Write-Host "  ALTER ROLE askdb_owner WITH PASSWORD 'askdb_owner';" -ForegroundColor White
+            if ($iface.Count -gt 0) {
+                Write-Host "Windows asyncio/psycopg issue (InterfaceError). Start API via run_dev.py, not raw uvicorn." -ForegroundColor Yellow
+            } else {
+                Write-Host "Postgres is not reachable with the passwords in askdb/.env." -ForegroundColor Yellow
+                Write-Host "Fix: run database bootstrap (needs your postgres superuser password):" -ForegroundColor Yellow
+                Write-Host '  $env:PGPASSWORD = "YOUR_POSTGRES_PASSWORD"' -ForegroundColor White
+                Write-Host "  & `"C:\Program Files\PostgreSQL\18\bin\psql.exe`" -U postgres -h 127.0.0.1 -f database\app\00_bootstrap.sql" -ForegroundColor White
+            }
         }
     } catch {
         Write-Host "  /ready   FAIL ($($_.Exception.Message))" -ForegroundColor Red
@@ -119,11 +125,12 @@ try {
     }
 
     $reloadOn = $env:ASKDB_API_RELOAD -eq "1"
+    # Use run_dev.py so WindowsSelectorEventLoopPolicy is set BEFORE Uvicorn creates the loop.
     if ($reloadOn) {
-        $uvicornArgs = "-m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --reload-dir app --reload-exclude .venv --reload-exclude __pycache__"
+        $uvicornArgs = "run_dev.py --host 127.0.0.1 --port 8000 --reload"
         Write-Host "API reload: ON" -ForegroundColor DarkGray
     } else {
-        $uvicornArgs = "-m uvicorn app.main:app --host 127.0.0.1 --port 8000"
+        $uvicornArgs = "run_dev.py --host 127.0.0.1 --port 8000"
         Write-Host "API reload: OFF (set ASKDB_API_RELOAD=1 to enable)" -ForegroundColor DarkGray
     }
 
