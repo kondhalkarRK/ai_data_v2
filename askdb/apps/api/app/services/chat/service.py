@@ -457,7 +457,12 @@ class ChatService:
             # standalone template would silently discard that context.
             hit = None
         else:
-            hit = resolve_template(self._industry, question, plan=plan)
+            hit = resolve_template(
+                self._industry,
+                question,
+                plan=plan,
+                pack=semantic_pack,
+            )
         timings.semantic_lookup_ms = int((time.perf_counter() - semantic_t0) * 1000)
         completed_steps.append("metrics")
         yield _progress("sql", completed_steps, slow=maybe_slow())
@@ -494,9 +499,12 @@ class ChatService:
         else:
             if plan.entity:
                 logger.info(
-                    "Question plan entity=%s metric=%s filters=%s; trying LLM",
+                    "Question plan entity=%s metric=%s dimensions=%s analysis=%s "
+                    "filters=%s; trying LLM",
                     plan.entity,
                     plan.metric,
+                    plan.dimensions,
+                    plan.analysis,
                     [f.value for f in plan.filters],
                 )
             yield _sse("stage", {"stage": "llm"})

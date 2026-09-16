@@ -14,6 +14,8 @@ export type GalaxyNodeData = OntologyNode & {
   focused: boolean;
   pulsing: boolean;
   hop: 0 | 1 | 2 | null;
+  /** When false, idle float / pulse motion is suppressed. */
+  motionEnabled: boolean;
 };
 
 export type GalaxyFlowNode = Node<GalaxyNodeData, "galaxy">;
@@ -30,11 +32,14 @@ export function GalaxyNode({ data, selected }: NodeProps<GalaxyFlowNode>) {
       initial={false}
       animate={{
         scale: selected || data.focused ? 1.06 : 1,
-        y: data.pulsing ? [0, -3, 0] : 0,
+        y: data.motionEnabled && data.pulsing ? [0, -3, 0] : 0,
       }}
       transition={{
         scale: { type: "spring", stiffness: 380, damping: 24 },
-        y: { duration: 2.4, repeat: Infinity, ease: "easeInOut" },
+        y:
+          data.motionEnabled && data.pulsing
+            ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
+            : { duration: 0.2 },
       }}
     >
       <Handle type="target" position={Position.Left} className="!opacity-0" />
@@ -44,7 +49,7 @@ export function GalaxyNode({ data, selected }: NodeProps<GalaxyFlowNode>) {
         data-fact={isFact}
         data-focused={data.focused || selected}
         data-dimmed={data.dimmed}
-        data-pulse={data.pulsing}
+        data-pulse={data.motionEnabled && data.pulsing}
         style={
           {
             "--node-color": data.clusterColor,

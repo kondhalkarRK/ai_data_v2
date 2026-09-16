@@ -213,6 +213,18 @@
   }
 }
 
+/* Explicit Motion: OFF — static graph without remounting React Flow. */
+.semantic-galaxy[data-motion="off"] .galaxy-edge-path--animated,
+.semantic-galaxy[data-motion="off"] .galaxy-cluster-zone,
+.semantic-galaxy[data-motion="off"] .galaxy-node[data-pulse="true"]::after,
+.semantic-galaxy[data-motion="off"] .galaxy-particle {
+  animation: none !important;
+}
+
+.semantic-galaxy[data-motion="off"] .galaxy-edge-path {
+  stroke-dasharray: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .galaxy-edge-path--animated,
   .galaxy-cluster-zone,

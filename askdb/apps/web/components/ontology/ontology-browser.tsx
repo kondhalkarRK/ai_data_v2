@@ -36,6 +36,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { hopNeighborhood } from "@/lib/ontology/graph-metrics";
 import {
+  ONTOLOGY_KIND_FILTERS,
+  nodeMatchesKindFilter,
+  type OntologyKindFilter,
+} from "@/lib/ontology/kind-filter";
+import {
   edgeVisualKind,
   layoutGalaxy,
   type CentralityMetric,
@@ -94,6 +99,9 @@ function OntologyBrowserInner({
   const [pulseId, setPulseId] = React.useState<string | null>(null);
   const [activeCluster, setActiveCluster] = React.useState<string | null>(null);
   const [showClusters, setShowClusters] = React.useState(true);
+  /** Motion defaults OFF so large graphs stay readable without distraction. */
+  const [motionEnabled, setMotionEnabled] = React.useState(false);
+  const [kindFilter, setKindFilter] = React.useState<OntologyKindFilter>("all");
 
   const positioned = React.useMemo(
     () => layoutGalaxy(snapshot, mode, metric),
@@ -135,12 +143,18 @@ function OntologyBrowserInner({
         } else {
           dimmed = true;
         }
-        if (hop === 2 && !focus.one.nodes.has(node.id)) {
-          // keep 2-hop visible but slightly quieter via opacity in CSS only when dimmed false
-        }
       }
       if (activeCluster && node.cluster !== activeCluster && node.id !== selectedId) {
         dimmed = true;
+      }
+      if (kindFilter !== "all") {
+        const matches = nodeMatchesKindFilter(node, kindFilter);
+        if (matches) {
+          focused = focused || !focus;
+        } else {
+          dimmed = true;
+          if (node.id !== selectedId) focused = false;
+        }
       }
       return {
         id: node.id,
@@ -152,12 +166,13 @@ function OntologyBrowserInner({
           focused,
           pulsing: pulseId === node.id,
           hop,
+          motionEnabled,
         },
         style: { width: size, height: size + 4 },
         zIndex: focused || pulseId === node.id ? 20 : dimmed ? 1 : 5,
       };
     });
-  }, [positioned, focus, selectedId, pulseId, activeCluster]);
+  }, [positioned, focus, selectedId, pulseId, activeCluster, kindFilter, motionEnabled]);
 
   const flowEdges: GalaxyFlowEdge[] = React.useMemo(() => {
     return snapshot.edges.map((edge) => {
@@ -177,6 +192,22 @@ function OntologyBrowserInner({
           emphasized = false;
         }
       }
+      if (kindFilter !== "all") {
+        const source = nodeById.get(edge.source);
+        const target = nodeById.get(edge.target);
+        if (kindFilter === "relationship") {
+          emphasized = !dimmed;
+        } else {
+          const sourceMatch = source ? nodeMatchesKindFilter(source, kindFilter) : false;
+          const targetMatch = target ? nodeMatchesKindFilter(target, kindFilter) : false;
+          if (!sourceMatch && !targetMatch) {
+            dimmed = true;
+            emphasized = false;
+          } else if (!focus) {
+            emphasized = sourceMatch || targetMatch;
+          }
+        }
+      }
       return {
         id: edge.id,
         type: "galaxy",
@@ -187,12 +218,13 @@ function OntologyBrowserInner({
           label: edge.label || EDGE_STYLES[visualKind].label,
           dimmed,
           emphasized,
+          motionEnabled,
         },
-        animated: emphasized,
+        animated: motionEnabled && (emphasized || EDGE_STYLES[visualKind].animated) && !dimmed,
         zIndex: emphasized ? 4 : 0,
       };
     });
-  }, [snapshot.edges, nodeById, focus, activeCluster]);
+  }, [snapshot.edges, nodeById, focus, activeCluster, kindFilter, motionEnabled]);
 
   const selectedNode = selectedId ? (nodeById.get(selectedId) ?? null) : null;
 
@@ -255,8 +287,11 @@ function OntologyBrowserInner({
   const positionedForClusters: PositionedNode[] = positioned;
 
   return (
-    <div className="semantic-galaxy relative flex h-[min(78vh,860px)] min-h-[560px] w-full flex-col">
-      <ParticleField />
+    <div
+      className="semantic-galaxy relative flex h-[min(78vh,860px)] min-h-[560px] w-full flex-col"
+      data-motion={motionEnabled ? "on" : "off"}
+    >
+      {motionEnabled ? <ParticleField /> : null}
 
       <div className="galaxy-toolbar relative z-20 flex flex-wrap items-center gap-2 px-3 py-2.5">
         <div className="mr-1 flex items-center gap-2">
@@ -311,6 +346,34 @@ function OntologyBrowserInner({
           </div>
         ) : null}
 
+        <div
+          className="flex flex-wrap gap-1"
+          role="tablist"
+          aria-label="Entity type filter"
+        >
+          {ONTOLOGY_KIND_FILTERS.map((item) => {
+            const active = kindFilter === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={cn(
+                  "galaxy-chip rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors duration-150",
+                  active
+                    ? "border-info/40 bg-info/15 text-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                )}
+                data-active={active}
+                onClick={() => setKindFilter(item.id)}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="ml-auto flex min-w-[220px] max-w-sm flex-1 items-center gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -354,6 +417,17 @@ function OntologyBrowserInner({
               ) : null}
             </AnimatePresence>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1.5 text-xs"
+            aria-pressed={motionEnabled}
+            aria-label={`Motion ${motionEnabled ? "on" : "off"}`}
+            onClick={() => setMotionEnabled((value) => !value)}
+          >
+            Motion: {motionEnabled ? "ON" : "OFF"}
+          </Button>
           <Button
             type="button"
             size="sm"

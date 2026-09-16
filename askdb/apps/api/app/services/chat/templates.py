@@ -10,6 +10,10 @@ from app.services.chat.question_understanding import (
     QuestionPlan,
     understand_question,
 )
+from app.services.chat.semantic_analytics import (
+    SemanticCompileError,
+    compile_analytical_query,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +47,7 @@ def resolve_template(
     question: str,
     *,
     plan: QuestionPlan | None = None,
+    pack: object | None = None,
 ) -> TemplateHit | None:
     q = question.strip()
     if not q:
@@ -51,6 +56,36 @@ def resolve_template(
     plan = plan or understand_question(industry, q)
     if plan.is_ambiguous:
         return None
+
+    # Rich plans must be compiled before narrow legacy templates get a chance to
+    # collapse the grain (for example month + car type + colour -> month only).
+    if plan.requires_semantic_compiler:
+        try:
+            compiled = compile_analytical_query(plan, pack)
+        except SemanticCompileError:
+            return None
+        if compiled is not None:
+            return TemplateHit(
+                sql=compiled.sql,
+                title=compiled.title,
+                glossary_matches=max(2, len(plan.dimensions) + 1),
+                path="semantic_compiler",
+            )
+        if pack is None:
+            # Offline inventory/tests and deployments without a loaded pack retain
+            # the existing governed templates. Runtime always supplies the pack.
+            pass
+        elif (
+            plan.industry is Industry.AUTOMOTIVE
+            and plan.entity == "vehicle"
+            and any("group by region" in note.lower() for note in plan.notes)
+        ):
+            # Backward-compatible governed template; also keeps offline template
+            # inventory/tests useful when no pack object is available.
+            pass
+        else:
+            # Never silently route an advanced plan to a less expressive fallback.
+            return None
 
     if industry is Industry.AUTOMOTIVE:
         hit = _automotive_from_plan(plan)

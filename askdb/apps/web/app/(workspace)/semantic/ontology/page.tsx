@@ -1,13 +1,11 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { LoadingState } from "@/components/loading/loading-state";
 import { OntologyBrowser } from "@/components/ontology/ontology-browser";
-import { Button } from "@/components/ui/button";
+import { SemanticBackLink } from "@/components/semantic/semantic-back-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { useOntologySnapshot } from "@/hooks/use-semantic";
 
@@ -27,11 +25,7 @@ function OntologyPageInner() {
   return (
     <>
       <div className="mb-3 flex items-center gap-3">
-        <Button asChild variant="ghost" size="icon-sm">
-          <Link href="/semantic" aria-label="Back to Semantic Atlas">
-            <ChevronLeft />
-          </Link>
-        </Button>
+        <SemanticBackLink />
         <div>
           <h1 className="text-lg font-semibold tracking-tight">Semantic Galaxy</h1>
           <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">

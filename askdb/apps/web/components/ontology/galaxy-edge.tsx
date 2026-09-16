@@ -34,6 +34,8 @@ export type GalaxyEdgeData = {
   label: string;
   dimmed: boolean;
   emphasized: boolean;
+  /** When false, flowing dash animation is suppressed without remounting the graph. */
+  motionEnabled: boolean;
 };
 
 export type GalaxyFlowEdge = Edge<GalaxyEdgeData, "galaxy">;
@@ -62,7 +64,10 @@ export function GalaxyEdge({
   const strokeWidth = data?.emphasized ? visual.width + 1.2 : visual.width;
   const opacity = data?.dimmed ? 0.08 : data?.emphasized ? 1 : 0.72;
 
-  const animated = !data?.dimmed && (visual.animated || Boolean(data?.emphasized));
+  const animated =
+    Boolean(data?.motionEnabled) &&
+    !data?.dimmed &&
+    (visual.animated || Boolean(data?.emphasized));
 
   return (
     <>

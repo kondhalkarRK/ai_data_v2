@@ -20,6 +20,18 @@ IntentKind = Literal[
     "ambiguous",
     "unknown",
 ]
+AnalysisKind = Literal[
+    "basic",
+    "breakdown",
+    "ranking",
+    "top_n_per_group",
+    "running_total",
+    "moving_average",
+    "period_growth",
+    "contribution",
+    "above_average",
+]
+AggregationKind = Literal["sum", "count", "count_distinct", "avg", "ratio"]
 
 EntityKind = Literal[
     "salesperson",
@@ -74,10 +86,46 @@ class QuestionPlan:
     ambiguity_options: list[str] = field(default_factory=list)
     glossary_hits: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    aggregation: AggregationKind = "sum"
+    dimensions: list[str] = field(default_factory=list)
+    time_grain: str | None = None
+    analysis: AnalysisKind = "basic"
+    partition_by: list[str] = field(default_factory=list)
 
     @property
     def is_ambiguous(self) -> bool:
         return self.intent == "ambiguous" or bool(self.ambiguity_options)
+
+    @property
+    def requires_semantic_compiler(self) -> bool:
+        """True when a fixed single-grain template cannot faithfully answer the plan."""
+        advanced = {
+            "ranking",
+            "top_n_per_group",
+            "running_total",
+            "moving_average",
+            "period_growth",
+            "contribution",
+            "above_average",
+        }
+        if self.analysis in advanced or len(self.dimensions) > 1:
+            return True
+        # These dimensions have no complete legacy template.
+        return any(
+            dimension
+            in {
+                "colour",
+                "car_type",
+                "make",
+                "city",
+                "state",
+                "product_family",
+                "line_of_business",
+                "channel",
+                "branch",
+            }
+            for dimension in self.dimensions
+        )
 
 
 _TOP = re.compile(r"\b(top|best|highest|leading|most|lowest|worst)\b", re.I)
@@ -86,6 +134,23 @@ _TREND = re.compile(r"\b(trend|by\s+month|monthly|over\s+time|time\s+series)\b",
 _REVENUE = re.compile(r"\b(revenue|sales\s+value|dollar|amount|turnover)\b", re.I)
 _UNITS = re.compile(r"\b(unit|units|volume|qty|quantity)\b", re.I)
 _SELLING = re.compile(r"\b(selling|sold|popular)\b", re.I)
+_RUNNING = re.compile(r"\b(running|cumulative)\s+(?:total\s+)?", re.I)
+_MOVING_AVG = re.compile(r"\b(moving|rolling)\s+average\b", re.I)
+_PERIOD_GROWTH = re.compile(
+    r"\b(month[-\s]*over[-\s]*month|mom|year[-\s]*over[-\s]*year|yoy)\b|"
+    r"\bgrowth\b",
+    re.I,
+)
+_CONTRIBUTION = re.compile(
+    r"\b(contribution|share|percentage|percent|%)\b",
+    re.I,
+)
+_ABOVE_AVERAGE = re.compile(
+    r"\b(above|greater\s+than|more\s+than|outperform(?:ing|ed)?|compared\s+to)\b"
+    r"[\s\S]{0,40}\baverage\b",
+    re.I,
+)
+_PER_GROUP = re.compile(r"\b(?:within\s+)?each\b|\bper\s+(?!cent\b)", re.I)
 
 _SALESPERSON = re.compile(
     r"\b(salesperson|salespersons|salespeople|sales\s*rep|sales\s*reps|"
@@ -180,7 +245,146 @@ def understand_question(
     plan.order_direction = "asc" if _LOWEST.search(q) else "desc"
     plan.filters = _merge_filters(plan.filters, value_filters or [])
     _apply_value_inference(plan, q)
+    _enrich_analytical_plan(plan, q)
     return plan
+
+
+def _append_unique(items: list[str], value: str) -> None:
+    if value not in items:
+        items.append(value)
+
+
+def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
+    """Extract ordered semantic GROUP BY dimensions, not concrete filter values."""
+    q = question.lower()
+    dimensions: list[str] = []
+
+    patterns: list[tuple[str, str]] = [
+        ("month", r"\bmonthly\b|\bby\s+month\b|\bmonth[-\s]*over[-\s]*month\b|\bmom\b"),
+        ("quarter", r"\bquarterly\b|\bby\s+quarter\b|\bper\s+quarter\b"),
+        ("year", r"\byearly\b|\bby\s+year\b|\byear[-\s]*over[-\s]*year\b|\byoy\b"),
+    ]
+    if industry is Industry.AUTOMOTIVE:
+        patterns.extend(
+            [
+                ("car_type", r"\bcar\s+type\b|\bvehicle\s+type\b|\bbody\s+style\b"),
+                ("colour", r"\bpaint\s+colou?r\b|\bcolou?r\b|\bpaint\b"),
+                ("make", r"\bcar\s+brand\b|\bvehicle\s+brand\b|\bby\s+(?:make|brand)\b"),
+                ("model", r"\bby\s+model\b|\bmodels?\s+(?:per|within\s+each)\b"),
+                ("dealer", r"\bdealers?\b"),
+                ("salesperson", r"\bsalespersons?\b|\bsalespeople\b|\bsales\s*rep\b"),
+                ("region", r"\b(?:by|per)\s+region\b|\bwithin\s+each\s+region\b|\bregional\s+average\b"),
+                ("city", r"\b(?:by|per)\s+cit(?:y|ies)\b|\bwithin\s+each\s+city\b|\beach\s+city\b"),
+            ]
+        )
+    else:
+        patterns.extend(
+            [
+                ("product", r"\bproducts?\b"),
+                ("product_family", r"\b(?:product\s+)?categor(?:y|ies)\b|\bproduct\s+famil(?:y|ies)\b"),
+                ("line_of_business", r"\bline\s+of\s+business\b|\blob\b"),
+                ("customer", r"\bcustomers?\b|\bpolicyholders?\b"),
+                ("policy", r"\bpolic(?:y|ies)\b"),
+                ("agent", r"\bagents?\b|\bbrokers?\b"),
+                ("channel", r"\bby\s+channel\b|\bper\s+channel\b"),
+                ("branch", r"\bby\s+branch\b|\bper\s+branch\b"),
+                ("region", r"\b(?:by|per)\s+region\b|\bwithin\s+each\s+region\b|\bregional\s+average\b"),
+                ("state", r"\b(?:by|per)\s+state\b|\bwithin\s+each\s+state\b"),
+                ("claim_status", r"\bby\s+(?:claim\s+)?status\b"),
+            ]
+        )
+
+    hits: list[tuple[int, str]] = []
+    for name, pattern in patterns:
+        match = re.search(pattern, q, re.I)
+        if match:
+            hits.append((match.start(), name))
+    for _, name in sorted(hits):
+        _append_unique(dimensions, name)
+    return dimensions
+
+
+def _default_dimension(plan: QuestionPlan) -> str | None:
+    return {
+        "salesperson": "salesperson",
+        "dealer": "dealer",
+        "vehicle": "model",
+        "region": "region",
+        "agent": "agent",
+        "product": "product",
+        "policy": "policy",
+        "customer": "customer",
+        "claim": "claim_status",
+    }.get(plan.entity)
+
+
+def _enrich_analytical_plan(plan: QuestionPlan, question: str) -> None:
+    dimensions = _explicit_dimensions(plan.industry, question)
+    default = _default_dimension(plan)
+    if default and default not in dimensions and plan.entity != "metric_only":
+        dimensions.append(default)
+
+    if _TREND.search(question) and not any(d in dimensions for d in ("month", "quarter", "year")):
+        dimensions.insert(0, "month")
+    plan.dimensions = dimensions
+    plan.time_grain = next(
+        (grain for grain in ("month", "quarter", "year") if grain in dimensions),
+        None,
+    )
+
+    if _ABOVE_AVERAGE.search(question):
+        plan.analysis = "above_average"
+    elif _MOVING_AVG.search(question):
+        plan.analysis = "moving_average"
+    elif _RUNNING.search(question):
+        plan.analysis = "running_total"
+    elif _PERIOD_GROWTH.search(question):
+        plan.analysis = "period_growth"
+    elif _CONTRIBUTION.search(question):
+        plan.analysis = "contribution"
+    elif _TOP.search(question) and _PER_GROUP.search(question) and len(dimensions) >= 2:
+        plan.analysis = "top_n_per_group"
+    elif _TOP.search(question) or re.search(r"\brank(?:ing)?\b", question, re.I):
+        plan.analysis = "ranking"
+    elif dimensions:
+        plan.analysis = "breakdown"
+
+    if plan.analysis in {"top_n_per_group", "above_average"} and len(dimensions) >= 2:
+        scope_patterns = {
+            "region": r"\bwithin\s+each\s+region\b|\bper\s+region\b|\bregional\s+average\b",
+            "city": r"\bwithin\s+each\s+city\b|\bper\s+city\b|\beach\s+city\b",
+            "state": r"\bwithin\s+each\s+state\b|\bper\s+state\b|\beach\s+state\b",
+            "product_family": (
+                r"\bwithin\s+each\s+(?:product\s+)?category\b|"
+                r"\bper\s+(?:product\s+)?category\b|\bcategory\s+average\b"
+            ),
+        }
+        plan.partition_by = [
+            dimension
+            for dimension, pattern in scope_patterns.items()
+            if dimension in dimensions and re.search(pattern, question, re.I)
+        ]
+        if not plan.partition_by:
+            plan.partition_by = dimensions[:-1]
+        # Stable output reads scope -> leaf, regardless of phrase word order.
+        dimensions = [
+            *plan.partition_by,
+            *(dimension for dimension in dimensions if dimension not in plan.partition_by),
+        ]
+        plan.dimensions = dimensions
+    elif plan.analysis in {"period_growth", "running_total", "moving_average"}:
+        plan.partition_by = [d for d in dimensions if d not in {"month", "quarter", "year"}]
+
+    if plan.metric in {"orders", "claim_count"}:
+        plan.aggregation = "count_distinct"
+    elif plan.metric in {
+        "loss_ratio",
+        "frequency",
+        "approval_rate",
+        "renewal_rate",
+        "severity",
+    }:
+        plan.aggregation = "ratio"
 
 
 def _merge_filters(

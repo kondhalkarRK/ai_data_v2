@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import * as React from "react";
 
 import { LoadingState } from "@/components/loading/loading-state";
+import { SemanticBackLink } from "@/components/semantic/semantic-back-link";
 import { PageHeader } from "@/components/shell/page-header";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ export default function GlossaryPage() {
 
   return (
     <>
+      <SemanticBackLink className="mb-2" />
       <PageHeader
         title="Business Glossary"
         description="Canonical business language mapped to governed measures and dimensions."

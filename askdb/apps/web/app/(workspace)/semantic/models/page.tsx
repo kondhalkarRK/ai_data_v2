@@ -3,6 +3,7 @@
 import { KeyRound, Link2 } from "lucide-react";
 
 import { LoadingState } from "@/components/loading/loading-state";
+import { SemanticBackLink } from "@/components/semantic/semantic-back-link";
 import { PageHeader } from "@/components/shell/page-header";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { useSemanticPack } from "@/hooks/use-semantic";
@@ -12,6 +13,7 @@ export default function SemanticModelsPage() {
 
   return (
     <>
+      <SemanticBackLink className="mb-2" />
       <PageHeader
         title="Semantic Model"
         description="Validated tables, grains, keys, columns and join contracts with explicit cardinality."
