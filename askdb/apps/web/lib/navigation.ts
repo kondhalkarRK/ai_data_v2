@@ -6,6 +6,7 @@ import {
   Boxes,
   History,
   Home,
+  LineChart,
   type LucideIcon,
   MessageSquare,
   Network,
@@ -29,7 +30,7 @@ export interface NavSection {
   items: NavItem[];
 }
 
-/** Left sidebar, in the order given by spec section 9. */
+/** Left sidebar — flagship workspace order for business users. */
 export const NAV_SECTIONS: NavSection[] = [
   {
     id: "workspace",
@@ -43,18 +44,25 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Ask DB hero, live demo, and connected data sources.",
       },
       {
-        href: "/data-preview",
-        label: "Data Preview",
-        icon: Boxes,
-        minRole: "viewer",
-        description: "Browse governed tables from the active industry pack.",
-      },
-      {
         href: "/dashboard",
         label: "Executive Intelligence",
         icon: BarChart3,
         minRole: "viewer",
         description: "Domain-aware KPIs, grounded AI insights, and performance analytics.",
+      },
+      {
+        href: "/chat",
+        label: "AI Chat",
+        icon: MessageSquare,
+        minRole: "analyst",
+        description: "Ask questions in natural language over governed data.",
+      },
+      {
+        href: "/analytics-builder",
+        label: "Analytics Builder",
+        icon: LineChart,
+        minRole: "analyst",
+        description: "No-code business analytics over the semantic layer.",
       },
       {
         href: "/data-quality",
@@ -64,18 +72,25 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Observability, quality, governance, and trust scoring.",
       },
       {
-        href: "/chat",
-        label: "AI Chat",
-        icon: MessageSquare,
-        minRole: "analyst",
-        description: "Ask questions in natural language over governed data.",
+        href: "/semantic/ontology",
+        label: "Ontology Browser",
+        icon: Network,
+        minRole: "viewer",
+        description: "Explore the enterprise knowledge graph.",
       },
     ],
   },
   {
-    id: "semantic",
-    label: "Semantics",
+    id: "explore",
+    label: "Explore",
     items: [
+      {
+        href: "/data-preview",
+        label: "Data Preview",
+        icon: Boxes,
+        minRole: "viewer",
+        description: "Browse governed tables from the active industry pack.",
+      },
       {
         href: "/semantic",
         label: "Semantic Atlas",
@@ -128,11 +143,12 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-/** The three main tabs above the workspace (spec section 9). */
+/** Primary top tabs — includes Analytics Builder as a flagship surface. */
 export const MAIN_TABS = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/dashboard", label: "Executive Intelligence", icon: BarChart3 },
   { href: "/chat", label: "AI Chat", icon: MessageSquare },
+  { href: "/analytics-builder", label: "Analytics Builder", icon: LineChart },
 ] as const;
 
 const ROLE_RANK: Record<Role, number> = { viewer: 0, analyst: 1, admin: 2 };

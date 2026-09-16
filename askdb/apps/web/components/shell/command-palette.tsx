@@ -63,6 +63,13 @@ export function CommandPalette() {
 
     const graph: PaletteItem[] = [
       {
+        id: "graph-analytics",
+        label: "Analytics Builder",
+        hint: "No-code business metrics, dimensions, and charts",
+        group: "Semantic Graph",
+        href: "/analytics-builder",
+      },
+      {
         id: "graph-ontology",
         label: "Open Semantic Galaxy",
         hint: "Jump to the ontology knowledge graph",

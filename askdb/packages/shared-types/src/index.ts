@@ -328,3 +328,90 @@ export interface DataQualityReport {
   dateCol: string | null;
   computedIn: string;
 }
+
+// --- analytics builder ------------------------------------------------------
+
+export type AnalyticsVizKind =
+  | "table"
+  | "bar"
+  | "line"
+  | "area"
+  | "pie"
+  | "donut"
+  | "scatter"
+  | "kpi"
+  | "auto";
+
+export type AnalyticsAnalysisKind =
+  | "basic"
+  | "breakdown"
+  | "ranking"
+  | "top_n"
+  | "bottom_n"
+  | "contribution"
+  | "running_total"
+  | "moving_average"
+  | "period_growth"
+  | "trend"
+  | "variance";
+
+export interface AnalyticsFilterSpec {
+  domain: string;
+  values: string[];
+  operator?: string;
+}
+
+export interface AnalyticsSpec {
+  metrics: string[];
+  dimensions: string[];
+  filters: AnalyticsFilterSpec[];
+  analysis: AnalyticsAnalysisKind;
+  limit: number;
+  orderDirection: "asc" | "desc";
+  timeGrain?: string | null;
+  viz: AnalyticsVizKind;
+}
+
+export interface AnalyticsRunResponse {
+  title: string;
+  columns: string[];
+  rows: Array<Record<string, unknown>>;
+  sql: string;
+  chart: {
+    type: string;
+    x: string;
+    y: string;
+    points: Array<Record<string, unknown>>;
+  } | null;
+  recommendedViz: AnalyticsVizKind;
+  meta: Record<string, unknown>;
+}
+
+export interface AnalyticsAssistResponse {
+  spec: AnalyticsSpec;
+  explanation: string;
+  glossaryHits: string[];
+}
+
+export interface FilterValueItem {
+  value: string;
+  frequency: number;
+  label?: string | null;
+}
+
+export interface FilterValuesResponse {
+  domain: string;
+  label: string;
+  values: FilterValueItem[];
+}
+
+export interface SavedAnalysis {
+  id: string;
+  title: string;
+  industry: string;
+  spec: AnalyticsSpec | Record<string, unknown>;
+  viz: string;
+  sqlSnapshot?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -466,9 +466,20 @@ LIMIT {limit}""".strip()
     return f"{aggregate}\nORDER BY {order}\nLIMIT {limit}".strip()
 
 
-def compile_analytical_query(plan: QuestionPlan, pack: Any | None) -> AnalyticalQuery | None:
-    """Compile advanced plans; return ``None`` when legacy/LLM handling is preferable."""
-    if pack is None or not plan.dimensions or not plan.requires_semantic_compiler:
+def compile_analytical_query(
+    plan: QuestionPlan,
+    pack: Any | None,
+    *,
+    force: bool = False,
+) -> AnalyticalQuery | None:
+    """Compile advanced plans; return ``None`` when legacy/LLM handling is preferable.
+
+    ``force=True`` lets Analytics Builder compile single-dimension breakdowns
+    without falling through to narrow legacy templates.
+    """
+    if pack is None or not plan.dimensions:
+        return None
+    if not force and not plan.requires_semantic_compiler:
         return None
     metric = _metric_spec(plan)
     dimensions = _dimension_specs(plan, metric.table)

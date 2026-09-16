@@ -8,7 +8,7 @@ export type GroundedSource =
 
 export type ValidationStatus = "passed" | "auto_repaired" | "failed" | "skipped";
 
-export type ResponseTab = "chart" | "table" | "sql";
+export type ResponseTab = "table" | "chart" | "narration" | "sql";
 
 export type InsightDepth = "executive" | "analyst";
 

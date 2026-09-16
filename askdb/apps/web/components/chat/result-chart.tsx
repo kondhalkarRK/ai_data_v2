@@ -35,6 +35,7 @@ export function ResultChart({
   columns,
   anomalies = [],
   className,
+  initialType = "bar",
 }: {
   xKey: string;
   yKey: string;
@@ -42,6 +43,7 @@ export function ResultChart({
   columns?: string[];
   anomalies?: AnomalyMarker[];
   className?: string;
+  initialType?: ChartKind;
 }) {
   const keys = React.useMemo(() => {
     if (columns?.length) return columns;
@@ -57,13 +59,17 @@ export function ResultChart({
   const [yKey, setYKey] = React.useState(
     initialY || numericKeys.find((key) => key !== initialX) || numericKeys[0] || keys[1] || "",
   );
-  const [chartType, setChartType] = React.useState<ChartKind>("bar");
+  const [chartType, setChartType] = React.useState<ChartKind>(initialType);
   const [hover, setHover] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     if (keys.includes(initialX)) setXKey(initialX);
     if (keys.includes(initialY)) setYKey(initialY);
   }, [initialX, initialY, keys]);
+
+  React.useEffect(() => {
+    setChartType(initialType);
+  }, [initialType]);
 
   const points = React.useMemo(() => {
     return rows.slice(0, chartType === "pie" ? 12 : 48).map((row, index) => {

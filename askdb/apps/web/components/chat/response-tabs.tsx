@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Code2, Table2 } from "lucide-react";
+import { BarChart3, Code2, MessageSquareText, Table2 } from "lucide-react";
 import * as React from "react";
 
 import type { ResponseTab } from "@/components/chat/types";
@@ -13,6 +13,7 @@ const TABS: Array<{
 }> = [
   { id: "table", label: "Table", icon: Table2 },
   { id: "chart", label: "Chart", icon: BarChart3 },
+  { id: "narration", label: "Narration", icon: MessageSquareText },
   { id: "sql", label: "SQL", icon: Code2 },
 ];
 

@@ -8,12 +8,13 @@ import {
   failureKindFromCategory,
   ResponseErrorState,
 } from "@/components/chat/response-error-state";
+import { InsightSummary } from "@/components/chat/insight-summary";
 import { ResponseTabs } from "@/components/chat/response-tabs";
 import { ResultChart } from "@/components/chat/result-chart";
 import { SQLViewer } from "@/components/chat/sql-viewer";
 import { SuggestedQuestions } from "@/components/chat/suggested-questions";
 import { TrustIndicators } from "@/components/chat/trust-indicators";
-import type { ChatMessage, ResponseTab } from "@/components/chat/types";
+import type { ChatMessage, InsightDepth, ResponseTab } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 
 export function ResponseCard({
@@ -32,6 +33,7 @@ export function ResponseCard({
   className?: string;
 }) {
   const [tab, setTab] = React.useState<ResponseTab>("table");
+  const [insightDepth, setInsightDepth] = React.useState<InsightDepth>("executive");
   const meta = message.meta;
 
   if (message.cancelled) {
@@ -215,6 +217,35 @@ export function ResponseCard({
                 ) : (
                   <p className="py-8 text-center text-sm text-muted-foreground">
                     Chart needs at least two columns in the result.
+                  </p>
+                )
+              ) : null}
+
+              {tab === "narration" ? (
+                meta?.insights?.executive || message.narrative ? (
+                  <div className="space-y-3">
+                    <InsightSummary
+                      executive={
+                        meta?.insights?.executive ||
+                        message.narrative ||
+                        "Business summary will appear when the answer is ready."
+                      }
+                      analyst={
+                        meta?.insights?.analyst ||
+                        message.narrative ||
+                        "Detailed analyst notes will appear when the answer is ready."
+                      }
+                      depth={insightDepth}
+                      onDepthChange={setInsightDepth}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      AI Business Analyst Summary — plain-language findings from the governed
+                      result, not SQL commentary.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    Narration is generating… switch back in a moment, or keep the Table view open.
                   </p>
                 )
               ) : null}

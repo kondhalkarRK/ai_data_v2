@@ -29,7 +29,7 @@ export function InsightSummary({
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          AI Insight
+          AI Business Analyst Summary
         </p>
         <div
           className="inline-flex rounded-full border border-border/70 bg-background p-0.5 text-[11px]"

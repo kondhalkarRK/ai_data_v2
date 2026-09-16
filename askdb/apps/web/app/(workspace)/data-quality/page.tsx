@@ -8,10 +8,9 @@ import { AiDataSteward } from "@/components/trust/ai-data-steward";
 import { DatasetHealthGrid } from "@/components/trust/dataset-health-grid";
 import { IncidentFeed } from "@/components/trust/incident-feed";
 import {
-  GovernanceCenter,
   LineageImpactExplorer,
   ProfilingWorkspace,
-  RuleManagement,
+  QualityTrends,
   SchemaDriftMonitor,
 } from "@/components/trust/technical-panels";
 import { TrustScoreHero } from "@/components/trust/trust-score-hero";
@@ -46,7 +45,7 @@ export default function DataTrustCenterPage() {
     <PageShell>
       <PageHeader
         title="Data Trust Center"
-        description="Observability, quality, and governance — the source of truth for trust signals across Ask DB."
+        description="Modern data observability — health score, incidents, trends, profiling, and lineage."
         actions={
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-[var(--radius-control)] border border-border bg-muted/30 p-0.5 text-[11px]">
@@ -100,7 +99,9 @@ export default function DataTrustCenterPage() {
               : ""}
           </p>
 
-          <TrustScoreHero hero={center.data.hero} />
+          <Section title="Data Health Score">
+            <TrustScoreHero hero={center.data.hero} />
+          </Section>
 
           {view === "overview" ? (
             <>
@@ -110,38 +111,29 @@ export default function DataTrustCenterPage() {
                   history={center.data.incidentHistory}
                 />
               </Section>
-              <Section title="AI Data Steward" description="Purple marks AI-assisted stewardship.">
-                <AiDataSteward steward={center.data.steward} />
+              <Section
+                title="Data Quality Trends"
+                description="Org-wide trust score movement as Trust Center refreshes."
+              >
+                <QualityTrends trends={center.data.trends} />
               </Section>
-              <Section title="Dataset Health">
+              <Section title="Dataset Health Grid">
                 <DatasetHealthGrid datasets={center.data.datasets} />
+              </Section>
+              <Section title="AI Data Steward" description="AI-assisted stewardship recommendations.">
+                <AiDataSteward steward={center.data.steward} />
               </Section>
             </>
           ) : (
             <>
-              {/* Data Quality Trends removed (Round 2). Aggregate series was
-                  redundant with Dataset Health per-dataset sparklines below;
-                  unique lost: org-wide trust score over time as a single chart. */}
-              <Section title="Schema Drift">
+              <Section title="Schema Drift Monitor">
                 <SchemaDriftMonitor changes={center.data.schemaChanges} />
               </Section>
               <Section title="Data Profiling">
                 <ProfilingWorkspace profiles={center.data.profiles} />
               </Section>
-              <Section title="Governance">
-                <GovernanceCenter records={center.data.governance} />
-              </Section>
-              <Section title="Lineage Impact">
+              <Section title="Lineage Impact Analysis">
                 <LineageImpactExplorer lineage={center.data.lineage} />
-              </Section>
-              <Section title="Rule Management">
-                <RuleManagement
-                  rules={center.data.rules}
-                  notifications={center.data.notificationRules}
-                />
-              </Section>
-              <Section title="Dataset Health">
-                <DatasetHealthGrid datasets={center.data.datasets} />
               </Section>
             </>
           )}

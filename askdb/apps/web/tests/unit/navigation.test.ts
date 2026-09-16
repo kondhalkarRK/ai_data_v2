@@ -18,9 +18,11 @@ describe("sidebar visibility", () => {
     expect(labels).not.toContain("Data Sources");
   });
 
-  it("gives an analyst chat and LLM observability, but not system logs", () => {
+  it("gives an analyst chat, analytics builder, and LLM observability, but not system logs", () => {
     const labels = labelsFor("analyst");
     expect(labels).toContain("AI Chat");
+    expect(labels).toContain("Analytics Builder");
+    expect(labels).toContain("Ontology Browser");
     expect(labels).toContain("LLM Observability");
     expect(labels).not.toContain("System Logs");
   });

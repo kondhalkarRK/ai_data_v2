@@ -72,7 +72,7 @@ export function TrustScoreHero({ hero }: { hero: TrustHero }) {
           </div>
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
             <Stat label="Datasets" value={String(hero.datasets)} />
-            <Stat label="DQ checks" value={hero.dqChecks.toLocaleString()} />
+            <Stat label="DQ Checks" value={hero.dqChecks.toLocaleString()} />
             <Stat label="Active incidents" value={String(hero.activeIncidents)} />
             <Stat label="Schema drift" value={String(hero.schemaDrift)} />
           </div>

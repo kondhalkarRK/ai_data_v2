@@ -4,7 +4,7 @@ Importing this package registers every table on ``Base.metadata``, which is what
 autogenerate reads. New model modules must be imported here.
 """
 
-from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuestion
+from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedAnalysis, SavedQuestion
 from app.models.audit import AuthAuditEvent
 from app.models.base import Base
 from app.models.enums import AuthEventType, Role
@@ -20,6 +20,7 @@ __all__ = [
     "QueryHistory",
     "RefreshToken",
     "Role",
+    "SavedAnalysis",
     "SavedQuestion",
     "User",
 ]

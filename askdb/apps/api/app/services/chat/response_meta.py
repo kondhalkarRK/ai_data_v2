@@ -146,25 +146,27 @@ def build_insights(
             or "The query completed but returned no rows for the current filters."
         )
         analyst = (
-            f"{executive} Path: {path}. Consider widening the date range or removing a filter."
+            f"{executive} Consider widening the date range or removing a filter."
         )
-        return {"executive": executive[:420], "analyst": analyst[:900]}
+        return {"executive": executive[:520], "analyst": analyst[:900]}
 
+    # Prefer business storytelling over SQL-path commentary.
+    story = _business_story(columns, rows)
+    base = narrative.strip()
+    if story:
+        executive = f"{base.rstrip('.')}. {story}".strip() if base else story
+    elif base:
+        executive = f"{base.rstrip('.')} Across {n} result rows."
+    else:
+        executive = f"Returned {n} row{'s' if n != 1 else ''} across {len(columns)} fields."
+
+    analyst_parts = [executive]
     first_cols = columns[:3]
-    sample_bits: list[str] = []
     if rows and first_cols:
         head = rows[0]
         sample_bits = [f"{col}={head.get(col)}" for col in first_cols if col in head]
-
-    executive = narrative.strip()
-    if not executive:
-        executive = f"Returned {n} row{'s' if n != 1 else ''} across {len(columns)} fields."
-    elif n:
-        executive = f"{executive.rstrip('.')} Across {n} result rows."
-
-    analyst_parts = [executive]
-    if sample_bits:
-        analyst_parts.append("Leading row: " + ", ".join(str(b) for b in sample_bits) + ".")
+        if sample_bits:
+            analyst_parts.append("Leading row: " + ", ".join(str(b) for b in sample_bits) + ".")
     if len(columns) >= 2 and rows:
         y_key = columns[1]
         numeric: list[float] = []
@@ -176,15 +178,90 @@ def build_insights(
         if len(numeric) >= 3:
             peak = max(numeric)
             trough = min(numeric)
+            mean = sum(numeric) / len(numeric)
             analyst_parts.append(
-                f"Observed range on `{y_key}`: {trough:g} to {peak:g} "
-                f"(n={len(numeric)})."
+                f"On {y_key.replace('_', ' ')}: range {trough:g}–{peak:g}, "
+                f"average {mean:g} across {len(numeric)} points."
             )
-    analyst_parts.append(f"Resolution path: {path}.")
+            # Highlight simple anomalies relative to mean
+            outliers = [v for v in numeric if abs(v - mean) >= max(mean * 0.35, 1e-9)]
+            if outliers and len(numeric) >= 5:
+                analyst_parts.append(
+                    f"{len(outliers)} value(s) sit notably above or below the series average."
+                )
     return {
-        "executive": executive[:420],
+        "executive": executive[:520],
         "analyst": " ".join(analyst_parts)[:900],
     }
+
+
+def _business_story(columns: list[str], rows: list[dict[str, Any]]) -> str:
+    """Plain-language highlights: leaders, share, and simple comparisons."""
+    if not columns or not rows:
+        return ""
+    label_key = columns[0]
+    value_key = None
+    for col in columns[1:]:
+        try:
+            float(rows[0].get(col))  # type: ignore[arg-type]
+            value_key = col
+            break
+        except (TypeError, ValueError):
+            continue
+    if value_key is None:
+        leaders = [
+            str(row.get(label_key) or "")
+            for row in rows[:3]
+            if row.get(label_key) is not None
+        ]
+        if leaders:
+            return f"Top results include {', '.join(leaders)}."
+        return ""
+
+    scored: list[tuple[str, float]] = []
+    for row in rows:
+        label = row.get(label_key)
+        if label is None:
+            continue
+        try:
+            scored.append((str(label), float(row[value_key])))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+    if not scored:
+        return ""
+    scored.sort(key=lambda item: item[1], reverse=True)
+    total = sum(v for _, v in scored) or 0.0
+    top_name, top_value = scored[0]
+    parts = [
+        f"{top_name} led with {_fmt(top_value)} {_friendly(value_key)}"
+        + (f" ({top_value / total:.0%} of the total)." if total > 0 and len(scored) > 1 else ".")
+    ]
+    if len(scored) >= 2:
+        second_name, second_value = scored[1]
+        parts.append(
+            f"{second_name} followed at {_fmt(second_value)}"
+            + (f" ({second_value / total:.0%})." if total > 0 else ".")
+        )
+    if len(scored) >= 3 and total > 0:
+        top3 = sum(v for _, v in scored[:3])
+        parts.append(f"The top three together account for {top3 / total:.0%} of the result set.")
+    return " ".join(parts)
+
+
+def _friendly(column: str) -> str:
+    return column.replace("_", " ").strip()
+
+
+def _fmt(value: float) -> str:
+    if abs(value) >= 10_000_000:
+        return f"{value / 10_000_000:.1f}Cr"
+    if abs(value) >= 100_000:
+        return f"{value / 100_000:.1f}L"
+    if abs(value) >= 1000:
+        return f"{value:,.0f}"
+    if float(value).is_integer():
+        return f"{int(value)}"
+    return f"{value:.2f}"
 
 
 def detect_anomalies(

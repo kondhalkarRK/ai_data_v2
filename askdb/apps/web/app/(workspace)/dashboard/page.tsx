@@ -1,15 +1,17 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import * as React from "react";
 import { useMemo, useState } from "react";
 
 import { AiIntelligenceSection } from "@/components/executive/ai-intelligence";
 import { AskDashboardAi } from "@/components/executive/ask-dashboard-ai";
 import { BusinessHealthPanel } from "@/components/executive/business-health";
 import { KpiCardsGrid } from "@/components/executive/kpi-cards";
-import { PerformanceAnalytics } from "@/components/executive/performance-analytics";
+import { ProgressiveExplorer } from "@/components/executive/progressive-explorer";
 import type { ExecutiveIntelligence } from "@/components/executive/types";
 import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
@@ -21,9 +23,6 @@ import { useTrustSnapshot } from "@/hooks/use-trust-snapshot";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import Link from "next/link";
-import { ChevronDown } from "lucide-react";
-import * as React from "react";
 
 interface KpiFilters {
   windows: Array<{ id: string; label: string }>;
@@ -70,23 +69,63 @@ export default function DashboardPage() {
     },
   });
 
-  function applyCrossFilter(dimension: string, name: string) {
-    if (dimension === "lob") setLob(name);
-    else if (dimension === "region") setRegion(name);
-    else if (dimension === "make") setMake(name);
-  }
-
   function explore(kpiId: string) {
     router.push(`/semantic/ontology?focus=${encodeURIComponent(kpiId)}`);
   }
 
   const data = bundle.data;
+  const highlightCards = useMemo(() => {
+    if (!data) return [];
+    // Prefer primary KPI cards; append derived top region / brand when missing.
+    const cards = [...data.cards];
+    const hasTopRegion = cards.some((c) => /top.?region/i.test(c.label) || c.id.includes("region"));
+    const hasTopBrand = cards.some(
+      (c) => /top.?(brand|make)/i.test(c.label) || c.id.includes("make"),
+    );
+    const topRegion = data.breakdowns.region?.[0];
+    const topMake = data.breakdowns.make?.[0];
+    if (!hasTopRegion && topRegion) {
+      cards.push({
+        id: "derived_top_region",
+        label: "Top Region",
+        value: topRegion.value,
+        formatted: topRegion.name,
+        format: "text",
+        delta: null,
+      });
+    }
+    if (!hasTopBrand && topMake) {
+      cards.push({
+        id: "derived_top_brand",
+        label: industry === "automotive" ? "Top Brand" : "Top LOB",
+        value: topMake.value,
+        formatted: topMake.name,
+        format: "text",
+        delta: null,
+      });
+    }
+    const topModel = data.breakdowns.model?.[0];
+    if (topModel && !cards.some((c) => /top.?model/i.test(c.label))) {
+      cards.push({
+        id: "derived_top_model",
+        label: "Top Model",
+        value: topModel.value,
+        formatted: topModel.name,
+        format: "text",
+        delta: null,
+      });
+    }
+    return cards.slice(0, 8);
+  }, [data, industry]);
 
   return (
     <PageShell>
       <PageHeader
         title={data?.title ?? "Executive Intelligence"}
-        description={data?.tagline ?? "Domain-aware KPIs, grounded AI insights, and performance analytics."}
+        description={
+          data?.tagline ??
+          "Guided progressive exploration — Region → Dealer → Brand → Model."
+        }
         className={presenterMode ? "origin-left scale-110" : undefined}
         actions={
           <Button
@@ -123,39 +162,23 @@ export default function DashboardPage() {
               ]}
               onChange={setLob}
             />
-          ) : (
-            <FilterSelect
-              label="Make"
-              value={make}
-              options={[
-                { value: "", label: "All" },
-                ...(filters.data?.makes ?? []).map((item) => ({ value: item, label: item })),
-              ]}
-              onChange={setMake}
-            />
-          )}
-          <FilterSelect
-            label="Region"
-            value={region}
-            options={[
-              { value: "", label: "All" },
-              ...(filters.data?.regions ?? []).map((item) => ({ value: item, label: item })),
-            ]}
-            onChange={setRegion}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setLob("");
-              setRegion("");
-              setMake("");
-              setWindowId("ytd");
-            }}
-          >
-            Reset
-          </Button>
+          ) : null}
+          <p className="pb-2 text-[11px] text-muted-foreground">
+            Region and brand filters update automatically as you drill in the explorer.
+            {region || make ? (
+              <button
+                type="button"
+                className="ml-2 font-medium text-primary hover:underline"
+                onClick={() => {
+                  setRegion("");
+                  setMake("");
+                  setLob("");
+                }}
+              >
+                Clear focus
+              </button>
+            ) : null}
+          </p>
         </CardContent>
       </Card>
 
@@ -180,6 +203,8 @@ export default function DashboardPage() {
               {data.endDate ? ` → ${data.endDate}` : ""}
               {" · "}
               {data.compareLabel}
+              {region ? ` · Focus: ${region}` : ""}
+              {make ? ` · ${make}` : ""}
             </p>
             <p>
               Data as of {formatStamp(data.dataAsOf)}
@@ -188,7 +213,10 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <Section title="Business Health" description="Primary score for this domain and window.">
+          <Section
+            title="Executive snapshot"
+            description="Start here — then drill into regions below."
+          >
             <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
               {trustSnapshot.data?.available && trustSnapshot.data.score != null ? (
                 <button
@@ -243,7 +271,7 @@ export default function DashboardPage() {
             ) : null}
             <div className="mt-4">
               <KpiCardsGrid
-                cards={data.cards}
+                cards={highlightCards}
                 compareLabel={data.compareLabel}
                 onExplore={explore}
                 presenterMode={presenterMode}
@@ -251,25 +279,25 @@ export default function DashboardPage() {
             </div>
           </Section>
 
+          <Section
+            title="Progressive explorer"
+            description="Region → Dealer → Brand → Model. Each click reveals the next story."
+          >
+            <ProgressiveExplorer
+              data={data}
+              industry={industry}
+              presenterMode={presenterMode}
+              regionFilter={region}
+              makeFilter={make}
+              onRegionChange={setRegion}
+              onMakeChange={setMake}
+            />
+          </Section>
+
           <Section title="AI Intelligence" description="Grounded risks, opportunities, and recommendations.">
             <AiIntelligenceSection
               insights={data.insights}
               exploreBasePath={data.exploreBasePath}
-            />
-          </Section>
-
-          {/* What-If Analysis is hidden for this release (Round 2). Backend
-              presets remain available on the bundle for a later return. */}
-          <Section title="Performance Analytics">
-            <PerformanceAnalytics
-              data={data}
-              industry={industry}
-              presenterMode={presenterMode}
-              onFilter={applyCrossFilter}
-              windowId={windowId}
-              lob={lob}
-              region={region}
-              make={make}
             />
           </Section>
 
