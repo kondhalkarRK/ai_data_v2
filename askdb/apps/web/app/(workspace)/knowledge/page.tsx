@@ -18,6 +18,8 @@ interface KnowledgeDoc {
   createdAt: string;
   deduped?: boolean;
   version?: number;
+  collection?: string;
+  suggestedQuestions?: string[];
 }
 
 interface Citation {
@@ -27,7 +29,18 @@ interface Citation {
   snippet: string;
   locator: string;
   untrusted: boolean;
+  confidence?: number;
+  collection?: string;
 }
+
+const COLLECTIONS = [
+  "general",
+  "dealer_reports",
+  "market_research",
+  "product_catalogs",
+  "sales_reports",
+  "policies",
+] as const;
 
 export default function KnowledgePage() {
   const industry = useActiveIndustry();
@@ -35,6 +48,8 @@ export default function KnowledgePage() {
   const [query, setQuery] = useState("claims settlement");
   const [hits, setHits] = useState<Citation[]>([]);
   const [webRetrieval, setWebRetrieval] = useState(false);
+  const [collection, setCollection] = useState<string>("general");
+  const [searchCollection, setSearchCollection] = useState<string>("");
 
   const docs = useQuery({
     queryKey: ["documents", industry],
@@ -46,6 +61,7 @@ export default function KnowledgePage() {
       const body = new FormData();
       body.append("file", file);
       body.append("title", file.name);
+      body.append("collection", collection);
       const csrf = document.cookie.match(/(?:^|; )nql_csrf=([^;]*)/)?.[1];
       const response = await fetch(`${API_BASE_URL}/api/v1/documents`, {
         method: "POST",
@@ -83,7 +99,7 @@ export default function KnowledgePage() {
     event.preventDefault();
     const result = await apiClient.post<Citation[]>(
       "/api/v1/documents/search",
-      { query, webRetrieval },
+      { query, webRetrieval, collection: searchCollection || undefined },
       { industry },
     );
     setHits(result);
@@ -118,6 +134,20 @@ export default function KnowledgePage() {
                 if (file) upload.mutate(file);
               }}
             />
+            <label className="block text-xs text-muted-foreground">
+              Collection
+              <select
+                className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                value={collection}
+                onChange={(event) => setCollection(event.target.value)}
+              >
+                {COLLECTIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
             <p className="text-2xs text-muted-foreground">
               Supports text, Markdown, HTML, CSV, PDF and DOCX (install API extras{" "}
               <code>[rag]</code> for PDF/DOCX parsers).
@@ -130,11 +160,18 @@ export default function KnowledgePage() {
                     <div>
                       <p className="font-medium">{doc.title}</p>
                       <CardDescription>
-                        {doc.chunkCount} chunks
+                        {doc.collection ?? "general"} · {doc.chunkCount} chunks
                         {doc.version != null ? ` · v${doc.version}` : ""}
                         {doc.deduped ? " · deduped" : ""} ·{" "}
                         {new Date(doc.createdAt).toLocaleString()}
                       </CardDescription>
+                      {doc.suggestedQuestions?.length ? (
+                        <ul className="mt-1 list-disc pl-4 text-2xs text-muted-foreground">
+                          {doc.suggestedQuestions.slice(0, 3).map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      ) : null}
                     </div>
                     <Button
                       type="button"
@@ -159,6 +196,18 @@ export default function KnowledgePage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
+              <select
+                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                value={searchCollection}
+                onChange={(event) => setSearchCollection(event.target.value)}
+              >
+                <option value="">All collections</option>
+                {COLLECTIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <input
                   type="checkbox"
@@ -176,6 +225,7 @@ export default function KnowledgePage() {
                 <li key={hit.chunkId} className="rounded-md border border-border px-3 py-2 text-sm">
                   <p className="font-medium">
                     {hit.title} · {hit.locator}
+                    {hit.confidence != null ? ` · ${Math.round(hit.confidence * 100)}%` : ""}
                     {hit.untrusted ? " · untrusted" : ""}
                   </p>
                   <p className="text-muted-foreground">{hit.snippet}</p>

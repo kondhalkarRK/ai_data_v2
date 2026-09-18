@@ -137,6 +137,7 @@ def build_insights(
     columns: list[str],
     rows: list[dict[str, Any]],
     path: str,
+    evidence: list[str] | None = None,
 ) -> dict[str, str]:
     """Derive executive vs analyst depth from real result shape — no invented KPIs."""
     n = len(rows)
@@ -146,9 +147,12 @@ def build_insights(
             or "The query completed but returned no rows for the current filters."
         )
         analyst = (
-            f"{executive} Consider widening the date range or removing a filter."
+            executive
+            if narrative.strip()
+            else f"{executive} Consider widening the date range or removing a filter."
         )
-        return {"executive": executive[:520], "analyst": analyst[:900]}
+        payload = {"executive": executive[:520], "analyst": analyst[:900]}
+        return merge_hybrid_evidence(payload, evidence or [])
 
     # Prefer business storytelling over SQL-path commentary.
     story = _business_story(columns, rows)
@@ -189,9 +193,44 @@ def build_insights(
                 analyst_parts.append(
                     f"{len(outliers)} value(s) sit notably above or below the series average."
                 )
-    return {
+    payload = {
         "executive": executive[:520],
         "analyst": " ".join(analyst_parts)[:900],
+    }
+    return merge_hybrid_evidence(payload, evidence or [])
+
+
+def merge_hybrid_evidence(
+    insights: dict[str, str],
+    snippets: list[str],
+    *,
+    entities: list[str] | None = None,
+) -> dict[str, str]:
+    """Append up to two report sentences when they mention plan entities."""
+    picked: list[str] = []
+    wanted = [item.casefold() for item in (entities or []) if item]
+    for raw in snippets:
+        text = (raw or "").strip()
+        if not text:
+            continue
+        clipped = text[:400]
+        if wanted and not any(term in clipped.casefold() for term in wanted):
+            continue
+        picked.append(clipped)
+        if len(picked) >= 2:
+            break
+    if not picked and snippets:
+        first = (snippets[0] or "").strip()[:400]
+        if first:
+            picked = [first]
+    if not picked:
+        return insights
+    extra = " ".join(picked)
+    return {
+        "executive": f"{insights.get('executive', '').rstrip()} {extra}".strip()[:520],
+        "analyst": (
+            f"{insights.get('analyst', '').rstrip()} Report evidence: {extra}"
+        ).strip()[:900],
     }
 
 

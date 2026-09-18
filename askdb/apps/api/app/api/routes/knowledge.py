@@ -20,6 +20,8 @@ class SearchRequest(ApiModel):
     query: str = Field(min_length=1, max_length=2000)
     top_k: int | None = Field(default=None, ge=1, le=20)
     web_retrieval: bool = False
+    collection: str | None = None
+    entities: list[str] = Field(default_factory=list)
 
 
 @router.get("")
@@ -38,6 +40,7 @@ async def upload_document(
     settings: Annotated[Settings, Depends(get_app_settings)],
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
+    collection: str | None = Form(default=None),
 ) -> dict[str, Any]:
     raw = await file.read()
     service = KnowledgeService(settings, industry)
@@ -45,6 +48,7 @@ async def upload_document(
         title=title or (file.filename or "Untitled"),
         raw=raw,
         filename=file.filename or "upload.txt",
+        collection=collection,
     )
 
 
@@ -75,7 +79,12 @@ async def search_documents(
     industry: ActiveIndustry,
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> list[dict[str, Any]]:
-    hits = KnowledgeService(settings, industry).search(body.query, top_k=body.top_k)
+    hits = KnowledgeService(settings, industry).search(
+        body.query,
+        top_k=body.top_k,
+        collection=body.collection,
+        entities=body.entities or None,
+    )
     if body.web_retrieval:
         hits.extend(
             await WebRetrievalService(settings).retrieve(
@@ -90,6 +99,8 @@ async def search_documents(
             "snippet": hit.snippet,
             "locator": hit.locator,
             "untrusted": hit.untrusted,
+            "confidence": hit.confidence,
+            "collection": hit.collection,
         }
         for hit in hits
     ]

@@ -21,7 +21,11 @@ export function applyChatSseEvent(
       return {
         ...message,
         ...(data.historyId ? { historyId: String(data.historyId) } : {}),
-        path: String(data.stage ?? message.path ?? ""),
+        path:
+          data.stage === "route"
+            ? message.path
+            : String(data.stage ?? message.path ?? ""),
+        ...(data.route ? { route: String(data.route) } : {}),
       };
     case "sql":
       return {
@@ -38,7 +42,12 @@ export function applyChatSseEvent(
     case "chart":
       return { ...message, chart: data as unknown as ChartPayload };
     case "meta":
-      return { ...message, meta: data as unknown as ResponseMeta, progress: null };
+      return {
+        ...message,
+        meta: data as unknown as ResponseMeta,
+        progress: null,
+        ...(data.route ? { route: String(data.route) } : {}),
+      };
     case "token":
       return {
         ...message,
@@ -62,6 +71,8 @@ export function applyChatSseEvent(
         snippet: String(data.snippet ?? ""),
         locator: String(data.locator ?? ""),
         untrusted: Boolean(data.untrusted),
+        ...(data.confidence != null ? { confidence: Number(data.confidence) } : {}),
+        ...(data.collection ? { collection: String(data.collection) } : {}),
       };
       return {
         ...message,

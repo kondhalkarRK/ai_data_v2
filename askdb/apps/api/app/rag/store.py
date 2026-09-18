@@ -74,6 +74,9 @@ class KnowledgeStore:
         content_hash: str,
         raw_text: str,
         chunks: list[dict[str, Any]],
+        collection: str = "general",
+        suggested_questions: list[str] | None = None,
+        entities: list[str] | None = None,
     ) -> dict[str, Any]:
         existing = self.find_by_hash(content_hash)
         if existing is not None:
@@ -89,12 +92,15 @@ class KnowledgeStore:
             "title": title,
             "filename": filename,
             "industry": self.industry.value,
+            "collection": collection,
             "chunkCount": len(chunks),
             "createdAt": datetime.now(UTC).isoformat(),
             "bytes": len(raw_text.encode("utf-8")),
             "contentHash": content_hash,
             "version": max(versions, default=0) + 1,
             "deduped": False,
+            "suggestedQuestions": suggested_questions or [],
+            "entities": entities or [],
         }
         (self.root / f"{doc_id}.meta.json").write_text(
             json.dumps(meta, indent=2), encoding="utf-8"
@@ -107,9 +113,13 @@ class KnowledgeStore:
         self._qdrant_write(meta, chunks)
         return meta
 
-    def iter_chunks(self) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    def iter_chunks(
+        self, *, collection: str | None = None
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         rows: list[tuple[dict[str, Any], dict[str, Any]]] = []
         for meta in self.list_documents():
+            if collection and str(meta.get("collection") or "general") != collection:
+                continue
             path = self.root / f"{meta['id']}.chunks.json"
             if path.exists():
                 rows.extend(
@@ -227,6 +237,8 @@ class KnowledgeStore:
                             "title": meta["title"],
                             "text": chunk["text"],
                             "locator": chunk["locator"],
+                            "collection": meta.get("collection", "general"),
+                            "entities": chunk.get("entities") or meta.get("entities") or [],
                         },
                     )
                     for chunk in chunks

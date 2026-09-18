@@ -72,6 +72,8 @@ export interface ChatCitation {
   snippet: string;
   locator: string;
   untrusted?: boolean;
+  confidence?: number;
+  collection?: string;
 }
 
 export interface ChartPayload {
@@ -99,6 +101,8 @@ export interface ResponseMeta {
   executionError?: string | null;
   autoRepaired?: boolean;
   cacheHit?: boolean;
+  route?: "sql" | "knowledge" | "hybrid";
+  routeReason?: string;
 }
 
 export interface ChatMessage {
@@ -118,6 +122,7 @@ export interface ChatMessage {
   options?: string[];
   followups?: string[];
   citations?: ChatCitation[];
+  route?: string;
   cancelled?: boolean;
   error?: string;
   failure?: FailurePayload;

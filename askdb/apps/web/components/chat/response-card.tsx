@@ -17,6 +17,12 @@ import { TrustIndicators } from "@/components/chat/trust-indicators";
 import type { ChatMessage, InsightDepth, ResponseTab } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 
+const ROUTE_LABEL: Record<string, string> = {
+  sql: "Answered from data",
+  knowledge: "Documents",
+  hybrid: "Data + reports",
+};
+
 export function ResponseCard({
   message,
   busy,
@@ -35,6 +41,13 @@ export function ResponseCard({
   const [tab, setTab] = React.useState<ResponseTab>("table");
   const [insightDepth, setInsightDepth] = React.useState<InsightDepth>("executive");
   const meta = message.meta;
+  const route = message.route || meta?.route;
+
+  React.useEffect(() => {
+    if (route === "knowledge") {
+      setTab("narration");
+    }
+  }, [route]);
 
   if (message.cancelled) {
     return (
@@ -158,6 +171,10 @@ export function ResponseCard({
           />
         ) : null}
 
+        {route && ROUTE_LABEL[route] ? (
+          <p className="text-[11px] font-medium text-muted-foreground">{ROUTE_LABEL[route]}</p>
+        ) : null}
+
         {meta ? (
           <TrustIndicators
             groundedOn={meta.groundedOn ?? []}
@@ -239,9 +256,26 @@ export function ResponseCard({
                       onDepthChange={setInsightDepth}
                     />
                     <p className="text-[11px] text-muted-foreground">
-                      AI Business Analyst Summary — plain-language findings from the governed
-                      result, not SQL commentary.
+                      AI Business Analyst — plain-language findings
+                      {route === "knowledge"
+                        ? " from documents."
+                        : route === "hybrid"
+                          ? " from governed data plus report evidence."
+                          : " from the governed result, not SQL commentary."}
                     </p>
+                    {route && route !== "sql" && message.citations?.length ? (
+                      <ul className="space-y-1 text-[11px] text-muted-foreground">
+                        {message.citations.map((citation, index) => (
+                          <li key={`${citation.locator}-${index}`}>
+                            [{citation.locator}] {citation.title}
+                            {citation.confidence != null
+                              ? ` · ${Math.round(citation.confidence * 100)}%`
+                              : ""}
+                            {citation.untrusted ? " (untrusted web)" : ""}: {citation.snippet}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="py-8 text-center text-sm text-muted-foreground">
@@ -299,7 +333,7 @@ export function ResponseCard({
           </div>
         )}
 
-        {message.citations?.length ? (
+        {message.citations?.length && route === "sql" ? (
           <ul className="space-y-1 text-[11px] text-muted-foreground">
             {message.citations.map((citation, index) => (
               <li key={`${citation.locator}-${index}`}>

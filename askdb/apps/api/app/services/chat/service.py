@@ -40,12 +40,14 @@ from app.services.chat.intents import (
 )
 from app.services.chat.profiler import PROFILER, QueryProfile
 from app.services.chat.query_cache import QUERY_CACHE, CachedAnswer
+from app.services.chat.query_router import knowledge_narrative, plan_entities, route_question
 from app.services.chat.question_understanding import QuestionPlan, understand_question
 from app.services.chat.response_meta import (
     QueryTimings,
     build_insights,
     detect_anomalies,
     extract_query_meta,
+    merge_hybrid_evidence,
     resolve_grounded_on,
     semantic_followups,
     source_database_label,
@@ -89,6 +91,19 @@ def _jsonable(value: Any) -> Any:
 
 def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+def _citation_payload(citation: Any) -> dict[str, Any]:
+    return {
+        "documentId": citation.document_id,
+        "title": citation.title,
+        "chunkId": citation.chunk_id,
+        "snippet": citation.snippet,
+        "locator": citation.locator,
+        "untrusted": citation.untrusted,
+        "confidence": getattr(citation, "confidence", None),
+        "collection": getattr(citation, "collection", None),
+    }
 
 
 def _progress(
@@ -355,6 +370,92 @@ class ChatService:
                 yield frame
             return
 
+        knowledge_service = KnowledgeService(self._settings, self._industry)
+        decision = route_question(
+            question,
+            plan,
+            has_documents=bool(knowledge_service.list_documents()),
+        )
+        yield _sse(
+            "stage",
+            {"stage": "route", "route": decision.route, "reason": decision.reason},
+        )
+
+        if decision.route == "knowledge":
+            completed_steps.append("understanding")
+            yield _progress("visualize", completed_steps, slow=maybe_slow())
+            try:
+                citations = knowledge_service.search(
+                    question,
+                    top_k=min(5, self._settings.rag_top_k),
+                    user_id=str(self._user.id),
+                )
+            except Exception:
+                logger.debug("Knowledge search failed", exc_info=True)
+                citations = []
+            for citation in citations:
+                yield _sse("citation", _citation_payload(citation))
+            narrative = knowledge_narrative(citations)
+            insights = build_insights(
+                narrative=narrative,
+                columns=[],
+                rows=[],
+                path="knowledge",
+            )
+            followups: list[str] = []
+            for doc in knowledge_service.list_documents():
+                for item in doc.get("suggestedQuestions") or []:
+                    if item not in followups:
+                        followups.append(str(item))
+                if len(followups) >= 4:
+                    break
+            if not followups:
+                followups = suggested_followups(self._industry, "knowledge")
+            yield _sse(
+                "meta",
+                {
+                    "groundedOn": [],
+                    "ambiguityFlag": False,
+                    "validationStatus": "skipped",
+                    "rowCount": 0,
+                    "executionTimeMs": 0,
+                    "sourceDatabase": "Knowledge base",
+                    "dataAsOf": None,
+                    "timings": timings.to_dict(),
+                    "queryMeta": extract_query_meta(None).to_dict(),
+                    "insights": insights,
+                    "anomalies": [],
+                    "alternateInterpretations": [],
+                    "cacheHit": False,
+                    "route": "knowledge",
+                    "routeReason": decision.reason,
+                },
+            )
+            for token in narrative.split():
+                yield _sse("token", {"token": token + " "})
+            history.status = "completed"
+            history.row_count = 0
+            history.trust_score = 0
+            history.trust_breakdown = {"path": "knowledge", "route": "knowledge"}
+            history.latency_ms = int((time.perf_counter() - started) * 1000)
+            await self._app.flush()
+            profile.path = "knowledge"
+            profile.timings = timings.to_dict()
+            PROFILER.record(profile)
+            yield _sse("followups", {"items": followups})
+            yield _sse(
+                "done",
+                {
+                    "historyId": str(history_id),
+                    "conversationId": str(conversation.id),
+                    "latencyMs": history.latency_ms,
+                    "trustScore": 0,
+                    "ambiguityFlag": False,
+                    "route": "knowledge",
+                },
+            )
+            return
+
         if await cancelled():
             yield _sse("cancelled", {"historyId": str(history_id)})
             return
@@ -407,7 +508,12 @@ class ChatService:
                 )
             if cached.chart:
                 yield _sse("chart", cached.chart)
-            meta = {**cached.meta, "cacheHit": True, "timings": timings.to_dict()}
+            meta = {
+                **cached.meta,
+                "cacheHit": True,
+                "timings": timings.to_dict(),
+                "route": decision.route,
+            }
             yield _sse("meta", meta)
             for token in cached.narrative.split(" "):
                 yield _sse("token", {"token": token + " "})
@@ -725,21 +831,16 @@ class ChatService:
             return
 
         try:
-            citations = KnowledgeService(self._settings, self._industry).search(
-                question, top_k=min(3, self._settings.rag_top_k), user_id=str(self._user.id)
-            )
-            for citation in citations:
-                yield _sse(
-                    "citation",
-                    {
-                        "documentId": citation.document_id,
-                        "title": citation.title,
-                        "chunkId": citation.chunk_id,
-                        "snippet": citation.snippet,
-                        "locator": citation.locator,
-                        "untrusted": citation.untrusted,
-                    },
+            citations = []
+            if decision.route == "hybrid":
+                citations = KnowledgeService(self._settings, self._industry).search(
+                    question,
+                    top_k=min(2, self._settings.rag_top_k),
+                    user_id=str(self._user.id),
+                    entities=plan_entities(plan),
                 )
+                for citation in citations:
+                    yield _sse("citation", _citation_payload(citation))
             if web_retrieval and question.startswith(("http://", "https://")):
                 web_hits = await WebRetrievalService(self._settings).retrieve(
                     question, opted_in=True
@@ -748,16 +849,13 @@ class ChatService:
                     yield _sse(
                         "citation",
                         {
-                            "documentId": citation.document_id,
-                            "title": citation.title,
-                            "chunkId": citation.chunk_id,
-                            "snippet": citation.snippet,
-                            "locator": citation.locator,
+                            **_citation_payload(citation),
                             "untrusted": True,
                         },
                     )
         except Exception:
             logger.debug("Supplementary knowledge retrieval failed", exc_info=True)
+            citations = []
 
         query_meta = extract_query_meta(sql_text)
         insights = build_insights(
@@ -766,6 +864,12 @@ class ChatService:
             rows=rows,
             path=path,
         )
+        if decision.route == "hybrid" and citations:
+            insights = merge_hybrid_evidence(
+                insights,
+                [citation.snippet for citation in citations],
+                entities=plan_entities(plan),
+            )
         grounded = resolve_grounded_on(
             path=path,
             glossary_matches=glossary_matches,
@@ -792,6 +896,8 @@ class ChatService:
             "executionError": execution_error,
             "autoRepaired": validation_status == "auto_repaired",
             "cacheHit": False,
+            "route": decision.route,
+            "routeReason": decision.reason,
         }
         yield _sse("meta", meta_payload)
 
