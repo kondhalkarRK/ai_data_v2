@@ -73,6 +73,11 @@ class AnalyticsChartPayload(ApiModel):
     points: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class AnalyticsInsights(ApiModel):
+    executive: str
+    analyst: str
+
+
 class AnalyticsRunResponse(ApiModel):
     title: str
     columns: list[str]
@@ -80,6 +85,7 @@ class AnalyticsRunResponse(ApiModel):
     sql: str
     chart: AnalyticsChartPayload | None = None
     recommended_viz: AnalyticsVizKind
+    insights: AnalyticsInsights | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
 
 

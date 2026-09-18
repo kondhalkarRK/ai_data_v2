@@ -19,6 +19,7 @@ from app.schemas.analytics import (
     AnalyticsAssistRequest,
     AnalyticsAssistResponse,
     AnalyticsChartPayload,
+    AnalyticsInsights,
     AnalyticsRunResponse,
     AnalyticsSpec,
     FilterValueItem,
@@ -35,6 +36,7 @@ from app.services.analytics.spec_to_plan import (
     spec_to_plan,
 )
 from app.services.chat.question_understanding import understand_question
+from app.services.chat.response_meta import build_insights
 from app.services.chat.semantic_analytics import (
     SemanticCompileError,
     compile_analytical_query,
@@ -147,6 +149,17 @@ class AnalyticsService:
                 points=rows[:40],
             )
 
+        insight_payload = build_insights(
+            narrative=title,
+            columns=columns,
+            rows=rows,
+            path=path,
+        )
+        insights = AnalyticsInsights(
+            executive=insight_payload["executive"],
+            analyst=insight_payload["analyst"],
+        )
+
         return AnalyticsRunResponse(
             title=title,
             columns=columns,
@@ -154,6 +167,7 @@ class AnalyticsService:
             sql=sql_text,
             chart=chart,
             recommended_viz=recommended,
+            insights=insights,
             meta={
                 "path": path,
                 "metric": plan.metric,

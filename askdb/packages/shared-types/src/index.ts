@@ -384,6 +384,7 @@ export interface AnalyticsRunResponse {
     points: Array<Record<string, unknown>>;
   } | null;
   recommendedViz: AnalyticsVizKind;
+  insights?: { executive: string; analyst: string } | null;
   meta: Record<string, unknown>;
 }
 

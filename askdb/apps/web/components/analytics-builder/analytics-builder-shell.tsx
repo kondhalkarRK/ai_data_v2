@@ -31,7 +31,9 @@ import {
 import Link from "next/link";
 import * as React from "react";
 
+import { InsightSummary } from "@/components/chat/insight-summary";
 import { ResultChart } from "@/components/chat/result-chart";
+import type { InsightDepth } from "@/components/chat/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -42,11 +44,20 @@ import {
   useSavedAnalyses,
   useSavedAnalysisMutations,
 } from "@/hooks/use-analytics";
-import { downloadCsv, recommendViz } from "@/lib/analytics/helpers";
+import {
+  downloadCsv,
+  formatQuerySentence,
+  prettyLabel,
+  recommendViz,
+} from "@/lib/analytics/helpers";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
-const VIZ_OPTIONS: Array<{ id: AnalyticsVizKind; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+const VIZ_OPTIONS: Array<{
+  id: AnalyticsVizKind;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
   { id: "auto", label: "Auto", icon: Sparkles },
   { id: "table", label: "Table", icon: Table2 },
   { id: "bar", label: "Bar", icon: BarChart3 },
@@ -72,7 +83,39 @@ const ANALYSIS_OPTIONS: Array<{ id: AnalyticsAnalysisKind; label: string; hint: 
   { id: "variance", label: "Variance", hint: "Above average" },
 ];
 
+const PRIMARY_ONLY = new Set<AnalyticsAnalysisKind>([
+  "top_n",
+  "bottom_n",
+  "ranking",
+  "contribution",
+  "running_total",
+  "moving_average",
+  "period_growth",
+  "trend",
+  "variance",
+]);
+
+const DIM_GROUP_ORDER = ["Time", "Geography", "Product", "Organization", "Entities"] as const;
+
 type DimOption = { id: string; label: string; group: string };
+
+function classifyDimensionGroup(id: string, fallback: string): string {
+  const key = id.toLowerCase();
+  if (["month", "quarter", "year", "date"].includes(key)) return "Time";
+  if (["region", "city", "state", "state_code", "country"].includes(key)) return "Geography";
+  if (
+    ["car", "car_type", "make", "model", "colour", "color", "vehicle", "product", "brand"].includes(
+      key,
+    )
+  ) {
+    return "Product";
+  }
+  if (["dealer", "salesperson", "salesman", "channel", "branch"].includes(key)) {
+    return "Organization";
+  }
+  if (fallback === "Time" || fallback === "Geography") return fallback;
+  return fallback || "Entities";
+}
 
 function buildDimensionOptions(pack: SemanticPackResponse): DimOption[] {
   const options: DimOption[] = [
@@ -84,17 +127,16 @@ function buildDimensionOptions(pack: SemanticPackResponse): DimOption[] {
     options.push({
       id: key,
       label: dim.displayName || key,
-      group: "Entities",
+      group: classifyDimensionGroup(key, "Entities"),
     });
     for (const attr of dim.attributes ?? []) {
       options.push({
         id: attr,
-        label: attr.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        group: dim.displayName || key,
+        label: prettyLabel(attr),
+        group: classifyDimensionGroup(attr, dim.displayName || "Entities"),
       });
     }
   }
-  // Dedupe by id keeping first
   const seen = new Set<string>();
   return options.filter((item) => {
     if (seen.has(item.id.toLowerCase())) return false;
@@ -104,20 +146,18 @@ function buildDimensionOptions(pack: SemanticPackResponse): DimOption[] {
 }
 
 function buildFilterDomains(pack: SemanticPackResponse): Array<{ id: string; label: string }> {
-  // Prefer value-domain style labels from common pack attributes
   const domains: Array<{ id: string; label: string }> = [];
   const push = (id: string, label: string) => {
     if (!domains.some((d) => d.id === id)) domains.push({ id, label });
   };
   for (const dim of Object.values(pack.model.dimensions)) {
     for (const attr of dim.attributes ?? []) {
-      push(attr, attr.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
+      push(attr, prettyLabel(attr));
     }
     if (dim.sourceColumn) {
       push(dim.sourceColumn, dim.displayName);
     }
   }
-  // Canonical automotive/insurance domains
   for (const id of [
     "region",
     "city",
@@ -130,11 +170,65 @@ function buildFilterDomains(pack: SemanticPackResponse): Array<{ id: string; lab
     "line_of_business",
     "channel",
   ]) {
-    if (!domains.some((d) => d.id === id)) {
-      push(id, id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
-    }
+    if (!domains.some((d) => d.id === id)) push(id, prettyLabel(id));
   }
   return domains;
+}
+
+function startersForPack(pack: SemanticPackResponse): Array<{ label: string; spec: AnalyticsSpec }> {
+  const measures = pack.model.measures;
+  const hasRevenue = Boolean(measures.revenue);
+  const hasUnits = Boolean(measures.units_sold);
+  const hasPremium = Boolean(measures.premium || measures.written_premium);
+  const items: Array<{ label: string; spec: AnalyticsSpec }> = [];
+  if (hasRevenue) {
+    items.push({
+      label: "Revenue by Month",
+      spec: {
+        ...EMPTY_SPEC,
+        metrics: ["revenue"],
+        dimensions: ["month"],
+        analysis: "trend",
+        viz: "auto",
+      },
+    });
+    items.push({
+      label: "Top dealers",
+      spec: {
+        ...EMPTY_SPEC,
+        metrics: ["revenue"],
+        dimensions: ["dealer"],
+        analysis: "top_n",
+        limit: 10,
+        viz: "auto",
+      },
+    });
+  }
+  if (hasUnits) {
+    items.push({
+      label: "Units by Vehicle Type",
+      spec: {
+        ...EMPTY_SPEC,
+        metrics: ["units_sold"],
+        dimensions: ["car_type"],
+        analysis: "basic",
+        viz: "auto",
+      },
+    });
+  }
+  if (hasPremium) {
+    items.push({
+      label: "Premium by Region",
+      spec: {
+        ...EMPTY_SPEC,
+        metrics: [measures.premium ? "premium" : "written_premium"],
+        dimensions: ["region"],
+        analysis: "basic",
+        viz: "auto",
+      },
+    });
+  }
+  return items.slice(0, 4);
 }
 
 export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) {
@@ -142,6 +236,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
   const [aiPrompt, setAiPrompt] = React.useState("");
   const [sqlOpen, setSqlOpen] = React.useState(false);
   const [result, setResult] = React.useState<AnalyticsRunResponse | null>(null);
+  const [previewTab, setPreviewTab] = React.useState<"chart" | "table" | "narration">("chart");
   const [error, setError] = React.useState<string | null>(null);
   const [flash, setFlash] = React.useState<string | null>(null);
   const [activeAnalysisId, setActiveAnalysisId] = React.useState<string | null>(null);
@@ -176,26 +271,49 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
 
   const dimensionOptions = React.useMemo(() => buildDimensionOptions(pack), [pack]);
   const filterDomains = React.useMemo(() => buildFilterDomains(pack), [pack]);
+  const starters = React.useMemo(() => startersForPack(pack), [pack]);
 
+  const metricLabels = React.useMemo(
+    () => Object.fromEntries(measures.map((m) => [m.id, m.label])),
+    [measures],
+  );
+  const dimensionLabels = React.useMemo(
+    () => Object.fromEntries(dimensionOptions.map((d) => [d.id, d.label])),
+    [dimensionOptions],
+  );
+
+  const sentence = formatQuerySentence(spec, {
+    metrics: metricLabels,
+    dimensions: dimensionLabels,
+  });
   const effectiveViz = result?.recommendedViz ?? recommendViz(spec);
+  const primaryOnly = PRIMARY_ONLY.has(spec.analysis);
+  const ontologyHref = spec.metrics[0]
+    ? `/semantic/ontology?focus=${encodeURIComponent(spec.metrics[0])}`
+    : "/semantic/ontology";
 
   function showFlash(message: string) {
     setFlash(message);
     window.setTimeout(() => setFlash(null), 2400);
   }
 
-  async function handleRun() {
-    setError(null);
-    try {
-      const payload = await run.mutateAsync(spec);
-      setResult(payload);
-      if (spec.viz === "auto") {
-        setSpec((prev) => ({ ...prev, viz: "auto" }));
+  const executeSpec = React.useCallback(
+    async (next: AnalyticsSpec) => {
+      setError(null);
+      try {
+        const payload = await run.mutateAsync(next);
+        setResult(payload);
+        setPreviewTab(next.viz === "table" || next.viz === "kpi" ? "table" : "chart");
+      } catch (err) {
+        setResult(null);
+        setError(err instanceof ApiError ? err.message : "Analysis failed.");
       }
-    } catch (err) {
-      setResult(null);
-      setError(err instanceof ApiError ? err.message : "Analysis failed.");
-    }
+    },
+    [run],
+  );
+
+  async function handleRun() {
+    await executeSpec(spec);
   }
 
   async function handleAssist() {
@@ -203,7 +321,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
     setError(null);
     try {
       const response = await assist.mutateAsync(aiPrompt.trim());
-      setSpec({
+      const next: AnalyticsSpec = {
         ...EMPTY_SPEC,
         ...response.spec,
         metrics: response.spec.metrics ?? [],
@@ -213,8 +331,10 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
         limit: response.spec.limit ?? 25,
         orderDirection: response.spec.orderDirection ?? "desc",
         viz: "auto",
-      });
+      };
+      setSpec(next);
       showFlash(response.explanation.slice(0, 120));
+      if (next.metrics.length) await executeSpec(next);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not interpret the prompt.");
     }
@@ -223,7 +343,12 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
   function toggleMetric(id: string) {
     setSpec((prev) => {
       const exists = prev.metrics.includes(id);
-      const metrics = exists ? prev.metrics.filter((m) => m !== id) : [...prev.metrics, id].slice(0, 3);
+      if (!exists && PRIMARY_ONLY.has(prev.analysis) && prev.metrics.length >= 1) {
+        return { ...prev, metrics: [id] };
+      }
+      const metrics = exists
+        ? prev.metrics.filter((m) => m !== id)
+        : [...prev.metrics, id].slice(0, 3);
       return { ...prev, metrics };
     });
   }
@@ -245,6 +370,20 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
         values.length > 0 ? [...rest, { domain, values, operator: "=" }] : rest;
       return { ...prev, filters };
     });
+  }
+
+  async function applyResultFilter(domain: string, value: string) {
+    const existing = spec.filters.find((f) => f.domain === domain)?.values ?? [];
+    const values = existing.includes(value) ? existing : [...existing, value];
+    const next: AnalyticsSpec = {
+      ...spec,
+      filters: [
+        ...spec.filters.filter((f) => f.domain !== domain),
+        { domain, values, operator: "=" },
+      ],
+    };
+    setSpec(next);
+    await executeSpec(next);
   }
 
   async function handleSave() {
@@ -275,20 +414,42 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
     }
   }
 
-  function loadSaved(item: SavedAnalysis) {
+  async function loadSaved(item: SavedAnalysis) {
     const loaded = item.spec as AnalyticsSpec;
-    setSpec({
+    const next: AnalyticsSpec = {
       ...EMPTY_SPEC,
       ...loaded,
       metrics: loaded.metrics ?? [],
       dimensions: loaded.dimensions ?? [],
       filters: loaded.filters ?? [],
-    });
+    };
+    setSpec(next);
     setActiveAnalysisId(item.id);
     setSaveTitle(item.title);
-    setResult(null);
     showFlash(`Loaded “${item.title}”`);
+    if (next.metrics.length) await executeSpec(next);
   }
+
+  async function applyStarter(starter: { label: string; spec: AnalyticsSpec }) {
+    setSpec(starter.spec);
+    setActiveAnalysisId(null);
+    await executeSpec(starter.spec);
+  }
+
+  const groupedDimensions = React.useMemo(() => {
+    const groups = new Map<string, DimOption[]>();
+    for (const dim of dimensionOptions) {
+      const list = groups.get(dim.group) ?? [];
+      list.push(dim);
+      groups.set(dim.group, list);
+    }
+    return DIM_GROUP_ORDER.filter((g) => groups.has(g)).map((g) => ({
+      group: g,
+      items: groups.get(g) ?? [],
+    }));
+  }, [dimensionOptions]);
+
+  const filterDomain = spec.dimensions[0] ?? "region";
 
   return (
     <div className="analytics-builder relative min-h-[70vh]">
@@ -315,10 +476,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
               behind the scenes.
             </p>
           </div>
-          <Link
-            href="/semantic/ontology"
-            className="text-xs font-medium text-primary hover:underline"
-          >
+          <Link href={ontologyHref} className="text-xs font-medium text-primary hover:underline">
             Inspect in Ontology →
           </Link>
         </div>
@@ -352,24 +510,40 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
       <div className="relative grid gap-4 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
         <aside className="space-y-3">
           <ConfigCard title="Metrics" subtitle="Select one or more business measures">
+            <SelectedPills
+              ids={spec.metrics}
+              labels={metricLabels}
+              onRemove={(id) => toggleMetric(id)}
+            />
+            {primaryOnly ? (
+              <p className="mb-2 text-[10px] text-muted-foreground">
+                Advanced analyses use the first metric.
+              </p>
+            ) : null}
             <SearchableChips
               items={measures.map((m) => ({
                 id: m.id,
                 label: m.label,
                 keywords: [...m.synonyms, ...(glossaryByMeasure.get(m.id) ?? [])],
+                disabled: primaryOnly && spec.metrics.length >= 1 && !spec.metrics.includes(m.id),
+                title:
+                  primaryOnly && spec.metrics.length >= 1 && !spec.metrics.includes(m.id)
+                    ? "Advanced analyses use the first metric."
+                    : undefined,
               }))}
               selected={spec.metrics}
               onToggle={toggleMetric}
             />
           </ConfigCard>
 
-          <ConfigCard title="Dimensions" subtitle="Primary breakdown and secondary cuts">
-            <SearchableChips
-              items={dimensionOptions.map((d) => ({
-                id: d.id,
-                label: d.label,
-                keywords: [d.group],
-              }))}
+          <ConfigCard title="Dimensions" subtitle="Grouped by Time, Geography, Product, Organization">
+            <SelectedPills
+              ids={spec.dimensions}
+              labels={dimensionLabels}
+              onRemove={(id) => toggleDimension(id)}
+            />
+            <GroupedDimensionChips
+              groups={groupedDimensions}
               selected={spec.dimensions}
               onToggle={toggleDimension}
             />
@@ -396,7 +570,13 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                       ? "border-info/40 bg-info/15 text-foreground"
                       : "border-transparent bg-muted/40 text-muted-foreground hover:bg-muted",
                   )}
-                  onClick={() => setSpec((prev) => ({ ...prev, analysis: item.id }))}
+                  onClick={() =>
+                    setSpec((prev) => ({
+                      ...prev,
+                      analysis: item.id,
+                      metrics: PRIMARY_ONLY.has(item.id) ? prev.metrics.slice(0, 1) : prev.metrics,
+                    }))
+                  }
                 >
                   {item.label}
                 </button>
@@ -447,9 +627,17 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
               })}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Suggested: <span className="font-medium text-foreground">{recommendViz({ ...spec, viz: "auto" })}</span>
+              Suggested:{" "}
+              <span className="font-medium text-foreground">
+                {recommendViz({ ...spec, viz: "auto" })}
+              </span>
             </p>
           </ConfigCard>
+
+          <div className="rounded-2xl border border-info/20 bg-info/8 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-info">Query</p>
+            <p className="mt-1 text-sm font-medium leading-snug">{sentence}</p>
+          </div>
 
           <Button
             type="button"
@@ -471,8 +659,8 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   {result
-                    ? `${result.rows.length} rows · ${String(result.meta.path ?? "semantic")}`
-                    : "Configure metrics and dimensions, then run."}
+                    ? `${result.rows.length} rows · ${sentence}`
+                    : "Configure metrics and dimensions, then run — or pick a starter."}
                 </p>
               </div>
               <AnalysisActions
@@ -504,17 +692,36 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                     showFlash("Nothing to export");
                     return;
                   }
-                  downloadCsv(
-                    `analysis-${Date.now()}.csv`,
-                    result.columns,
-                    result.rows,
-                  );
+                  downloadCsv(`analysis-${Date.now()}.csv`, result.columns, result.rows);
                   showFlash("CSV downloaded");
                 }}
                 onStub={(label) => showFlash(`${label} — coming soon`)}
                 saving={mutations.create.isPending || mutations.update.isPending}
               />
             </div>
+
+            {spec.filters.length ? (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground">Focus:</span>
+                {spec.filters.flatMap((filt) =>
+                  filt.values.map((value) => (
+                    <button
+                      key={`${filt.domain}-${value}`}
+                      type="button"
+                      className="rounded-full bg-info/15 px-2 py-0.5 text-[10px] font-medium"
+                      onClick={() =>
+                        upsertFilter(
+                          filt.domain,
+                          filt.values.filter((entry) => entry !== value),
+                        )
+                      }
+                    >
+                      {filt.domain}={value} ×
+                    </button>
+                  )),
+                )}
+              </div>
+            ) : null}
 
             {error ? (
               <p className="mt-4 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -524,14 +731,51 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
 
             <div className="mt-4 min-h-[280px]">
               {!result && !run.isPending ? (
-                <EmptyPreview />
+                <EmptyPreview starters={starters} onPick={(item) => void applyStarter(item)} />
               ) : run.isPending ? (
                 <div className="flex h-[280px] items-center justify-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
                   Compiling governed SQL and running…
                 </div>
               ) : result ? (
-                <ResultPreview result={result} viz={spec.viz === "auto" ? effectiveViz : spec.viz} />
+                <>
+                  <div
+                    className="mb-3 inline-flex rounded-full border border-border/70 bg-muted/30 p-0.5 text-[11px]"
+                    role="tablist"
+                    aria-label="Result view"
+                  >
+                    {(
+                      [
+                        { id: "chart", label: "Chart" },
+                        { id: "table", label: "Table" },
+                        { id: "narration", label: "Narration" },
+                      ] as const
+                    ).map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={previewTab === tab.id}
+                        className={cn(
+                          "rounded-full px-3 py-1",
+                          previewTab === tab.id
+                            ? "bg-background font-medium text-foreground shadow-sm"
+                            : "text-muted-foreground",
+                        )}
+                        onClick={() => setPreviewTab(tab.id)}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                  <ResultPreview
+                    result={result}
+                    viz={spec.viz === "auto" ? effectiveViz : spec.viz}
+                    tab={previewTab}
+                    filterDomain={filterDomain}
+                    onFilterValue={(value) => void applyResultFilter(filterDomain, value)}
+                  />
+                </>
               ) : null}
             </div>
           </div>
@@ -557,7 +801,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
           <SavedList
             items={saved.data ?? []}
             activeId={activeAnalysisId}
-            onLoad={loadSaved}
+            onLoad={(item) => void loadSaved(item)}
             loading={saved.isPending}
           />
         </main>
@@ -584,12 +828,44 @@ function ConfigCard({
   );
 }
 
+function SelectedPills({
+  ids,
+  labels,
+  onRemove,
+}: {
+  ids: string[];
+  labels: Record<string, string>;
+  onRemove: (id: string) => void;
+}) {
+  if (!ids.length) return null;
+  return (
+    <div className="mb-2 flex flex-wrap gap-1">
+      {ids.map((id) => (
+        <button
+          key={id}
+          type="button"
+          className="rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] font-medium"
+          onClick={() => onRemove(id)}
+        >
+          {labels[id] ?? prettyLabel(id)} ×
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function SearchableChips({
   items,
   selected,
   onToggle,
 }: {
-  items: Array<{ id: string; label: string; keywords?: string[] }>;
+  items: Array<{
+    id: string;
+    label: string;
+    keywords?: string[];
+    disabled?: boolean;
+    title?: string;
+  }>;
   selected: string[];
   onToggle: (id: string) => void;
 }) {
@@ -619,11 +895,14 @@ function SearchableChips({
             <button
               key={item.id}
               type="button"
+              title={item.title}
+              disabled={item.disabled}
               className={cn(
                 "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
                 active
                   ? "border-success/40 bg-success/15 text-foreground"
                   : "border-border/50 bg-background/50 text-muted-foreground hover:bg-muted/50",
+                item.disabled && "cursor-not-allowed opacity-40",
               )}
               onClick={() => onToggle(item.id)}
             >
@@ -631,9 +910,69 @@ function SearchableChips({
             </button>
           );
         })}
-        {!filtered.length ? (
-          <p className="text-[11px] text-muted-foreground">No matches.</p>
-        ) : null}
+        {!filtered.length ? <p className="text-[11px] text-muted-foreground">No matches.</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function GroupedDimensionChips({
+  groups,
+  selected,
+  onToggle,
+}: {
+  groups: Array<{ group: string; items: DimOption[] }>;
+  selected: string[];
+  onToggle: (id: string) => void;
+}) {
+  const [q, setQ] = React.useState("");
+  return (
+    <div>
+      <div className="relative mb-2">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={q}
+          onChange={(event) => setQ(event.target.value)}
+          placeholder="Search dimensions…"
+          className="h-8 pl-8 text-xs"
+        />
+      </div>
+      <div className="max-h-52 space-y-2 overflow-y-auto">
+        {groups.map(({ group, items }) => {
+          const visible = items.filter((item) => {
+            const needle = q.trim().toLowerCase();
+            if (!needle) return true;
+            return `${item.id} ${item.label} ${group}`.toLowerCase().includes(needle);
+          });
+          if (!visible.length) return null;
+          return (
+            <div key={group}>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {group}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {visible.map((item) => {
+                  const active = selected.includes(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                        active
+                          ? "border-success/40 bg-success/15 text-foreground"
+                          : "border-border/50 bg-background/50 text-muted-foreground hover:bg-muted/50",
+                      )}
+                      onClick={() => onToggle(item.id)}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -709,33 +1048,6 @@ function FilterBuilder({
           <span className="text-[11px] text-danger">Could not load values for this domain.</span>
         ) : null}
       </div>
-      {filters.length ? (
-        <div className="flex flex-wrap gap-1 pt-1">
-          {filters.flatMap((filt) =>
-            filt.values.map((value) => (
-              <span
-                key={`${filt.domain}-${value}`}
-                className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-[10px]"
-              >
-                {filt.domain}={value}
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label={`Remove ${value}`}
-                  onClick={() =>
-                    onChange(
-                      filt.domain,
-                      filt.values.filter((entry) => entry !== value),
-                    )
-                  }
-                >
-                  ×
-                </button>
-              </span>
-            )),
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -743,24 +1055,52 @@ function FilterBuilder({
 function ResultPreview({
   result,
   viz,
+  tab,
+  filterDomain,
+  onFilterValue,
 }: {
   result: AnalyticsRunResponse;
   viz: AnalyticsVizKind;
+  tab: "chart" | "table" | "narration";
+  filterDomain: string;
+  onFilterValue: (value: string) => void;
 }) {
-  if (viz === "kpi") {
-    const key = result.columns[0];
-    const value = result.rows[0]?.[key];
-    return (
-      <div className="flex h-[240px] flex-col items-center justify-center rounded-xl bg-gradient-to-b from-info/10 to-transparent">
-        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{result.title}</p>
-        <p className="mt-2 text-4xl font-semibold tracking-tight tabular-nums">
-          {formatValue(value)}
+  const [insightDepth, setInsightDepth] = React.useState<InsightDepth>("executive");
+
+  if (tab === "narration") {
+    const executive = result.insights?.executive;
+    const analyst = result.insights?.analyst;
+    if (!executive && !analyst) {
+      return (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          Narration will appear after the analysis runs.
         </p>
-      </div>
+      );
+    }
+    return (
+      <InsightSummary
+        executive={executive || ""}
+        analyst={analyst || executive || ""}
+        depth={insightDepth}
+        onDepthChange={setInsightDepth}
+      />
     );
   }
 
-  if (viz === "table" || result.columns.length > 3) {
+  if (tab === "table" || viz === "table" || viz === "kpi") {
+    if (viz === "kpi" && tab !== "table") {
+      const key = result.columns[0];
+      const value = result.rows[0]?.[key];
+      return (
+        <div className="flex h-[240px] flex-col items-center justify-center rounded-xl bg-gradient-to-b from-info/10 to-transparent">
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{result.title}</p>
+          <p className="mt-2 text-4xl font-semibold tracking-tight tabular-nums">
+            {formatValue(value)}
+          </p>
+        </div>
+      );
+    }
+    const labelCol = result.columns[0];
     return (
       <div className="max-h-[420px] overflow-auto rounded-xl border border-border/50">
         <table className="w-full text-left text-xs">
@@ -775,7 +1115,15 @@ function ResultPreview({
           </thead>
           <tbody>
             {result.rows.map((row, index) => (
-              <tr key={index} className="odd:bg-muted/20">
+              <tr
+                key={index}
+                className="cursor-pointer odd:bg-muted/20 hover:bg-info/10"
+                onClick={() => {
+                  const raw = row[labelCol];
+                  if (raw != null && String(raw)) onFilterValue(String(raw));
+                }}
+                title={`Filter ${filterDomain} to this value`}
+              >
                 {result.columns.map((column) => (
                   <td key={column} className="border-b border-border/40 px-3 py-1.5 tabular-nums">
                     {formatValue(row[column])}
@@ -785,6 +1133,9 @@ function ResultPreview({
             ))}
           </tbody>
         </table>
+        <p className="px-3 py-2 text-[10px] text-muted-foreground">
+          Click a row to add a {prettyLabel(filterDomain)} filter and re-run.
+        </p>
       </div>
     );
   }
@@ -800,15 +1151,35 @@ function ResultPreview({
           ? "scatter"
           : "bar";
 
+  const labelCol = result.chart?.x ?? result.columns[0] ?? "";
+
   return (
-    <ResultChart
-      rows={result.rows}
-      columns={result.columns}
-      xKey={result.chart?.x ?? result.columns[0] ?? ""}
-      yKey={result.chart?.y ?? result.columns[1] ?? result.columns[0] ?? ""}
-      initialType={chartType}
-      className={cn(chartType === "pie" && "max-w-md")}
-    />
+    <div>
+      <ResultChart
+        rows={result.rows}
+        columns={result.columns}
+        xKey={labelCol}
+        yKey={result.chart?.y ?? result.columns[1] ?? result.columns[0] ?? ""}
+        initialType={chartType}
+        className={cn(chartType === "pie" && "max-w-md")}
+      />
+      <div className="mt-2 flex flex-wrap gap-1">
+        {result.rows.slice(0, 12).map((row, index) => {
+          const value = String(row[labelCol] ?? "");
+          if (!value) return null;
+          return (
+            <button
+              key={`${value}-${index}`}
+              type="button"
+              className="rounded-full border border-border/50 px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted/50"
+              onClick={() => onFilterValue(value)}
+            >
+              Filter {value}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -822,14 +1193,35 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-function EmptyPreview() {
+function EmptyPreview({
+  starters,
+  onPick,
+}: {
+  starters: Array<{ label: string; spec: AnalyticsSpec }>;
+  onPick: (item: { label: string; spec: AnalyticsSpec }) => void;
+}) {
   return (
-    <div className="flex h-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/20 text-center">
+    <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
       <BarChart3 className="mb-2 size-8 text-muted-foreground/70" />
       <p className="text-sm font-medium">Your insight appears here</p>
       <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-        Pick Revenue by Month, or use AI Assist to draft the builder from a sentence.
+        Start with a guided analysis, or compose metrics on the left.
       </p>
+      {starters.length ? (
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          {starters.map((item) => (
+            <Button
+              key={item.label}
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => onPick(item)}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -855,6 +1247,8 @@ function AnalysisActions({
   onStub: (label: string) => void;
   saving: boolean;
 }) {
+  const [exportOpen, setExportOpen] = React.useState(false);
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Input
@@ -875,22 +1269,65 @@ function AnalysisActions({
         <Trash2 className="size-3.5" />
         Delete
       </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={onExportCsv}>
-        <Download className="size-3.5" />
-        CSV
-      </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={() => onStub("Share link")}>
-        <Link2 className="size-3.5" />
-        Share
-      </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={() => onStub("Excel export")}>
-        <FileSpreadsheet className="size-3.5" />
-        Excel
-      </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={() => onStub("PDF export")}>
-        <FileText className="size-3.5" />
-        PDF
-      </Button>
+      <div className="relative">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => setExportOpen((value) => !value)}
+        >
+          <Download className="size-3.5" />
+          Export
+        </Button>
+        {exportOpen ? (
+          <div className="absolute right-0 z-20 mt-1 min-w-[160px] overflow-hidden rounded-xl border border-border/70 bg-surface-raised py-1 shadow-lg">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted/50"
+              onClick={() => {
+                onExportCsv();
+                setExportOpen(false);
+              }}
+            >
+              <Download className="size-3.5" />
+              CSV
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted/50"
+              onClick={() => {
+                onStub("Share link");
+                setExportOpen(false);
+              }}
+            >
+              <Link2 className="size-3.5" />
+              Share link
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted/50"
+              onClick={() => {
+                onStub("Excel export");
+                setExportOpen(false);
+              }}
+            >
+              <FileSpreadsheet className="size-3.5" />
+              Excel
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted/50"
+              onClick={() => {
+                onStub("PDF export");
+                setExportOpen(false);
+              }}
+            >
+              <FileText className="size-3.5" />
+              PDF
+            </button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -909,7 +1346,9 @@ function SavedList({
   return (
     <section className="rounded-2xl border border-border/60 bg-surface-raised/70 p-4">
       <h3 className="text-sm font-semibold">Saved analyses</h3>
-      <p className="mb-3 text-[11px] text-muted-foreground">Metadata only — reopen and re-run anytime.</p>
+      <p className="mb-3 text-[11px] text-muted-foreground">
+        Metadata only — reopen and re-run anytime.
+      </p>
       {loading ? (
         <p className="text-xs text-muted-foreground">Loading…</p>
       ) : !items.length ? (

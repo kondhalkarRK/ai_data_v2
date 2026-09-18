@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AnalyticsSpec } from "@nql/shared-types";
 
-import { recommendViz } from "@/lib/analytics/helpers";
+import { formatQuerySentence, recommendViz } from "@/lib/analytics/helpers";
 
 const base: AnalyticsSpec = {
   metrics: ["revenue"],
@@ -25,5 +25,24 @@ describe("analytics recommendViz", () => {
 
   it("respects explicit viz override", () => {
     expect(recommendViz({ ...base, viz: "table" })).toBe("table");
+  });
+});
+
+describe("formatQuerySentence", () => {
+  it("describes metrics, dimensions, and filters", () => {
+    const sentence = formatQuerySentence({
+      ...base,
+      dimensions: ["month", "region"],
+      filters: [{ domain: "car_type", values: ["SUV"] }],
+      analysis: "top_n",
+      limit: 10,
+    });
+    expect(sentence).toContain("Top Revenue by Month and Region");
+    expect(sentence).toContain("SUV");
+    expect(sentence).toContain("10");
+  });
+
+  it("prompts when no metric is selected", () => {
+    expect(formatQuerySentence({ ...base, metrics: [] })).toMatch(/Select a metric/);
   });
 });
