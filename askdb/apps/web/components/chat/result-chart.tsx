@@ -36,6 +36,7 @@ export function ResultChart({
   anomalies = [],
   className,
   initialType = "bar",
+  hideTypeSelect = false,
 }: {
   xKey: string;
   yKey: string;
@@ -44,6 +45,7 @@ export function ResultChart({
   anomalies?: AnomalyMarker[];
   className?: string;
   initialType?: ChartKind;
+  hideTypeSelect?: boolean;
 }) {
   const keys = React.useMemo(() => {
     if (columns?.length) return columns;
@@ -108,14 +110,16 @@ export function ResultChart({
           options={numericKeys.length ? numericKeys : keys}
           onChange={setYKey}
         />
-        <FieldSelect
-          id="chart-type"
-          label="Chart Type"
-          value={chartType}
-          options={CHART_KINDS.map((item) => item.id)}
-          labels={Object.fromEntries(CHART_KINDS.map((item) => [item.id, item.label]))}
-          onChange={(value) => setChartType(value as ChartKind)}
-        />
+        {hideTypeSelect ? null : (
+          <FieldSelect
+            id="chart-type"
+            label="Chart Type"
+            value={chartType}
+            options={CHART_KINDS.map((item) => item.id)}
+            labels={Object.fromEntries(CHART_KINDS.map((item) => [item.id, item.label]))}
+            onChange={(value) => setChartType(value as ChartKind)}
+          />
+        )}
       </div>
 
       {chartType === "pie" ? (

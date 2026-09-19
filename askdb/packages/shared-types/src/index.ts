@@ -340,6 +340,8 @@ export type AnalyticsVizKind =
   | "donut"
   | "scatter"
   | "kpi"
+  | "heatmap"
+  | "treemap"
   | "auto";
 
 export type AnalyticsAnalysisKind =

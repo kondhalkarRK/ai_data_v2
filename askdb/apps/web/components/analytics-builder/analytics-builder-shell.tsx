@@ -11,11 +11,15 @@ import type {
 } from "@nql/shared-types";
 import {
   BarChart3,
+  Boxes,
   ChevronDown,
   Copy,
   Download,
   FileSpreadsheet,
   FileText,
+  Gauge,
+  Grid3x3,
+  Layers,
   LineChart,
   Link2,
   Loader2,
@@ -23,6 +27,7 @@ import {
   Play,
   Save,
   Search,
+  SlidersHorizontal,
   Sparkles,
   Table2,
   Trash2,
@@ -66,8 +71,61 @@ const VIZ_OPTIONS: Array<{
   { id: "pie", label: "Pie", icon: PieChart },
   { id: "donut", label: "Donut", icon: PieChart },
   { id: "scatter", label: "Scatter", icon: BarChart3 },
-  { id: "kpi", label: "KPI", icon: TrendingUp },
+  { id: "kpi", label: "KPI", icon: Gauge },
+  { id: "heatmap", label: "Heatmap", icon: Grid3x3 },
+  { id: "treemap", label: "Treemap", icon: Boxes },
 ];
+
+const COMPOSER_TABS = [
+  {
+    id: "metrics" as const,
+    label: "Metrics",
+    hint: "Business measures",
+    icon: Gauge,
+  },
+  {
+    id: "dimensions" as const,
+    label: "Dimensions",
+    hint: "Group and split",
+    icon: Layers,
+  },
+  {
+    id: "advanced" as const,
+    label: "Advanced Analytics",
+    hint: "Ranking, trend, growth",
+    icon: SlidersHorizontal,
+  },
+];
+
+type ComposerTab = (typeof COMPOSER_TABS)[number]["id"];
+
+const DEMO_FILTER_VALUES: Record<string, string[]> = {
+  region: ["Mumbai", "Delhi", "Pune", "Bengaluru", "Chennai", "Hyderabad", "Kolkata"],
+  city: ["Mumbai", "Navi Mumbai", "Pune", "Thane", "Bengaluru", "Chennai"],
+  make: ["Hyundai", "Toyota", "Maruti", "Honda", "Tata", "Kia", "Mahindra"],
+  car_type: ["SUV", "Sedan", "Hatchback", "MUV", "EV"],
+  colour: ["White", "Silver", "Black", "Red", "Blue"],
+  color: ["White", "Silver", "Black", "Red", "Blue"],
+  model: ["Creta", "Venue", "Nexon", "City", "Innova", "Swift"],
+  dealer_grade: ["Platinum", "Gold", "Silver"],
+  claim_status: ["Open", "Paid", "Rejected", "Pending"],
+  line_of_business: ["Motor", "Health", "Property", "Life"],
+  channel: ["Dealer", "Online", "Broker", "Direct"],
+  year: ["2023", "2024", "2025", "2026"],
+  quarter: ["Q1", "Q2", "Q3", "Q4"],
+  month: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+};
+
+function demoValuesForDomain(domain: string): Array<{ value: string; label: string }> {
+  const listed = DEMO_FILTER_VALUES[domain.toLowerCase()];
+  const values = listed ?? [
+    `Sample ${prettyLabel(domain)} A`,
+    `Sample ${prettyLabel(domain)} B`,
+    `Sample ${prettyLabel(domain)} C`,
+    `Sample ${prettyLabel(domain)} D`,
+  ];
+  return values.map((value) => ({ value, label: value }));
+}
 
 const ANALYSIS_OPTIONS: Array<{ id: AnalyticsAnalysisKind; label: string; hint: string }> = [
   { id: "basic", label: "Standard", hint: "Grouped aggregation" },
@@ -241,6 +299,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
   const [flash, setFlash] = React.useState<string | null>(null);
   const [activeAnalysisId, setActiveAnalysisId] = React.useState<string | null>(null);
   const [saveTitle, setSaveTitle] = React.useState("");
+  const [composerTab, setComposerTab] = React.useState<ComposerTab>("metrics");
 
   const run = useAnalyticsRun();
   const assist = useAnalyticsAssist();
@@ -507,148 +566,188 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
         </div>
       </section>
 
-      <div className="relative grid gap-4 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
-        <aside className="space-y-3">
-          <ConfigCard title="Metrics" subtitle="Select one or more business measures">
-            <SelectedPills
-              ids={spec.metrics}
-              labels={metricLabels}
-              onRemove={(id) => toggleMetric(id)}
-            />
-            {primaryOnly ? (
-              <p className="mb-2 text-[10px] text-muted-foreground">
-                Advanced analyses use the first metric.
-              </p>
-            ) : null}
-            <SearchableChips
-              items={measures.map((m) => ({
-                id: m.id,
-                label: m.label,
-                keywords: [...m.synonyms, ...(glossaryByMeasure.get(m.id) ?? [])],
-                disabled: primaryOnly && spec.metrics.length >= 1 && !spec.metrics.includes(m.id),
-                title:
-                  primaryOnly && spec.metrics.length >= 1 && !spec.metrics.includes(m.id)
-                    ? "Advanced analyses use the first metric."
-                    : undefined,
-              }))}
-              selected={spec.metrics}
-              onToggle={toggleMetric}
-            />
-          </ConfigCard>
-
-          <ConfigCard title="Dimensions" subtitle="Grouped by Time, Geography, Product, Organization">
-            <SelectedPills
-              ids={spec.dimensions}
-              labels={dimensionLabels}
-              onRemove={(id) => toggleDimension(id)}
-            />
-            <GroupedDimensionChips
-              groups={groupedDimensions}
-              selected={spec.dimensions}
-              onToggle={toggleDimension}
-            />
-          </ConfigCard>
-
-          <ConfigCard title="Filters" subtitle="Value dictionary · cascading where available">
-            <FilterBuilder
-              domains={filterDomains}
-              filters={spec.filters}
-              onChange={upsertFilter}
-            />
-          </ConfigCard>
-
-          <ConfigCard title="Advanced analytics" subtitle="No SQL required">
-            <div className="flex flex-wrap gap-1.5">
-              {ANALYSIS_OPTIONS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  title={item.hint}
+      <div className="relative space-y-4">
+        <div
+          className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+          role="tablist"
+          aria-label="Builder sections"
+        >
+          {COMPOSER_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = composerTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={cn(
+                  "flex h-[72px] items-center gap-3 rounded-2xl border px-4 text-left shadow-sm transition-colors",
+                  active
+                    ? "border-primary/50 bg-primary/10 text-foreground"
+                    : "border-border/60 bg-surface-raised/85 text-muted-foreground hover:bg-muted/40",
+                )}
+                onClick={() => setComposerTab(tab.id)}
+              >
+                <span
                   className={cn(
-                    "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                    spec.analysis === item.id
-                      ? "border-info/40 bg-info/15 text-foreground"
-                      : "border-transparent bg-muted/40 text-muted-foreground hover:bg-muted",
+                    "flex size-9 items-center justify-center rounded-xl border",
+                    active ? "border-primary/30 bg-background" : "border-border/50 bg-muted/30",
                   )}
-                  onClick={() =>
-                    setSpec((prev) => ({
-                      ...prev,
-                      analysis: item.id,
-                      metrics: PRIMARY_ONLY.has(item.id) ? prev.metrics.slice(0, 1) : prev.metrics,
-                    }))
-                  }
                 >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <label className="text-[11px] text-muted-foreground" htmlFor="limit">
-                Limit
-              </label>
-              <Input
-                id="limit"
-                type="number"
-                min={1}
-                max={500}
-                value={spec.limit}
-                onChange={(event) =>
-                  setSpec((prev) => ({
-                    ...prev,
-                    limit: Math.min(500, Math.max(1, Number(event.target.value) || 25)),
-                  }))
-                }
-                className="h-8 w-20 text-xs"
-              />
-            </div>
-          </ConfigCard>
+                  <Icon className="size-4" />
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold text-foreground">{tab.label}</span>
+                  <span className="block text-[11px]">{tab.hint}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-          <ConfigCard title="Visualization" subtitle="Auto-recommended from your selection">
-            <div className="flex flex-wrap gap-1.5">
-              {VIZ_OPTIONS.map((item) => {
-                const Icon = item.icon;
-                const active = spec.viz === item.id;
-                return (
+        <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-4 shadow-sm">
+          {composerTab === "metrics" ? (
+            <>
+              <SelectedPills
+                ids={spec.metrics}
+                labels={metricLabels}
+                onRemove={(id) => toggleMetric(id)}
+              />
+              {primaryOnly ? (
+                <p className="mb-2 text-[10px] text-muted-foreground">
+                  Advanced analyses use the first metric.
+                </p>
+              ) : null}
+              <SearchableChips
+                items={measures.map((m) => ({
+                  id: m.id,
+                  label: m.label,
+                  keywords: [...m.synonyms, ...(glossaryByMeasure.get(m.id) ?? [])],
+                  disabled: primaryOnly && spec.metrics.length >= 1 && !spec.metrics.includes(m.id),
+                  title:
+                    primaryOnly && spec.metrics.length >= 1 && !spec.metrics.includes(m.id)
+                      ? "Advanced analyses use the first metric."
+                      : undefined,
+                }))}
+                selected={spec.metrics}
+                onToggle={toggleMetric}
+              />
+            </>
+          ) : null}
+          {composerTab === "dimensions" ? (
+            <>
+              <SelectedPills
+                ids={spec.dimensions}
+                labels={dimensionLabels}
+                onRemove={(id) => toggleDimension(id)}
+              />
+              <GroupedDimensionChips
+                groups={groupedDimensions}
+                selected={spec.dimensions}
+                onToggle={toggleDimension}
+              />
+            </>
+          ) : null}
+          {composerTab === "advanced" ? (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                {ANALYSIS_OPTIONS.map((item) => (
                   <button
                     key={item.id}
                     type="button"
+                    title={item.hint}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
-                      active
-                        ? "border-primary/40 bg-primary/15 text-foreground"
+                      "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                      spec.analysis === item.id
+                        ? "border-info/40 bg-info/15 text-foreground"
                         : "border-transparent bg-muted/40 text-muted-foreground hover:bg-muted",
                     )}
-                    onClick={() => setSpec((prev) => ({ ...prev, viz: item.id }))}
+                    onClick={() =>
+                      setSpec((prev) => ({
+                        ...prev,
+                        analysis: item.id,
+                        metrics: PRIMARY_ONLY.has(item.id) ? prev.metrics.slice(0, 1) : prev.metrics,
+                      }))
+                    }
                   >
-                    <Icon className="size-3" />
                     {item.label}
                   </button>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Suggested:{" "}
-              <span className="font-medium text-foreground">
-                {recommendViz({ ...spec, viz: "auto" })}
-              </span>
-            </p>
-          </ConfigCard>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <label className="text-[11px] text-muted-foreground" htmlFor="limit">
+                  Limit
+                </label>
+                <Input
+                  id="limit"
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={spec.limit}
+                  onChange={(event) =>
+                    setSpec((prev) => ({
+                      ...prev,
+                      limit: Math.min(500, Math.max(1, Number(event.target.value) || 25)),
+                    }))
+                  }
+                  className="h-8 w-20 text-xs"
+                />
+              </div>
+            </>
+          ) : null}
+        </section>
 
-          <div className="rounded-2xl border border-info/20 bg-info/8 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-info">Query</p>
+        <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-4 shadow-sm">
+          <h3 className="text-sm font-semibold tracking-tight">Filters</h3>
+          <p className="mb-3 text-[11px] text-muted-foreground">
+            Choose a field, then pick one or more values. Demo values appear if the dictionary is empty.
+          </p>
+          <FilterBuilder domains={filterDomains} filters={spec.filters} onChange={upsertFilter} />
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-surface-raised/90 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-info">Query summary</p>
             <p className="mt-1 text-sm font-medium leading-snug">{sentence}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+              <SummaryChip
+                label="Metrics"
+                value={
+                  spec.metrics.map((id) => metricLabels[id] ?? prettyLabel(id)).join(", ") || "None"
+                }
+              />
+              <SummaryChip
+                label="Dimensions"
+                value={
+                  spec.dimensions.map((id) => dimensionLabels[id] ?? prettyLabel(id)).join(", ") ||
+                  "None"
+                }
+              />
+              <SummaryChip
+                label="Filters"
+                value={
+                  spec.filters
+                    .map((item) => `${prettyLabel(item.domain)}: ${item.values.join(", ")}`)
+                    .join(" · ") || "None"
+                }
+              />
+              <SummaryChip
+                label="Advanced"
+                value={`${ANALYSIS_OPTIONS.find((item) => item.id === spec.analysis)?.label ?? spec.analysis} · ${spec.limit}`}
+              />
+            </div>
           </div>
-
           <Button
             type="button"
-            className="h-11 w-full text-sm"
+            className="h-12 shrink-0 px-6 text-sm"
             disabled={run.isPending || spec.metrics.length === 0}
             onClick={() => void handleRun()}
           >
             {run.isPending ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
-            Run analysis
+            Run Query
           </Button>
-        </aside>
+        </section>
 
         <main className="space-y-3">
           <div className="rounded-2xl border border-border/60 bg-surface-raised/80 p-4 shadow-[var(--shadow-card)] backdrop-blur">
@@ -729,53 +828,67 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
               </p>
             ) : null}
 
-            <div className="mt-4 min-h-[280px]">
+            <div className="mt-4 min-h-[320px] w-full">
+              {result || run.isPending ? (
+                <div
+                  className="mb-3 flex w-full gap-1 overflow-x-auto rounded-xl border border-border/60 bg-muted/25 p-1"
+                  role="toolbar"
+                  aria-label="Visualization"
+                >
+                  {VIZ_OPTIONS.filter((item) => item.id !== "auto").map((item) => {
+                    const Icon = item.icon;
+                    const active =
+                      spec.viz === item.id ||
+                      (spec.viz === "auto" && effectiveViz === item.id && previewTab !== "narration");
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={cn(
+                          "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium",
+                          active
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:bg-background/60",
+                        )}
+                        onClick={() => {
+                          setSpec((prev) => ({ ...prev, viz: item.id }));
+                          setPreviewTab(item.id === "table" || item.id === "kpi" ? "table" : "chart");
+                        }}
+                      >
+                        <Icon className="size-3.5" />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    className={cn(
+                      "ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium",
+                      previewTab === "narration"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-background/60",
+                    )}
+                    onClick={() => setPreviewTab("narration")}
+                  >
+                    Narration
+                  </button>
+                </div>
+              ) : null}
               {!result && !run.isPending ? (
                 <EmptyPreview starters={starters} onPick={(item) => void applyStarter(item)} />
               ) : run.isPending ? (
-                <div className="flex h-[280px] items-center justify-center gap-2 text-sm text-muted-foreground">
+                <div className="flex h-[320px] items-center justify-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
                   Compiling governed SQL and running…
                 </div>
               ) : result ? (
-                <>
-                  <div
-                    className="mb-3 inline-flex rounded-full border border-border/70 bg-muted/30 p-0.5 text-[11px]"
-                    role="tablist"
-                    aria-label="Result view"
-                  >
-                    {(
-                      [
-                        { id: "chart", label: "Chart" },
-                        { id: "table", label: "Table" },
-                        { id: "narration", label: "Narration" },
-                      ] as const
-                    ).map((tab) => (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={previewTab === tab.id}
-                        className={cn(
-                          "rounded-full px-3 py-1",
-                          previewTab === tab.id
-                            ? "bg-background font-medium text-foreground shadow-sm"
-                            : "text-muted-foreground",
-                        )}
-                        onClick={() => setPreviewTab(tab.id)}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                  <ResultPreview
-                    result={result}
-                    viz={spec.viz === "auto" ? effectiveViz : spec.viz}
-                    tab={previewTab}
-                    filterDomain={filterDomain}
-                    onFilterValue={(value) => void applyResultFilter(filterDomain, value)}
-                  />
-                </>
+                <ResultPreview
+                  result={result}
+                  viz={spec.viz === "auto" ? effectiveViz : spec.viz}
+                  tab={previewTab}
+                  filterDomain={filterDomain}
+                  onFilterValue={(value) => void applyResultFilter(filterDomain, value)}
+                />
               ) : null}
             </div>
           </div>
@@ -810,21 +923,12 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
   );
 }
 
-function ConfigCard({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-}) {
+function SummaryChip({ label, value }: { label: string; value: string }) {
   return (
-    <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-3 shadow-sm backdrop-blur">
-      <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
-      <p className="mb-2 text-[11px] text-muted-foreground">{subtitle}</p>
-      {children}
-    </section>
+    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1">
+      <span className="font-semibold text-muted-foreground">{label}:</span>
+      <span className="truncate text-foreground">{value}</span>
+    </span>
   );
 }
 
@@ -996,57 +1100,88 @@ function FilterBuilder({
     parentValues: domain === "city" ? parentRegion?.values : undefined,
   });
   const selected = filters.find((f) => f.domain === domain)?.values ?? [];
+  const live = valuesQuery.data?.values ?? [];
+  const demo = demoValuesForDomain(domain);
+  const merged = (live.length ? live : demo).filter((item) => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return true;
+    return `${item.value} ${item.label ?? ""}`.toLowerCase().includes(needle);
+  });
+
+  React.useEffect(() => {
+    if (!domains.some((item) => item.id === domain) && domains[0]) {
+      setDomain(domains[0].id);
+    }
+  }, [domains, domain]);
 
   return (
-    <div className="space-y-2">
-      <select
-        className="h-8 w-full rounded-[var(--radius-control)] border border-border bg-background px-2 text-xs"
-        value={domain}
-        onChange={(event) => setDomain(event.target.value)}
-        aria-label="Filter domain"
-      >
-        {domains.map((item) => (
-          <option key={item.id} value={item.id}>
-            {item.label}
-          </option>
-        ))}
-      </select>
-      <Input
-        value={q}
-        onChange={(event) => setQ(event.target.value)}
-        placeholder="Search values…"
-        className="h-8 text-xs"
-      />
-      <div className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
-        {(valuesQuery.data?.values ?? []).map((item) => {
-          const active = selected.includes(item.value);
-          return (
-            <button
-              key={item.value}
-              type="button"
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                active
-                  ? "border-info/40 bg-info/15 text-foreground"
-                  : "border-border/40 text-muted-foreground hover:bg-muted/40",
-              )}
-              onClick={() => {
-                const next = active
-                  ? selected.filter((value) => value !== item.value)
-                  : [...selected, item.value];
-                onChange(domain, next);
-              }}
-            >
-              {item.label ?? item.value}
-            </button>
-          );
-        })}
-        {valuesQuery.isPending ? (
-          <span className="text-[11px] text-muted-foreground">Loading values…</span>
-        ) : null}
-        {valuesQuery.isError ? (
-          <span className="text-[11px] text-danger">Could not load values for this domain.</span>
-        ) : null}
+    <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+      <label className="block text-[11px] text-muted-foreground">
+        Filter field
+        <select
+          className="mt-1 h-10 w-full rounded-[var(--radius-control)] border border-border bg-background px-2 text-sm text-foreground"
+          value={domain}
+          onChange={(event) => {
+            setDomain(event.target.value);
+            setQ("");
+          }}
+          aria-label="Filter domain"
+        >
+          {domains.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div>
+        <label className="block text-[11px] text-muted-foreground">
+          Values
+          <Input
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+            placeholder={`Search ${prettyLabel(domain)} values…`}
+            className="mt-1 h-10 text-sm"
+          />
+        </label>
+        <div className="mt-2 max-h-36 overflow-y-auto rounded-xl border border-border/60 bg-background/70 p-2">
+          {valuesQuery.isPending && !live.length ? (
+            <p className="px-1 py-2 text-[11px] text-muted-foreground">Loading values…</p>
+          ) : null}
+          <div className="flex flex-wrap gap-1.5">
+            {merged.map((item) => {
+              const active = selected.includes(item.value);
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                    active
+                      ? "border-info/40 bg-info/15 text-foreground"
+                      : "border-border/40 text-muted-foreground hover:bg-muted/40",
+                  )}
+                  onClick={() => {
+                    const next = active
+                      ? selected.filter((value) => value !== item.value)
+                      : [...selected, item.value];
+                    onChange(domain, next);
+                  }}
+                >
+                  {item.label ?? item.value}
+                </button>
+              );
+            })}
+            {!merged.length ? (
+              <p className="px-1 py-2 text-[11px] text-muted-foreground">No matching values.</p>
+            ) : null}
+          </div>
+          {!live.length && !valuesQuery.isPending ? (
+            <p className="mt-2 px-1 text-[10px] text-muted-foreground">
+              Showing sample values until the dictionary returns data.
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -1085,6 +1220,13 @@ function ResultPreview({
         onDepthChange={setInsightDepth}
       />
     );
+  }
+
+  if (tab === "chart" && viz === "heatmap") {
+    return <HeatmapPreview result={result} />;
+  }
+  if (tab === "chart" && viz === "treemap") {
+    return <TreemapPreview result={result} />;
   }
 
   if (tab === "table" || viz === "table" || viz === "kpi") {
@@ -1161,7 +1303,8 @@ function ResultPreview({
         xKey={labelCol}
         yKey={result.chart?.y ?? result.columns[1] ?? result.columns[0] ?? ""}
         initialType={chartType}
-        className={cn(chartType === "pie" && "max-w-md")}
+        hideTypeSelect
+        className={cn("w-full", chartType === "pie" && "max-w-xl")}
       />
       <div className="mt-2 flex flex-wrap gap-1">
         {result.rows.slice(0, 12).map((row, index) => {
@@ -1179,6 +1322,56 @@ function ResultPreview({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function HeatmapPreview({ result }: { result: AnalyticsRunResponse }) {
+  const labelCol = result.columns[0];
+  const valueCol = result.columns[1] ?? result.columns[0];
+  const nums = result.rows.map((row) => Number(row[valueCol]) || 0);
+  const max = Math.max(...nums, 1);
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      {result.rows.slice(0, 24).map((row, index) => {
+        const intensity = (Number(row[valueCol]) || 0) / max;
+        return (
+          <div
+            key={index}
+            className="rounded-xl border border-border/50 px-3 py-3 text-xs"
+            style={{
+              background: `color-mix(in oklab, hsl(var(--info)) ${Math.round(intensity * 55)}%, transparent)`,
+            }}
+          >
+            <p className="truncate font-medium">{String(row[labelCol] ?? "—")}</p>
+            <p className="mt-1 tabular-nums text-muted-foreground">{formatValue(row[valueCol])}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TreemapPreview({ result }: { result: AnalyticsRunResponse }) {
+  const labelCol = result.columns[0];
+  const valueCol = result.columns[1] ?? result.columns[0];
+  const items = result.rows.slice(0, 12).map((row) => ({
+    label: String(row[labelCol] ?? "—"),
+    value: Math.abs(Number(row[valueCol]) || 0),
+  }));
+  const total = items.reduce((sum, item) => sum + item.value, 0) || 1;
+  return (
+    <div className="flex min-h-[280px] flex-wrap overflow-hidden rounded-xl border border-border/50">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex min-w-[20%] flex-col justify-end border border-background/40 bg-info/20 p-2 text-xs"
+          style={{ flexGrow: Math.max(item.value / total, 0.08), minHeight: 88 }}
+        >
+          <p className="truncate font-medium">{item.label}</p>
+          <p className="tabular-nums text-muted-foreground">{formatValue(item.value)}</p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1205,7 +1398,7 @@ function EmptyPreview({
       <BarChart3 className="mb-2 size-8 text-muted-foreground/70" />
       <p className="text-sm font-medium">Your insight appears here</p>
       <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-        Start with a guided analysis, or compose metrics on the left.
+        Start with a guided analysis, or compose metrics, dimensions, and filters above.
       </p>
       {starters.length ? (
         <div className="mt-4 flex flex-wrap justify-center gap-2">

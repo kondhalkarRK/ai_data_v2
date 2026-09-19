@@ -19,6 +19,8 @@ AnalyticsVizKind = Literal[
     "donut",
     "scatter",
     "kpi",
+    "heatmap",
+    "treemap",
     "auto",
 ]
 
