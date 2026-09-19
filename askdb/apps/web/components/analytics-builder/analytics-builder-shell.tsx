@@ -12,11 +12,13 @@ import type {
 import {
   BarChart3,
   Boxes,
+  Calendar,
   ChevronDown,
   Copy,
   Download,
   FileSpreadsheet,
   FileText,
+  Filter,
   Gauge,
   Grid3x3,
   Layers,
@@ -25,6 +27,7 @@ import {
   Loader2,
   PieChart,
   Play,
+  RotateCcw,
   Save,
   Search,
   SlidersHorizontal,
@@ -50,10 +53,14 @@ import {
   useSavedAnalysisMutations,
 } from "@/hooks/use-analytics";
 import {
+  DATE_PRESETS,
+  type DatePresetId,
   downloadCsv,
+  formatDateRangeLabel,
   formatQuerySentence,
   prettyLabel,
   recommendViz,
+  resolveDatePreset,
 } from "@/lib/analytics/helpers";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -300,6 +307,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
   const [activeAnalysisId, setActiveAnalysisId] = React.useState<string | null>(null);
   const [saveTitle, setSaveTitle] = React.useState("");
   const [composerTab, setComposerTab] = React.useState<ComposerTab>("metrics");
+  const [showFilters, setShowFilters] = React.useState(false);
 
   const run = useAnalyticsRun();
   const assist = useAnalyticsAssist();
@@ -345,11 +353,18 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
     metrics: metricLabels,
     dimensions: dimensionLabels,
   });
+  const dateLabel = formatDateRangeLabel(spec);
+  const dateInvalid = Boolean(
+    spec.datePreset === "custom" &&
+      spec.dateFrom &&
+      spec.dateTo &&
+      spec.dateFrom > spec.dateTo,
+  );
   const effectiveViz = result?.recommendedViz ?? recommendViz(spec);
   const primaryOnly = PRIMARY_ONLY.has(spec.analysis);
   const ontologyHref = spec.metrics[0]
-    ? `/semantic/ontology?focus=${encodeURIComponent(spec.metrics[0])}`
-    : "/semantic/ontology";
+    ? `/semantic?tab=graph&focus=${encodeURIComponent(spec.metrics[0])}`
+    : "/semantic?tab=graph";
 
   function showFlash(message: string) {
     setFlash(message);
@@ -372,7 +387,48 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
   );
 
   async function handleRun() {
+    if (dateInvalid) {
+      setError("End date cannot be earlier than start date.");
+      return;
+    }
     await executeSpec(spec);
+  }
+
+  function applyDatePreset(preset: DatePresetId | "") {
+    if (!preset) {
+      setSpec((prev) => ({
+        ...prev,
+        datePreset: null,
+        dateFrom: null,
+        dateTo: null,
+      }));
+      return;
+    }
+    const resolved = resolveDatePreset(preset, {
+      from: spec.dateFrom,
+      to: spec.dateTo,
+    });
+    setSpec((prev) => ({
+      ...prev,
+      datePreset: preset,
+      dateFrom: resolved.from,
+      dateTo: resolved.to,
+      timeGrain: resolved.timeGrain ?? prev.timeGrain,
+      analysis: resolved.analysis ?? prev.analysis,
+    }));
+  }
+
+  function handleResetBuilder() {
+    setSpec({ ...EMPTY_SPEC });
+    setResult(null);
+    setError(null);
+    setComposerTab("metrics");
+    setShowFilters(false);
+    setPreviewTab("chart");
+    setActiveAnalysisId(null);
+    setSaveTitle("");
+    setAiPrompt("");
+    showFlash("Builder cleared");
   }
 
   async function handleAssist() {
@@ -483,6 +539,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
       filters: loaded.filters ?? [],
     };
     setSpec(next);
+    setShowFilters(Boolean(next.filters.length));
     setActiveAnalysisId(item.id);
     setSaveTitle(item.title);
     showFlash(`Loaded “${item.title}”`);
@@ -698,12 +755,78 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
           ) : null}
         </section>
 
-        <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-4 shadow-sm">
-          <h3 className="text-sm font-semibold tracking-tight">Filters</h3>
-          <p className="mb-3 text-[11px] text-muted-foreground">
-            Choose a field, then pick one or more values. Demo values appear if the dictionary is empty.
-          </p>
-          <FilterBuilder domains={filterDomains} filters={spec.filters} onChange={upsertFilter} />
+        <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-3 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex min-w-[220px] flex-1 items-center gap-2 text-[11px] text-muted-foreground">
+              <Calendar className="size-3.5 shrink-0" />
+              <span className="sr-only">Date filter</span>
+              <select
+                className="h-10 w-full rounded-[var(--radius-control)] border border-border bg-background px-2 text-sm text-foreground"
+                value={spec.datePreset ?? ""}
+                onChange={(event) => applyDatePreset(event.target.value as DatePresetId | "")}
+                aria-label="Date filter"
+              >
+                <option value="">Date filter</option>
+                {DATE_PRESETS.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-10"
+              onClick={() => setShowFilters((open) => !open)}
+            >
+              <Filter className="size-3.5" />
+              {showFilters ? "Hide Filters" : spec.filters.length ? `Filters (${spec.filters.length})` : "Show Filters"}
+            </Button>
+            <Button type="button" variant="ghost" className="h-10" onClick={handleResetBuilder}>
+              <RotateCcw className="size-3.5" />
+              Clear Analytics
+            </Button>
+          </div>
+
+          {spec.datePreset === "custom" ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-[11px] text-muted-foreground">
+                Start Date
+                <Input
+                  type="date"
+                  className="mt-1 h-10"
+                  value={spec.dateFrom ?? ""}
+                  onChange={(event) =>
+                    setSpec((prev) => ({ ...prev, dateFrom: event.target.value || null }))
+                  }
+                />
+              </label>
+              <label className="text-[11px] text-muted-foreground">
+                End Date
+                <Input
+                  type="date"
+                  className="mt-1 h-10"
+                  min={spec.dateFrom ?? undefined}
+                  value={spec.dateTo ?? ""}
+                  onChange={(event) =>
+                    setSpec((prev) => ({ ...prev, dateTo: event.target.value || null }))
+                  }
+                />
+              </label>
+              {dateInvalid ? (
+                <p className="text-[11px] text-danger sm:col-span-2">
+                  End date cannot be earlier than start date.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showFilters ? (
+            <div className="mt-3 border-t border-border/50 pt-3">
+              <FilterBuilder domains={filterDomains} filters={spec.filters} onChange={upsertFilter} />
+            </div>
+          ) : null}
         </section>
 
         <section className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-surface-raised/90 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
@@ -725,6 +848,10 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                 }
               />
               <SummaryChip
+                label="Date"
+                value={dateLabel || "All time"}
+              />
+              <SummaryChip
                 label="Filters"
                 value={
                   spec.filters
@@ -741,7 +868,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
           <Button
             type="button"
             className="h-12 shrink-0 px-6 text-sm"
-            disabled={run.isPending || spec.metrics.length === 0}
+            disabled={run.isPending || spec.metrics.length === 0 || dateInvalid}
             onClick={() => void handleRun()}
           >
             {run.isPending ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
@@ -1091,98 +1218,223 @@ function FilterBuilder({
   filters: AnalyticsFilterSpec[];
   onChange: (domain: string, values: string[]) => void;
 }) {
-  const [domain, setDomain] = React.useState(domains[0]?.id ?? "region");
-  const [q, setQ] = React.useState("");
+  const [draftDomain, setDraftDomain] = React.useState("");
+  const extra =
+    draftDomain && !filters.some((item) => item.domain === draftDomain)
+      ? [{ domain: draftDomain, values: [] as string[] }]
+      : [];
+  const rows = [...filters, ...extra];
+
+  function setRowDomain(previous: string, next: string) {
+    if (previous && previous !== next) onChange(previous, []);
+    setDraftDomain(next);
+    if (next) onChange(next, filters.find((item) => item.domain === next)?.values ?? []);
+  }
+
+  return (
+    <div className="space-y-3">
+      {(rows.length ? rows : [{ domain: "", values: [] }]).map((row, index) => (
+        <FilterRow
+          key={`${row.domain || "new"}-${index}`}
+          domains={domains}
+          domain={row.domain}
+          selected={row.values}
+          filters={filters}
+          onDomainChange={(next) => setRowDomain(row.domain, next)}
+          onValuesChange={(values) => {
+            if (row.domain) onChange(row.domain, values);
+          }}
+          onRemove={
+            row.domain
+              ? () => {
+                  onChange(row.domain, []);
+                  if (draftDomain === row.domain) setDraftDomain("");
+                }
+              : undefined
+          }
+        />
+      ))}
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        onClick={() => {
+          const unused = domains.find((item) => !filters.some((filt) => filt.domain === item.id));
+          if (unused) setDraftDomain(unused.id);
+        }}
+      >
+        Add filter
+      </Button>
+    </div>
+  );
+}
+
+function FilterRow({
+  domains,
+  domain,
+  selected,
+  filters,
+  onDomainChange,
+  onValuesChange,
+  onRemove,
+}: {
+  domains: Array<{ id: string; label: string }>;
+  domain: string;
+  selected: string[];
+  filters: AnalyticsFilterSpec[];
+  onDomainChange: (domain: string) => void;
+  onValuesChange: (values: string[]) => void;
+  onRemove?: () => void;
+}) {
+  const [fieldQuery, setFieldQuery] = React.useState("");
+  const [valueQuery, setValueQuery] = React.useState("");
   const parentRegion = filters.find((f) => f.domain === "region");
-  const valuesQuery = useFilterValues(domain, {
-    q: q || undefined,
+  const valuesQuery = useFilterValues(domain || null, {
+    q: valueQuery || undefined,
     parentDomain: domain === "city" && parentRegion?.values.length ? "region" : undefined,
     parentValues: domain === "city" ? parentRegion?.values : undefined,
   });
-  const selected = filters.find((f) => f.domain === domain)?.values ?? [];
   const live = valuesQuery.data?.values ?? [];
-  const demo = demoValuesForDomain(domain);
-  const merged = (live.length ? live : demo).filter((item) => {
-    const needle = q.trim().toLowerCase();
+  const demo = domain ? demoValuesForDomain(domain) : [];
+  const options = (live.length ? live : demo).filter((item) => {
+    const needle = valueQuery.trim().toLowerCase();
     if (!needle) return true;
     return `${item.value} ${item.label ?? ""}`.toLowerCase().includes(needle);
   });
-
-  React.useEffect(() => {
-    if (!domains.some((item) => item.id === domain) && domains[0]) {
-      setDomain(domains[0].id);
-    }
-  }, [domains, domain]);
+  const fieldOptions = domains.filter((item) => {
+    const needle = fieldQuery.trim().toLowerCase();
+    if (!needle) return true;
+    return `${item.id} ${item.label}`.toLowerCase().includes(needle);
+  });
 
   return (
-    <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
-      <label className="block text-[11px] text-muted-foreground">
-        Filter field
-        <select
-          className="mt-1 h-10 w-full rounded-[var(--radius-control)] border border-border bg-background px-2 text-sm text-foreground"
-          value={domain}
-          onChange={(event) => {
-            setDomain(event.target.value);
-            setQ("");
-          }}
-          aria-label="Filter domain"
-        >
-          {domains.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div>
-        <label className="block text-[11px] text-muted-foreground">
-          Values
-          <Input
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            placeholder={`Search ${prettyLabel(domain)} values…`}
-            className="mt-1 h-10 text-sm"
-          />
-        </label>
-        <div className="mt-2 max-h-36 overflow-y-auto rounded-xl border border-border/60 bg-background/70 p-2">
-          {valuesQuery.isPending && !live.length ? (
-            <p className="px-1 py-2 text-[11px] text-muted-foreground">Loading values…</p>
-          ) : null}
-          <div className="flex flex-wrap gap-1.5">
-            {merged.map((item) => {
-              const active = selected.includes(item.value);
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-[11px] font-medium",
-                    active
-                      ? "border-info/40 bg-info/15 text-foreground"
-                      : "border-border/40 text-muted-foreground hover:bg-muted/40",
-                  )}
-                  onClick={() => {
-                    const next = active
-                      ? selected.filter((value) => value !== item.value)
-                      : [...selected, item.value];
-                    onChange(domain, next);
-                  }}
-                >
-                  {item.label ?? item.value}
-                </button>
-              );
-            })}
-            {!merged.length ? (
-              <p className="px-1 py-2 text-[11px] text-muted-foreground">No matching values.</p>
-            ) : null}
+    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
+      <SearchableMenu
+        label="Filter field"
+        placeholder="Search fields…"
+        display={domain ? prettyLabel(domain) : "Select field"}
+        query={fieldQuery}
+        onQuery={setFieldQuery}
+      >
+        {fieldOptions.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={cn(
+              "flex w-full px-3 py-1.5 text-left text-sm hover:bg-muted/60",
+              domain === item.id && "bg-info/10 font-medium",
+            )}
+            onClick={() => {
+              onDomainChange(item.id);
+              setFieldQuery("");
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </SearchableMenu>
+      <SearchableMenu
+        label="Value"
+        placeholder={domain ? `Search ${prettyLabel(domain)}…` : "Select a field first"}
+        display={
+          selected.length
+            ? selected.slice(0, 3).join(", ") + (selected.length > 3 ? ` +${selected.length - 3}` : "")
+            : domain
+              ? "Select values"
+              : "—"
+        }
+        query={valueQuery}
+        onQuery={setValueQuery}
+        disabled={!domain}
+      >
+        {valuesQuery.isPending && !live.length ? (
+          <p className="px-3 py-2 text-[11px] text-muted-foreground">Loading values…</p>
+        ) : null}
+        {options.map((item) => {
+          const active = selected.includes(item.value);
+          return (
+            <button
+              key={item.value}
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted/60"
+              onClick={() => {
+                const next = active
+                  ? selected.filter((value) => value !== item.value)
+                  : [...selected, item.value];
+                onValuesChange(next);
+              }}
+            >
+              <span
+                className={cn(
+                  "flex size-3.5 items-center justify-center rounded border text-[9px]",
+                  active ? "border-info bg-info/20" : "border-border",
+                )}
+              >
+                {active ? "✓" : ""}
+              </span>
+              {item.label ?? item.value}
+            </button>
+          );
+        })}
+        {!options.length && domain ? (
+          <p className="px-3 py-2 text-[11px] text-muted-foreground">No matching values.</p>
+        ) : null}
+      </SearchableMenu>
+      {onRemove ? (
+        <Button type="button" size="sm" variant="ghost" className="mt-5 h-10" onClick={onRemove}>
+          Remove
+        </Button>
+      ) : (
+        <span className="hidden md:block" />
+      )}
+    </div>
+  );
+}
+
+function SearchableMenu({
+  label,
+  placeholder,
+  display,
+  query,
+  onQuery,
+  disabled,
+  children,
+}: {
+  label: string;
+  placeholder: string;
+  display: string;
+  query: string;
+  onQuery: (value: string) => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="relative">
+      <p className="mb-1 text-[11px] text-muted-foreground">{label}</p>
+      <button
+        type="button"
+        disabled={disabled}
+        className="flex h-10 w-full items-center justify-between rounded-[var(--radius-control)] border border-border bg-background px-3 text-left text-sm disabled:opacity-50"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="truncate">{display}</span>
+        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+      </button>
+      {open && !disabled ? (
+        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-border/70 bg-surface-raised shadow-lg">
+          <div className="border-b border-border/50 p-2">
+            <Input
+              autoFocus
+              value={query}
+              onChange={(event) => onQuery(event.target.value)}
+              placeholder={placeholder}
+              className="h-8 text-xs"
+            />
           </div>
-          {!live.length && !valuesQuery.isPending ? (
-            <p className="mt-2 px-1 text-[10px] text-muted-foreground">
-              Showing sample values until the dictionary returns data.
-            </p>
-          ) : null}
+          <div className="max-h-48 overflow-y-auto py-1">{children}</div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

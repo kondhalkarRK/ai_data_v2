@@ -35,12 +35,13 @@ export function ClusterLayer({
         }
         const hull = expandHull(convexHull(points), 28);
         const center = centroid(hull);
-        return { cluster, path: hullToPath(hull), center };
+        return { cluster, path: hullToPath(hull), center, assetCount: members.length };
       })
       .filter(Boolean) as Array<{
       cluster: OntologyCluster;
       path: string;
       center: Point;
+      assetCount: number;
     }>;
   }, [clusters, nodes]);
 
@@ -75,7 +76,7 @@ export function ClusterLayer({
             </filter>
           ))}
         </defs>
-        {zones.map(({ cluster, path, center }) => (
+        {zones.map(({ cluster, path, center, assetCount }) => (
           <g key={cluster.id}>
             <path
               d={path}
@@ -93,12 +94,27 @@ export function ClusterLayer({
             />
             <text
               x={center.x}
-              y={center.y - 8}
+              y={center.y - 14}
               textAnchor="middle"
               className="galaxy-cluster-label"
               style={{ "--cluster-color": cluster.color } as React.CSSProperties}
             >
               {cluster.label}
+            </text>
+            <text
+              x={center.x}
+              y={center.y + 8}
+              textAnchor="middle"
+              className="galaxy-cluster-label"
+              style={
+                {
+                  "--cluster-color": cluster.color,
+                  fontSize: 11,
+                  opacity: 0.75,
+                } as React.CSSProperties
+              }
+            >
+              {assetCount} assets
             </text>
           </g>
         ))}

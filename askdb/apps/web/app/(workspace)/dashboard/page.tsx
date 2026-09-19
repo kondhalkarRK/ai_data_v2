@@ -70,7 +70,7 @@ export default function DashboardPage() {
   });
 
   function explore(kpiId: string) {
-    router.push(`/semantic/ontology?focus=${encodeURIComponent(kpiId)}`);
+    router.push(`/semantic?tab=graph&focus=${encodeURIComponent(kpiId)}`);
   }
 
   const data = bundle.data;

@@ -45,4 +45,14 @@ describe("formatQuerySentence", () => {
   it("prompts when no metric is selected", () => {
     expect(formatQuerySentence({ ...base, metrics: [] })).toMatch(/Select a metric/);
   });
+
+  it("includes a custom date range", () => {
+    const sentence = formatQuerySentence({
+      ...base,
+      datePreset: "custom",
+      dateFrom: "2026-01-01",
+      dateTo: "2026-01-31",
+    });
+    expect(sentence).toContain("2026-01-01 → 2026-01-31");
+  });
 });

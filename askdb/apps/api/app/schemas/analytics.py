@@ -62,6 +62,9 @@ class AnalyticsSpec(ApiModel):
     order_direction: Literal["asc", "desc"] = "desc"
     time_grain: str | None = None
     viz: AnalyticsVizKind = "auto"
+    date_preset: str | None = None
+    date_from: str | None = None
+    date_to: str | None = None
 
 
 class AnalyticsRunRequest(ApiModel):

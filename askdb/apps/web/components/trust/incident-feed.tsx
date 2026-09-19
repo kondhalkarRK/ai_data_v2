@@ -77,7 +77,7 @@ export function IncidentFeed({
                   {formatRelative(incident.detectedAt)}
                 </p>
                 <Link
-                  href={`/semantic/ontology?focus=${encodeURIComponent(incident.dataset)}`}
+                  href={`/semantic?tab=graph&focus=${encodeURIComponent(incident.dataset)}`}
                   className="mt-2 inline-block text-[11px] font-medium text-teal underline-offset-2 hover:underline"
                 >
                   View details / lineage

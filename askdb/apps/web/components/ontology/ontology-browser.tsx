@@ -34,6 +34,16 @@ import { NodeDrawer } from "@/components/ontology/node-drawer";
 import { ParticleField } from "@/components/ontology/particle-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  JOURNEYS,
+  deriveAssetContext,
+  displayName,
+  journeyNodeIds,
+  matchesDiscoveryQuery,
+  snapshotTrustRate,
+  storyLabel,
+  type ContextOverlay,
+} from "@/lib/ontology/asset-context";
 import { hopNeighborhood } from "@/lib/ontology/graph-metrics";
 import {
   ONTOLOGY_KIND_FILTERS,
@@ -70,6 +80,23 @@ const METRICS: ReadonlyArray<{ id: CentralityMetric; label: string }> = [
   { id: "pagerank", label: "PageRank" },
 ];
 
+const OVERLAYS: ReadonlyArray<{ id: ContextOverlay; label: string }> = [
+  { id: "business", label: "Business View" },
+  { id: "technical", label: "Technical View" },
+  { id: "governance", label: "Governance View" },
+];
+
+const DISCOVERY_HINTS = [
+  "Revenue",
+  "Sales",
+  "Dealer",
+  "Customer",
+  "Claims",
+  "Premium",
+  "Vehicle",
+  "Policy",
+];
+
 export function OntologyBrowser({
   snapshot,
   initialFocusId,
@@ -102,6 +129,8 @@ function OntologyBrowserInner({
   /** Motion defaults OFF so large graphs stay readable without distraction. */
   const [motionEnabled, setMotionEnabled] = React.useState(false);
   const [kindFilter, setKindFilter] = React.useState<OntologyKindFilter>("all");
+  const [overlay, setOverlay] = React.useState<ContextOverlay>("business");
+  const [journeyId, setJourneyId] = React.useState<string | null>(null);
 
   const positioned = React.useMemo(
     () => layoutGalaxy(snapshot, mode, metric),
@@ -112,6 +141,13 @@ function OntologyBrowserInner({
     const map = new Map(snapshot.nodes.map((node) => [node.id, node]));
     return map;
   }, [snapshot.nodes]);
+
+  const journeyPath = React.useMemo(() => {
+    const journey = JOURNEYS.find((item) => item.id === journeyId);
+    return journey ? journeyNodeIds(snapshot, journey.seeds) : [];
+  }, [journeyId, snapshot]);
+
+  const journeySet = React.useMemo(() => new Set(journeyPath), [journeyPath]);
 
   const focus = React.useMemo(() => {
     if (!selectedId) return null;
@@ -156,6 +192,14 @@ function OntologyBrowserInner({
           if (node.id !== selectedId) focused = false;
         }
       }
+      if (journeySet.size && !journeySet.has(node.id) && node.id !== selectedId) {
+        dimmed = true;
+      }
+      if (journeySet.has(node.id) && !focus) {
+        focused = true;
+      }
+      const asset = nodeById.get(node.id);
+      const badges = asset ? deriveAssetContext(asset, snapshot).badges : [];
       return {
         id: node.id,
         type: "galaxy",
@@ -167,12 +211,27 @@ function OntologyBrowserInner({
           pulsing: pulseId === node.id,
           hop,
           motionEnabled,
+          displayLabel: asset ? displayName(asset, overlay) : node.label,
+          certified: badges.includes("certified") || badges.includes("trusted"),
+          review: badges.includes("review"),
         },
         style: { width: size, height: size + 4 },
         zIndex: focused || pulseId === node.id ? 20 : dimmed ? 1 : 5,
       };
     });
-  }, [positioned, focus, selectedId, pulseId, activeCluster, kindFilter, motionEnabled]);
+  }, [
+    positioned,
+    focus,
+    selectedId,
+    pulseId,
+    activeCluster,
+    kindFilter,
+    motionEnabled,
+    journeySet,
+    nodeById,
+    overlay,
+    snapshot,
+  ]);
 
   const flowEdges: GalaxyFlowEdge[] = React.useMemo(() => {
     return snapshot.edges.map((edge) => {
@@ -208,6 +267,15 @@ function OntologyBrowserInner({
           }
         }
       }
+      if (journeySet.size) {
+        if (journeySet.has(edge.source) && journeySet.has(edge.target)) {
+          emphasized = true;
+          dimmed = false;
+        } else if (!focus) {
+          dimmed = true;
+          emphasized = false;
+        }
+      }
       return {
         id: edge.id,
         type: "galaxy",
@@ -215,7 +283,7 @@ function OntologyBrowserInner({
         target: edge.target,
         data: {
           visualKind,
-          label: edge.label || EDGE_STYLES[visualKind].label,
+          label: storyLabel(edge, overlay) || EDGE_STYLES[visualKind].label,
           dimmed,
           emphasized,
           motionEnabled,
@@ -224,25 +292,29 @@ function OntologyBrowserInner({
         zIndex: emphasized ? 4 : 0,
       };
     });
-  }, [snapshot.edges, nodeById, focus, activeCluster, kindFilter, motionEnabled]);
+  }, [snapshot.edges, nodeById, focus, activeCluster, kindFilter, motionEnabled, journeySet, overlay]);
 
   const selectedNode = selectedId ? (nodeById.get(selectedId) ?? null) : null;
 
   const relationshipCount = focus?.one.edges.size ?? 0;
 
   const searchHits = React.useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    return snapshot.nodes
-      .filter((node) => {
-        if (node.label.toLowerCase().includes(q) || node.id.toLowerCase().includes(q)) return true;
-        return node.columns.some(
-          (col) =>
-            col.name.toLowerCase().includes(q) || col.displayName.toLowerCase().includes(q),
-        );
-      })
-      .slice(0, 8);
+    if (!search.trim()) return [];
+    return snapshot.nodes.filter((node) => matchesDiscoveryQuery(node, search)).slice(0, 10);
   }, [search, snapshot.nodes]);
+
+  const execStats = React.useMemo(() => {
+    const metrics = snapshot.nodes.filter((node) => node.kind === "measure").length;
+    const glossary = new Set(snapshot.nodes.flatMap((node) => node.synonyms)).size;
+    return {
+      assets: snapshot.metadata.nodeCount,
+      domains: snapshot.clusters.length,
+      metrics,
+      glossary,
+      relationships: snapshot.metadata.edgeCount,
+      trusted: snapshotTrustRate(snapshot),
+    };
+  }, [snapshot]);
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -288,10 +360,78 @@ function OntologyBrowserInner({
 
   return (
     <div
-      className="semantic-galaxy relative flex h-[min(78vh,860px)] min-h-[560px] w-full flex-col"
+      className="semantic-galaxy relative flex h-[min(88vh,980px)] min-h-[680px] w-full flex-col"
       data-motion={motionEnabled ? "on" : "off"}
     >
       {motionEnabled ? <ParticleField /> : null}
+
+      <div className="relative z-20 border-b border-border/50 bg-surface-raised/55 px-3 py-3 backdrop-blur-xl">
+        <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <ExecStat label="Assets" value={String(execStats.assets)} />
+          <ExecStat label="Domains" value={String(execStats.domains)} />
+          <ExecStat label="Metrics" value={String(execStats.metrics)} />
+          <ExecStat label="Glossary" value={String(execStats.glossary)} />
+          <ExecStat label="Relationships" value={String(execStats.relationships)} />
+          <ExecStat label="Trusted" value={`${execStats.trusted}%`} />
+        </div>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search assets, metrics, glossary terms, tables…"
+            className="h-11 border-border/60 bg-surface-raised/80 pl-10 text-sm shadow-sm backdrop-blur"
+            aria-label="Discover assets"
+          />
+          <AnimatePresence>
+            {searchHits.length > 0 ? (
+              <motion.ul
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 max-h-72 overflow-auto rounded-xl border border-border/70 bg-surface-raised/98 shadow-[var(--shadow-overlay)] backdrop-blur-xl"
+              >
+                {searchHits.map((hit) => (
+                  <li key={hit.id}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-muted/50"
+                      onClick={() => {
+                        setSearch("");
+                        setJourneyId(null);
+                        focusNode(hit.id);
+                      }}
+                    >
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ background: hit.clusterColor }}
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{displayName(hit, overlay)}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {hit.domain} · {hit.kind}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </motion.ul>
+            ) : null}
+          </AnimatePresence>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {DISCOVERY_HINTS.map((hint) => (
+            <button
+              key={hint}
+              type="button"
+              className="galaxy-chip rounded-full px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+              onClick={() => setSearch(hint)}
+            >
+              {hint}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="galaxy-toolbar relative z-20 flex flex-wrap items-center gap-2 px-3 py-2.5">
         <div className="mr-1 flex items-center gap-2">
@@ -374,49 +514,52 @@ function OntologyBrowserInner({
           })}
         </div>
 
-        <div className="ml-auto flex min-w-[220px] max-w-sm flex-1 items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search tables, columns…"
-              className="h-8 border-border/60 bg-surface-raised/70 pl-8 text-xs backdrop-blur"
-              aria-label="Semantic search"
-            />
-            <AnimatePresence>
-              {searchHits.length > 0 ? (
-                <motion.ul
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-xl border border-border/70 bg-surface-raised/95 shadow-[var(--shadow-overlay)] backdrop-blur-xl"
-                >
-                  {searchHits.map((hit) => (
-                    <li key={hit.id}>
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-muted/50"
-                        onClick={() => {
-                          setSearch("");
-                          focusNode(hit.id);
-                        }}
-                      >
-                        <span
-                          className="size-2 shrink-0 rounded-full"
-                          style={{ background: hit.clusterColor }}
-                        />
-                        <span className="truncate font-medium">{hit.label}</span>
-                        <span className="ml-auto truncate font-mono text-[10px] text-muted-foreground">
-                          {hit.kind}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </motion.ul>
-              ) : null}
-            </AnimatePresence>
-          </div>
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Context overlay">
+          {OVERLAYS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={overlay === item.id}
+              className={cn(
+                "galaxy-chip rounded-full px-2.5 py-1 text-[11px] font-medium",
+                overlay === item.id
+                  ? "border-warning/40 bg-warning/12 text-foreground"
+                  : "text-muted-foreground hover:bg-muted/40",
+              )}
+              onClick={() => setOverlay(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="KPI journey">
+          {JOURNEYS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={cn(
+                "galaxy-chip rounded-full px-2.5 py-1 text-[11px] font-medium",
+                journeyId === item.id
+                  ? "border-primary/40 bg-primary/15 text-foreground"
+                  : "text-muted-foreground hover:bg-muted/40",
+              )}
+              onClick={() => {
+                const next = journeyId === item.id ? null : item.id;
+                setJourneyId(next);
+                if (next) {
+                  const ids = journeyNodeIds(snapshot, item.seeds);
+                  if (ids[0]) focusNode(ids[0]);
+                }
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
           <Button
             type="button"
             size="sm"
@@ -485,14 +628,20 @@ function OntologyBrowserInner({
             >
               <div className="flex items-center gap-2 font-semibold tracking-tight">
                 <Binary className="size-3.5 text-success" />
-                {snapshot.metadata.nodeCount} nodes · {snapshot.metadata.edgeCount} edges
+                {snapshot.metadata.nodeCount} assets · {snapshot.metadata.edgeCount} relationships
               </div>
-              {selectedId ? (
+              {journeyPath.length ? (
+                <p className="mt-1 max-w-[16rem] text-muted-foreground">
+                  {journeyPath
+                    .map((id) => nodeById.get(id)?.label ?? id)
+                    .join(" → ")}
+                </p>
+              ) : selectedId ? (
                 <p className="mt-1 text-muted-foreground">
                   Focus · {relationshipCount} direct relations · 2-hop neighborhood
                 </p>
               ) : (
-                <p className="mt-1 text-muted-foreground">Click a node to enter Focus Graph</p>
+                <p className="mt-1 text-muted-foreground">Search or click an asset to enter Focus Graph</p>
               )}
             </motion.div>
           </Panel>
@@ -514,8 +663,23 @@ function OntologyBrowserInner({
           </Panel>
         </ReactFlow>
 
-        <NodeDrawer node={selectedNode} onClose={() => setSelectedId(null)} />
+        <NodeDrawer
+          node={selectedNode}
+          snapshot={snapshot}
+          overlay={overlay}
+          onClose={() => setSelectedId(null)}
+          onFocus={focusNode}
+        />
       </div>
+    </div>
+  );
+}
+
+function ExecStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border/50 bg-surface-raised/70 px-2.5 py-2">
+      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold tabular-nums">{value}</p>
     </div>
   );
 }

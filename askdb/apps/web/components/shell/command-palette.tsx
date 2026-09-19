@@ -58,7 +58,7 @@ export function CommandPalette() {
         label: term.displayLabel || name,
         hint: term.definition.slice(0, 80),
         group: "Glossary",
-        href: `/semantic/glossary?q=${encodeURIComponent(name)}`,
+        href: `/semantic?tab=glossary&q=${encodeURIComponent(name)}`,
       }));
 
     const graph: PaletteItem[] = [
@@ -74,14 +74,14 @@ export function CommandPalette() {
         label: "Open Semantic Galaxy",
         hint: "Jump to the ontology knowledge graph",
         group: "Semantic Graph",
-        href: "/semantic/ontology",
+        href: "/semantic?tab=graph",
       },
       {
         id: "graph-models",
         label: "Semantic models",
         hint: "Browse tables, measures, and dimensions",
         group: "Semantic Graph",
-        href: "/semantic/models",
+        href: "/semantic?tab=model",
       },
     ];
 

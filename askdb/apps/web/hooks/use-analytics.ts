@@ -21,6 +21,9 @@ export const EMPTY_SPEC: AnalyticsSpec = {
   orderDirection: "desc",
   timeGrain: null,
   viz: "auto",
+  datePreset: null,
+  dateFrom: null,
+  dateTo: null,
 };
 
 export function useAnalyticsRun() {

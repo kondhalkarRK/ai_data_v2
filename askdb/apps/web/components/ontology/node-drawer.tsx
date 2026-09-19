@@ -1,11 +1,16 @@
 "use client";
 
-import type { OntologyNode } from "@nql/shared-types";
+import type { OntologyNode, OntologySnapshot } from "@nql/shared-types";
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, X } from "lucide-react";
+import { BadgeCheck, KeyRound, ShieldAlert, Sparkles, Star, X } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  deriveAssetContext,
+  storyVerb,
+  type ContextOverlay,
+} from "@/lib/ontology/asset-context";
 import { cn } from "@/lib/utils";
 
 type Tab = "overview" | "schema" | "reach" | "lineage";
@@ -17,28 +22,64 @@ const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
   { id: "lineage", label: "Lineage" },
 ];
 
+const EMPTY_SNAPSHOT: OntologySnapshot = {
+  nodes: [],
+  edges: [],
+  clusters: [],
+  metadata: {
+    industry: "automotive",
+    version: "1",
+    compiledAt: new Date().toISOString(),
+    nodeCount: 0,
+    edgeCount: 0,
+    buildMs: 0,
+  },
+};
+
 export function NodeDrawer({
   node,
+  snapshot,
+  overlay = "business",
   onClose,
+  onFocus,
 }: {
   node: OntologyNode | null;
+  snapshot?: OntologySnapshot | null;
+  overlay?: ContextOverlay;
   onClose: () => void;
+  onFocus?: (id: string) => void;
 }) {
   return (
     <AnimatePresence>
-      {node ? <DrawerContent key={node.id} node={node} onClose={onClose} /> : null}
+      {node ? (
+        <DrawerContent
+          key={node.id}
+          node={node}
+          snapshot={snapshot ?? EMPTY_SNAPSHOT}
+          overlay={overlay}
+          onClose={onClose}
+          onFocus={onFocus}
+        />
+      ) : null}
     </AnimatePresence>
   );
 }
 
 function DrawerContent({
   node,
+  snapshot,
+  overlay,
   onClose,
+  onFocus,
 }: {
   node: OntologyNode;
+  snapshot: OntologySnapshot;
+  overlay: ContextOverlay;
   onClose: () => void;
+  onFocus?: (id: string) => void;
 }) {
   const [tab, setTab] = React.useState<Tab>("overview");
+  const context = deriveAssetContext(node, snapshot);
 
   React.useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -52,8 +93,6 @@ function DrawerContent({
     <motion.aside
       aria-label={`${node.label} details`}
       className="absolute inset-y-0 right-0 z-20 flex w-full max-w-[31rem] flex-col border-l border-border/60 bg-surface-raised/90 shadow-[var(--shadow-overlay)] backdrop-blur-xl"
-      // Content is present on the first paint. The requirement is an immediate drawer,
-      // so entrance animation must never delay visibility or accessibility.
       initial={false}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 32, opacity: 0 }}
@@ -75,6 +114,28 @@ function DrawerContent({
             </p>
             <h2 className="truncate text-2xl font-semibold tracking-tight">{node.label}</h2>
             <p className="mt-1 font-mono text-xs text-muted-foreground">{node.id}</p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {context.badges.includes("certified") ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium">
+                  <BadgeCheck className="size-3" /> Certified
+                </span>
+              ) : null}
+              {context.badges.includes("trusted") ? (
+                <span className="rounded-full bg-info/15 px-2 py-0.5 text-[10px] font-medium">
+                  Trusted
+                </span>
+              ) : null}
+              {context.badges.includes("popular") ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px]">
+                  <Star className="size-3" /> Popular
+                </span>
+              ) : null}
+              {context.badges.includes("review") ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-warning/20 px-2 py-0.5 text-[10px]">
+                  <ShieldAlert className="size-3" /> Review required
+                </span>
+              ) : null}
+            </div>
           </div>
           <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close details">
             <X />
@@ -107,10 +168,18 @@ function DrawerContent({
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {tab === "overview" ? <Overview node={node} /> : null}
+        {tab === "overview" ? (
+          <Overview
+            node={node}
+            overlay={overlay}
+            context={context}
+            snapshot={snapshot}
+            onFocus={onFocus}
+          />
+        ) : null}
         {tab === "schema" ? <Schema node={node} /> : null}
         {tab === "reach" ? <Reach node={node} /> : null}
-        {tab === "lineage" ? <Lineage node={node} /> : null}
+        {tab === "lineage" ? <Lineage node={node} snapshot={snapshot} /> : null}
       </div>
 
       <footer className="grid grid-cols-4 border-t border-border px-2 py-2 text-center text-xs text-muted-foreground">
@@ -131,12 +200,47 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Overview({ node }: { node: OntologyNode }) {
+function Overview({
+  node,
+  overlay,
+  context,
+  snapshot,
+  onFocus,
+}: {
+  node: OntologyNode;
+  overlay: ContextOverlay;
+  context: ReturnType<typeof deriveAssetContext>;
+  snapshot: OntologySnapshot;
+  onFocus?: (id: string) => void;
+}) {
+  const neighbors = snapshot.edges.filter((edge) => edge.source === node.id || edge.target === node.id);
+
   return (
     <>
+      <p className="text-[11px] text-muted-foreground">
+        Business name · {node.label}
+        {overlay !== "business" ? ` · Technical ${node.physicalName ?? node.id}` : ""}
+      </p>
       {node.description ? (
-        <p className="text-sm leading-relaxed text-foreground">{node.description}</p>
-      ) : null}
+        <p className="mt-2 text-sm leading-relaxed text-foreground">{node.description}</p>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">No business definition on this asset yet.</p>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+        <Stat label="Quality" value={`${context.qualityScore}`} />
+        <Stat label="Popularity" value={`${context.popularityScore}`} />
+        <Stat label="Owner" value={context.owner} />
+        <Stat
+          label="Updated"
+          value={
+            context.lastUpdated
+              ? new Date(context.lastUpdated).toLocaleDateString()
+              : "—"
+          }
+        />
+      </div>
+
       <SectionLabel>Synonyms</SectionLabel>
       {node.synonyms.length ? (
         <div className="flex flex-wrap gap-1.5">
@@ -152,6 +256,7 @@ function Overview({ node }: { node: OntologyNode }) {
       ) : (
         <p className="text-sm text-muted-foreground">None in the glossary.</p>
       )}
+
       <SectionLabel>Source bindings</SectionLabel>
       <dl className="divide-y divide-border rounded-[var(--radius-control)] border border-border text-sm">
         <div className="grid grid-cols-[6rem_1fr] gap-3 px-3 py-2.5">
@@ -167,13 +272,80 @@ function Overview({ node }: { node: OntologyNode }) {
           </dd>
         </div>
       </dl>
+
       {node.grain ? (
         <>
           <SectionLabel>Grain</SectionLabel>
           <p className="text-sm">{node.grain}</p>
         </>
       ) : null}
+
+      {neighbors.length ? (
+        <>
+          <SectionLabel>Relationship story</SectionLabel>
+          <ol className="space-y-1.5 text-sm">
+            {neighbors.slice(0, 6).map((edge) => {
+              const otherId = edge.source === node.id ? edge.target : edge.source;
+              const other = snapshot.nodes.find((item) => item.id === otherId);
+              return (
+                <li key={edge.id} className="rounded-lg border border-border/60 px-3 py-2">
+                  <p className="font-medium">{node.label}</p>
+                  <p className="text-[11px] text-muted-foreground">→ {storyVerb(edge)}</p>
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => other && onFocus?.(other.id)}
+                  >
+                    {other?.label ?? otherId}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      ) : null}
+
+      {context.relatedMetrics.length ? (
+        <>
+          <SectionLabel>Related metrics</SectionLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {context.relatedMetrics.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="rounded-full bg-info/12 px-2 py-0.5 text-[11px]"
+                onClick={() => onFocus?.(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {context.sampleQueries.length ? (
+        <>
+          <SectionLabel>Sample queries</SectionLabel>
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            {context.sampleQueries.map((item) => (
+              <li key={item} className="flex items-start gap-1.5">
+                <Sparkles className="mt-0.5 size-3 text-info" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
     </>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/20 px-2.5 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 truncate font-medium">{value}</p>
+    </div>
   );
 }
 
@@ -241,7 +413,7 @@ function Reach({ node }: { node: OntologyNode }) {
   );
 }
 
-function Lineage({ node }: { node: OntologyNode }) {
+function Lineage({ node, snapshot }: { node: OntologyNode; snapshot: OntologySnapshot }) {
   return (
     <>
       <ul className="space-y-2">
@@ -262,6 +434,12 @@ function Lineage({ node }: { node: OntologyNode }) {
           <SectionLabel>Primary key</SectionLabel>
           <code className="text-xs">{node.primaryKey}</code>
         </>
+      ) : null}
+      {snapshot.edges.length ? (
+        <p className="mt-4 text-[11px] text-muted-foreground">
+          {snapshot.edges.filter((edge) => edge.source === node.id || edge.target === node.id).length}{" "}
+          live graph connections.
+        </p>
       ) : null}
     </>
   );

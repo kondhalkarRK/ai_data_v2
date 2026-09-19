@@ -72,7 +72,7 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Observability, quality, governance, and trust scoring.",
       },
       {
-        href: "/semantic/ontology",
+        href: "/semantic?tab=graph",
         label: "Ontology Browser",
         icon: Network,
         minRole: "viewer",

@@ -372,6 +372,9 @@ export interface AnalyticsSpec {
   orderDirection: "asc" | "desc";
   timeGrain?: string | null;
   viz: AnalyticsVizKind;
+  datePreset?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
 }
 
 export interface AnalyticsRunResponse {

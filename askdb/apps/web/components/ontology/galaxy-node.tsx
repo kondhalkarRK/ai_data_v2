@@ -16,6 +16,9 @@ export type GalaxyNodeData = OntologyNode & {
   hop: 0 | 1 | 2 | null;
   /** When false, idle float / pulse motion is suppressed. */
   motionEnabled: boolean;
+  displayLabel?: string;
+  certified?: boolean;
+  review?: boolean;
 };
 
 export type GalaxyFlowNode = Node<GalaxyNodeData, "galaxy">;
@@ -46,6 +49,7 @@ export function GalaxyNode({ data, selected }: NodeProps<GalaxyFlowNode>) {
       <Handle type="source" position={Position.Right} className="!opacity-0" />
       <div
         className={cn("galaxy-node")}
+        title={`${data.label}${data.domain ? ` · ${data.domain}` : ""}`}
         data-fact={isFact}
         data-focused={data.focused || selected}
         data-dimmed={data.dimmed}
@@ -59,8 +63,18 @@ export function GalaxyNode({ data, selected }: NodeProps<GalaxyFlowNode>) {
           } as React.CSSProperties
         }
       >
-        <span className="galaxy-node__label">{data.label}</span>
+        <span className="galaxy-node__label">{data.displayLabel ?? data.label}</span>
       </div>
+      {data.certified ? (
+        <span className="pointer-events-none absolute -left-0.5 -top-0.5 rounded-full bg-success/90 px-1 text-[8px] font-bold text-white">
+          ✓
+        </span>
+      ) : null}
+      {data.review ? (
+        <span className="pointer-events-none absolute -left-0.5 -top-0.5 rounded-full bg-warning px-1 text-[8px] font-bold">
+          !
+        </span>
+      ) : null}
       {data.hop != null && data.hop > 0 ? (
         <span className="pointer-events-none absolute -right-1 -top-1 rounded-full border border-border/60 bg-surface-raised/90 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-muted-foreground shadow-sm backdrop-blur">
           {data.hop}h
