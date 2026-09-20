@@ -8,13 +8,21 @@ export type OntologyKindFilter =
   | "entity"
   | "relationship";
 
-export const ONTOLOGY_KIND_FILTERS: { id: OntologyKindFilter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "measure", label: "Measures" },
-  { id: "dimension", label: "Dimensions" },
-  { id: "fact", label: "Facts" },
-  { id: "entity", label: "Entities" },
-  { id: "relationship", label: "Relationships" },
+export const ONTOLOGY_KIND_FILTERS: {
+  id: OntologyKindFilter;
+  label: string;
+  hint: string;
+}[] = [
+  { id: "all", label: "All assets", hint: "Show every asset on the map." },
+  { id: "measure", label: "Measures", hint: "KPIs and calculations, such as Revenue or Premium." },
+  { id: "dimension", label: "Dimensions", hint: "Ways to slice a number — region, date, product." },
+  { id: "fact", label: "Facts", hint: "Transaction tables that feed the metrics." },
+  { id: "entity", label: "Entities", hint: "Business objects such as Dealer, Customer, or Vehicle." },
+  {
+    id: "relationship",
+    label: "Connected",
+    hint: "Hide isolated assets and keep only nodes that share a relationship.",
+  },
 ];
 
 export function isFactNode(node: Pick<OntologyNode, "kind" | "tableType" | "id">): boolean {

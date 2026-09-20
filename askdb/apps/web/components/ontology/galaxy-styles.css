@@ -61,6 +61,41 @@
   box-shadow: 0 8px 20px -12px color-mix(in oklab, hsl(var(--primary)) 55%, transparent);
 }
 
+.galaxy-hint {
+  position: relative;
+}
+
+.galaxy-hint::after {
+  content: attr(data-hint);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: max-content;
+  max-width: 16rem;
+  translate: -50% 0;
+  border-radius: 10px;
+  border: 1px solid var(--galaxy-stroke);
+  background: color-mix(in oklab, hsl(var(--surface-raised)) 94%, transparent);
+  padding: 0.45rem 0.6rem;
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1.35;
+  letter-spacing: 0;
+  color: hsl(var(--foreground));
+  text-transform: none;
+  box-shadow: var(--shadow-overlay);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.galaxy-hint:hover::after,
+.galaxy-hint:focus-visible::after,
+.galaxy-hint:focus-within::after {
+  opacity: 1;
+}
+
 .galaxy-node {
   position: relative;
   display: flex;

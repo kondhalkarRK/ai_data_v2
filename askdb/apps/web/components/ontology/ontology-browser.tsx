@@ -65,25 +65,63 @@ const edgeTypes: EdgeTypes = { galaxy: GalaxyEdge };
 const MODES: ReadonlyArray<{
   id: GalaxyMode;
   label: string;
+  hint: string;
   icon: React.ComponentType<{ className?: string }>;
 }> = [
-  { id: "network", label: "Network", icon: Network },
-  { id: "centrality", label: "Centrality", icon: Target },
-  { id: "hierarchy", label: "Hierarchy", icon: GitBranch },
-  { id: "lineage", label: "Lineage", icon: Waypoints },
-  { id: "constellation", label: "Constellation", icon: Orbit },
+  {
+    id: "constellation",
+    label: "Constellation",
+    hint: "Domain map. Assets sit in business zones so you see the landscape first.",
+    icon: Orbit,
+  },
+  {
+    id: "network",
+    label: "Network",
+    hint: "Connection map. Every relationship at once — best after you search or select an asset.",
+    icon: Network,
+  },
+  {
+    id: "hierarchy",
+    label: "Hierarchy",
+    hint: "Top-down structure. Read parent and child assets like an org chart.",
+    icon: GitBranch,
+  },
+  {
+    id: "lineage",
+    label: "Lineage",
+    hint: "Flow map. How assets feed each other — sources on one side, consumers on the other.",
+    icon: Waypoints,
+  },
+  {
+    id: "centrality",
+    label: "Influence",
+    hint: "Importance map. Larger nodes are more connected or sit on more paths.",
+    icon: Target,
+  },
 ];
 
-const METRICS: ReadonlyArray<{ id: CentralityMetric; label: string }> = [
-  { id: "degree", label: "Degree" },
-  { id: "betweenness", label: "Betweenness" },
-  { id: "pagerank", label: "PageRank" },
+const METRICS: ReadonlyArray<{ id: CentralityMetric; label: string; hint: string }> = [
+  { id: "degree", label: "Degree", hint: "How many direct connections an asset has." },
+  { id: "betweenness", label: "Betweenness", hint: "How often an asset sits on the shortest path between others." },
+  { id: "pagerank", label: "PageRank", hint: "How influential an asset is based on what links to it." },
 ];
 
-const OVERLAYS: ReadonlyArray<{ id: ContextOverlay; label: string }> = [
-  { id: "business", label: "Business View" },
-  { id: "technical", label: "Technical View" },
-  { id: "governance", label: "Governance View" },
+const OVERLAYS: ReadonlyArray<{ id: ContextOverlay; label: string; hint: string }> = [
+  {
+    id: "business",
+    label: "Business",
+    hint: "Everyday names, KPIs, and glossary language.",
+  },
+  {
+    id: "technical",
+    label: "Technical",
+    hint: "Table names, columns, and join keys.",
+  },
+  {
+    id: "governance",
+    label: "Governance",
+    hint: "Owners, stewardship, and relationship types.",
+  },
 ];
 
 const DISCOVERY_HINTS = [
@@ -433,154 +471,128 @@ function OntologyBrowserInner({
         </div>
       </div>
 
-      <div className="galaxy-toolbar relative z-20 flex flex-wrap items-center gap-2 px-3 py-2.5">
-        <div className="mr-1 flex items-center gap-2">
-          <Sparkles className="size-3.5 text-info" aria-hidden="true" />
-          <span className="text-xs font-semibold tracking-tight">Semantic Galaxy</span>
-        </div>
-
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Visualization mode">
-          {MODES.map((item) => {
-            const Icon = item.icon;
-            const active = mode === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                className={cn(
-                  "galaxy-chip inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium",
-                  active
-                    ? "border-primary/40 bg-primary/15 text-foreground"
-                    : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-                )}
-                data-active={active}
-                onClick={() => setMode(item.id)}
-              >
-                <Icon className="size-3" />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {mode === "centrality" ? (
-          <div className="flex gap-1">
-            {METRICS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={cn(
-                  "galaxy-chip rounded-full px-2.5 py-1 text-[11px] font-medium",
-                  metric === item.id
-                    ? "border-success/40 bg-success/15 text-foreground"
-                    : "text-muted-foreground hover:bg-muted/40",
-                )}
-                data-active={metric === item.id}
-                onClick={() => setMetric(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
+      <div className="galaxy-toolbar relative z-20 space-y-2 px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="mr-1 flex items-center gap-2">
+            <Sparkles className="size-3.5 text-info" aria-hidden="true" />
+            <span className="text-xs font-semibold tracking-tight">Map</span>
           </div>
-        ) : null}
 
-        <div
-          className="flex flex-wrap gap-1"
-          role="tablist"
-          aria-label="Entity type filter"
-        >
-          {ONTOLOGY_KIND_FILTERS.map((item) => {
-            const active = kindFilter === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                className={cn(
-                  "galaxy-chip rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors duration-150",
-                  active
-                    ? "border-info/40 bg-info/15 text-foreground"
-                    : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-                )}
-                data-active={active}
-                onClick={() => setKindFilter(item.id)}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
+          <div className="flex flex-wrap gap-1" role="tablist" aria-label="Map view">
+            {MODES.map((item) => {
+              const Icon = item.icon;
+              const active = mode === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-label={`${item.label}. ${item.hint}`}
+                  data-hint={item.hint}
+                  className={cn(
+                    "galaxy-chip galaxy-hint inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium",
+                    active
+                      ? "border-primary/40 bg-primary/15 text-foreground"
+                      : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                  )}
+                  data-active={active}
+                  onClick={() => setMode(item.id)}
+                >
+                  <Icon className="size-3" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
 
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Context overlay">
-          {OVERLAYS.map((item) => (
-            <button
-              key={item.id}
+          {mode === "centrality" ? (
+            <div className="flex gap-1" role="tablist" aria-label="Influence metric">
+              {METRICS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  data-hint={item.hint}
+                  aria-label={`${item.label}. ${item.hint}`}
+                  className={cn(
+                    "galaxy-chip galaxy-hint rounded-full px-2.5 py-1 text-[11px] font-medium",
+                    metric === item.id
+                      ? "border-success/40 bg-success/15 text-foreground"
+                      : "text-muted-foreground hover:bg-muted/40",
+                  )}
+                  data-active={metric === item.id}
+                  onClick={() => setMetric(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="ml-auto flex items-center gap-1">
+            <Button
               type="button"
-              role="tab"
-              aria-selected={overlay === item.id}
-              className={cn(
-                "galaxy-chip rounded-full px-2.5 py-1 text-[11px] font-medium",
-                overlay === item.id
-                  ? "border-warning/40 bg-warning/12 text-foreground"
-                  : "text-muted-foreground hover:bg-muted/40",
-              )}
-              onClick={() => setOverlay(item.id)}
+              size="sm"
+              variant="ghost"
+              className="galaxy-hint h-8 gap-1.5 text-xs"
+              data-hint="Animate nodes and flowing relationship lines."
+              aria-pressed={motionEnabled}
+              aria-label={`Motion ${motionEnabled ? "on" : "off"}`}
+              onClick={() => setMotionEnabled((value) => !value)}
             >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="KPI journey">
-          {JOURNEYS.map((item) => (
-            <button
-              key={item.id}
+              Motion: {motionEnabled ? "ON" : "OFF"}
+            </Button>
+            <Button
               type="button"
-              className={cn(
-                "galaxy-chip rounded-full px-2.5 py-1 text-[11px] font-medium",
-                journeyId === item.id
-                  ? "border-primary/40 bg-primary/15 text-foreground"
-                  : "text-muted-foreground hover:bg-muted/40",
-              )}
-              onClick={() => {
-                const next = journeyId === item.id ? null : item.id;
-                setJourneyId(next);
-                if (next) {
-                  const ids = journeyNodeIds(snapshot, item.seeds);
-                  if (ids[0]) focusNode(ids[0]);
-                }
-              }}
+              size="sm"
+              variant="ghost"
+              className="galaxy-hint h-8 gap-1.5 text-xs"
+              data-hint="Show or hide colored domain boundaries on the constellation map."
+              onClick={() => setShowClusters((value) => !value)}
             >
-              {item.label}
-            </button>
-          ))}
+              <Share2 className="size-3.5" />
+              {showClusters ? "Zones" : "Flat"}
+            </Button>
+          </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-8 gap-1.5 text-xs"
-            aria-pressed={motionEnabled}
-            aria-label={`Motion ${motionEnabled ? "on" : "off"}`}
-            onClick={() => setMotionEnabled((value) => !value)}
-          >
-            Motion: {motionEnabled ? "ON" : "OFF"}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-8 gap-1.5 text-xs"
-            onClick={() => setShowClusters((value) => !value)}
-          >
-            <Share2 className="size-3.5" />
-            {showClusters ? "Zones" : "Flat"}
-          </Button>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-2">
+          <ToolbarSelect
+            label="Labels"
+            hint="Change names on the same map — business, technical, or governance language."
+            value={overlay}
+            onChange={(value) => setOverlay(value as ContextOverlay)}
+            options={OVERLAYS.map((item) => ({ id: item.id, label: item.label, hint: item.hint }))}
+          />
+          <ToolbarSelect
+            label="Show"
+            hint="Focus the map on one asset type, such as measures or entities."
+            value={kindFilter}
+            onChange={(value) => setKindFilter(value as OntologyKindFilter)}
+            options={ONTOLOGY_KIND_FILTERS}
+          />
+          <ToolbarSelect
+            label="Story"
+            hint="Highlight a curated business path, such as Revenue through Dealer and Region."
+            value={journeyId ?? "none"}
+            onChange={(value) => {
+              const next = value === "none" ? null : value;
+              setJourneyId(next);
+              if (!next) return;
+              const journey = JOURNEYS.find((item) => item.id === next);
+              if (!journey) return;
+              const ids = journeyNodeIds(snapshot, journey.seeds);
+              if (ids[0]) focusNode(ids[0]);
+            }}
+            options={[
+              { id: "none", label: "None", hint: "No guided path." },
+              ...JOURNEYS.map((item) => ({
+                id: item.id,
+                label: item.label.replace(" journey", ""),
+                hint: `Follow ${item.seeds.join(" → ")}.`,
+              })),
+            ]}
+          />
         </div>
       </div>
 
@@ -681,5 +693,43 @@ function ExecStat({ label, value }: { label: string; value: string }) {
       <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-sm font-semibold tabular-nums">{value}</p>
     </div>
+  );
+}
+
+function ToolbarSelect({
+  label,
+  hint,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: ReadonlyArray<{ id: string; label: string; hint?: string }>;
+}) {
+  const selected = options.find((item) => item.id === value);
+  return (
+    <label
+      className="galaxy-hint inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-surface-raised/70 px-2.5 py-1"
+      data-hint={selected?.hint ?? hint}
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+        {label}
+      </span>
+      <select
+        value={value}
+        aria-label={`${label}. ${hint}`}
+        onChange={(event) => onChange(event.target.value)}
+        className="max-w-[9.5rem] cursor-pointer bg-transparent text-[11px] font-medium outline-none"
+      >
+        {options.map((item) => (
+          <option key={item.id} value={item.id} title={item.hint}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
