@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import type { Industry } from "@nql/shared-types";
+
 import { Button } from "@/components/ui/button";
 import { CHART_SERIES } from "@/lib/design";
 import { apiClient } from "@/lib/api-client";
@@ -63,7 +65,7 @@ export function IndiaRegionMap({
   presenterMode,
   displayMode = "panel",
 }: {
-  industry: string;
+  industry: Industry;
   presenterMode?: boolean;
   displayMode?: RegionMapDisplayMode;
 }) {

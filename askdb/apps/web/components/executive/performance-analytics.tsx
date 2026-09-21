@@ -12,7 +12,7 @@ export function PerformanceAnalytics({
   onFilter,
 }: {
   data: ExecutiveIntelligence;
-  industry: string;
+  industry: import("@nql/shared-types").Industry;
   presenterMode?: boolean;
   onFilter: (dimension: string, name: string) => void;
   windowId?: string;

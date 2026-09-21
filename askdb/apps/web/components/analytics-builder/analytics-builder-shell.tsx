@@ -1486,8 +1486,8 @@ function ResultPreview({
 
   if (tab === "table" || viz === "table" || viz === "kpi") {
     if (viz === "kpi" && tab !== "table") {
-      const key = result.columns[0];
-      const value = result.rows[0]?.[key];
+      const key = result.columns[0] ?? "";
+      const value = key ? result.rows[0]?.[key] : undefined;
       return (
         <div className="flex h-[240px] flex-col items-center justify-center rounded-xl bg-gradient-to-b from-info/10 to-transparent">
           <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{result.title}</p>
@@ -1497,7 +1497,7 @@ function ResultPreview({
         </div>
       );
     }
-    const labelCol = result.columns[0];
+    const labelCol = result.columns[0] ?? "";
     return (
       <div className="max-h-[420px] overflow-auto rounded-xl border border-border/50">
         <table className="w-full text-left text-xs">
@@ -1582,9 +1582,9 @@ function ResultPreview({
 }
 
 function HeatmapPreview({ result }: { result: AnalyticsRunResponse }) {
-  const labelCol = result.columns[0];
-  const valueCol = result.columns[1] ?? result.columns[0];
-  const nums = result.rows.map((row) => Number(row[valueCol]) || 0);
+  const labelCol = result.columns[0] ?? "";
+  const valueCol = result.columns[1] ?? result.columns[0] ?? "";
+  const nums = result.rows.map((row) => Number(valueCol ? row[valueCol] : 0) || 0);
   const max = Math.max(...nums, 1);
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -1608,11 +1608,11 @@ function HeatmapPreview({ result }: { result: AnalyticsRunResponse }) {
 }
 
 function TreemapPreview({ result }: { result: AnalyticsRunResponse }) {
-  const labelCol = result.columns[0];
-  const valueCol = result.columns[1] ?? result.columns[0];
+  const labelCol = result.columns[0] ?? "";
+  const valueCol = result.columns[1] ?? result.columns[0] ?? "";
   const items = result.rows.slice(0, 12).map((row) => ({
-    label: String(row[labelCol] ?? "—"),
-    value: Math.abs(Number(row[valueCol]) || 0),
+    label: String((labelCol ? row[labelCol] : undefined) ?? "—"),
+    value: Math.abs(Number(valueCol ? row[valueCol] : 0) || 0),
   }));
   const total = items.reduce((sum, item) => sum + item.value, 0) || 1;
   return (
