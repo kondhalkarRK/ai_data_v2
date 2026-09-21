@@ -5,13 +5,19 @@
 #   $env:ASKDB_API_RELOAD = "1"   # enable uvicorn --reload
 
 #Requires -Version 5.1
+param(
+    [ValidateSet("local", "hosted")]
+    [string]$Profile = "local"
+)
+
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 
 function Stop-AskDbApiOnPort {
-    # Prefer command-line match; fall back to whatever owns :8000 (stale listeners).
+    param([int]$Port = 8000)
+
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         Where-Object {
             $_.CommandLine -and (
@@ -23,16 +29,15 @@ function Stop-AskDbApiOnPort {
             Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
         }
 
-    $listeners = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+    $listeners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
     foreach ($row in @($listeners)) {
         $procId = $row.OwningProcess
         if ($procId -and $procId -gt 0) {
             $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$procId" -ErrorAction SilentlyContinue
             $cmd = if ($proc) { [string]$proc.CommandLine } else { "" }
             $name = if ($proc) { [string]$proc.Name } else { "" }
-            # Only kill python/uvicorn-looking owners, never system pid 0/4.
             if ($name -match "(?i)python|uvicorn" -or $cmd -match "(?i)uvicorn|app\.main:app|run_dev\.py") {
-                Write-Host "Stopping PID $procId on :8000 ($name)" -ForegroundColor DarkGray
+                Write-Host "Stopping PID $procId on :$Port ($name)" -ForegroundColor DarkGray
                 Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
             }
         }
@@ -40,10 +45,33 @@ function Stop-AskDbApiOnPort {
     Start-Sleep -Milliseconds 700
 }
 
+function Test-TcpPortFree {
+    param([int]$Port)
+    $rows = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    if ($rows.Count -eq 0) { return $true }
+    # A LISTEN row with a dead PID is not free on Windows (WinError 10048).
+    return $false
+}
+
+function Get-AskDbApiPort {
+    foreach ($candidate in 8000, 8010, 8011, 8020) {
+        if (Test-TcpPortFree -Port $candidate) { return $candidate }
+        $owner = @(Get-NetTCPConnection -LocalPort $candidate -State Listen -ErrorAction SilentlyContinue)[0].OwningProcess
+        $alive = if ($owner) { Get-Process -Id $owner -ErrorAction SilentlyContinue } else { $null }
+        if (-not $alive) {
+            Write-Host "Port $candidate is a ghost listener (PID $owner gone). Skipping." -ForegroundColor Yellow
+        } else {
+            Write-Host "Port $candidate is in use by PID $owner ($($alive.ProcessName)). Skipping." -ForegroundColor Yellow
+        }
+    }
+    throw "No free API port (tried 8000, 8010, 8011, 8020). Close the leftover process or reboot if Windows left a dead LISTEN."
+}
+
 function Test-ApiHealth {
+    param([int]$Port = 8000)
     try {
         $ErrorActionPreference = "Continue"
-        $r = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 2
+        $r = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
         return ($r.status -eq "ok")
     } catch {
         return $false
@@ -51,11 +79,12 @@ function Test-ApiHealth {
 }
 
 function Show-BackendStatus {
+    param([int]$Port = 8000)
     Write-Host ""
     Write-Host "Backend checks:" -ForegroundColor Cyan
     try {
         $ErrorActionPreference = "Continue"
-        $h = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 3
+        $h = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 3
         Write-Host "  /health  OK ($($h.service))" -ForegroundColor Green
     } catch {
         Write-Host "  /health  FAIL" -ForegroundColor Red
@@ -64,7 +93,7 @@ function Show-BackendStatus {
 
     try {
         $ErrorActionPreference = "Continue"
-        $ready = Invoke-RestMethod -Uri "http://127.0.0.1:8000/ready" -TimeoutSec 8
+        $ready = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/ready" -TimeoutSec 8
         Write-Host "  /ready   $($ready.status)" -ForegroundColor $(if ($ready.status -eq "ready") { "Green" } else { "Yellow" })
         foreach ($dep in $ready.dependencies) {
             $color = if ($dep.status -eq "ok") { "DarkGray" } elseif ($dep.status -eq "not_configured") { "DarkGray" } else { "Red" }
@@ -88,7 +117,7 @@ function Show-BackendStatus {
 
     try {
         $ErrorActionPreference = "Continue"
-        $me = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/auth/me" -TimeoutSec 5
+        $me = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/v1/auth/me" -TimeoutSec 5
         Write-Host "  /auth/me OK ($($me.email))" -ForegroundColor Green
     } catch {
         $msg = $_.Exception.Message
@@ -100,6 +129,24 @@ function Show-BackendStatus {
 }
 
 try {
+    if ($Profile -eq "hosted") {
+        $hosted = Join-Path $root ".env.hosted"
+        if (-not (Test-Path $hosted)) {
+            if (Test-Path (Join-Path $root ".env.hosted.example")) {
+                Copy-Item (Join-Path $root ".env.hosted.example") $hosted
+                Write-Error "Created .env.hosted from the example. Put your Supabase URI in .env.hosted, then re-run: .\scripts\dev.ps1 -Profile hosted"
+            }
+            Write-Error "Missing .env.hosted. Copy .env.hosted.example and paste the Supabase direct URI."
+        }
+        $env:ASKDB_ENV_FILE = $hosted
+        Write-Host "Database profile: HOSTED (Supabase via .env.hosted)" -ForegroundColor Magenta
+        Write-Host "Local Postgres is unused for this process. Your .env file is unchanged." -ForegroundColor DarkGray
+    } else {
+        Remove-Item Env:ASKDB_ENV_FILE -ErrorAction SilentlyContinue
+        Write-Host "Database profile: LOCAL (Postgres via .env)" -ForegroundColor Cyan
+        Write-Host "Supabase is unused. For a manager demo: .\scripts\dev.ps1 -Profile hosted" -ForegroundColor DarkGray
+    }
+
     if (-not (Test-Path ".env")) {
         if (Test-Path ".env.example") {
             Copy-Item ".env.example" ".env"
@@ -125,49 +172,64 @@ try {
     }
 
     $reloadOn = $env:ASKDB_API_RELOAD -eq "1"
+    Write-Host "Clearing leftover API processes ..." -ForegroundColor DarkGray
+    Stop-AskDbApiOnPort -Port 8000
+    Stop-AskDbApiOnPort -Port 8010
+
+    $apiPort = Get-AskDbApiPort
+    $env:API_REWRITE_TARGET = "http://localhost:$apiPort"
+    $env:API_PORT = "$apiPort"
+
     # Use run_dev.py so WindowsSelectorEventLoopPolicy is set BEFORE Uvicorn creates the loop.
     if ($reloadOn) {
-        $uvicornArgs = "run_dev.py --host 127.0.0.1 --port 8000 --reload"
+        $uvicornArgs = "run_dev.py --host 127.0.0.1 --port $apiPort --reload"
         Write-Host "API reload: ON" -ForegroundColor DarkGray
     } else {
-        $uvicornArgs = "run_dev.py --host 127.0.0.1 --port 8000"
+        $uvicornArgs = "run_dev.py --host 127.0.0.1 --port $apiPort"
         Write-Host "API reload: OFF (set ASKDB_API_RELOAD=1 to enable)" -ForegroundColor DarkGray
     }
 
-    Write-Host "Clearing port 8000 ..." -ForegroundColor DarkGray
-    Stop-AskDbApiOnPort
-
-    # If something non-python still holds the port, fail clearly.
-    $still = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
-    if ($still) {
-        $busyPid = ($still | Select-Object -First 1).OwningProcess
-        throw "Port 8000 is still in use by PID $busyPid. Stop that process and retry."
+    Write-Host "Starting API on http://127.0.0.1:$apiPort ..." -ForegroundColor Cyan
+    if ($env:ASKDB_ENV_FILE) {
+        Write-Host "ASKDB_ENV_FILE=$($env:ASKDB_ENV_FILE)" -ForegroundColor DarkGray
     }
-
-    Write-Host "Starting API on http://127.0.0.1:8000 ..." -ForegroundColor Cyan
-    $api = Start-Process -PassThru -NoNewWindow `
-        -WorkingDirectory (Join-Path $root "apps\api") `
-        -FilePath $python `
-        -ArgumentList $uvicornArgs
+    Write-Host "Web rewrite target: $($env:API_REWRITE_TARGET)" -ForegroundColor DarkGray
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $python
+    $psi.Arguments = $uvicornArgs
+    $psi.WorkingDirectory = Join-Path $root "apps\api"
+    $psi.UseShellExecute = $false
+    if ($env:ASKDB_ENV_FILE) {
+        $psi.EnvironmentVariables["ASKDB_ENV_FILE"] = $env:ASKDB_ENV_FILE
+    }
+    $api = New-Object System.Diagnostics.Process
+    $api.StartInfo = $psi
+    [void]$api.Start()
 
     $alive = $false
     foreach ($i in 1..60) {
         Start-Sleep -Milliseconds 500
+        $api.Refresh()
         if ($api.HasExited) {
             throw "The API exited during startup (exit $($api.ExitCode)). Check the uvicorn output above."
         }
-        if (Test-ApiHealth) {
+        if (Test-ApiHealth -Port $apiPort) {
             $alive = $true
-            Write-Host "API process is up (/health OK)." -ForegroundColor Green
+            Write-Host "API process is up (/health OK on :$apiPort)." -ForegroundColor Green
             break
         }
     }
     if (-not $alive) {
-        Stop-AskDbApiOnPort
-        throw "API did not answer http://127.0.0.1:8000/health within 30s."
+        Stop-AskDbApiOnPort -Port $apiPort
+        throw "API did not answer http://127.0.0.1:$apiPort/health within 30s."
     }
 
-    Show-BackendStatus
+    Show-BackendStatus -Port $apiPort
+
+    if ($Profile -eq "hosted") {
+        $env:NEXT_PUBLIC_AUTH_BYPASS = "false"
+        Write-Host "Web auth bypass: OFF (sign in with the Supabase admin)." -ForegroundColor Magenta
+    }
 
     Write-Host "Starting frontend on http://localhost:3000 ..." -ForegroundColor Cyan
     npm run dev
@@ -176,6 +238,7 @@ try {
     if ($api -and -not $api.HasExited) {
         Stop-Process -Id $api.Id -Force -ErrorAction SilentlyContinue
     }
-    Stop-AskDbApiOnPort
+    Stop-AskDbApiOnPort -Port 8000
+    Stop-AskDbApiOnPort -Port 8010
     Pop-Location
 }

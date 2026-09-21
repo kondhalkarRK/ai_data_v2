@@ -7,17 +7,21 @@ environment variables.
 
 from __future__ import annotations
 
+import os
 import secrets
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+# config.py lives at apps/api/app/core/config.py → APP_ROOT is apps/api.
+# In Docker the image WORKDIR is /app, which has no grandparent (only /).
 APP_ROOT = Path(__file__).resolve().parents[2]
-REPO_ROOT = APP_ROOT.parents[1]
+REPO_ROOT = APP_ROOT.parents[1] if len(APP_ROOT.parents) > 1 else APP_ROOT
 
 
 class Environment(StrEnum):
@@ -73,7 +77,8 @@ class Settings(BaseSettings):
     jwt_issuer: str = "nql-insight"
     jwt_audience: str = "nql-insight-web"
 
-    cookie_domain: str = "localhost"
+    # Empty = host-only cookie. "localhost" as Domain= is rejected by Chromium.
+    cookie_domain: str = ""
     cookie_secure: bool = False
     cookie_samesite: Literal["lax", "strict", "none"] = "lax"
     csrf_header_name: str = "x-csrf-token"
@@ -249,5 +254,29 @@ def get_settings() -> Settings:
 
     Cached so that importing modules never re-read the environment, and so tests can
     clear the cache deliberately with ``get_settings.cache_clear()``.
+
+    ``ASKDB_ENV_FILE`` selects an alternate dotenv (e.g. ``.env.hosted`` for Supabase)
+    without replacing the local ``.env`` used for day-to-day Postgres.
     """
-    return Settings()
+    override = os.environ.get("ASKDB_ENV_FILE", "").strip()
+    if not override:
+        return Settings()
+    path = Path(override)
+    if not path.is_absolute():
+        path = REPO_ROOT / override
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"ASKDB_ENV_FILE={path} does not exist. Copy .env.hosted.example to .env.hosted."
+        )
+    return Settings(_env_file=path, _env_file_encoding="utf-8")
+
+
+def database_host_label(url: str) -> str:
+    """Safe log label: localhost vs Supabase, never includes the password."""
+    raw = url.replace("postgresql+psycopg://", "postgresql://", 1)
+    host = urlparse(raw).hostname or "unknown"
+    if host in {"localhost", "127.0.0.1"}:
+        return f"local ({host})"
+    if "supabase" in host.lower():
+        return f"hosted supabase ({host})"
+    return f"remote ({host})"

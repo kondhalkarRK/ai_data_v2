@@ -60,6 +60,11 @@ def _database_url() -> str:
         raise SystemExit(f"Unknown -x target={target!r}. Expected one of: {valid}.") from exc
 
 
+def _version_table() -> str:
+    """One Postgres holds app + automotive + insurance; version rows must not share a table."""
+    return f"alembic_version_{_target_name()}"
+
+
 def _target_metadata():
     # Analytics trees are pure SQL and must not try to diff against the app ORM.
     return Base.metadata if _target_name() == "app" else None
@@ -70,6 +75,7 @@ def run_migrations_offline() -> None:
         url=_database_url(),
         target_metadata=_target_metadata(),
         version_locations=_version_locations(),
+        version_table=_version_table(),
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
@@ -84,6 +90,7 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=_target_metadata(),
         version_locations=_version_locations(),
+        version_table=_version_table(),
         compare_type=True,
         compare_server_default=True,
     )

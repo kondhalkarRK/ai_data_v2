@@ -1,0 +1,46 @@
+# Blueprint for the Ask DB FastAPI service (not the Next.js UI).
+# Dashboard: New → Blueprint → this repo. Or create a Web Service and point at this file.
+#
+# Do not put database passwords in this file. Add them in the Render dashboard.
+
+services:
+  - type: web
+    name: askdb-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: AUTH_BYPASS
+        value: "false"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: COOKIE_DOMAIN
+        value: ""
+      - key: TRUSTED_HOSTS
+        value: "*.onrender.com,localhost"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "http://localhost:3000,https://localhost:3000"
+      - key: APP_DATABASE_URL
+        sync: false
+      - key: AUTOMOTIVE_DATABASE_URL
+        sync: false
+      - key: INSURANCE_DATABASE_URL
+        sync: false
+      - key: AUTOMOTIVE_MIGRATE_DATABASE_URL
+        sync: false
+      - key: INSURANCE_MIGRATE_DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_DEFAULT_MODEL
+        sync: false

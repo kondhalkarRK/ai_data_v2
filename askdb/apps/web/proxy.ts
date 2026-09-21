@@ -12,7 +12,8 @@ import { NextResponse, type NextRequest } from "next/server";
  * API/health paths are always passed through — they are rewritten to FastAPI and must
  * never be redirected to the HTML login page (that caused opaque Failed to fetch / KPI errors).
  */
-const REFRESH_COOKIE = "nql_refresh";
+// Access cookie is Path=/. Refresh is Path=/api/v1/auth only, so it is not sent on /home.
+const ACCESS_COOKIE = "nql_access";
 const PUBLIC_PATHS = ["/login"];
 const API_PASSTHROUGH = ["/api", "/ready", "/health", "/docs", "/openapi.json"];
 const AUTH_BYPASS = process.env.NEXT_PUBLIC_AUTH_BYPASS === "true";
@@ -36,7 +37,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const hasSession = request.cookies.has(REFRESH_COOKIE);
+  const hasSession = request.cookies.has(ACCESS_COOKIE);
   const isPublic = PUBLIC_PATHS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );

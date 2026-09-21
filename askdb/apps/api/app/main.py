@@ -19,7 +19,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.api.router import api_v1_router
 from app.api.routes import system
 from app.auth.rate_limit import FixedWindowRateLimiter
-from app.core.config import Settings, get_settings
+from app.core.config import Settings, database_host_label, get_settings
 from app.core.context import current_request_id
 from app.core.exceptions import NqlError, RateLimitedError
 from app.db.session import DatabaseRegistry
@@ -56,6 +56,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         extra={
             "environment": settings.environment.value,
             "default_industry": settings.default_industry.value,
+            "app_db": database_host_label(settings.app_database_url),
+            "automotive_db": database_host_label(settings.automotive_database_url),
+            "insurance_db": database_host_label(settings.insurance_database_url),
         },
     )
     try:
