@@ -18,22 +18,105 @@ export function QualityTrends({ trends }: { trends: TrendPoint[] }) {
   if (!trends.length) {
     return <Empty label="No trend history yet. Scores accumulate as Trust Center refreshes." />;
   }
-  const max = Math.max(...trends.map((t) => t.trustScore ?? 0), 1);
+  const scores = trends.map((t) => t.trustScore ?? 0);
+  const max = Math.max(...scores, 100);
+  const latest = trends.at(-1);
+  const prior = trends.at(-2);
+  const delta =
+    latest?.trustScore != null && prior?.trustScore != null
+      ? latest.trustScore - prior.trustScore
+      : null;
+  const width = 640;
+  const height = 180;
+  const pad = { top: 16, right: 12, bottom: 36, left: 44 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+
   return (
     <div className="rounded-2xl border border-border/70 bg-background p-4 shadow-sm">
-      <h3 className="mb-3 text-sm font-semibold">Data Quality Trends</h3>
-      <div className="flex h-36 items-end gap-1">
-        {trends.map((point) => (
-          <div
-            key={point.period}
-            className="flex-1 rounded-t bg-foreground/70"
-            style={{ height: `${Math.max(((point.trustScore ?? 0) / max) * 100, 4)}%` }}
-            title={`${point.period}: ${point.trustScore ?? "—"}`}
-          />
-        ))}
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">Data Quality Trends</h3>
+          <p className="text-[11px] text-muted-foreground">Trust score 0–100 by refresh period</p>
+        </div>
+        {delta != null ? (
+          <p className="text-xs tabular-nums text-muted-foreground">
+            Latest {latest?.trustScore?.toFixed(0)} · {delta >= 0 ? "+" : ""}
+            {delta.toFixed(1)} vs prior
+          </p>
+        ) : null}
       </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[180px] w-full" role="img" aria-label="Data quality trend">
+        <text
+          x={12}
+          y={height / 2}
+          transform={`rotate(-90 12 ${height / 2})`}
+          textAnchor="middle"
+          className="fill-muted-foreground text-[10px]"
+        >
+          Trust score
+        </text>
+        {[0, 50, 100].map((tick) => {
+          const y = pad.top + (1 - tick / max) * plotH;
+          return (
+            <g key={tick}>
+              <line
+                x1={pad.left}
+                x2={width - pad.right}
+                y1={y}
+                y2={y}
+                stroke="currentColor"
+                className="text-border"
+                strokeWidth={1}
+              />
+              <text x={pad.left - 6} y={y + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">
+                {tick}
+              </text>
+            </g>
+          );
+        })}
+        {trends.map((point, index) => {
+          const value = point.trustScore ?? 0;
+          const h = (value / max) * plotH;
+          const barW = Math.max(8, plotW / trends.length - 6);
+          const x = pad.left + index * (plotW / trends.length) + 3;
+          return (
+            <g key={point.period}>
+              <rect
+                x={x}
+                y={pad.top + plotH - h}
+                width={barW}
+                height={Math.max(2, h)}
+                rx={3}
+                fill="currentColor"
+                className="text-foreground/70"
+              />
+              <text
+                x={x + barW / 2}
+                y={pad.top + plotH - h - 4}
+                textAnchor="middle"
+                className="fill-muted-foreground text-[8px]"
+              >
+                {value.toFixed(0)}
+              </text>
+              <text
+                x={x + barW / 2}
+                y={height - 10}
+                textAnchor="middle"
+                className="fill-muted-foreground text-[8px]"
+              >
+                {point.period.slice(0, 7)}
+              </text>
+            </g>
+          );
+        })}
+        <text x={width / 2} y={height - 2} textAnchor="middle" className="fill-muted-foreground text-[10px]">
+          Period
+        </text>
+      </svg>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        Latest failed checks: {trends.at(-1)?.failedChecks ?? 0}
+        Latest failed checks: {latest?.failedChecks ?? 0}
+        {latest?.freshness != null ? ` · Freshness ${latest.freshness}` : ""}
       </p>
     </div>
   );

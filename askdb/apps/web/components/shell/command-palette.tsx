@@ -70,6 +70,13 @@ export function CommandPalette() {
         href: "/analytics-builder",
       },
       {
+        id: "graph-knowledge",
+        label: "Knowledge Hub",
+        hint: "Upload documents and retrieve cited context",
+        group: "Semantic Graph",
+        href: "/knowledge",
+      },
+      {
         id: "graph-ontology",
         label: "Open Semantic Galaxy",
         hint: "Jump to the ontology knowledge graph",

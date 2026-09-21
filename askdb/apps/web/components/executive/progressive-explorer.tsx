@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, Layers3, TrendingUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, Home, Layers3, RotateCcw, TrendingUp } from "lucide-react";
 import * as React from "react";
 
 import type { ExecutiveIntelligence } from "@/components/executive/types";
@@ -69,6 +69,7 @@ export function ProgressiveExplorer({
   onMakeChange: (make: string) => void;
 }) {
   const isAutomotive = industry === "automotive";
+  const [selectedState, setSelectedState] = React.useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = React.useState<RegionPoint | null>(null);
   const [selectedDealer, setSelectedDealer] = React.useState<DealerRow | null>(null);
   const [selectedBrand, setSelectedBrand] = React.useState<string | null>(null);
@@ -105,6 +106,7 @@ export function ProgressiveExplorer({
   // Sync explorer when external filter bar changes
   React.useEffect(() => {
     if (!regionFilter) {
+      setSelectedState(null);
       setSelectedRegion(null);
       setSelectedDealer(null);
       setSelectedBrand(null);
@@ -141,6 +143,30 @@ export function ProgressiveExplorer({
     return list;
   }, [regions.data, metric]);
 
+  const stateBuckets = React.useMemo(() => {
+    const map = new Map<
+      string,
+      { state: string; revenue: number; units: number; cities: RegionPoint[] }
+    >();
+    for (const row of regionRows) {
+      const state = inferState(row.regionName, row.city);
+      const entry = map.get(state) ?? { state, revenue: 0, units: 0, cities: [] };
+      entry.revenue += row.revenue;
+      entry.units += row.unitsSold;
+      entry.cities.push(row);
+      map.set(state, entry);
+    }
+    return [...map.values()].sort((a, b) =>
+      metric === "revenue" ? b.revenue - a.revenue : b.units - a.units,
+    );
+  }, [regionRows, metric]);
+
+  const cityRows = React.useMemo(() => {
+    if (!selectedState) return [];
+    const bucket = stateBuckets.find((item) => item.state === selectedState);
+    return bucket?.cities ?? [];
+  }, [selectedState, stateBuckets]);
+
   const brandGroups = React.useMemo(() => {
     const source = models.data ?? [];
     const map = new Map<string, { make: string; units: number; revenue: number; models: ModelRow[] }>();
@@ -169,7 +195,17 @@ export function ProgressiveExplorer({
   const revenueMetric =
     data.chartMetrics.find((m) => /revenue|premium|sales/i.test(m)) ?? data.chartMetrics[0];
 
+  function selectState(state: string) {
+    setSelectedState(state);
+    setSelectedRegion(null);
+    setSelectedDealer(null);
+    setSelectedBrand(null);
+    onRegionChange("");
+    onMakeChange("");
+  }
+
   function selectRegion(point: RegionPoint) {
+    setSelectedState(inferState(point.regionName, point.city));
     setSelectedRegion(point);
     setSelectedDealer(null);
     setSelectedBrand(null);
@@ -186,8 +222,17 @@ export function ProgressiveExplorer({
     onMakeChange(make);
   }
 
-  function resetTo(target: "all" | "region" | "dealer") {
+  function resetTo(target: "all" | "state" | "region" | "dealer") {
     if (target === "all") {
+      setSelectedState(null);
+      setSelectedRegion(null);
+      setSelectedDealer(null);
+      setSelectedBrand(null);
+      onRegionChange("");
+      onMakeChange("");
+      return;
+    }
+    if (target === "state") {
       setSelectedRegion(null);
       setSelectedDealer(null);
       setSelectedBrand(null);
@@ -203,6 +248,24 @@ export function ProgressiveExplorer({
     }
     setSelectedBrand(null);
     onMakeChange("");
+  }
+
+  function goBack() {
+    if (selectedBrand) {
+      resetTo("dealer");
+      return;
+    }
+    if (selectedDealer) {
+      resetTo("region");
+      return;
+    }
+    if (selectedRegion) {
+      resetTo("state");
+      return;
+    }
+    if (selectedState) {
+      resetTo("all");
+    }
   }
 
   // Insurance: hierarchical bars from breakdowns only
@@ -221,27 +284,55 @@ export function ProgressiveExplorer({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb
+          state={selectedState}
           region={selectedRegion?.regionName}
           dealer={selectedDealer?.dealerName}
           brand={selectedBrand}
           onReset={resetTo}
         />
-        <div className="inline-flex rounded-full border border-border/70 bg-muted/30 p-0.5 text-[11px]">
-          {(["revenue", "units"] as const).map((option) => (
-            <button
-              key={option}
-              type="button"
-              className={cn(
-                "rounded-full px-3 py-1 capitalize",
-                metric === option
-                  ? "bg-background font-medium text-foreground shadow-sm"
-                  : "text-muted-foreground",
-              )}
-              onClick={() => setMetric(option)}
-            >
-              {option}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-full border border-border/70 bg-muted/30 p-0.5 text-[11px]">
+            {(["revenue", "units"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={cn(
+                  "rounded-full px-3 py-1 capitalize",
+                  metric === option
+                    ? "bg-background font-medium text-foreground shadow-sm"
+                    : "text-muted-foreground",
+                )}
+                onClick={() => setMetric(option)}
+              >
+                {option === "revenue" ? "Revenue (₹)" : "Units"}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2.5 py-1 text-[11px] hover:bg-muted/40"
+            onClick={goBack}
+            disabled={!selectedState && !selectedRegion}
+          >
+            <ChevronLeft className="size-3.5" />
+            Back
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2.5 py-1 text-[11px] hover:bg-muted/40"
+            onClick={() => resetTo("all")}
+          >
+            <RotateCcw className="size-3.5" />
+            Reset view
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2.5 py-1 text-[11px] hover:bg-muted/40"
+            onClick={() => resetTo("all")}
+          >
+            <Home className="size-3.5" />
+            Home
+          </button>
         </div>
       </div>
 
@@ -250,26 +341,45 @@ export function ProgressiveExplorer({
       </p>
 
       {!selectedRegion ? (
-        <HeatmapList
-          title="Revenue by Region"
-          subtitle="Click a region to drill into dealers and product mix"
-          rows={regionRows.map((r) => ({
-            id: String(r.regionId),
-            label: r.regionName,
-            detail: r.city || `${r.dealerCount} dealers`,
-            value: metric === "revenue" ? r.revenue : r.unitsSold,
-            formatted: metric === "revenue" ? r.revenueFormatted : r.unitsFormatted,
-            meta: r.topMake ? `Top brand · ${r.topMake}` : undefined,
-          }))}
-          onSelect={(id) => {
-            const point = regionRows.find((r) => String(r.regionId) === id);
-            if (point) selectRegion(point);
-          }}
-          presenterMode={Boolean(presenterMode)}
-          loading={regions.isPending}
-          error={regions.isError ? "Could not load regional performance." : null}
-          accent={CHART_SERIES.primary}
-        />
+        selectedState ? (
+          <GeoHeatmap
+            title={`Cities in ${selectedState}`}
+            subtitle="Click a city or market to open dealers and product mix"
+            unit={metric === "revenue" ? "Revenue (₹)" : "Units sold"}
+            cells={cityRows.map((r) => ({
+              id: String(r.regionId),
+              label: r.city || r.regionName,
+              detail: r.regionName,
+              value: metric === "revenue" ? r.revenue : r.unitsSold,
+              formatted: metric === "revenue" ? r.revenueFormatted : r.unitsFormatted,
+            }))}
+            onSelect={(id) => {
+              const point = cityRows.find((r) => String(r.regionId) === id);
+              if (point) selectRegion(point);
+            }}
+            loading={regions.isPending}
+            error={regions.isError ? "Could not load regional performance." : null}
+          />
+        ) : (
+          <GeoHeatmap
+            title="Revenue heatmap by state"
+            subtitle="Click a state to drill into cities, then dealers"
+            unit={metric === "revenue" ? "Revenue (₹)" : "Units sold"}
+            cells={stateBuckets.map((s) => ({
+              id: s.state,
+              label: s.state,
+              detail: `${s.cities.length} markets`,
+              value: metric === "revenue" ? s.revenue : s.units,
+              formatted:
+                metric === "revenue"
+                  ? formatCompact(s.revenue, true)
+                  : formatCompact(s.units, false),
+            }))}
+            onSelect={selectState}
+            loading={regions.isPending}
+            error={regions.isError ? "Could not load regional performance." : null}
+          />
+        )
       ) : (
         <div className="space-y-4">
           <ContextBanner
@@ -458,15 +568,17 @@ function InsuranceExplorer({
 }
 
 function Breadcrumb({
+  state,
   region,
   dealer,
   brand,
   onReset,
 }: {
+  state?: string | null;
   region?: string;
   dealer?: string;
   brand?: string | null;
-  onReset: (target: "all" | "region" | "dealer") => void;
+  onReset: (target: "all" | "state" | "region" | "dealer") => void;
 }) {
   return (
     <nav aria-label="Drill path" className="flex flex-wrap items-center gap-1 text-xs">
@@ -474,13 +586,28 @@ function Breadcrumb({
         type="button"
         className={cn(
           "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-medium",
-          !region ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground",
+          !state ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground",
         )}
         onClick={() => onReset("all")}
       >
         <Layers3 className="size-3.5" />
-        All regions
+        All India
       </button>
+      {state ? (
+        <>
+          <ChevronRight className="size-3 text-muted-foreground" />
+          <button
+            type="button"
+            className={cn(
+              "rounded-full px-2.5 py-1 font-medium",
+              !region ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => onReset("state")}
+          >
+            {state}
+          </button>
+        </>
+      ) : null}
       {region ? (
         <>
           <ChevronRight className="size-3 text-muted-foreground" />
@@ -739,30 +866,197 @@ function MiniTrend({
   const points = series.slice(-14);
   const values = points.map((p) => Number(p.values[metric] || 0));
   const max = Math.max(...values, 1);
+  const [hover, setHover] = React.useState<number | null>(null);
 
   if (!points.length) return null;
 
+  const width = 640;
+  const height = presenterMode ? 180 : 140;
+  const pad = { top: 16, right: 12, bottom: 36, left: 52 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+
   return (
     <div className="rounded-2xl border border-border/60 bg-surface-raised/80 p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <TrendingUp className="size-3.5 text-info" />
-        <h3 className={cn("font-semibold", presenterMode ? "text-base" : "text-sm")}>{title}</h3>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="size-3.5 text-info" />
+          <h3 className={cn("font-semibold", presenterMode ? "text-base" : "text-sm")}>{title}</h3>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Unit · {prettyMetric(metric)}</p>
       </div>
-      <div className={cn("flex items-end gap-1", presenterMode ? "h-32" : "h-24")}>
-        {points.map((point, index) => {
-          const value = values[index] ?? 0;
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[140px] w-full" role="img" aria-label={title}>
+        <text
+          x={12}
+          y={height / 2}
+          transform={`rotate(-90 12 ${height / 2})`}
+          className="fill-muted-foreground text-[10px]"
+          textAnchor="middle"
+        >
+          {prettyMetric(metric)}
+        </text>
+        {[0, 0.5, 1].map((t) => {
+          const y = pad.top + (1 - t) * plotH;
           return (
-            <div
-              key={point.period}
-              className="flex-1 rounded-t bg-info/70"
-              style={{ height: `${Math.max((value / max) * 100, value > 0 ? 4 : 0)}%` }}
-              title={`${point.period}: ${value.toLocaleString()}`}
-            />
+            <g key={t}>
+              <line
+                x1={pad.left}
+                x2={width - pad.right}
+                y1={y}
+                y2={y}
+                stroke="currentColor"
+                className="text-border"
+                strokeWidth={1}
+              />
+              <text x={pad.left - 6} y={y + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">
+                {formatCompact(max * t, /revenue|premium|sales/i.test(metric))}
+              </text>
+            </g>
           );
         })}
-      </div>
+        {points.map((point, index) => {
+          const value = values[index] ?? 0;
+          const h = (value / max) * plotH;
+          const barW = Math.max(6, plotW / points.length - 4);
+          const x = pad.left + index * (plotW / points.length) + 2;
+          return (
+            <g
+              key={point.period}
+              onMouseEnter={() => setHover(index)}
+              onMouseLeave={() => setHover(null)}
+            >
+              <rect
+                x={x}
+                y={pad.top + plotH - h}
+                width={barW}
+                height={Math.max(2, h)}
+                rx={3}
+                fill={CHART_SERIES.primary}
+                opacity={hover === index ? 1 : 0.82}
+              />
+              {index % Math.ceil(points.length / 6) === 0 ? (
+                <text
+                  x={x + barW / 2}
+                  y={height - 10}
+                  textAnchor="middle"
+                  className="fill-muted-foreground text-[8px]"
+                >
+                  {point.period.slice(0, 7)}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
+        <text x={width / 2} y={height - 2} textAnchor="middle" className="fill-muted-foreground text-[10px]">
+          Period
+        </text>
+      </svg>
+      {hover != null ? (
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {points[hover]?.period}: {prettyMetric(metric)} {values[hover]?.toLocaleString()}
+        </p>
+      ) : (
+        <p className="mt-1 text-[11px] text-muted-foreground">Hover a bar for the exact value.</p>
+      )}
     </div>
   );
+}
+
+function GeoHeatmap({
+  title,
+  subtitle,
+  unit,
+  cells,
+  onSelect,
+  loading,
+  error,
+}: {
+  title: string;
+  subtitle: string;
+  unit: string;
+  cells: Array<{ id: string; label: string; detail: string; value: number; formatted: string }>;
+  onSelect: (id: string) => void;
+  loading?: boolean;
+  error?: string | null;
+}) {
+  const max = Math.max(...cells.map((c) => c.value), 1);
+  return (
+    <div className="rounded-2xl border border-border/60 bg-surface-raised/80 p-4 shadow-sm">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{subtitle}</p>
+        </div>
+        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{unit}</p>
+      </div>
+      <div className="mb-3 flex items-center gap-2 text-[10px] text-muted-foreground">
+        <span>Low</span>
+        <span className="h-2 flex-1 rounded-full bg-gradient-to-r from-info/15 to-info" />
+        <span>High</span>
+      </div>
+      {loading ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">Loading heatmap…</p>
+      ) : error ? (
+        <p className="py-6 text-center text-sm text-danger">{error}</p>
+      ) : !cells.length ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">No geography in this window.</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {cells.map((cell) => {
+            const intensity = 0.18 + (cell.value / max) * 0.82;
+            return (
+              <button
+                key={cell.id}
+                type="button"
+                title={`${cell.label}: ${cell.formatted} ${unit}`}
+                className="rounded-xl border border-border/50 p-3 text-left transition hover:ring-2 hover:ring-primary/40"
+                style={{ backgroundColor: `color-mix(in oklab, var(--info, #38bdf8) ${Math.round(intensity * 55)}%, transparent)` }}
+                onClick={() => onSelect(cell.id)}
+              >
+                <p className="truncate text-sm font-semibold">{cell.label}</p>
+                <p className="mt-1 text-xs tabular-nums">{cell.formatted}</p>
+                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{cell.detail}</p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <p className="mt-3 text-[10px] text-muted-foreground">Legend: cell color intensity = relative {unit.toLowerCase()}.</p>
+    </div>
+  );
+}
+
+function inferState(regionName: string, city: string | null): string {
+  const hay = `${regionName} ${city ?? ""}`.toLowerCase();
+  const table: Array<[string, string]> = [
+    ["mumbai", "Maharashtra"],
+    ["pune", "Maharashtra"],
+    ["thane", "Maharashtra"],
+    ["nagpur", "Maharashtra"],
+    ["delhi", "Delhi"],
+    ["noida", "Uttar Pradesh"],
+    ["lucknow", "Uttar Pradesh"],
+    ["bengaluru", "Karnataka"],
+    ["bangalore", "Karnataka"],
+    ["chennai", "Tamil Nadu"],
+    ["hyderabad", "Telangana"],
+    ["kolkata", "West Bengal"],
+    ["ahmedabad", "Gujarat"],
+    ["surat", "Gujarat"],
+    ["jaipur", "Rajasthan"],
+    ["kochi", "Kerala"],
+    ["chandigarh", "Chandigarh"],
+    ["gurgaon", "Haryana"],
+    ["gurugram", "Haryana"],
+  ];
+  for (const [needle, state] of table) {
+    if (hay.includes(needle)) return state;
+  }
+  return regionName;
+}
+
+function prettyMetric(metric: string): string {
+  return metric.replace(/_/g, " ");
 }
 
 function formatCompact(value: number, money: boolean): string {

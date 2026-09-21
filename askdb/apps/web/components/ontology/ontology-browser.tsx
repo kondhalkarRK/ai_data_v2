@@ -16,6 +16,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Binary,
   GitBranch,
+  Maximize2,
+  Minimize2,
   Network,
   Orbit,
   Search,
@@ -169,6 +171,7 @@ function OntologyBrowserInner({
   const [kindFilter, setKindFilter] = React.useState<OntologyKindFilter>("all");
   const [overlay, setOverlay] = React.useState<ContextOverlay>("business");
   const [journeyId, setJourneyId] = React.useState<string | null>(null);
+  const [fullScreen, setFullScreen] = React.useState(false);
 
   const positioned = React.useMemo(
     () => layoutGalaxy(snapshot, mode, metric),
@@ -359,7 +362,7 @@ function OntologyBrowserInner({
       void fitView({ padding: 0.22, duration: 650 });
     }, 40);
     return () => window.clearTimeout(timer);
-  }, [mode, metric, snapshot, fitView]);
+  }, [mode, metric, snapshot, fitView, fullScreen]);
 
   const focusNode = React.useCallback(
     (nodeId: string) => {
@@ -394,11 +397,25 @@ function OntologyBrowserInner({
     return () => window.clearTimeout(timer);
   }, [initialFocusId, snapshot.nodes, focusNode]);
 
+  React.useEffect(() => {
+    if (!fullScreen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setFullScreen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullScreen]);
+
   const positionedForClusters: PositionedNode[] = positioned;
 
   return (
     <div
-      className="semantic-galaxy relative flex h-[min(88vh,980px)] min-h-[680px] w-full flex-col"
+      className={cn(
+        "semantic-galaxy relative flex w-full flex-col",
+        fullScreen
+          ? "fixed inset-0 z-[80] h-dvh min-h-0 rounded-none"
+          : "h-[min(88vh,980px)] min-h-[680px]",
+      )}
       data-motion={motionEnabled ? "on" : "off"}
     >
       {motionEnabled ? <ParticleField /> : null}
@@ -530,6 +547,21 @@ function OntologyBrowserInner({
           ) : null}
 
           <div className="ml-auto flex items-center gap-1">
+            <Button
+              type="button"
+              size="sm"
+              className="galaxy-hint h-8 gap-1.5 text-xs"
+              data-hint={
+                fullScreen
+                  ? "Exit full screen and return to the page layout."
+                  : "Expand the graph to fill the screen for exploration."
+              }
+              aria-pressed={fullScreen}
+              onClick={() => setFullScreen((value) => !value)}
+            >
+              {fullScreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+              {fullScreen ? "Exit full screen" : "Full Screen"}
+            </Button>
             <Button
               type="button"
               size="sm"

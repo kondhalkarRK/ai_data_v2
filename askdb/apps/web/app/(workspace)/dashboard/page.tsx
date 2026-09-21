@@ -8,7 +8,6 @@ import * as React from "react";
 import { useMemo, useState } from "react";
 
 import { AiIntelligenceSection } from "@/components/executive/ai-intelligence";
-import { AskDashboardAi } from "@/components/executive/ask-dashboard-ai";
 import { BusinessHealthPanel } from "@/components/executive/business-health";
 import { KpiCardsGrid } from "@/components/executive/kpi-cards";
 import { ProgressiveExplorer } from "@/components/executive/progressive-explorer";
@@ -17,7 +16,7 @@ import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { PageShell, Section } from "@/components/ui/page-shell";
+import { PageShell } from "@/components/ui/page-shell";
 import { useActiveIndustry } from "@/hooks/use-session";
 import { useTrustSnapshot } from "@/hooks/use-trust-snapshot";
 import { apiClient } from "@/lib/api-client";
@@ -76,7 +75,6 @@ export default function DashboardPage() {
   const data = bundle.data;
   const highlightCards = useMemo(() => {
     if (!data) return [];
-    // Prefer primary KPI cards; append derived top region / brand when missing.
     const cards = [...data.cards];
     const hasTopRegion = cards.some((c) => /top.?region/i.test(c.label) || c.id.includes("region"));
     const hasTopBrand = cards.some(
@@ -122,10 +120,7 @@ export default function DashboardPage() {
     <PageShell>
       <PageHeader
         title={data?.title ?? "Executive Intelligence"}
-        description={
-          data?.tagline ??
-          "Guided progressive exploration — Region → Dealer → Brand → Model."
-        }
+        description="Primary KPIs first. Drill the heatmap, then read grounded insights."
         className={presenterMode ? "origin-left scale-110" : undefined}
         actions={
           <Button
@@ -144,44 +139,6 @@ export default function DashboardPage() {
         }
       />
 
-      <Card className="mb-6 card-secondary shadow-none">
-        <CardContent className="flex flex-wrap items-end gap-3 pt-4">
-          <FilterSelect
-            label="Period"
-            value={windowId}
-            options={(filters.data?.windows ?? []).map((w) => ({ value: w.id, label: w.label }))}
-            onChange={setWindowId}
-          />
-          {industry === "insurance" ? (
-            <FilterSelect
-              label="Line of business"
-              value={lob}
-              options={[
-                { value: "", label: "All" },
-                ...(filters.data?.lobs ?? []).map((item) => ({ value: item, label: item })),
-              ]}
-              onChange={setLob}
-            />
-          ) : null}
-          <p className="pb-2 text-[11px] text-muted-foreground">
-            Region and brand filters update automatically as you drill in the explorer.
-            {region || make ? (
-              <button
-                type="button"
-                className="ml-2 font-medium text-primary hover:underline"
-                onClick={() => {
-                  setRegion("");
-                  setMake("");
-                  setLob("");
-                }}
-              >
-                Clear focus
-              </button>
-            ) : null}
-          </p>
-        </CardContent>
-      </Card>
-
       {bundle.isPending ? (
         <LoadingState title="Building Executive Intelligence" />
       ) : bundle.isError ? (
@@ -195,7 +152,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       ) : data ? (
-        <div className={cn("space-y-8", presenterMode && "text-base")}>
+        <div className={cn("space-y-5", presenterMode && "text-base")}>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p>
               {data.windowLabel}
@@ -213,97 +170,143 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <Section
-            title="Executive snapshot"
-            description="Start here — then drill into regions below."
-          >
-            <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
-              {trustSnapshot.data?.available && trustSnapshot.data.score != null ? (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                  aria-expanded={trustOpen}
-                  onClick={() => setTrustOpen((v) => !v)}
-                >
-                  Data Trust: {trustSnapshot.data.label} — {trustSnapshot.data.score.toFixed(0)}/100
-                  <ChevronDown className={cn("size-3.5", trustOpen && "rotate-180")} />
-                </button>
-              ) : data.dataQuality.healthyPct != null ? (
-                <p className="text-xs text-muted-foreground">
-                  Data Quality {data.dataQuality.healthyPct.toFixed(1)}% · {data.dataQuality.label}
-                </p>
-              ) : null}
+          <KpiCardsGrid
+            cards={highlightCards}
+            compareLabel={data.compareLabel}
+            onExplore={explore}
+            presenterMode={presenterMode}
+          />
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 space-y-5">
+              <section className="rounded-2xl border border-border/60 bg-surface-raised/80 p-4 shadow-sm">
+                <div className="mb-3">
+                  <h2 className="text-base font-semibold tracking-tight">Progressive explorer</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Region → State → City. Click a cell to drill. Use Home, Back, or Reset if you go too deep.
+                  </p>
+                </div>
+                <ProgressiveExplorer
+                  data={data}
+                  industry={industry}
+                  presenterMode={presenterMode}
+                  regionFilter={region}
+                  makeFilter={make}
+                  onRegionChange={setRegion}
+                  onMakeChange={setMake}
+                />
+              </section>
+
+              <section className="rounded-2xl border border-border/60 bg-surface-raised/80 p-4 shadow-sm">
+                <h2 className="mb-3 text-base font-semibold tracking-tight">AI Intelligence</h2>
+                <AiIntelligenceSection
+                  insights={data.insights}
+                  exploreBasePath={data.exploreBasePath}
+                />
+              </section>
             </div>
-            {trustOpen && trustSnapshot.data?.components?.length ? (
-              <div className="mb-3 card-supporting px-3 py-2 text-xs">
-                <p className="mb-2 text-muted-foreground">
-                  {trustSnapshot.data.formulaNote ||
-                    "Sourced from Data Trust Center — same breakdown as the Trust Score hero."}
+
+            <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+              <div className="rounded-2xl border border-border/60 bg-surface-raised/90 p-4 shadow-sm">
+                <h2 className="text-sm font-semibold tracking-tight">Period & filters</h2>
+                <p className="mt-1 mb-3 text-[11px] text-muted-foreground">
+                  Year window and line of business. Region focus follows the heatmap.
                 </p>
-                <ul className="space-y-1">
-                  {trustSnapshot.data.components.map((c) => (
-                    <li key={c.id} className="flex justify-between gap-2">
-                      <span>{c.label}</span>
-                      <span className="tabular-nums text-muted-foreground">
-                        {c.score.toFixed(0)} · w {(c.weight * 100).toFixed(0)}%
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href="/data-quality"
-                  className="mt-2 inline-block font-medium text-teal underline-offset-2 hover:underline"
-                >
-                  Open Data Trust Center
-                </Link>
+                <div className="space-y-3">
+                  <FilterSelect
+                    label="Period"
+                    value={windowId}
+                    options={(filters.data?.windows ?? []).map((w) => ({
+                      value: w.id,
+                      label: w.label,
+                    }))}
+                    onChange={setWindowId}
+                  />
+                  {industry === "insurance" ? (
+                    <FilterSelect
+                      label="Line of business"
+                      value={lob}
+                      options={[
+                        { value: "", label: "All" },
+                        ...(filters.data?.lobs ?? []).map((item) => ({ value: item, label: item })),
+                      ]}
+                      onChange={setLob}
+                    />
+                  ) : null}
+                  {region || make || lob ? (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-primary hover:underline"
+                      onClick={() => {
+                        setRegion("");
+                        setMake("");
+                        setLob("");
+                      }}
+                    >
+                      Clear focus
+                    </button>
+                  ) : null}
+                </div>
               </div>
-            ) : null}
-            <BusinessHealthPanel health={data.health} />
-            {data.dataQuality.notices.length ? (
-              <div className="mt-3 rounded-[var(--radius-card)] border border-warning/30 bg-warning/8 px-3 py-2 text-sm">
-                <p className="font-medium">Data quality notice</p>
-                <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-                  {data.dataQuality.notices.map((notice) => (
-                    <li key={notice}>{notice}</li>
-                  ))}
-                </ul>
+
+              <div className="rounded-2xl border border-border/60 bg-surface-raised/90 p-4 shadow-sm">
+                <h2 className="mb-3 text-sm font-semibold tracking-tight">Business Health</h2>
+                <BusinessHealthPanel health={data.health} />
+                <div className="mt-3">
+                  {trustSnapshot.data?.available && trustSnapshot.data.score != null ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                      aria-expanded={trustOpen}
+                      onClick={() => setTrustOpen((v) => !v)}
+                    >
+                      Data Trust: {trustSnapshot.data.label} — {trustSnapshot.data.score.toFixed(0)}
+                      /100
+                      <ChevronDown className={cn("size-3.5", trustOpen && "rotate-180")} />
+                    </button>
+                  ) : data.dataQuality.healthyPct != null ? (
+                    <p className="text-xs text-muted-foreground">
+                      Data Quality {data.dataQuality.healthyPct.toFixed(1)}% · {data.dataQuality.label}
+                    </p>
+                  ) : null}
+                </div>
+                {trustOpen && trustSnapshot.data?.components?.length ? (
+                  <div className="mt-3 card-supporting px-3 py-2 text-xs">
+                    <p className="mb-2 text-muted-foreground">
+                      {trustSnapshot.data.formulaNote ||
+                        "Sourced from Data Trust Center — same breakdown as the Trust Score hero."}
+                    </p>
+                    <ul className="space-y-1">
+                      {trustSnapshot.data.components.map((c) => (
+                        <li key={c.id} className="flex justify-between gap-2">
+                          <span>{c.label}</span>
+                          <span className="tabular-nums text-muted-foreground">
+                            {c.score.toFixed(0)} · w {(c.weight * 100).toFixed(0)}%
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      href="/data-quality"
+                      className="mt-2 inline-block font-medium text-teal underline-offset-2 hover:underline"
+                    >
+                      Open Data Trust Center
+                    </Link>
+                  </div>
+                ) : null}
+                {data.dataQuality.notices.length ? (
+                  <div className="mt-3 rounded-[var(--radius-card)] border border-warning/30 bg-warning/8 px-3 py-2 text-sm">
+                    <p className="font-medium">Data quality notice</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                      {data.dataQuality.notices.map((notice) => (
+                        <li key={notice}>{notice}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-            <div className="mt-4">
-              <KpiCardsGrid
-                cards={highlightCards}
-                compareLabel={data.compareLabel}
-                onExplore={explore}
-                presenterMode={presenterMode}
-              />
-            </div>
-          </Section>
-
-          <Section
-            title="Progressive explorer"
-            description="Region → Dealer → Brand → Model. Each click reveals the next story."
-          >
-            <ProgressiveExplorer
-              data={data}
-              industry={industry}
-              presenterMode={presenterMode}
-              regionFilter={region}
-              makeFilter={make}
-              onRegionChange={setRegion}
-              onMakeChange={setMake}
-            />
-          </Section>
-
-          <Section title="AI Intelligence" description="Grounded risks, opportunities, and recommendations.">
-            <AiIntelligenceSection
-              insights={data.insights}
-              exploreBasePath={data.exploreBasePath}
-            />
-          </Section>
-
-          <Section title="Ask the dashboard">
-            <AskDashboardAi suggestions={data.suggestedQuestions} />
-          </Section>
+            </aside>
+          </div>
         </div>
       ) : null}
     </PageShell>
@@ -322,7 +325,7 @@ function FilterSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex min-w-[160px] flex-col gap-1 text-xs text-muted-foreground">
+    <label className="flex w-full flex-col gap-1 text-xs text-muted-foreground">
       {label}
       <select
         className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"

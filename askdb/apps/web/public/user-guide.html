@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ask DB — User Guide</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b1220;
+        --panel: #121a2b;
+        --ink: #f4f7fb;
+        --mute: #9aa8bc;
+        --line: #243049;
+        --accent: #5b8def;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f6f8fc;
+          --panel: #fff;
+          --ink: #122033;
+          --mute: #5b6b80;
+          --line: #e2e8f4;
+          --accent: #2563eb;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 16px/1.55 system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      header {
+        padding: 2.5rem 1.25rem 1.5rem;
+        max-width: 880px;
+        margin: 0 auto;
+      }
+      header p { color: var(--mute); max-width: 40rem; }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        max-width: 880px;
+        margin: 0 auto 2rem;
+        padding: 0 1.25rem;
+      }
+      nav a {
+        color: var(--accent);
+        text-decoration: none;
+        font-size: 0.85rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 0.3rem 0.75rem;
+        background: var(--panel);
+      }
+      main { max-width: 880px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 1.25rem 1.4rem;
+        margin-bottom: 1rem;
+      }
+      h2 { margin: 0 0 0.6rem; font-size: 1.15rem; }
+      ol, ul { color: var(--mute); }
+      code { font-size: 0.9em; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <p style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--accent);margin:0 0 .4rem">Enterprise analytics</p>
+      <h1 style="margin:0 0 .5rem">Ask DB User Guide</h1>
+      <p>
+        Governed self-serve analytics: certified metrics, ontology, documents, and natural-language
+        questions on one semantic layer. Open this file in a browser for demos.
+      </p>
+    </header>
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#exec">Executive Intelligence</a>
+      <a href="#builder">Analytics Builder</a>
+      <a href="#atlas">Semantic Atlas</a>
+      <a href="#hub">Knowledge Hub</a>
+      <a href="#trust">Data Trust</a>
+      <a href="#chat">AI Chat</a>
+      <a href="#faq">FAQs</a>
+    </nav>
+    <main>
+      <section id="overview">
+        <h2>Platform overview</h2>
+        <p>Ask DB is not a second Power BI. It is the contract for what Revenue, Dealer, and Claims mean — then Chat, Builder, and dashboards all use that contract.</p>
+      </section>
+      <section id="exec">
+        <h2>Executive Intelligence</h2>
+        <ul>
+          <li>KPI cards sit at the top — the first thing leadership sees.</li>
+          <li>Period and Business Health live in the right panel.</li>
+          <li>Progressive explorer is a heatmap: Region → State → City. Use Home, Back, and Reset view so you never get stuck.</li>
+          <li>Ask detailed questions in AI Chat, not on this page.</li>
+        </ul>
+      </section>
+      <section id="builder">
+        <h2>Analytics Builder</h2>
+        <p>Left panel: Metrics, Dimensions, Advanced Analytics. Top: filters and query summary. Center: large chart/table preview. Run Query compiles governed SQL. Save analyses for reuse.</p>
+      </section>
+      <section id="atlas">
+        <h2>Semantic Atlas &amp; exploring ontology</h2>
+        <p>Glossary, semantic model, and Knowledge Graph. In the Ontology Browser, use search, map views, and <strong>Full Screen</strong> for exploration. Hover chips for what Lineage, Hierarchy, and other maps mean.</p>
+      </section>
+      <section id="hub">
+        <h2>Knowledge Hub &amp; uploading documents</h2>
+        <ol>
+          <li>Click <strong>Upload document</strong> (or Try Demo / sample files).</li>
+          <li>Wait until chunks appear.</li>
+          <li>Search the library or continue in AI Chat with citations.</li>
+        </ol>
+      </section>
+      <section id="trust">
+        <h2>Data Trust Center</h2>
+        <p>Trust score, quality trends (with axes and values), incidents, and schema drift. Use this before arguing about a KPI movement.</p>
+      </section>
+      <section id="chat">
+        <h2>AI Chat &amp; running analytics</h2>
+        <p>Ask in business language. The router chooses SQL, documents, or both. Prefer certified measures from the glossary. Stress-test with <code>docs/ai-testing-questions.md</code>.</p>
+      </section>
+      <section>
+        <h2>Common use cases</h2>
+        <ul>
+          <li>Board snapshot → heatmap drill → ontology path for Revenue.</li>
+          <li>Analyst compose in Builder without writing joins.</li>
+          <li>Policy question: Knowledge Hub + Chat citation.</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Best practices</h2>
+        <ul>
+          <li>Start from a certified metric, not a raw table.</li>
+          <li>Check Data Trust when a number surprises you.</li>
+          <li>Do not maintain a second definition of Revenue in Power BI if this layer is the contract.</li>
+        </ul>
+      </section>
+      <section id="faq">
+        <h2>FAQs</h2>
+        <p><strong>Does this replace Power BI?</strong> No. It is the source of truth Power BI should consume.</p>
+        <p><strong>Where did System Logs go?</strong> Admin only. Analysts use Query History.</p>
+        <p><strong>Why Knowledge Hub?</strong> Clearer than “Knowledge” — documents that give AI business context.</p>
+      </section>
+    </main>
+  </body>
+</html>

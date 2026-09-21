@@ -623,47 +623,47 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
         </div>
       </section>
 
-      <div className="relative space-y-4">
-        <div
-          className="grid grid-cols-1 gap-2 sm:grid-cols-3"
-          role="tablist"
-          aria-label="Builder sections"
-        >
-          {COMPOSER_TABS.map((tab) => {
-            const Icon = tab.icon;
-            const active = composerTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                className={cn(
-                  "flex h-[72px] items-center gap-3 rounded-2xl border px-4 text-left shadow-sm transition-colors",
-                  active
-                    ? "border-primary/50 bg-primary/10 text-foreground"
-                    : "border-border/60 bg-surface-raised/85 text-muted-foreground hover:bg-muted/40",
-                )}
-                onClick={() => setComposerTab(tab.id)}
-              >
-                <span
+      <div className="relative grid gap-4 lg:grid-cols-[17.5rem_minmax(0,1fr)]">
+        <aside className="space-y-2 lg:sticky lg:top-3 lg:self-start">
+          <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Configure
+          </p>
+          <div className="flex flex-col gap-1.5" role="tablist" aria-label="Builder sections">
+            {COMPOSER_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const active = composerTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
                   className={cn(
-                    "flex size-9 items-center justify-center rounded-xl border",
-                    active ? "border-primary/30 bg-background" : "border-border/50 bg-muted/30",
+                    "flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left shadow-sm transition-colors",
+                    active
+                      ? "border-primary/50 bg-primary/10 text-foreground"
+                      : "border-border/60 bg-surface-raised/85 text-muted-foreground hover:bg-muted/40",
                   )}
+                  onClick={() => setComposerTab(tab.id)}
                 >
-                  <Icon className="size-4" />
-                </span>
-                <span>
-                  <span className="block text-sm font-semibold text-foreground">{tab.label}</span>
-                  <span className="block text-[11px]">{tab.hint}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                  <span
+                    className={cn(
+                      "flex size-8 items-center justify-center rounded-xl border",
+                      active ? "border-primary/30 bg-background" : "border-border/50 bg-muted/30",
+                    )}
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-foreground">{tab.label}</span>
+                    <span className="block text-[11px]">{tab.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-        <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-4 shadow-sm">
+          <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-3 shadow-sm">
           {composerTab === "metrics" ? (
             <>
               <SelectedPills
@@ -754,7 +754,9 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
             </>
           ) : null}
         </section>
+        </aside>
 
+        <div className="min-w-0 space-y-4">
         <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex min-w-[220px] flex-1 items-center gap-2 text-[11px] text-muted-foreground">
@@ -1045,6 +1047,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
             loading={saved.isPending}
           />
         </main>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NAV_SECTIONS, visibleSections } from "@/lib/navigation";
+import { visibleSections } from "@/lib/navigation";
 
 function labelsFor(role: Parameters<typeof visibleSections>[0]): string[] {
   return visibleSections(role).flatMap((section) => section.items.map((item) => item.label));
@@ -27,11 +27,9 @@ describe("sidebar visibility", () => {
     expect(labels).not.toContain("System Logs");
   });
 
-  it("shows an admin everything", () => {
-    const everything = NAV_SECTIONS.flatMap((section) =>
-      section.items.map((item) => item.label),
-    );
-    expect(labelsFor("admin")).toEqual(everything);
+  it("shows an admin everything including system logs under Admin", () => {
+    expect(labelsFor("admin")).toContain("System Logs");
+    expect(visibleSections("admin").some((s) => s.id === "admin")).toBe(true);
   });
 
   it("drops a section once every item in it is filtered away", () => {

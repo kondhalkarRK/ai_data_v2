@@ -95,6 +95,12 @@ export function ResultChart({
 
   return (
     <div className={cn("space-y-3", className)}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold tracking-tight">
+          {yKey.replace(/_/g, " ")} by {xKey.replace(/_/g, " ")}
+        </p>
+        <p className="text-[10px] text-muted-foreground">Hover a point for exact values</p>
+      </div>
       <div className="flex flex-wrap items-end gap-2">
         <FieldSelect
           id="chart-x"
@@ -130,6 +136,7 @@ export function ResultChart({
           chartType={chartType}
           hover={hover}
           setHover={setHover}
+          xKey={xKey}
           yKey={yKey}
           anomalies={anomalies}
         />
@@ -177,6 +184,7 @@ function CartesianChart({
   chartType,
   hover,
   setHover,
+  xKey,
   yKey,
   anomalies,
 }: {
@@ -184,12 +192,13 @@ function CartesianChart({
   chartType: Exclude<ChartKind, "pie">;
   hover: number | null;
   setHover: (value: number | null) => void;
+  xKey: string;
   yKey: string;
   anomalies: AnomalyMarker[];
 }) {
   const width = 640;
   const height = 260;
-  const pad = { top: 16, right: 16, bottom: 40, left: 48 };
+  const pad = { top: 28, right: 16, bottom: 52, left: 58 };
   const maxY = Math.max(...points.map((p) => p.y), 1);
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
@@ -298,7 +307,7 @@ function CartesianChart({
               {index % Math.ceil(points.length / 6) === 0 ? (
                 <text
                   x={point.cx}
-                  y={height - 14}
+                  y={height - 22}
                   textAnchor="middle"
                   className="fill-muted-foreground text-[9px]"
                 >
@@ -308,6 +317,18 @@ function CartesianChart({
             </g>
           );
         })}
+        <text
+          x={12}
+          y={height / 2}
+          transform={`rotate(-90 12 ${height / 2})`}
+          textAnchor="middle"
+          className="fill-muted-foreground text-[10px]"
+        >
+          {yKey.replace(/_/g, " ")}
+        </text>
+        <text x={width / 2} y={height - 6} textAnchor="middle" className="fill-muted-foreground text-[10px]">
+          {xKey.replace(/_/g, " ")}
+        </text>
       </svg>
       {hover != null ? (
         <HoverCard

@@ -100,10 +100,10 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         href: "/knowledge",
-        label: "Knowledge",
+        label: "Knowledge Hub",
         icon: BookOpen,
         minRole: "viewer",
-        description: "Documents, ingestion jobs and retrieval sources.",
+        description: "Upload documents and retrieve cited business context for AI Chat.",
       },
     ],
   },
@@ -132,12 +132,18 @@ export const NAV_SECTIONS: NavSection[] = [
         minRole: "analyst",
         description: "Cost analytics and LLM sampling controls.",
       },
+    ],
+  },
+  {
+    id: "admin",
+    label: "Admin",
+    items: [
       {
         href: "/system-logs",
         label: "System Logs",
         icon: ScrollText,
         minRole: "admin",
-        description: "Execution logs, errors and performance stages.",
+        description: "Operator diagnostics — not a business report. Prefer Query History for analysts.",
       },
     ],
   },
