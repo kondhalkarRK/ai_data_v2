@@ -1,45 +1,30 @@
-need something for home page or hero page
-data soruce looks good no change
+i think we need redesing Executive Inglinces UI
+filter of years and Bussiners health should be appered on right pane, and main KPI card should be dsiplayed in on top betwen left & right pane
 
-under exe intellinge
-add two more KPI cards to aling properly with 8 cards for both domain
-remove what if anaylsis
-under Perfomonce anaylitic revenue, unit sold graph shown but scale was missing
-can we make map kind graph for region, make, model, if region wise which dealer sales is more so far 
-that region maker logo should be displayed, if user click on that region there delear file data shown mean top selling car means units sold and reveune, and should have furhter drill down option
-so later we can show pop-up display option, if want those map graph very interactive(serach on web if can fit best out of it)
-
-Data Trust Center
-Remove Data Quality Trends under Techincal
-
-Semantic Core
-can we keep some intersting name for 'Semantic Core' instead of this
-now instead of 6 tab in 3 row, i want single row and only 3 tabs, Ontology browser, Semanitc mode(which as table attribute and joins that 1-1, 1-M like)
-and in bussiness glossary if doable represent in different way
-
-And one sidebar tab LLM Observerablit
-which should have two tab, Cost Analytics & LLM Controls
-under LLM controls - unlike we give under stremlit 
-ai_data_v2\config\llm_catalog
-user can have choose the llm model and based on that user can able to see how much question can they asked and all stuff, also add controls like temperture, p & t index (not sure what if doable add them) also add i icon and should what is use of those controls
-
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> 2026-09-14 12:25:43,133 INFO    [-] uvicorn.error: Shutting down
-2026-09-14 12:25:43,243 INFO    [-] uvicorn.error: Waiting for application shutdown.
-2026-09-14 12:25:43,249 INFO    [-] app.db.session: database registry stopped
-2026-09-14 12:25:43,249 INFO    [-] app.main: api stopped
-2026-09-14 12:25:43,250 INFO    [-] uvicorn.error: Application shutdown complete.
-2026-09-14 12:25:43,253 INFO    [-] uvicorn.error: Finished server process [25956]
+and current 'Progressive explorer' has line chart replace it will heatmap, and further if user click on any region it can furter drill down,
+also the bar chart if Trend in Mumbai central has no lable and axis mentioned
+and after i drill down, i dont have back button or rest chart button in UI
+think like pro BI devploer and arrange rest of chart nit and smooth with great UX experince,
+remove 'Ask the dashboard' from 'Executive Inglinces ' 
 
 
-which regions has highest suv selling
-SQL Generation Failed
-Reason: Missing mandatory filter value 'SUV' in SQL
-
-Try Again
-
-
-Top selling car in mumbai not answered
-
-top selling car in mumbai region it shown - the different answer
+Analytics Builder -
+in this also i want UI changes, currently metric, dim,adavnce anayltic place on top row,
+add them left col
+and filter and Query summary should be on top row, so 'Chart / table preview' look clear
+'Data Quality Trends' doesnt have any number or axis, please update
 
 
+'Semantic Atlas' - Onotlogy Browser
+i want the full screen button, it full screen button it can be clear visbale and user can toggle to of the oprion
+
+Knowledge
+
+i dont understand UI, where is upload button, can we add some demo like button, user can see the demo animation and understand how to use, and can we replace 'Knowledge' with any other word simialar to RAG or something else
+
+System Logs
+what is use 'System Logs' it doesnt have anything to show,
+
+
+also give me list of 20 questions medidum to complex, very complex, window function rolling winodw like question need to test ai chat,
+also give me html guide line file how to use the application
