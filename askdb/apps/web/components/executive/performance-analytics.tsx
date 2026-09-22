@@ -76,10 +76,11 @@ function niceTicks(max: number, count = 4): number[] {
   const raw = max / count;
   const pow = 10 ** Math.floor(Math.log10(raw));
   const candidates = [1, 2, 2.5, 5, 10].map((n) => n * pow);
-  const step = candidates.find((n) => n >= raw) ?? candidates[candidates.length - 1];
+  const step = candidates.find((n) => n >= raw) ?? candidates[candidates.length - 1] ?? 1;
   const ticks: number[] = [];
   for (let v = 0; v <= max + step * 0.01; v += step) ticks.push(v);
-  if (ticks[ticks.length - 1] < max) ticks.push(ticks[ticks.length - 1] + step);
+  const last = ticks[ticks.length - 1] ?? 0;
+  if (last < max) ticks.push(last + step);
   return ticks;
 }
 

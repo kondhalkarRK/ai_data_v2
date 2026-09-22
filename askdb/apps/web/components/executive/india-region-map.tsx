@@ -299,7 +299,7 @@ function DrillDetail({
   onBackToDealers,
   onSelectDealer,
 }: {
-  industry: string;
+  industry: Industry;
   selectedRegion: RegionPoint | null;
   selectedDealer: DealerRow | null;
   dealers?: DealerRow[];

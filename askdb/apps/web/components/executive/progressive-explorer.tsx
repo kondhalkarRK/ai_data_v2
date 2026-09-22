@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Home, Layers3, RotateCcw, TrendingUp } from "lucide-react";
 import * as React from "react";
 
+import type { Industry } from "@nql/shared-types";
+
 import type { ExecutiveIntelligence } from "@/components/executive/types";
 import { CHART_SERIES } from "@/lib/design";
 import { apiClient } from "@/lib/api-client";
@@ -61,7 +63,7 @@ export function ProgressiveExplorer({
   onMakeChange,
 }: {
   data: ExecutiveIntelligence;
-  industry: string;
+  industry: Industry;
   presenterMode?: boolean;
   regionFilter: string;
   makeFilter: string;

@@ -85,7 +85,9 @@ describe("asset-context", () => {
   });
 
   it("tells a join story for references", () => {
-    expect(storyVerb(snapshot.edges[0])).toBe("Joined through");
+    const edge = snapshot.edges[0];
+    expect(edge).toBeDefined();
+    expect(storyVerb(edge!)).toBe("Joined through");
     expect(snapshotTrustRate(snapshot)).toBe(100);
   });
 });

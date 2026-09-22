@@ -177,7 +177,7 @@ export function recommendViz(spec: AnalyticsSpec): AnalyticsVizKind {
   }
   if (metrics === 1 && dimCount === 0) return "kpi";
   if (metrics >= 2 && dimCount === 1) return "scatter";
-  if (hasTime && dimCount <= 2) return spec.analysis === "running_total" ? "area" : "line";
+  if (hasTime && dimCount <= 2) return "line";
   if (dimCount === 1) return "bar";
   if (dimCount >= 2) return "table";
   return "bar";
