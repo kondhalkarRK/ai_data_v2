@@ -37,6 +37,7 @@ WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=nql:nql app ./app
+COPY --chown=nql:nql semantic ./semantic
 COPY --chown=nql:nql migrations ./migrations
 COPY --chown=nql:nql alembic.ini ./alembic.ini
 COPY --chown=nql:nql pyproject.toml ./pyproject.toml
