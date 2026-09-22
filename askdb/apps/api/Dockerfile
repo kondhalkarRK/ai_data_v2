@@ -42,6 +42,9 @@ COPY --chown=nql:nql migrations ./migrations
 COPY --chown=nql:nql alembic.ini ./alembic.ini
 COPY --chown=nql:nql pyproject.toml ./pyproject.toml
 
+RUN mkdir -p /app/data/knowledge/automotive /app/data/knowledge/insurance /app/data/knowledge/_audit \
+ && chown -R nql:nql /app/data
+
 USER nql
 
 EXPOSE 8000

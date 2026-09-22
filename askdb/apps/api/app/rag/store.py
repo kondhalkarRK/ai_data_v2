@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from app.core.config import APP_ROOT, Industry, Settings
@@ -21,9 +23,19 @@ class KnowledgeStore:
     def __init__(self, settings: Settings, industry: Industry) -> None:
         self.settings = settings
         self.industry = industry
-        self.root = APP_ROOT / "data" / "knowledge" / industry.value
-        self.root.mkdir(parents=True, exist_ok=True)
-        self.audit_root = APP_ROOT / "data" / "knowledge" / "_audit"
+        preferred = APP_ROOT / "data" / "knowledge"
+        root = preferred / industry.value
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            (preferred / "_audit").mkdir(parents=True, exist_ok=True)
+        except OSError:
+            fallback = Path(tempfile.gettempdir()) / "askdb-knowledge"
+            root = fallback / industry.value
+            root.mkdir(parents=True, exist_ok=True)
+            preferred = fallback
+        self.root = root
+        self.audit_root = preferred / "_audit"
+        self.audit_root.mkdir(parents=True, exist_ok=True)
         self._mongo: Any | None = None
         self._qdrant: Any | None = None
         self._qdrant_models: Any | None = None
