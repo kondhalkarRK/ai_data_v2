@@ -97,7 +97,15 @@ async def chat_ask(
             )
             yield payload.encode("utf-8")
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.post("/chat/cancel/{history_id}")
