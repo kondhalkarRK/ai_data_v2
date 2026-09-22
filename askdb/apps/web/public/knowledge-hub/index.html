@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ask DB — Platform Knowledge Hub</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --panel: #ffffff;
+      --ink: #122033;
+      --mute: #5c6b80;
+      --line: #dbe3f0;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --ok: #047857;
+      --sidebar: #0f172a;
+      --sidebar-ink: #e2e8f0;
+      --sidebar-mute: #94a3b8;
+      --shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+      --radius: 16px;
+    }
+    html[data-theme="dark"] {
+      --bg: #0b1220;
+      --panel: #121a2b;
+      --ink: #eef3fb;
+      --mute: #9aa8bc;
+      --line: #243049;
+      --accent: #7aa2ff;
+      --accent-soft: #1d2a4a;
+      --ok: #34d399;
+      --sidebar: #070b14;
+      --sidebar-ink: #e8eef8;
+      --sidebar-mute: #8b9bb3;
+      --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font: 16px/1.55 "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    .app { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+    aside {
+      background: var(--sidebar);
+      color: var(--sidebar-ink);
+      padding: 1.25rem 0.9rem;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+    }
+    aside h1 { font-size: 1.05rem; margin: 0 0 0.2rem; }
+    aside .sub { color: var(--sidebar-mute); font-size: 0.78rem; margin-bottom: 1rem; }
+    #q {
+      width: 100%;
+      border: 1px solid #334155;
+      background: #0b1220;
+      color: #fff;
+      border-radius: 10px;
+      padding: 0.55rem 0.7rem;
+      margin-bottom: 0.9rem;
+    }
+    nav a, nav button.nav-link {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: 0;
+      color: var(--sidebar-ink);
+      padding: 0.38rem 0.55rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.86rem;
+    }
+    nav a:hover, nav button.nav-link:hover, nav a.active { background: #1e293b; }
+    nav .group { color: var(--sidebar-mute); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; margin: 0.85rem 0.4rem 0.3rem; }
+    main { padding: 1.5rem 1.8rem 4rem; max-width: 1100px; }
+    .topbar { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-bottom: 1.2rem; }
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 0.45rem 0.75rem;
+      cursor: pointer;
+    }
+    .hero, .card, details.mod {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero { padding: 1.6rem 1.7rem; margin-bottom: 1.2rem; }
+    .hero p { color: var(--mute); max-width: 46rem; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; margin-top: 1rem; }
+    .kpi { background: var(--accent-soft); border-radius: 12px; padding: 0.7rem 0.8rem; }
+    .kpi b { display: block; font-size: 1.15rem; }
+    .kpi span { color: var(--mute); font-size: 0.78rem; }
+    h2 { margin: 2rem 0 0.7rem; font-size: 1.35rem; }
+    h3 { margin: 1.1rem 0 0.45rem; font-size: 1.05rem; }
+    .card { padding: 1rem 1.1rem; margin: 0.8rem 0; }
+    .mermaid { background: #0b1220; border-radius: 12px; padding: 0.8rem; overflow: auto; }
+    html:not([data-theme="dark"]) .mermaid { background: #f8fafc; }
+    details.mod { margin: 0.75rem 0; }
+    details.mod > summary {
+      cursor: pointer;
+      padding: 0.95rem 1.1rem;
+      font-weight: 650;
+      list-style: none;
+    }
+    details.mod > summary::-webkit-details-marker { display: none; }
+    details.mod[open] > summary { border-bottom: 1px solid var(--line); }
+    .body { padding: 0 1.1rem 1.1rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 0.45rem 0.3rem; vertical-align: top; }
+    th { color: var(--mute); font-weight: 600; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .tag { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 0.1rem 0.5rem; font-size: 0.72rem; }
+    .hidden { display: none !important; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      aside { height: auto; position: relative; }
+      .kpis, .grid2 { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) { .kpis, .grid2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>Ask DB Knowledge Hub</h1>
+    <div class="sub">Architecture, flows, and module playbooks</div>
+    <input id="q" placeholder="Search modules, flows, terms…" />
+    <nav id="nav">
+      <div class="group">Overview</div>
+      <a href="#intro">Introduction</a>
+      <a href="#solution">Solution architecture</a>
+      <a href="#e2e">End-to-end data flow</a>
+      <a href="#query">Query processing</a>
+      <a href="#llm">LLM reasoning</a>
+      <a href="#semantic-flow">Semantic &amp; ontology</a>
+      <a href="#dq-flow">Quality &amp; governance</a>
+      <a href="#rag-flow">Knowledge / RAG</a>
+      <a href="#insight">Request to insight</a>
+      <a href="#render-flow">Dashboard rendering</a>
+      <a href="#security">Security &amp; access</a>
+      <a href="#deploy">Deployment</a>
+      <div class="group">Modules</div>
+      <a href="#m-builder">Analytics Builder</a>
+      <a href="#m-preview">Data Preview</a>
+      <a href="#m-exec">Executive Intelligence</a>
+      <a href="#m-explorer">Progressive Explorer</a>
+      <a href="#m-ask">ASK DB / NLQ</a>
+      <a href="#m-semantic">Semantic Layer</a>
+      <a href="#m-ontology">Ontology Explorer</a>
+      <a href="#m-kb">Knowledge Base</a>
+      <a href="#m-trust">Data Trust Center</a>
+      <a href="#m-glossary">Business Glossary</a>
+      <a href="#m-packs">Industry Packs</a>
+      <a href="#m-saved">Saved Questions</a>
+      <a href="#m-sql">SQL Explorer</a>
+      <a href="#m-viz">Charts &amp; viz</a>
+      <a href="#m-dq">DQ monitoring</a>
+      <a href="#m-gov">Governance &amp; lineage</a>
+      <a href="#m-sec">Users &amp; security</a>
+    </nav>
+  </aside>
+  <main>
+    <div class="topbar">
+      <div>
+        <strong>Enterprise analytics platform</strong>
+        <div class="sub" style="color:var(--mute)">Next.js · FastAPI · PostgreSQL · YAML semantic packs · optional RAG</div>
+      </div>
+      <button class="btn" id="themeBtn" type="button">Toggle theme</button>
+    </div>
+
+    <section class="hero" id="intro" data-search="ask db nql insight introduction stakeholders">
+      <span class="tag">Knowledge portal</span>
+      <h2 style="margin-top:0.4rem">One place to understand Ask DB</h2>
+      <p>This hub is for developers, architects, business users, and stakeholders. It explains what each workspace does, how a question becomes a governed number, and how the hosted stack (Vercel UI, Render API, Supabase Postgres, optional Mongo/Qdrant, Capgemini-compatible LLM) fits together.</p>
+      <div class="kpis">
+        <div class="kpi"><b>2</b><span>Industry packs (auto / insurance)</span></div>
+        <div class="kpi"><b>3</b><span>Logical databases (app + analytics)</span></div>
+        <div class="kpi"><b>SQL</b><span>Only source of numerical truth</span></div>
+        <div class="kpi"><b>YAML</b><span>Only source of semantic truth</span></div>
+      </div>
+    </section>
+
+    <h2 id="solution">Overall solution architecture</h2>
+    <div class="card" data-search="architecture vercel render supabase">
+      <p>The browser never holds an LLM key and never executes SQL. Vercel serves Next.js. FastAPI on Render owns auth, NLQ, KPIs, and guardrails. Postgres (hosted as one Supabase project with schemas, or three local DBs) stores app state and analytics facts.</p>
+      <pre class="mermaid">
+flowchart LR
+  U[Browser] --> W[Next.js on Vercel]
+  W -->|HTTPS cookies /api rewrite| A[FastAPI on Render]
+  A --> APP[(askdb_app / public schema)]
+  A --> AUTO[(automotive analytics)]
+  A --> INS[(insurance analytics)]
+  A --> LLM[LLM provider]
+  A -.-> M[(MongoDB optional)]
+  A -.-> Q[(Qdrant optional)]
+  A --> Y[YAML industry packs]
+      </pre>
+    </div>
+
+    <h2 id="e2e">End-to-end data flow</h2>
+    <div class="card">
+      <pre class="mermaid">
+flowchart TD
+  S[Seed / warehouse load] --> P[(Postgres facts + dims)]
+  Y[pack.yaml + semantic_model.yaml + glossary] --> SEM[SemanticService]
+  P --> RO[Read-only analytics pool]
+  SEM --> NLQ[NLQ / Analytics Builder]
+  RO --> NLQ
+  NLQ --> G[SQL guardrails LIMIT + timeout + SELECT-only]
+  G --> P
+  P --> UI[Charts / KPIs / Chat cards]
+  DOC[Knowledge uploads] -.-> RAG[Chunk + embed]
+  RAG -.-> UI
+      </pre>
+    </div>
+
+    <h2 id="query">Query processing flow</h2>
+    <div class="card">
+      <pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant W as Next.js
+  participant A as FastAPI
+  participant L as LLM
+  participant D as Postgres
+  U->>W: Question or Builder spec
+  W->>A: POST /analytics/run or /chat/ask-sync
+  A->>A: Auth JWT + RBAC + industry header
+  A->>A: Understand intent vs YAML pack
+  alt NLQ path
+    A->>L: Schema-constrained SQL prompt
+    L-->>A: SELECT statement
+  end
+  A->>A: Validate + repair SQL
+  A->>D: Read-only execute
+  D-->>A: Rows
+  A-->>W: JSON / folded SSE events
+  W-->>U: Table, chart, narrative
+      </pre>
+    </div>
+
+    <h2 id="llm">LLM interaction &amp; reasoning</h2>
+    <div class="card">
+      <p>The model proposes SQL and optional narrative. It does not compute KPIs in Python. Timeouts, retries, and a circuit breaker protect the API. Home “LLM connected” only means a key is configured.</p>
+      <pre class="mermaid">
+flowchart TD
+  Q[User question] --> U[Question understanding]
+  U --> H[YAML hints + glossary ALWAYS/NEVER]
+  H --> P[System prompt: one PostgreSQL SELECT]
+  P --> C{Circuit open?}
+  C -->|yes| F[Degraded message]
+  C -->|no| L[complete_chat]
+  L --> V[sql_is_safe + pack allowlist]
+  V -->|fail| R[Auto-repair or failure card]
+  V -->|pass| X[Execute]
+      </pre>
+    </div>
+
+    <h2 id="semantic-flow">Semantic layer &amp; ontology flow</h2>
+    <div class="card">
+      <pre class="mermaid">
+flowchart LR
+  YAML[Industry pack YAML] --> LOAD[Semantic loader]
+  LOAD --> REG[Metric + entity registry]
+  REG --> ONT[Ontology snapshot compiler]
+  ONT --> RF[React Flow browser]
+  REG --> NLQ[NLQ + Builder]
+  RF -.->|clicks never query SQL| YAML
+      </pre>
+    </div>
+
+    <h2 id="dq-flow">Data quality &amp; governance flow</h2>
+    <div class="card">
+      <pre class="mermaid">
+flowchart TD
+  F[Fact tables] --> DQ[DQ engine / freshness / completeness]
+  DQ --> T[Trust snapshot]
+  T --> DTC[Data Trust Center]
+  T --> KPI[KPI cards caution flags]
+  YAML --> GOV[Lineage + glossary]
+  GOV --> ONT[Ontology overlays]
+      </pre>
+    </div>
+
+    <h2 id="rag-flow">Knowledge base / RAG flow</h2>
+    <div class="card">
+      <p>Documents narrate; they never supply a number shown as a calculated result. Web retrieval is opt-in and allowlisted.</p>
+      <pre class="mermaid">
+flowchart LR
+  UP[Upload PDF/DOCX] --> CH[Chunk]
+  CH --> FS[Filesystem store]
+  CH -.-> QD[Qdrant vectors]
+  Q[Chat question] --> RT[Retrieve top-k]
+  RT --> CIT[Citations]
+  CIT --> CARD[Chat card: document context]
+      </pre>
+    </div>
+
+    <h2 id="insight">User request to insight</h2>
+    <div class="card">
+      <pre class="mermaid">
+flowchart TD
+  R[Request] --> AUTH[Cookie session]
+  AUTH --> IND[x-industry automotive|insurance]
+  IND --> ROUTE{Surface}
+  ROUTE -->|Chat| NLQ
+  ROUTE -->|Builder| SPEC[AnalyticsSpec]
+  ROUTE -->|Executive| KPI[KPI SQL]
+  NLQ --> SQL
+  SPEC --> SQL
+  KPI --> SQL
+  SQL --> INS[Insights + anomaly hints]
+  INS --> UI[Insight depth: executive / analyst]
+      </pre>
+    </div>
+
+    <h2 id="render-flow">Dashboard &amp; analytics rendering</h2>
+    <div class="card">
+      <pre class="mermaid">
+flowchart LR
+  API[JSON rows + chart spec] --> RQ[TanStack Query cache]
+  RQ --> RC[ResultChart / heatmap / KPI]
+  RQ --> TB[Tables]
+  RQ --> EX[Executive cards + explorer]
+  TH[Theme store] --> RC
+      </pre>
+    </div>
+
+    <h2 id="security">Security &amp; access control</h2>
+    <div class="card">
+      <ul>
+        <li>HttpOnly cookies <code>nql_access</code> / <code>nql_refresh</code> + CSRF double-submit.</li>
+        <li>Roles: viewer, analyst, admin. Chat and Builder require analyst+.</li>
+        <li>Analytics pools: <code>SET TRANSACTION READ ONLY</code>, statement timeout, max rows.</li>
+        <li>Production: <code>AUTH_BYPASS=false</code>, <code>COOKIE_SECURE=true</code>.</li>
+      </ul>
+      <pre class="mermaid">
+flowchart TD
+  L[Login] --> C[Set cookies]
+  C --> M[Next proxy: nql_access]
+  M --> API[FastAPI deps]
+  API --> RBAC[RequireViewer / Analyst / Admin]
+  RBAC --> RO[Read-only SQL]
+      </pre>
+    </div>
+
+    <h2 id="deploy">Deployment architecture</h2>
+    <div class="card">
+      <table>
+        <tr><th>Layer</th><th>Host</th><th>Notes</th></tr>
+        <tr><td>Frontend</td><td>Vercel</td><td><code>askdb</code> root, Next.js, <code>API_REWRITE_TARGET</code></td></tr>
+        <tr><td>Backend</td><td>Render Docker</td><td>FastAPI, <code>$PORT</code>, free instance sleeps</td></tr>
+        <tr><td>Database</td><td>Supabase Postgres</td><td>Session pooler IPv4 for Render</td></tr>
+        <tr><td>Vector / docs</td><td>Optional Mongo + Qdrant</td><td>Filesystem fallback for knowledge</td></tr>
+        <tr><td>LLM</td><td>External OpenAI-compatible API</td><td>Key only on Render</td></tr>
+      </table>
+      <pre class="mermaid">
+flowchart TB
+  subgraph Edge
+    V[Vercel Next.js]
+  end
+  subgraph Compute
+    R[Render FastAPI]
+  end
+  subgraph Data
+    S[Supabase pooler]
+    F[Pack YAML in image]
+  end
+  subgraph AI
+    L[LLM HTTPS]
+  end
+  V --> R --> S
+  R --> F
+  R --> L
+      </pre>
+    </div>
+
+    <h2>Module playbooks</h2>
+    <p style="color:var(--mute)">Each module below expands. Search above filters these cards.</p>
+
+    <details class="mod" id="m-builder" open data-search="analytics builder spec filters charts no-code">
+      <summary>Analytics Builder</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> No-code analysis over the semantic layer without writing SQL.</p>
+        <p><strong>Key features.</strong> Metrics, dimensions, filters, analysis kinds (trend, ranking, contribution), save/share, chart/table/heatmap previews.</p>
+        <p><strong>User workflow.</strong> Pick industry → choose measures &amp; dims → optional filters → Run → inspect chart/SQL → save.</p>
+        <p><strong>Technical workflow.</strong> UI builds <code>AnalyticsSpec</code> → <code>POST /api/v1/analytics/run</code> → runner compiles guarded SQL → rows + viz hint.</p>
+        <div class="grid2">
+          <div><strong>Input</strong><br/>Spec JSON, industry header, session cookie.</div>
+          <div><strong>Output</strong><br/>Columns, rows, title, recommended viz.</div>
+        </div>
+        <p><strong>Depends on.</strong> Semantic pack, read-only analytics DB, ResultChart.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-preview" data-search="data preview tables pagination">
+      <summary>Data Preview</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Browse governed tables for the active industry.</p>
+        <p><strong>Key features.</strong> Table list from the pack, keyset pagination, no full-table download.</p>
+        <p><strong>User workflow.</strong> Open Data Preview → select table → page through rows.</p>
+        <p><strong>Technical workflow.</strong> <code>GET /api/v1/data/tables</code> then preview with LIMIT/keyset.</p>
+        <p><strong>I/O.</strong> Table name in; page of rows out. <strong>Depends on</strong> pack physical names + reader role.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-exec" data-search="executive intelligence kpi dashboard">
+      <summary>Executive Intelligence Dashboard</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Domain KPIs, grounded insights, and performance series for leadership.</p>
+        <p><strong>Key features.</strong> Industry-aware KPI grid, AI insight votes, filters (region/make/window), heatmap/explorer.</p>
+        <p><strong>User workflow.</strong> Home or Executive → switch industry → read cards → drill via explorer.</p>
+        <p><strong>Technical workflow.</strong> KPI SQL engines (automotive/insurance) + executive routes; numbers always from SQL.</p>
+        <p><strong>Depends on.</strong> KPI service, trust flags, Progressive Explorer, charts.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-explorer" data-search="progressive drill region dealer brand">
+      <summary>Progressive Drill-Down Explorer</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Guided Region → Dealer → Brand → Model story for automotive (insurance uses analogous cuts).</p>
+        <p><strong>User workflow.</strong> Click a region → dealers → models; filters sync with the dashboard bar.</p>
+        <p><strong>Technical workflow.</strong> <code>/executive/region-map</code>, dealers, models endpoints; metric units vs revenue.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-ask" data-search="ask db nlq chat natural language">
+      <summary>ASK DB / Natural Language Query</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Ask governed questions in English; get SQL-backed answers plus narrative.</p>
+        <p><strong>Key features.</strong> Question understanding, template hits, LLM SQL, citations, follow-ups, cancel, saved prompts.</p>
+        <p><strong>User workflow.</strong> AI Chat → type question → review table/SQL/trust → follow-up.</p>
+        <p><strong>Technical workflow.</strong> Hosted UI uses <code>POST /api/v1/chat/ask-sync</code> (JSON) because Vercel buffers SSE. Locally SSE <code>/chat/ask</code> still exists.</p>
+        <p><strong>I/O.</strong> Question + industry in; events (sql, rows, meta, tokens, failure) out.</p>
+        <p><strong>Depends on.</strong> LLM key on API, YAML pack, analytics DB, optional knowledge store.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-semantic" data-search="semantic layer yaml metrics">
+      <summary>Semantic Layer</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Single source of entities, measures, joins, and rules.</p>
+        <p><strong>Technical workflow.</strong> Load <code>apps/api/semantic/packs/{industry}/*.yaml</code> at runtime. Docker image must copy the <code>semantic/</code> folder.</p>
+        <p><strong>Output.</strong> Pack API, ontology snapshot, NLQ hints. <strong>Never</strong> inferred from scanning tables ad hoc.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-ontology" data-search="ontology browser react flow constellation">
+      <summary>Ontology Explorer</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Visual knowledge graph: network, centrality, hierarchy, lineage, constellation.</p>
+        <p><strong>User workflow.</strong> Ontology Browser → choose layout → inspect node → business vs technical overlay.</p>
+        <p><strong>Technical workflow.</strong> Snapshot compiled from YAML only; node clicks do not query Postgres.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-kb" data-search="knowledge hub upload rag">
+      <summary>Knowledge Base</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Upload reports so Chat can cite narrative context.</p>
+        <p><strong>User workflow.</strong> Knowledge Hub → upload → wait for index → ask in Chat.</p>
+        <p><strong>Technical workflow.</strong> Filesystem store under <code>data/knowledge</code> (temp fallback on Render); optional Mongo/Qdrant mirrors.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-trust" data-search="data trust center observability">
+      <summary>Data Trust Center</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Observability for freshness, incidents, and trust score.</p>
+        <p><strong>Depends on.</strong> Semantic pack (missing <code>pack.yaml</code> fails this page) + DQ services.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-glossary" data-search="business glossary always never">
+      <summary>Business Glossary</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Human definitions and ALWAYS/NEVER disambiguation (e.g. dealer vs salesman).</p>
+        <p><strong>Lives in.</strong> <code>business_glossary.yaml</code> inside each industry pack. Consumed by NLQ and Semantic Atlas.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-packs" data-search="industry packs automotive insurance">
+      <summary>Industry Packs</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Swap the entire semantic + KPI surface with one industry flag.</p>
+        <p><strong>Packs.</strong> Automotive (sales, dealers, models) and Insurance (claims, policies, loss ratio).</p>
+        <p><strong>Switch.</strong> Session default + per-tab override via <code>x-industry</code>.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-saved" data-search="saved questions">
+      <summary>Saved Questions</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Pin NLQ or Builder questions for reuse.</p>
+        <p><strong>Store.</strong> <code>askdb_app</code> tables. Open from Chat deep link <code>?q=</code>.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-sql" data-search="sql explorer viewer">
+      <summary>SQL Explorer</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Show the exact SELECT that produced an answer (Chat / Builder / history).</p>
+        <p><strong>Governance.</strong> Display only; users cannot submit arbitrary SQL from the UI.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-viz" data-search="chart visualization heatmap treemap">
+      <summary>Chart &amp; Visualization Engine</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Turn row sets into bar/line/area/pie/scatter/KPI/heatmap/treemap.</p>
+        <p><strong>Component.</strong> <code>ResultChart</code> plus Builder previews. Labels come from semantic titles, not raw column ids where possible.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-dq" data-search="data quality monitoring">
+      <summary>Data Quality Monitoring</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Score completeness/freshness and surface incidents on Trust Center and KPI caution states.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-gov" data-search="governance lineage">
+      <summary>Governance &amp; Lineage</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Show how a measure traces to physical tables/columns via YAML lineage, not inferred FK scans.</p>
+        <p><strong>UI.</strong> Ontology lineage layout + technical overlay (physical names).</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-sec" data-search="user management rbac admin">
+      <summary>User Management &amp; Security</summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> Identity, roles, audit of login, and admin-only logs.</p>
+        <p><strong>Workflow.</strong> <code>create_admin.py</code> seeds the first admin; admins create users via API.</p>
+        <p><strong>Hosted.</strong> Real login, no AUTH_BYPASS. System Logs under Admin.</p>
+      </div>
+    </details>
+
+    <div class="card" style="margin-top:2rem">
+      <strong>How to open this hub</strong>
+      <p>After a Vercel deploy: <code>/knowledge-hub/</code> on the same site. Locally: <code>askdb/apps/web/public/knowledge-hub/index.html</code>.</p>
+    </div>
+  </main>
+</div>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: document.documentElement.dataset.theme === "dark" ? "dark" : "neutral", securityLevel: "loose" });
+  const root = document.documentElement;
+  const stored = localStorage.getItem("askdb-docs-theme");
+  if (stored) root.dataset.theme = stored;
+  else if (matchMedia("(prefers-color-scheme: dark)").matches) root.dataset.theme = "dark";
+  document.getElementById("themeBtn").onclick = () => {
+    root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+    localStorage.setItem("askdb-docs-theme", root.dataset.theme);
+    location.reload();
+  };
+  const q = document.getElementById("q");
+  q.addEventListener("input", () => {
+    const term = q.value.trim().toLowerCase();
+    document.querySelectorAll("[data-search], details.mod, .card, .hero").forEach((el) => {
+      const blob = (el.getAttribute("data-search") || el.innerText).toLowerCase();
+      el.classList.toggle("hidden", Boolean(term) && !blob.includes(term));
+    });
+  });
+  document.querySelectorAll("nav a").forEach((a) => {
+    a.addEventListener("click", () => {
+      document.querySelectorAll("nav a").forEach((x) => x.classList.remove("active"));
+      a.classList.add("active");
+    });
+  });
+</script>
+</body>
+</html>
