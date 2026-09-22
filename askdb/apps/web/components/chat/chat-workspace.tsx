@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 import { type ActionKey } from "@/components/chat/action-toolbar";
 import { ResponseCard } from "@/components/chat/response-card";
-import { applyChatSseEvent, consumeSseBuffer } from "@/components/chat/sse";
+import { applyChatSseEvent } from "@/components/chat/sse";
 import type { ChatMessage } from "@/components/chat/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
@@ -72,71 +72,35 @@ export function ChatWorkspace() {
     historyIdRef.current = null;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/chat/ask`, {
-        method: "POST",
-        credentials: "include",
-        signal: controller.signal,
-        headers: {
-          "content-type": "application/json",
-          "x-industry": industry,
-          "x-csrf-token": readCookie("nql_csrf") ?? "",
-        },
-        body: JSON.stringify({
-          question: userMessage.question,
-          conversationId,
-          webRetrieval,
-          model: llmModel || undefined,
-          temperature: llmTemperature,
-          topP: llmTopP,
-          topK: llmTopK,
-        }),
-      });
-      if (!response.ok || !response.body) {
-        throw new Error(`Chat failed (${response.status})`);
-      }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const { frames, rest } = consumeSseBuffer(buffer);
-        buffer = rest;
-        for (const frame of frames) {
-          const eventName = frame.event;
-          const data = frame.data;
-          if (eventName === "stage" && data.historyId) {
-            historyIdRef.current = String(data.historyId);
-          }
-          if (eventName === "done" && data.conversationId) {
-            setConversationId(String(data.conversationId));
-          }
-          setMessages((prev) =>
-            prev.map((message) =>
-              message.id === assistantId
-                ? applyChatSseEvent(message, eventName, data)
-                : message,
-            ),
-          );
+      const payload = {
+        question: userMessage.question,
+        conversationId,
+        webRetrieval,
+        model: llmModel || undefined,
+        temperature: llmTemperature,
+        topP: llmTopP,
+        topK: llmTopK,
+      };
+      // Vercel rewrites buffer SSE, so production uses one JSON round-trip.
+      const sync = await apiClient.post<{
+        events: Array<{ event: string; data: Record<string, unknown> }>;
+      }>("/api/v1/chat/ask-sync", payload, { industry });
+      for (const frame of sync.events ?? []) {
+        const eventName = frame.event;
+        const data = frame.data ?? {};
+        if (eventName === "stage" && data.historyId) {
+          historyIdRef.current = String(data.historyId);
         }
-      }
-      if (buffer.trim()) {
-        const { frames } = consumeSseBuffer(`${buffer}\n\n`);
-        for (const frame of frames) {
-          const eventName = frame.event;
-          const data = frame.data;
-          if (eventName === "done" && data.conversationId) {
-            setConversationId(String(data.conversationId));
-          }
-          setMessages((prev) =>
-            prev.map((message) =>
-              message.id === assistantId
-                ? applyChatSseEvent(message, eventName, data)
-                : message,
-            ),
-          );
+        if (eventName === "done" && data.conversationId) {
+          setConversationId(String(data.conversationId));
         }
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantId
+              ? applyChatSseEvent(message, eventName, data)
+              : message,
+          ),
+        );
       }
     } catch (error) {
       if ((error as Error).name === "AbortError") {

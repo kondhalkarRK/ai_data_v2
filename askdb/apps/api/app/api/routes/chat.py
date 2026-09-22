@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
@@ -106,6 +107,67 @@ async def chat_ask(
             "Connection": "keep-alive",
         },
     )
+
+
+def _sse_events_from_frames(frames: list[str]) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for frame in frames:
+        event_name = "message"
+        data_line = ""
+        for line in frame.splitlines():
+            if line.startswith("event:"):
+                event_name = line[6:].strip()
+            elif line.startswith("data:"):
+                data_line += line[5:].strip()
+        if not data_line:
+            continue
+        try:
+            events.append({"event": event_name, "data": json.loads(data_line)})
+        except json.JSONDecodeError:
+            continue
+    return events
+
+
+@router.post("/chat/ask-sync")
+async def chat_ask_sync(
+    body: AskRequest,
+    user: RequireAnalyst,
+    industry: ActiveIndustry,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+    semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
+) -> dict[str, Any]:
+    """One JSON response for hosts (Vercel) that buffer SSE and never paint tokens."""
+    service = ChatService(
+        app_session=session,
+        analytics=analytics,
+        settings=settings,
+        user=user,
+        industry=industry,
+        semantic_service=semantic_service,
+    )
+    frames: list[str] = []
+    try:
+        async for frame in service.ask_stream(
+            body.question,
+            body.conversation_id,
+            cancel_requested=_cancel_requested,
+            web_retrieval=body.web_retrieval,
+            model_override=body.model,
+            temperature=body.temperature,
+            top_p=body.top_p,
+            top_k=body.top_k,
+        ):
+            frames.append(frame)
+    except NqlError as exc:
+        return {
+            "events": [
+                {"event": "error", "data": {"code": exc.code, "message": exc.message}},
+                {"event": "done", "data": {"failed": True}},
+            ]
+        }
+    return {"events": _sse_events_from_frames(frames)}
 
 
 @router.post("/chat/cancel/{history_id}")

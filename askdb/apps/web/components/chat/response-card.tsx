@@ -112,7 +112,9 @@ export function ResponseCard({
       >
         <ExecutionTimeline progress={message.progress ?? undefined} />
         {!message.progress ? (
-          <p className="mt-2 text-sm text-muted-foreground">Understanding your question…</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Working on your question… this can take up to a minute on the hosted API.
+          </p>
         ) : null}
       </div>
     );
