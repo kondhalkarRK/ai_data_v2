@@ -20,7 +20,8 @@ def test_classify_llm_timeout() -> None:
 
 def test_classify_db_timeout() -> None:
     info = classify_database("canceling statement due to statement_timeout")
-    assert info.category == "database"
+    assert info.category == "timeout"
+    assert info.title == "Timeout Error"
     assert "timeout" in info.reason.lower()
 
 

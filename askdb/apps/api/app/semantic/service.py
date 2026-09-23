@@ -30,12 +30,18 @@ from app.schemas.semantic import (
 
 CLUSTER_COLORS: dict[str, str] = {
     "Domain": "#0f766e",
+    "Actors": "#059669",
+    "Events": "#2563eb",
+    "Context": "#7c3aed",
+    "Outcomes": "#db2777",
+    "Attributes": "#ca8a04",
+    "Other": "#64748b",
+    # Legacy warehouse names (older snapshots).
     "Facts": "#2563eb",
     "Dimensions": "#7c3aed",
     "Entities": "#059669",
     "Measures": "#db2777",
     "Metrics": "#ca8a04",
-    "Other": "#64748b",
 }
 
 
@@ -232,7 +238,7 @@ class SemanticService:
 
         for table_name, table in model.tables.items():
             node_id = f"table:{table_name}"
-            cluster = "Facts" if table.type == "fact" else "Dimensions"
+            cluster = "Events" if table.type == "fact" else "Context"
             columns = [
                 OntologyColumn(
                     name=name,
@@ -301,8 +307,8 @@ class SemanticService:
                     description=entity.description,
                     tables=[entity.table],
                     lineage=[f"{entity.name} → {entity.table}"],
-                    cluster="Entities",
-                    cluster_color=CLUSTER_COLORS["Entities"],
+                    cluster="Actors",
+                    cluster_color=CLUSTER_COLORS["Actors"],
                 )
             )
             add_edge(
@@ -333,8 +339,8 @@ class SemanticService:
                     ]
                     if measure.source_table
                     else [measure.expression],
-                    cluster="Measures",
-                    cluster_color=CLUSTER_COLORS["Measures"],
+                    cluster="Outcomes",
+                    cluster_color=CLUSTER_COLORS["Outcomes"],
                 )
             )
             if measure.source_table:
@@ -386,8 +392,8 @@ class SemanticService:
                         f"{dimension.display_name} ← {dimension.source_table}."
                         f"{dimension.source_column or ','.join(dimension.attributes)}"
                     ],
-                    cluster="Metrics",
-                    cluster_color=CLUSTER_COLORS["Metrics"],
+                    cluster="Attributes",
+                    cluster_color=CLUSTER_COLORS["Attributes"],
                 )
             )
             add_edge(

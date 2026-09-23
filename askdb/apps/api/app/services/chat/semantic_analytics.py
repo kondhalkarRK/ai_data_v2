@@ -376,6 +376,32 @@ def _render_advanced_sql(
     direction = plan.order_direction.upper()
     limit = max(1, min(plan.limit or 20, 100))
 
+    if plan.analysis == "year_window_compare":
+        months = max(1, min(plan.window_months or 3, 12))
+        years = max(1, min(plan.window_years or 3, 10))
+        date_column = "sales_date" if metric.table == "fact_sales" else (
+            "accounting_month" if metric.table == "fact_policy_monthly" else "reported_date"
+        )
+        where = [
+            *where,
+            f"{base_alias}.{date_column} >= date_trunc('month', CURRENT_DATE) - INTERVAL '{years} years'",
+            f"{base_alias}.{date_column} < date_trunc('month', CURRENT_DATE)",
+            (
+                f"EXTRACT(MONTH FROM {base_alias}.{date_column})::int IN ("
+                "SELECT EXTRACT(MONTH FROM date_trunc('month', CURRENT_DATE) - "
+                f"(n || ' months')::interval)::int FROM generate_series(1, {months}) AS n)"
+            ),
+        ]
+        # Rebuild the aggregate so the seasonal window is part of the grouped query.
+        aggregate = (
+            "SELECT "
+            + ",\n       ".join(select_lines)
+            + f"\nFROM {from_sql} {base_alias}"
+            + (f"\n{chr(10).join(joins)}" if joins else "")
+            + (f"\nWHERE {' AND '.join(where)}" if where else "")
+            + (f"\nGROUP BY {group_by}" if group_by else "")
+        )
+
     if plan.analysis == "top_n_per_group":
         return f"""WITH aggregated AS (
   {aggregate.replace(chr(10), chr(10) + '  ')}

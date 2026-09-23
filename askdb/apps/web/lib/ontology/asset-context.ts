@@ -72,11 +72,14 @@ function sampleQueriesFor(node: OntologyNode): string[] {
 }
 
 export function storyVerb(edge: OntologyEdge): string {
-  if (edge.kind === "maps_to") return "Defined as";
-  if (edge.kind === "reference") return "Joined through";
-  if (edge.kind === "dependency") return "Depends on";
-  if (edge.fromColumn || edge.toColumn) return "Joined through";
-  return "Related to";
+  if (edge.label && !/^[a-z_]+$/.test(edge.label) && edge.label.length > 2) {
+    return edge.label;
+  }
+  if (edge.kind === "maps_to") return "Means";
+  if (edge.kind === "reference") return "Links to";
+  if (edge.kind === "dependency") return "Includes";
+  if (edge.fromColumn || edge.toColumn) return "Links to";
+  return edge.label || "Relates to";
 }
 
 export function storyLabel(edge: OntologyEdge, overlay: ContextOverlay): string {

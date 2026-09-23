@@ -22,11 +22,11 @@ export const EDGE_STYLES: Record<
   EdgeVisualKind,
   { color: string; width: number; animated: boolean; label: string }
 > = {
-  primary_key: { color: "#38bdf8", width: 2.4, animated: true, label: "PK" },
-  foreign_key: { color: "#34d399", width: 2, animated: true, label: "FK" },
-  semantic: { color: "#a78bfa", width: 1.6, animated: false, label: "SEM" },
-  ai_inferred: { color: "#fbbf24", width: 1.8, animated: true, label: "AI" },
-  lineage: { color: "#fb7185", width: 2.2, animated: true, label: "LIN" },
+  primary_key: { color: "#38bdf8", width: 2.4, animated: true, label: "Identifies" },
+  foreign_key: { color: "#34d399", width: 2, animated: true, label: "Links" },
+  semantic: { color: "#a78bfa", width: 2.1, animated: false, label: "Relates" },
+  ai_inferred: { color: "#fbbf24", width: 1.8, animated: true, label: "Means" },
+  lineage: { color: "#fb7185", width: 2.2, animated: true, label: "Includes" },
 };
 
 export type GalaxyEdgeData = {

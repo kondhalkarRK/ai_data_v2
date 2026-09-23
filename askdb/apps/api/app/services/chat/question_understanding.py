@@ -16,6 +16,7 @@ IntentKind = Literal[
     "ranking",
     "aggregation",
     "trend",
+    "comparison",
     "lookup",
     "ambiguous",
     "unknown",
@@ -30,6 +31,7 @@ AnalysisKind = Literal[
     "period_growth",
     "contribution",
     "above_average",
+    "year_window_compare",
 ]
 AggregationKind = Literal["sum", "count", "count_distinct", "avg", "ratio"]
 
@@ -91,6 +93,8 @@ class QuestionPlan:
     time_grain: str | None = None
     analysis: AnalysisKind = "basic"
     partition_by: list[str] = field(default_factory=list)
+    window_months: int | None = None
+    window_years: int | None = None
 
     @property
     def is_ambiguous(self) -> bool:
@@ -107,6 +111,7 @@ class QuestionPlan:
             "period_growth",
             "contribution",
             "above_average",
+            "year_window_compare",
         }
         if self.analysis in advanced or len(self.dimensions) > 1:
             return True
@@ -181,13 +186,42 @@ _EV = re.compile(r"\b(ev|evs|electric(?:\s+vehicle|\s+car)?s?|battery\s+electric
 
 
 def _metric_from_question(q: str) -> MetricKind:
-    if _REVENUE.search(q):
-        return "revenue"
     if _UNITS.search(q) or _SELLING.search(q):
         return "units"
     if re.search(r"\b(orders?|transactions?)\b", q, re.I):
         return "orders"
+    if _REVENUE.search(q):
+        return "revenue"
+    # "sales" is revenue unless it names a person (salesperson, sales rep).
+    if re.search(r"\bsales\b", q, re.I) and not _SALESPERSON.search(q):
+        return "revenue"
     return "unknown"
+
+
+def _normalized_ask(question: str) -> str:
+    return re.sub(r"\s+", " ", (question or "").strip().lower()).strip(" ?.!")
+
+
+_BARE_SALES = {
+    "sales",
+    "show sales",
+    "show me sales",
+    "give me sales",
+    "what is sales",
+    "what's sales",
+}
+_BARE_PERFORMANCE = {
+    "performance",
+    "show performance",
+    "show me performance",
+    "how is performance",
+}
+_BARE_GROWTH = {
+    "growth",
+    "show growth",
+    "show me growth",
+    "what is growth",
+}
 
 
 def _extract_body_filters(q: str) -> list[ExtractedFilter]:
@@ -260,9 +294,9 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
     dimensions: list[str] = []
 
     patterns: list[tuple[str, str]] = [
-        ("month", r"\bmonthly\b|\bby\s+month\b|\bmonth[-\s]*over[-\s]*month\b|\bmom\b"),
+        ("month", r"\bmonthly\b|\bby\s+month\b|\bper\s+month\b|\bmonth[-\s]*over[-\s]*month\b|\bmom\b"),
         ("quarter", r"\bquarterly\b|\bby\s+quarter\b|\bper\s+quarter\b"),
-        ("year", r"\byearly\b|\bby\s+year\b|\byear[-\s]*over[-\s]*year\b|\byoy\b"),
+        ("year", r"\byearly\b|\bby\s+year\b|\bper\s+year\b|\beach\s+year\b|\byear[-\s]*over[-\s]*year\b|\byoy\b"),
     ]
     if industry is Industry.AUTOMOTIVE:
         patterns.extend(
@@ -273,7 +307,7 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
                 ("model", r"\bby\s+model\b|\bmodels?\s+(?:per|within\s+each)\b"),
                 ("dealer", r"\bdealers?\b"),
                 ("salesperson", r"\bsalespersons?\b|\bsalespeople\b|\bsales\s*rep\b"),
-                ("region", r"\b(?:by|per)\s+region\b|\bwithin\s+each\s+region\b|\bregional\s+average\b"),
+                ("region", r"\b(?:by|per|across)\s+regions?\b|\bwithin\s+each\s+region\b|\bregional\s+average\b"),
                 ("city", r"\b(?:by|per)\s+cit(?:y|ies)\b|\bwithin\s+each\s+city\b|\beach\s+city\b"),
             ]
         )
@@ -288,7 +322,7 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
                 ("agent", r"\bagents?\b|\bbrokers?\b"),
                 ("channel", r"\bby\s+channel\b|\bper\s+channel\b"),
                 ("branch", r"\bby\s+branch\b|\bper\s+branch\b"),
-                ("region", r"\b(?:by|per)\s+region\b|\bwithin\s+each\s+region\b|\bregional\s+average\b"),
+                ("region", r"\b(?:by|per|across)\s+regions?\b|\bwithin\s+each\s+region\b|\bregional\s+average\b"),
                 ("state", r"\b(?:by|per)\s+state\b|\bwithin\s+each\s+state\b"),
                 ("claim_status", r"\bby\s+(?:claim\s+)?status\b"),
             ]
@@ -318,7 +352,28 @@ def _default_dimension(plan: QuestionPlan) -> str | None:
     }.get(plan.entity)
 
 
+_WINDOW = re.compile(
+    r"last\s+(\d{1,2})\s+months?\b[\s\S]{0,80}last\s+(\d{1,2})\s+years?",
+    re.I,
+)
+
+
 def _enrich_analytical_plan(plan: QuestionPlan, question: str) -> None:
+    window = _WINDOW.search(question)
+    if window and plan.intent != "ambiguous":
+        plan.intent = "comparison"
+        plan.analysis = "year_window_compare"
+        plan.window_months = max(1, min(int(window.group(1)), 12))
+        plan.window_years = max(1, min(int(window.group(2)), 10))
+        plan.entity = "metric_only"
+        if plan.metric in {"unknown", "units"}:
+            plan.metric = "revenue"
+        plan.dimensions = ["year", "month"]
+        plan.time_grain = "month"
+        plan.limit = 36
+        plan.notes.append("Compare the latest months across prior years")
+        return
+
     dimensions = _explicit_dimensions(plan.industry, question)
     default = _default_dimension(plan)
     if default and default not in dimensions and plan.entity != "metric_only":
@@ -432,8 +487,61 @@ def _apply_value_inference(plan: QuestionPlan, question: str) -> None:
 
 
 def _understand_automotive(q: str) -> QuestionPlan:
+    normalized = _normalized_ask(q)
+    if normalized in _BARE_SALES:
+        return QuestionPlan(
+            industry=Industry.AUTOMOTIVE,
+            intent="ambiguous",
+            entity="metric_only",
+            metric="unknown",
+            ambiguity_options=[
+                "Total Revenue",
+                "Total Orders",
+                "Quantity Sold",
+                "Revenue by month",
+                "Revenue by region",
+            ],
+            notes=["Sales was not specific enough to choose a metric."],
+        )
+    if normalized in _BARE_PERFORMANCE:
+        return QuestionPlan(
+            industry=Industry.AUTOMOTIVE,
+            intent="ambiguous",
+            entity="unknown",
+            metric="unknown",
+            ambiguity_options=[
+                "Dealer performance",
+                "Best performing region",
+                "Top selling car by units",
+                "Top salesperson",
+            ],
+            notes=["Performance needs a business entity."],
+        )
+    if normalized in _BARE_GROWTH:
+        return QuestionPlan(
+            industry=Industry.AUTOMOTIVE,
+            intent="ambiguous",
+            entity="metric_only",
+            metric="unknown",
+            ambiguity_options=[
+                "Revenue growth by month",
+                "Order growth by month",
+                "Quantity sold growth by month",
+            ],
+            notes=["Growth needs a metric."],
+        )
+
     metric = _metric_from_question(q)
     filters = _extract_body_filters(q)
+    if re.search(r"\bmumbai\b", q, re.I):
+        filters.append(
+            ExtractedFilter(
+                column="automotive.dim_region.city",
+                operator="=",
+                value="Mumbai",
+                label="City = Mumbai",
+            )
+        )
     limit = _limit_from_question(q)
     hits: list[str] = []
     notes: list[str] = []
@@ -475,13 +583,17 @@ def _understand_automotive(q: str) -> QuestionPlan:
         if _VEHICLE.search(q) or _SELLING.search(q) or filters:
             # region + vehicle still vehicle-ranked by region handled elsewhere
             pass
-        elif not _VEHICLE.search(q) and _TOP.search(q):
+        elif not _VEHICLE.search(q) and (
+            _TOP.search(q) or re.search(r"\bperform", q, re.I)
+        ):
             hits.append("Region")
+            if metric == "unknown":
+                metric = "revenue" if re.search(r"\bperform", q, re.I) else "units"
             return QuestionPlan(
                 industry=Industry.AUTOMOTIVE,
                 intent="ranking",
                 entity="region",
-                metric="units" if metric == "unknown" else metric,
+                metric=metric,
                 filters=filters,
                 limit=limit,
                 glossary_hits=hits,
@@ -552,6 +664,24 @@ def _understand_automotive(q: str) -> QuestionPlan:
             filters=filters,
             limit=36,
             glossary_hits=["Revenue"] if re.search(r"\brevenue\b", q, re.I) else [],
+        )
+
+    if metric != "unknown" or filters:
+        resolved = metric if metric != "unknown" else "revenue"
+        return QuestionPlan(
+            industry=Industry.AUTOMOTIVE,
+            intent="trend" if _TREND.search(q) else "aggregation",
+            entity="metric_only",
+            metric=resolved,
+            filters=filters,
+            limit=36,
+            glossary_hits=(
+                ["Orders"]
+                if resolved == "orders"
+                else ["Revenue"]
+                if resolved == "revenue"
+                else ["Units"]
+            ),
         )
 
     return QuestionPlan(

@@ -13,15 +13,15 @@ export const ONTOLOGY_KIND_FILTERS: {
   label: string;
   hint: string;
 }[] = [
-  { id: "all", label: "All assets", hint: "Show every asset on the map." },
-  { id: "measure", label: "Measures", hint: "KPIs and calculations, such as Revenue or Premium." },
-  { id: "dimension", label: "Dimensions", hint: "Ways to slice a number — region, date, product." },
-  { id: "fact", label: "Facts", hint: "Transaction tables that feed the metrics." },
-  { id: "entity", label: "Entities", hint: "Business objects such as Dealer, Customer, or Vehicle." },
+  { id: "all", label: "All concepts", hint: "Show every business concept on the graph." },
+  { id: "measure", label: "Outcomes", hint: "KPIs such as Revenue, Premium, or Loss ratio." },
+  { id: "dimension", label: "Attributes", hint: "Ways to describe a concept — region, product, date." },
+  { id: "fact", label: "Events", hint: "Business events such as a sale or a claim." },
+  { id: "entity", label: "Actors", hint: "People and organizations — Dealer, Customer, Vehicle." },
   {
     id: "relationship",
     label: "Connected",
-    hint: "Hide isolated assets and keep only nodes that share a relationship.",
+    hint: "Keep only concepts that share a relationship.",
   },
 ];
 

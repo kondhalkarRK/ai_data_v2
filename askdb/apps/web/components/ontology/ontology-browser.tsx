@@ -13,19 +13,7 @@ import {
   type EdgeTypes,
 } from "@xyflow/react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Binary,
-  GitBranch,
-  Maximize2,
-  Minimize2,
-  Network,
-  Orbit,
-  Search,
-  Share2,
-  Sparkles,
-  Target,
-  Waypoints,
-} from "lucide-react";
+import { Maximize2, Minimize2, Orbit, Search, Share2, Sparkles } from "lucide-react";
 import * as React from "react";
 
 import { ClusterLayer } from "@/components/ontology/cluster-layer";
@@ -59,6 +47,7 @@ import {
   type GalaxyMode,
   type PositionedNode,
 } from "@/lib/ontology/layouts";
+import { conceptOnlySnapshot, mergeOntologyConcepts } from "@/lib/ontology/merge-concepts";
 import { cn } from "@/lib/utils";
 
 const nodeTypes: NodeTypes = { galaxy: GalaxyNode };
@@ -71,34 +60,22 @@ const MODES: ReadonlyArray<{
   icon: React.ComponentType<{ className?: string }>;
 }> = [
   {
-    id: "constellation",
-    label: "Constellation",
-    hint: "Domain map. Assets sit in business zones so you see the landscape first.",
-    icon: Orbit,
+    id: "semantic",
+    label: "Knowledge Graph",
+    hint: "Organic semantic network. One node per business concept, linked by named relationships.",
+    icon: Sparkles,
   },
   {
     id: "network",
-    label: "Network",
-    hint: "Connection map. Every relationship at once — best after you search or select an asset.",
-    icon: Network,
+    label: "Relationship Network",
+    hint: "Investigative view. Size and pull show influence and hidden communities.",
+    icon: Share2,
   },
   {
-    id: "hierarchy",
-    label: "Hierarchy",
-    hint: "Top-down structure. Read parent and child assets like an org chart.",
-    icon: GitBranch,
-  },
-  {
-    id: "lineage",
-    label: "Lineage",
-    hint: "Flow map. How assets feed each other — sources on one side, consumers on the other.",
-    icon: Waypoints,
-  },
-  {
-    id: "centrality",
-    label: "Influence",
-    hint: "Importance map. Larger nodes are more connected or sit on more paths.",
-    icon: Target,
+    id: "ontology",
+    label: "Concept Graph",
+    hint: "Business vocabulary as a radial taxonomy — meaning, not tables.",
+    icon: Orbit,
   },
 ];
 
@@ -159,40 +136,44 @@ function OntologyBrowserInner({
   initialFocusId?: string | null;
 }) {
   const { fitView, setCenter, getNode } = useReactFlow();
-  const [mode, setMode] = React.useState<GalaxyMode>("constellation");
+  const [mode, setMode] = React.useState<GalaxyMode>("semantic");
   const [metric, setMetric] = React.useState<CentralityMetric>("pagerank");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [pulseId, setPulseId] = React.useState<string | null>(null);
   const [activeCluster, setActiveCluster] = React.useState<string | null>(null);
   const [showClusters, setShowClusters] = React.useState(true);
-  /** Motion defaults OFF so large graphs stay readable without distraction. */
-  const [motionEnabled, setMotionEnabled] = React.useState(false);
+  const [motionEnabled, setMotionEnabled] = React.useState(true);
   const [kindFilter, setKindFilter] = React.useState<OntologyKindFilter>("all");
   const [overlay, setOverlay] = React.useState<ContextOverlay>("business");
   const [journeyId, setJourneyId] = React.useState<string | null>(null);
   const [fullScreen, setFullScreen] = React.useState(false);
 
+  const graph = React.useMemo(() => {
+    const merged = mergeOntologyConcepts(snapshot);
+    return mode === "ontology" ? conceptOnlySnapshot(merged) : merged;
+  }, [snapshot, mode]);
+
   const positioned = React.useMemo(
-    () => layoutGalaxy(snapshot, mode, metric),
-    [snapshot, mode, metric],
+    () => layoutGalaxy(graph, mode, metric),
+    [graph, mode, metric],
   );
 
   const nodeById = React.useMemo(() => {
-    const map = new Map(snapshot.nodes.map((node) => [node.id, node]));
+    const map = new Map(graph.nodes.map((node) => [node.id, node]));
     return map;
-  }, [snapshot.nodes]);
+  }, [graph.nodes]);
 
   const journeyPath = React.useMemo(() => {
     const journey = JOURNEYS.find((item) => item.id === journeyId);
-    return journey ? journeyNodeIds(snapshot, journey.seeds) : [];
-  }, [journeyId, snapshot]);
+    return journey ? journeyNodeIds(graph, journey.seeds) : [];
+  }, [journeyId, graph]);
 
   const journeySet = React.useMemo(() => new Set(journeyPath), [journeyPath]);
 
   const focus = React.useMemo(() => {
     if (!selectedId) return null;
-    const links = snapshot.edges.map((edge) => ({
+    const links = graph.edges.map((edge) => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
@@ -200,7 +181,7 @@ function OntologyBrowserInner({
     const one = hopNeighborhood(selectedId, links, 1);
     const two = hopNeighborhood(selectedId, links, 2);
     return { one, two };
-  }, [selectedId, snapshot.edges]);
+  }, [selectedId, graph.edges]);
 
   const flowNodes: GalaxyFlowNode[] = React.useMemo(() => {
     return positioned.map((node) => {
@@ -240,7 +221,7 @@ function OntologyBrowserInner({
         focused = true;
       }
       const asset = nodeById.get(node.id);
-      const badges = asset ? deriveAssetContext(asset, snapshot).badges : [];
+      const badges = asset ? deriveAssetContext(asset, graph).badges : [];
       return {
         id: node.id,
         type: "galaxy",
@@ -271,11 +252,11 @@ function OntologyBrowserInner({
     journeySet,
     nodeById,
     overlay,
-    snapshot,
+    graph,
   ]);
 
   const flowEdges: GalaxyFlowEdge[] = React.useMemo(() => {
-    return snapshot.edges.map((edge) => {
+    return graph.edges.map((edge) => {
       const visualKind = edgeVisualKind(edge, nodeById);
       let dimmed = false;
       let emphasized = false;
@@ -333,7 +314,7 @@ function OntologyBrowserInner({
         zIndex: emphasized ? 4 : 0,
       };
     });
-  }, [snapshot.edges, nodeById, focus, activeCluster, kindFilter, motionEnabled, journeySet, overlay]);
+  }, [graph.edges, nodeById, focus, activeCluster, kindFilter, motionEnabled, journeySet, overlay]);
 
   const selectedNode = selectedId ? (nodeById.get(selectedId) ?? null) : null;
 
@@ -341,28 +322,28 @@ function OntologyBrowserInner({
 
   const searchHits = React.useMemo(() => {
     if (!search.trim()) return [];
-    return snapshot.nodes.filter((node) => matchesDiscoveryQuery(node, search)).slice(0, 10);
-  }, [search, snapshot.nodes]);
+    return graph.nodes.filter((node) => matchesDiscoveryQuery(node, search)).slice(0, 10);
+  }, [search, graph.nodes]);
 
   const execStats = React.useMemo(() => {
-    const metrics = snapshot.nodes.filter((node) => node.kind === "measure").length;
-    const glossary = new Set(snapshot.nodes.flatMap((node) => node.synonyms)).size;
+    const metrics = graph.nodes.filter((node) => node.kind === "measure").length;
+    const glossary = new Set(graph.nodes.flatMap((node) => node.synonyms)).size;
     return {
-      assets: snapshot.metadata.nodeCount,
-      domains: snapshot.clusters.length,
+      concepts: graph.metadata.nodeCount,
+      communities: graph.clusters.length,
       metrics,
       glossary,
-      relationships: snapshot.metadata.edgeCount,
-      trusted: snapshotTrustRate(snapshot),
+      relationships: graph.metadata.edgeCount,
+      trusted: snapshotTrustRate(graph),
     };
-  }, [snapshot]);
+  }, [graph]);
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
       void fitView({ padding: 0.22, duration: 650 });
     }, 40);
     return () => window.clearTimeout(timer);
-  }, [mode, metric, snapshot, fitView, fullScreen]);
+  }, [mode, metric, graph, fitView, fullScreen]);
 
   const focusNode = React.useCallback(
     (nodeId: string) => {
@@ -386,8 +367,8 @@ function OntologyBrowserInner({
   React.useEffect(() => {
     if (!initialFocusId) return;
     const match =
-      snapshot.nodes.find((node) => node.id === initialFocusId) ??
-      snapshot.nodes.find(
+      graph.nodes.find((node) => node.id === initialFocusId) ??
+      graph.nodes.find(
         (node) =>
           node.id.toLowerCase().includes(initialFocusId.toLowerCase()) ||
           node.label.toLowerCase().includes(initialFocusId.toLowerCase()),
@@ -395,7 +376,7 @@ function OntologyBrowserInner({
     if (!match) return;
     const timer = window.setTimeout(() => focusNode(match.id), 500);
     return () => window.clearTimeout(timer);
-  }, [initialFocusId, snapshot.nodes, focusNode]);
+  }, [initialFocusId, graph.nodes, focusNode]);
 
   React.useEffect(() => {
     if (!fullScreen) return;
@@ -417,13 +398,14 @@ function OntologyBrowserInner({
           : "h-[min(88vh,980px)] min-h-[680px]",
       )}
       data-motion={motionEnabled ? "on" : "off"}
+      data-mode={mode}
     >
       {motionEnabled ? <ParticleField /> : null}
 
       <div className="relative z-20 border-b border-border/50 bg-surface-raised/55 px-3 py-3 backdrop-blur-xl">
         <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
-          <ExecStat label="Assets" value={String(execStats.assets)} />
-          <ExecStat label="Domains" value={String(execStats.domains)} />
+          <ExecStat label="Concepts" value={String(execStats.concepts)} />
+          <ExecStat label="Communities" value={String(execStats.communities)} />
           <ExecStat label="Metrics" value={String(execStats.metrics)} />
           <ExecStat label="Glossary" value={String(execStats.glossary)} />
           <ExecStat label="Relationships" value={String(execStats.relationships)} />
@@ -434,7 +416,7 @@ function OntologyBrowserInner({
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search assets, metrics, glossary terms, tables…"
+            placeholder="Search concepts, glossary, relationships…"
             className="h-11 border-border/60 bg-surface-raised/80 pl-10 text-sm shadow-sm backdrop-blur"
             aria-label="Discover assets"
           />
@@ -492,7 +474,7 @@ function OntologyBrowserInner({
         <div className="flex flex-wrap items-center gap-2">
           <div className="mr-1 flex items-center gap-2">
             <Sparkles className="size-3.5 text-info" aria-hidden="true" />
-            <span className="text-xs font-semibold tracking-tight">Map</span>
+            <span className="text-xs font-semibold tracking-tight">Graph</span>
           </div>
 
           <div className="flex flex-wrap gap-1" role="tablist" aria-label="Map view">
@@ -523,7 +505,7 @@ function OntologyBrowserInner({
             })}
           </div>
 
-          {mode === "centrality" ? (
+          {mode === "network" ? (
             <div className="flex gap-1" role="tablist" aria-label="Influence metric">
               {METRICS.map((item) => (
                 <button
@@ -613,7 +595,7 @@ function OntologyBrowserInner({
               if (!next) return;
               const journey = JOURNEYS.find((item) => item.id === next);
               if (!journey) return;
-              const ids = journeyNodeIds(snapshot, journey.seeds);
+              const ids = journeyNodeIds(graph, journey.seeds);
               if (ids[0]) focusNode(ids[0]);
             }}
             options={[
@@ -659,7 +641,7 @@ function OntologyBrowserInner({
           />
           {showClusters ? (
             <ClusterLayer
-              clusters={snapshot.clusters}
+              clusters={graph.clusters}
               nodes={positionedForClusters}
               activeCluster={activeCluster}
               onHover={setActiveCluster}
@@ -671,8 +653,9 @@ function OntologyBrowserInner({
               className="rounded-2xl border border-border/50 bg-surface-raised/75 px-3 py-2 text-[11px] shadow-lg backdrop-blur-xl"
             >
               <div className="flex items-center gap-2 font-semibold tracking-tight">
-                <Binary className="size-3.5 text-success" />
-                {snapshot.metadata.nodeCount} assets · {snapshot.metadata.edgeCount} relationships
+                <Sparkles className="size-3.5 text-success" />
+                {MODES.find((item) => item.id === mode)?.label} · {graph.metadata.nodeCount} concepts ·{" "}
+                {graph.metadata.edgeCount} links
               </div>
               {journeyPath.length ? (
                 <p className="mt-1 max-w-[16rem] text-muted-foreground">
@@ -682,10 +665,16 @@ function OntologyBrowserInner({
                 </p>
               ) : selectedId ? (
                 <p className="mt-1 text-muted-foreground">
-                  Focus · {relationshipCount} direct relations · 2-hop neighborhood
+                  Explore · {relationshipCount} neighbors · 2-hop neighborhood
                 </p>
               ) : (
-                <p className="mt-1 text-muted-foreground">Search or click an asset to enter Focus Graph</p>
+                <p className="mt-1 text-muted-foreground">
+                  {mode === "semantic"
+                    ? "Click a concept to expand its semantic neighborhood"
+                    : mode === "network"
+                      ? "Influence sized by connectivity — hover a community"
+                      : "Taxonomy of business meaning, not physical tables"}
+                </p>
               )}
             </motion.div>
           </Panel>
@@ -709,7 +698,7 @@ function OntologyBrowserInner({
 
         <NodeDrawer
           node={selectedNode}
-          snapshot={snapshot}
+          snapshot={graph}
           overlay={overlay}
           onClose={() => setSelectedId(null)}
           onFocus={focusNode}

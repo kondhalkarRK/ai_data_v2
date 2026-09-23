@@ -151,11 +151,11 @@ export function ResponseCard({
         {execFailed ? (
           <ResponseErrorState
             kind="execution"
-            title="Database Execution Failed"
+            title="SQL Execution Error"
             detail={
               meta?.executionError
                 ? `Reason: ${meta.executionError}`
-                : message.error || "SQL execution failed after validation."
+                : message.error || "The query did not finish. Try a more specific business question."
             }
             sql={message.sql}
             onRetry={onRetry}
@@ -165,7 +165,7 @@ export function ResponseCard({
         {zeroRows ? (
           <ResponseErrorState
             kind="zero_rows"
-            title="No rows matched"
+            title="No matching records"
             detail="The governed query ran successfully but returned zero rows. Try loosening a filter or widening the date range."
             sql={message.sql}
             suggestions={message.followups?.slice(0, 2)}

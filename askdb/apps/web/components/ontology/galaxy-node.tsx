@@ -24,8 +24,6 @@ export type GalaxyNodeData = OntologyNode & {
 export type GalaxyFlowNode = Node<GalaxyNodeData, "galaxy">;
 
 export function GalaxyNode({ data, selected }: NodeProps<GalaxyFlowNode>) {
-  const isFact =
-    data.tableType === "fact" || (data.kind === "table" && data.id.includes("fact"));
   const size = Math.max(36, data.radius * 2);
 
   return (
@@ -50,7 +48,7 @@ export function GalaxyNode({ data, selected }: NodeProps<GalaxyFlowNode>) {
       <div
         className={cn("galaxy-node")}
         title={`${data.label}${data.domain ? ` · ${data.domain}` : ""}`}
-        data-fact={isFact}
+        data-kind={data.kind}
         data-focused={data.focused || selected}
         data-dimmed={data.dimmed}
         data-pulse={data.motionEnabled && data.pulsing}

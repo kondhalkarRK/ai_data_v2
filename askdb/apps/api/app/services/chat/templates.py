@@ -143,7 +143,176 @@ def _automotive_filter_parts(
     return joins, where
 
 
+def _governed_automotive(plan: QuestionPlan) -> TemplateHit | None:
+    """Pack-free SQL for business questions the legacy entity templates skip."""
+    if plan.industry is not Industry.AUTOMOTIVE:
+        return None
+    if plan.analysis == "year_window_compare":
+        return _year_window_sql(plan)
+    if plan.analysis == "period_growth" and plan.entity == "metric_only":
+        return _growth_sql(plan)
+    if plan.entity != "metric_only":
+        return None
+    if plan.metric not in {"revenue", "orders", "units"}:
+        return None
+    if plan.dimensions:
+        return _dimension_breakdown_sql(plan)
+    if plan.metric in {"orders", "units"} or plan.filters:
+        # A named metric with no grain still deserves a time series, not a failure.
+        return _dimension_breakdown_sql(
+            _with_month(plan) if not plan.time_grain else plan,
+        )
+    return None
+
+
+def _with_month(plan: QuestionPlan) -> QuestionPlan:
+    plan.dimensions = ["month", *plan.dimensions]
+    plan.time_grain = "month"
+    plan.intent = "trend"
+    return plan
+
+
+def _year_window_sql(plan: QuestionPlan) -> TemplateHit:
+    months = max(1, min(plan.window_months or 3, 12))
+    years = max(1, min(plan.window_years or 3, 10))
+    metrics, _alias = _order_metric(plan.metric if plan.metric != "unknown" else "revenue")
+    return TemplateHit(
+        title=f"Last {months} months compared across {years} years",
+        glossary_matches=3,
+        path="semantic_compiler",
+        sql=f"""
+SELECT EXTRACT(YEAR FROM f.sales_date)::int AS year,
+       date_trunc('month', f.sales_date)::date AS month,
+       {metrics}
+FROM automotive.fact_sales f
+WHERE f.sales_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '{years} years'
+  AND f.sales_date < date_trunc('month', CURRENT_DATE)
+  AND EXTRACT(MONTH FROM f.sales_date)::int IN (
+        SELECT EXTRACT(MONTH FROM date_trunc('month', CURRENT_DATE) - (n || ' months')::interval)::int
+        FROM generate_series(1, {months}) AS n
+      )
+GROUP BY 1, 2
+ORDER BY 1, 2
+LIMIT 36
+""".strip(),
+    )
+
+
+def _growth_sql(plan: QuestionPlan) -> TemplateHit:
+    metrics, alias = _order_metric(plan.metric if plan.metric != "unknown" else "revenue")
+    label = "yoy_growth_pct" if plan.time_grain == "year" else "mom_growth_pct"
+    grain_expr = (
+        "EXTRACT(YEAR FROM f.sales_date)::int"
+        if plan.time_grain == "year"
+        else "date_trunc('month', f.sales_date)::date"
+    )
+    grain_alias = "year" if plan.time_grain == "year" else "month"
+    return TemplateHit(
+        title=f"{alias.replace('_', ' ').title()} growth",
+        glossary_matches=2,
+        path="semantic_compiler",
+        sql=f"""
+WITH aggregated AS (
+  SELECT {grain_expr} AS {grain_alias},
+         {metrics}
+  FROM automotive.fact_sales f
+  GROUP BY 1
+)
+SELECT {grain_alias},
+       {alias},
+       LAG({alias}) OVER (ORDER BY {grain_alias}) AS previous_{alias},
+       100.0 * ({alias} - LAG({alias}) OVER (ORDER BY {grain_alias}))
+         / NULLIF(LAG({alias}) OVER (ORDER BY {grain_alias}), 0) AS {label}
+FROM aggregated
+ORDER BY 1
+LIMIT 36
+""".strip(),
+    )
+
+
+_DIM_EXPR: dict[str, tuple[str, str, str | None]] = {
+    "year": ("EXTRACT(YEAR FROM f.sales_date)::int", "year", None),
+    "quarter": ("date_trunc('quarter', f.sales_date)::date", "quarter", None),
+    "month": ("date_trunc('month', f.sales_date)::date", "month", None),
+    "region": (
+        "COALESCE(r.region_name, 'Unknown')",
+        "region_name",
+        "LEFT JOIN automotive.dim_region r ON r.region_id = f.region_id",
+    ),
+    "city": (
+        "r.city",
+        "city",
+        "LEFT JOIN automotive.dim_region r ON r.region_id = f.region_id",
+    ),
+    "car_type": (
+        "c.car_type",
+        "car_type",
+        "JOIN automotive.dim_carline c ON c.carline_id = f.carline_id",
+    ),
+    "model": (
+        "c.model",
+        "model",
+        "JOIN automotive.dim_carline c ON c.carline_id = f.carline_id",
+    ),
+    "make": (
+        "c.make",
+        "make",
+        "JOIN automotive.dim_carline c ON c.carline_id = f.carline_id",
+    ),
+    "dealer": (
+        "d.dealer_name",
+        "dealer_name",
+        "JOIN automotive.dim_dealer d ON d.dealer_id = f.dealer_id",
+    ),
+}
+
+
+def _dimension_breakdown_sql(plan: QuestionPlan) -> TemplateHit | None:
+    dims = [key for key in plan.dimensions if key in _DIM_EXPR] or ["month"]
+    selects: list[str] = []
+    joins: list[str] = []
+    aliases: set[str] = set()
+    for key in dims:
+        expr, alias, join = _DIM_EXPR[key]
+        selects.append(f"{expr} AS {alias}")
+        if join and join not in joins:
+            joins.append(join)
+            if " dim_region " in f" {join} ":
+                aliases.add("r")
+            if " dim_carline " in f" {join} ":
+                aliases.add("c")
+            if " dim_dealer " in f" {join} ":
+                aliases.add("d")
+    extra_joins, where = _automotive_filter_parts(plan, base_aliases=aliases)
+    for join in extra_joins:
+        if join not in joins:
+            joins.append(join)
+    metrics, order_alias = _order_metric(plan.metric if plan.metric != "unknown" else "revenue")
+    chronological = any(key in dims for key in ("year", "quarter", "month"))
+    order = "1" if chronological else f"{order_alias} {plan.order_direction.upper()}"
+    title_dims = ", ".join(alias for _expr, alias, _join in (_DIM_EXPR[key] for key in dims))
+    return TemplateHit(
+        title=f"{order_alias.replace('_', ' ').title()} by {title_dims}",
+        glossary_matches=max(2, len(dims) + 1),
+        path="semantic_compiler",
+        sql=f"""
+SELECT {", ".join(selects)},
+       {metrics}
+FROM automotive.fact_sales f
+{chr(10).join(joins)}
+{where}
+GROUP BY {", ".join(str(i) for i in range(1, len(selects) + 1))}
+ORDER BY {order}
+LIMIT {max(1, min(plan.limit or 36, 100))}
+""".strip(),
+    )
+
+
 def _automotive_from_plan(plan: QuestionPlan) -> TemplateHit | None:
+    governed = _governed_automotive(plan)
+    if governed is not None:
+        return governed
+
     limit = plan.limit or 10
     metric = plan.metric if plan.metric != "unknown" else "units"
     select_metrics, order_alias = _order_metric(metric)

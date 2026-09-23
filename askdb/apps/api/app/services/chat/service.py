@@ -28,6 +28,7 @@ from app.services.chat.failures import (
     classify_llm_failure,
     classify_semantic,
     classify_sql_validation,
+    propose_sql_repair,
 )
 from app.services.chat.intents import (
     is_followup,
@@ -356,6 +357,18 @@ class ChatService:
             self._industry,
             question,
             value_filters=value_filters,
+        )
+        logger.info(
+            "nlq_plan question=%r intent=%s entity=%s metric=%s analysis=%s "
+            "dimensions=%s filters=%s ambiguous=%s",
+            question[:180],
+            plan.intent,
+            plan.entity,
+            plan.metric,
+            plan.analysis,
+            plan.dimensions,
+            [f"{item.column}={item.value}" for item in plan.filters],
+            plan.is_ambiguous,
         )
         if plan.is_ambiguous and plan.ambiguity_options:
             msg = "Your question is ambiguous. Did you mean one of these?"
@@ -716,23 +729,32 @@ class ChatService:
             except Exception as exc:
                 await self._recover_analytics()
                 repair_t0 = time.perf_counter()
-                repaired = sql_text.strip().rstrip(";")
-                try:
-                    await self._analytics.execute(text(f"EXPLAIN {repaired}"))
-                    sql_text = repaired
-                    validation_status = "auto_repaired"
-                    timings.sql_auto_repair_ms = int((time.perf_counter() - repair_t0) * 1000)
-                except Exception as repair_exc:
-                    await self._recover_analytics()
-                    timings.sql_auto_repair_ms = int((time.perf_counter() - repair_t0) * 1000)
+                candidate = sql_text
+                last_exc: Exception = exc
+                repaired_ok = False
+                for _attempt in range(3):
+                    proposal = propose_sql_repair(candidate, str(last_exc))
+                    if not proposal:
+                        break
+                    try:
+                        await self._analytics.execute(text(f"EXPLAIN {proposal}"))
+                        sql_text = proposal
+                        validation_status = "auto_repaired"
+                        repaired_ok = True
+                        break
+                    except Exception as repair_exc:
+                        await self._recover_analytics()
+                        last_exc = repair_exc
+                        candidate = proposal
+                timings.sql_auto_repair_ms = int((time.perf_counter() - repair_t0) * 1000)
+                if not repaired_ok:
                     validation_status = "failed"
                     timings.sql_validation_ms = int((time.perf_counter() - val_t0) * 1000)
-                    detail = str(repair_exc)[:240]
-                    # Prefer the original EXPLAIN error when repair only hit an aborted txn.
+                    detail = str(last_exc)[:240]
                     if "InFailedSqlTransaction" in detail:
                         detail = str(exc)[:240]
                     async for frame in emit_failure(
-                        classify_sql_validation(detail),
+                        classify_database(detail),
                         sql=sql_text,
                     ):
                         yield frame

@@ -99,7 +99,7 @@ export function failureKindFromCategory(category?: string): ResponseErrorKind {
     case "llm":
     case "circuit_open":
     case "timeout":
-      return "llm";
+      return "execution";
     case "sql_generation":
       return "sql_generation";
     case "database":
