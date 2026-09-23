@@ -10,10 +10,30 @@ from app.services.chat.question_understanding import understand_question
 from app.services.chat.semantic_context import validate_sql_against_plan
 from app.services.chat.templates import resolve_template
 
+_AUTOMOTIVE_SCHEMA = {
+    "automotive.fact_sales": {
+        "order_id",
+        "carline_id",
+        "colour_id",
+        "sales_person_id",
+        "region_id",
+        "dealer_id",
+        "sales_date",
+        "order_qty",
+        "price_per_unit",
+        "total_sales",
+    },
+    "automotive.dim_carline": {"carline_id", "model", "make", "car_type", "engine_type"},
+    "automotive.dim_salesman": {"sales_person_id", "first_name", "last_name"},
+    "automotive.dim_dealer": {"dealer_id", "dealer_name", "city", "dealer_grade"},
+    "automotive.dim_region": {"region_id", "region_name", "city"},
+}
+
 
 @pytest.mark.parametrize(
     ("question", "sql_bits"),
     [
+        ("Show total sales per year", ("total_sales", "extract(year", "sales_date", "fact_sales")),
         ("Show me total orders per year", ("count(distinct", "extract(year", "fact_sales")),
         ("Show orders per year", ("count(distinct", "extract(year", "fact_sales")),
         ("Show revenue by month", ("total_sales", "date_trunc('month'", "fact_sales")),
@@ -39,7 +59,7 @@ def test_business_questions_compile(question: str, sql_bits: tuple[str, ...]) ->
     sql = hit.sql.lower()
     for bit in sql_bits:
         assert bit in sql, f"{question} missing {bit}"
-    ok, reason = validate_sql_against_plan(hit.sql, plan)
+    ok, reason = validate_sql_against_plan(hit.sql, plan, allowed_schema=_AUTOMOTIVE_SCHEMA)
     assert ok, reason
 
 

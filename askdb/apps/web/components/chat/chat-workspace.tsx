@@ -20,7 +20,7 @@ const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/,
 export function ChatWorkspace() {
   const industry = useActiveIndustry();
   const searchParams = useSearchParams();
-  const [question, setQuestion] = useState("Show loss ratio by month");
+  const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [webRetrieval, setWebRetrieval] = useState(false);

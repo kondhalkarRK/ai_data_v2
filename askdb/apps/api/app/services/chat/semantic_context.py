@@ -162,6 +162,15 @@ def build_allowed_schema(pack: Any | None) -> dict[str, set[str]]:
     }
 
 
+# Physical schemas owned by a domain pack. EXTRACT(YEAR FROM f.sales_date) also
+# contains the word FROM, so table detection must require one of these schemas.
+_DOMAIN_SCHEMAS = ("automotive", "insurance")
+_SCHEMA_TABLE = re.compile(
+    r"\b(?:from|join)\s+((?:automotive|insurance)\.[a-z_][\w]*)(?:\s+(?:as\s+)?([a-z_][\w]*))?",
+    re.I,
+)
+
+
 def validate_sql_against_plan(
     sql: str,
     plan: QuestionPlan,
@@ -211,10 +220,6 @@ def validate_sql_against_plan(
 
     if allowed_schema:
         alias_map: dict[str, str] = {}
-        table_pattern = re.compile(
-            r"\b(?:from|join)\s+([a-z_][\w]*\.[a-z_][\w]*)(?:\s+(?:as\s+)?([a-z_][\w]*))?",
-            re.I,
-        )
         reserved = {
             "where",
             "join",
@@ -228,7 +233,7 @@ def validate_sql_against_plan(
             "limit",
             "on",
         }
-        for match in table_pattern.finditer(sql):
+        for match in _SCHEMA_TABLE.finditer(sql):
             table = match.group(1).lower()
             if table not in allowed_schema:
                 return False, f"Table '{table}' is outside the selected domain semantic pack"
@@ -237,6 +242,11 @@ def validate_sql_against_plan(
                 alias = table.rsplit(".", 1)[-1]
             alias_map[alias] = table
         for alias, column in re.findall(r"\b([a-z_][\w]*)\.([a-z_][\w]*)\b", lowered):
+            if alias in _DOMAIN_SCHEMAS:
+                qualified = f"{alias}.{column}"
+                if qualified not in allowed_schema:
+                    return False, f"Table '{qualified}' is outside the selected domain semantic pack"
+                continue
             table = alias_map.get(alias)
             if table and column not in allowed_schema[table]:
                 return (
