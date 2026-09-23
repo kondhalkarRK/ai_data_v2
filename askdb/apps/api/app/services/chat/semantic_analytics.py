@@ -137,6 +137,12 @@ def _metric_spec(plan: QuestionPlan) -> MetricSpec:
                 "COUNT(DISTINCT {alias}.order_id)",
                 "orders",
             ),
+            "average_selling_price": MetricSpec(
+                "average_selling_price",
+                "fact_sales",
+                "SUM({alias}.total_sales) / NULLIF(SUM({alias}.order_qty), 0)",
+                "average_selling_price",
+            ),
         }
     else:
         specs = {
@@ -329,6 +335,8 @@ def _where_clauses(plan: QuestionPlan, pack: Any, required_tables: set[str]) -> 
             raise SemanticCompileError(f"Unsupported filter operator '{filt.operator}'")
         value = filt.value.replace("'", "''")
         clauses.append(f"{_ALIASES[logical]}.{column} {filt.operator} '{value}'")
+    if plan.year_filter and plan.industry is Industry.AUTOMOTIVE:
+        clauses.append(f"f.sales_date IS NOT NULL AND EXTRACT(YEAR FROM f.sales_date)::int = {int(plan.year_filter)}")
     return clauses
 
 

@@ -201,6 +201,14 @@ def validate_sql_against_plan(
         if not re.search(rf"\border\s+by\b[\s\S]*?\b{required_direction}\b", lowered):
             return False, f"Ranking SQL must order {required_direction.upper()}"
 
+    if plan.dimensions and re.search(r"\b(sum|count|avg)\s*\(", lowered):
+        if "group by" not in lowered:
+            return False, "Aggregation requires GROUP BY for the selected dimensions"
+        for dimension in plan.dimensions:
+            token = dimension.replace("_", "")
+            if dimension not in lowered and token not in lowered.replace("_", ""):
+                return False, f"SQL is missing dimension '{dimension}'"
+
     if allowed_schema:
         alias_map: dict[str, str] = {}
         table_pattern = re.compile(

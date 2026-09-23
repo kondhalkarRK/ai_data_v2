@@ -153,7 +153,6 @@ function runForce(
 
 /** Taxonomy fan — parent concepts with children, not concentric warehouse rings. */
 function layoutOntology(snapshot: OntologySnapshot, centrality: Map<string, number>): PositionedNode[] {
-  const domain = snapshot.nodes.find((node) => node.kind === "domain");
   const families = new Map<string, OntologyNode[]>();
   for (const node of snapshot.nodes) {
     if (node.kind === "domain") continue;
@@ -163,15 +162,6 @@ function layoutOntology(snapshot: OntologySnapshot, centrality: Map<string, numb
 
   const keys = [...families.keys()];
   const placed: PositionedNode[] = [];
-  if (domain) {
-    placed.push({
-      ...domain,
-      x: 0,
-      y: 0,
-      radius: 42,
-      centrality: centrality.get(domain.id) ?? 1,
-    });
-  }
 
   keys.forEach((key, familyIndex) => {
     const members = families.get(key) ?? [];

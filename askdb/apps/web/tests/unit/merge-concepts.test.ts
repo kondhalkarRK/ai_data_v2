@@ -1,7 +1,7 @@
 import type { OntologyNode, OntologySnapshot } from "@nql/shared-types";
 import { describe, expect, it } from "vitest";
 
-import { mergeOntologyConcepts, normalizeConceptKey } from "@/lib/ontology/merge-concepts";
+import { mergeOntologyConcepts, normalizeConceptKey, withoutDomainNodes } from "@/lib/ontology/merge-concepts";
 
 function node(partial: Partial<OntologyNode> & Pick<OntologyNode, "id" | "label" | "kind">): OntologyNode {
   return {
@@ -68,5 +68,39 @@ describe("mergeOntologyConcepts", () => {
     expect(merged.edges.some((edge) => edge.source === edge.target)).toBe(false);
     expect(merged.nodes.find((item) => item.label === "Vehicle")?.cluster).toBe("Actors");
     expect(merged.clusters.some((cluster) => cluster.id === "Facts")).toBe(false);
+  });
+
+  it("drops the industry domain node and its edges", () => {
+    const snapshot: OntologySnapshot = {
+      nodes: [
+        node({ id: "domain:automotive", label: "Automotive Sales", kind: "domain", cluster: "Domain" }),
+        node({ id: "entity:dealer", label: "Dealer", kind: "entity" }),
+      ],
+      edges: [
+        {
+          id: "contains",
+          source: "domain:automotive",
+          target: "entity:dealer",
+          kind: "dependency",
+          label: "contains",
+        },
+      ],
+      clusters: [
+        { id: "Domain", label: "Domain", color: "#0f766e" },
+        { id: "Entities", label: "Entities", color: "#059669" },
+      ],
+      metadata: {
+        industry: "automotive",
+        version: "1",
+        compiledAt: "2026-01-01T00:00:00.000Z",
+        nodeCount: 2,
+        edgeCount: 1,
+        buildMs: 1,
+      },
+    };
+    const graph = withoutDomainNodes(snapshot);
+    expect(graph.nodes.map((item) => item.label)).toEqual(["Dealer"]);
+    expect(graph.edges).toHaveLength(0);
+    expect(graph.clusters.some((cluster) => cluster.id === "Domain")).toBe(false);
   });
 });

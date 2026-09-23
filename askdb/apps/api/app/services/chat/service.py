@@ -30,8 +30,8 @@ from app.services.chat.failures import (
     classify_sql_validation,
     propose_sql_repair,
 )
+from app.services.chat.conversation_context import is_contextual_followup, plan_state
 from app.services.chat.intents import (
-    is_followup,
     is_out_of_bounds,
     is_surprise_me,
     is_whatif,
@@ -42,6 +42,12 @@ from app.services.chat.intents import (
 from app.services.chat.profiler import PROFILER, QueryProfile
 from app.services.chat.query_cache import QUERY_CACHE, CachedAnswer
 from app.services.chat.query_router import knowledge_narrative, plan_entities, route_question
+from app.services.chat.semantic_query_planner import (
+    PIPELINE_STAGES,
+    plan_semantic_query,
+    recommend_chart,
+    rewrite_question,
+)
 from app.services.chat.question_understanding import QuestionPlan, understand_question
 from app.services.chat.response_meta import (
     QueryTimings,
@@ -60,7 +66,7 @@ from app.services.chat.semantic_context import (
     validate_sql_against_plan,
 )
 from app.services.chat.sql_limits import ensure_result_limit
-from app.services.chat.templates import list_templates, resolve_template
+from app.services.chat.templates import list_templates
 from app.services.chat.trust import compute_trust_score
 from app.services.chat.value_dictionary import (
     ValueDictionarySnapshot,
@@ -72,14 +78,7 @@ from app.services.web_retrieval import WebRetrievalService
 
 logger = logging.getLogger(__name__)
 
-PROGRESS_STEPS = [
-    {"id": "understanding", "label": "Understanding your question"},
-    {"id": "metrics", "label": "Matching your semantic layer"},
-    {"id": "sql", "label": "Generating SQL"},
-    {"id": "validate", "label": "Validating query"},
-    {"id": "execute", "label": "Crunching the data"},
-    {"id": "visualize", "label": "Building your answer"},
-]
+PROGRESS_STEPS = PIPELINE_STAGES
 
 
 def _jsonable(value: Any) -> Any:
@@ -188,10 +187,10 @@ class ChatService:
         )
         history_id = uuid.uuid4()
         profile.history_id = str(history_id)
-        completed_steps: list[str] = []
+        completed_steps: list[str] = ["question"]
 
         yield _sse("stage", {"stage": "accepted", "historyId": str(history_id)})
-        yield _progress("understanding", completed_steps)
+        yield _progress("rewrite", completed_steps)
 
         conversation = await self._ensure_conversation(conversation_id, question)
         history = await self._create_running_history(history_id, conversation.id, question)
@@ -353,15 +352,19 @@ class ChatService:
             value_dictionary = ValueDictionarySnapshot(self._industry, ())
         value_filters = value_dictionary.match(question)
         allowed_schema = build_allowed_schema(semantic_pack)
+        rewritten = rewrite_question(question)
+        completed_steps.append("rewrite")
+        yield _progress("intent", completed_steps, slow=maybe_slow())
         plan = understand_question(
             self._industry,
-            question,
+            rewritten,
             value_filters=value_filters,
         )
         logger.info(
-            "nlq_plan question=%r intent=%s entity=%s metric=%s analysis=%s "
+            "nlq_plan question=%r rewritten=%r intent=%s entity=%s metric=%s analysis=%s "
             "dimensions=%s filters=%s ambiguous=%s",
             question[:180],
+            rewritten[:180],
             plan.intent,
             plan.entity,
             plan.metric,
@@ -370,6 +373,8 @@ class ChatService:
             [f"{item.column}={item.value}" for item in plan.filters],
             plan.is_ambiguous,
         )
+        completed_steps.append("intent")
+        yield _progress("ambiguity", completed_steps, slow=maybe_slow())
         if plan.is_ambiguous and plan.ambiguity_options:
             msg = "Your question is ambiguous. Did you mean one of these?"
             async for frame in finish_without_sql(
@@ -395,8 +400,10 @@ class ChatService:
         )
 
         if decision.route == "knowledge":
-            completed_steps.append("understanding")
-            yield _progress("visualize", completed_steps, slow=maybe_slow())
+            completed_steps.extend(
+                step for step in ("rewrite", "intent", "ambiguity") if step not in completed_steps
+            )
+            yield _progress("narration", completed_steps, slow=maybe_slow())
             try:
                 citations = knowledge_service.search(
                     question,
@@ -473,8 +480,8 @@ class ChatService:
             yield _sse("cancelled", {"historyId": str(history_id)})
             return
 
-        completed_steps.append("understanding")
-        yield _progress("metrics", completed_steps, slow=maybe_slow())
+        completed_steps.append("ambiguity")
+        yield _progress("context", completed_steps, slow=maybe_slow())
 
         data_as_of_hint = await self._industry_data_as_of()
 
@@ -492,15 +499,23 @@ class ChatService:
             profile.timings = timings.to_dict()
             PROFILER.record(profile)
             yield _sse("stage", {"stage": "cache_hit"})
-            cache_steps = [
-                s
-                for s in PROGRESS_STEPS
-                if s["id"] in {"understanding", "metrics", "visualize"}
-            ]
-            for step in ("metrics", "visualize"):
+            for step in (
+                "rewrite",
+                "intent",
+                "ambiguity",
+                "context",
+                "semantic",
+                "joins",
+                "formula",
+                "sql",
+                "validate",
+                "repair",
+                "execute",
+                "chart",
+            ):
                 if step not in completed_steps:
                     completed_steps.append(step)
-            yield _progress("visualize", completed_steps, steps=cache_steps)
+            yield _progress("narration", completed_steps)
             if cached.sql:
                 yield _sse(
                     "sql",
@@ -560,44 +575,51 @@ class ChatService:
 
         prior_sql: str | None = None
         followup_note = ""
-        if is_followup(question):
+        prior_state: dict[str, Any] | None = None
+        if is_contextual_followup(question):
             prior_sql = await self._prior_sql(conversation.id, history_id)
-            if prior_sql:
+            prior_state = await self._prior_state(conversation.id, history_id)
+            if prior_sql or prior_state:
                 yield _sse("stage", {"stage": "followup"})
-                followup_note = "Using the previous query as conversational context. "
+                followup_note = "Using the previous question's metric, filters, and grain. "
 
         semantic_t0 = time.perf_counter()
+        surprise_sql = None
         if is_surprise_me(question):
             templates = list_templates(self._industry)
-            hit = secrets.choice(templates) if templates else None
+            surprise = secrets.choice(templates) if templates else None
+            if surprise is not None:
+                surprise_sql = (surprise.sql, surprise.title, surprise.glossary_matches)
             yield _sse("stage", {"stage": "surprise"})
-        elif prior_sql:
-            # Follow-ups must preserve the prior query's grain and joins. A fresh
-            # standalone template would silently discard that context.
-            hit = None
-        else:
-            hit = resolve_template(
-                self._industry,
-                question,
-                plan=plan,
-                pack=semantic_pack,
-            )
+        planned = plan_semantic_query(
+            self._industry,
+            question,
+            value_filters=value_filters,
+            prior_sql=prior_sql,
+            pack=semantic_pack,
+            surprise_sql=surprise_sql,
+            prior_state=prior_state,
+        )
+        plan = planned.plan
+        yield _sse("stage", {"stage": "semantic_plan", **planned.trace()})
         timings.semantic_lookup_ms = int((time.perf_counter() - semantic_t0) * 1000)
-        completed_steps.append("metrics")
+        for step in ("context", "semantic", "joins", "formula"):
+            if step not in completed_steps:
+                completed_steps.append(step)
         yield _progress("sql", completed_steps, slow=maybe_slow())
 
-        sql_text: str | None = None
-        path = "fallback"
-        glossary_matches = 0
+        sql_text: str | None = planned.sql
+        path = planned.path
+        glossary_matches = planned.glossary_matches
         narrative = followup_note
         scenario = parse_whatif(question) if is_whatif(question) else None
         ambiguity_flag = False
         alternate_interpretations: list[str] = []
 
-        if hit is not None:
+        if planned.sql is not None:
             if not is_surprise_me(question):
                 ok, reason = validate_sql_against_plan(
-                    hit.sql,
+                    planned.sql,
                     plan,
                     allowed_schema=allowed_schema,
                 )
@@ -610,12 +632,11 @@ class ChatService:
                     ):
                         yield frame
                     return
-            sql_text = hit.sql
-            path = hit.path
-            glossary_matches = hit.glossary_matches
-            narrative += f"Answered with governed template: {hit.title}."
-            yield _sse("stage", {"stage": "template", "title": hit.title})
-        else:
+            path = planned.path
+            glossary_matches = planned.glossary_matches
+            narrative += f"Answered with governed template: {planned.title}."
+            yield _sse("stage", {"stage": "template", "title": planned.title})
+        elif planned.path == "followup" or planned.sql is None:
             if plan.entity:
                 logger.info(
                     "Question plan entity=%s metric=%s dimensions=%s analysis=%s "
@@ -733,7 +754,7 @@ class ChatService:
                 last_exc: Exception = exc
                 repaired_ok = False
                 for _attempt in range(3):
-                    proposal = propose_sql_repair(candidate, str(last_exc))
+                    proposal = propose_sql_repair(candidate, str(last_exc), semantic_pack)
                     if not proposal:
                         break
                     try:
@@ -761,6 +782,8 @@ class ChatService:
                     return
             timings.sql_validation_ms = int((time.perf_counter() - val_t0) * 1000)
             completed_steps.append("validate")
+            if "repair" not in completed_steps:
+                completed_steps.append("repair")
             yield _progress("execute", completed_steps, slow=maybe_slow())
 
             yield _sse(
@@ -808,7 +831,7 @@ class ChatService:
                 return
 
             completed_steps.append("execute")
-            yield _progress("visualize", completed_steps, slow=maybe_slow())
+            yield _progress("chart", completed_steps, slow=maybe_slow())
 
             if rows or columns:
                 yield _sse("columns", {"columns": columns})
@@ -821,9 +844,10 @@ class ChatService:
                     },
                 )
             render_t0 = time.perf_counter()
-            if rows and len(columns) >= 2:
+            chart_type = recommend_chart(plan, columns)
+            if rows and len(columns) >= 2 and chart_type != "table":
                 chart_payload = {
-                    "type": "bar",
+                    "type": chart_type,
                     "x": columns[0],
                     "y": columns[1],
                     "points": rows[:40],
@@ -831,6 +855,8 @@ class ChatService:
                 }
                 yield _sse("chart", chart_payload)
             timings.render_ms = int((time.perf_counter() - render_t0) * 1000)
+            completed_steps.append("chart")
+            yield _progress("narration", completed_steps, slow=maybe_slow())
 
             score, breakdown = compute_trust_score(
                 glossary_matches=glossary_matches,
@@ -845,8 +871,12 @@ class ChatService:
                 resolution_path=path,
                 row_count=0,
             )
-            completed_steps.extend(["sql", "execute", "visualize"])
-            yield _progress("visualize", completed_steps, slow=maybe_slow())
+            completed_steps.extend(
+                step
+                for step in ("sql", "validate", "repair", "execute", "chart")
+                if step not in completed_steps
+            )
+            yield _progress("narration", completed_steps, slow=maybe_slow())
 
         if await cancelled():
             yield _sse("cancelled", {"historyId": str(history_id)})
@@ -898,8 +928,10 @@ class ChatService:
             has_sql=bool(sql_text),
             dq_checked=False,
         )
-        if "visualize" not in completed_steps:
-            completed_steps.append("visualize")
+        if "chart" not in completed_steps:
+            completed_steps.append("chart")
+        if "narration" not in completed_steps:
+            completed_steps.append("narration")
 
         meta_payload = {
             "groundedOn": grounded,
@@ -914,6 +946,7 @@ class ChatService:
             "insights": insights,
             "anomalies": detect_anomalies(columns, rows) if rows else [],
             "alternateInterpretations": alternate_interpretations,
+            "queryPlan": planned.trace(),
             "dqFailed": dq_failed,
             "executionError": execution_error,
             "autoRepaired": validation_status == "auto_repaired",
@@ -937,6 +970,7 @@ class ChatService:
             "groundedOn": grounded,
             "ambiguityFlag": ambiguity_flag,
             "validationStatus": validation_status,
+            "queryState": plan_state(plan),
         }
         history.latency_ms = latency_ms
         history.status = "completed"
@@ -951,7 +985,7 @@ class ChatService:
         )
         yield _sse("followups", {"items": followups})
 
-        if sql_text and path != "fallback":
+        if sql_text and path != "fallback" and not is_contextual_followup(question):
             QUERY_CACHE.put(
                 industry=self._industry.value,
                 question=question,
@@ -1070,6 +1104,23 @@ class ChatService:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def _prior_state(
+        self, conversation_id: uuid.UUID, current_history_id: uuid.UUID
+    ) -> dict[str, Any] | None:
+        result = await self._app.execute(
+            select(QueryHistory.trust_breakdown)
+            .where(QueryHistory.conversation_id == conversation_id)
+            .where(QueryHistory.id != current_history_id)
+            .where(QueryHistory.status == "completed")
+            .order_by(QueryHistory.created_at.desc())
+            .limit(1)
+        )
+        breakdown = result.scalar_one_or_none()
+        if not isinstance(breakdown, dict):
+            return None
+        state = breakdown.get("queryState")
+        return state if isinstance(state, dict) else None
 
     async def list_history(self, *, limit: int = 50) -> list[QueryHistory]:
         result = await self._app.execute(

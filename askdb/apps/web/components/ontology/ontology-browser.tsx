@@ -47,7 +47,7 @@ import {
   type GalaxyMode,
   type PositionedNode,
 } from "@/lib/ontology/layouts";
-import { conceptOnlySnapshot, mergeOntologyConcepts } from "@/lib/ontology/merge-concepts";
+import { conceptOnlySnapshot, mergeOntologyConcepts, withoutDomainNodes } from "@/lib/ontology/merge-concepts";
 import { cn } from "@/lib/utils";
 
 const nodeTypes: NodeTypes = { galaxy: GalaxyNode };
@@ -150,7 +150,7 @@ function OntologyBrowserInner({
   const [fullScreen, setFullScreen] = React.useState(false);
 
   const graph = React.useMemo(() => {
-    const merged = mergeOntologyConcepts(snapshot);
+    const merged = withoutDomainNodes(mergeOntologyConcepts(snapshot));
     return mode === "ontology" ? conceptOnlySnapshot(merged) : merged;
   }, [snapshot, mode]);
 

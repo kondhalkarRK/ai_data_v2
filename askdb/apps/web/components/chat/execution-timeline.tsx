@@ -7,12 +7,12 @@ import type { ProgressState, QueryTimings } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 
 const COMPLETE_STAGES: Array<{ key: keyof QueryTimings; label: string }> = [
-  { key: "semanticLookupMs", label: "Matching your semantic layer" },
-  { key: "llmGenerationMs", label: "Generating SQL" },
-  { key: "sqlValidationMs", label: "Validating query" },
-  { key: "sqlAutoRepairMs", label: "SQL auto-repair" },
-  { key: "executionMs", label: "Crunching the data" },
-  { key: "renderMs", label: "Building your answer" },
+  { key: "semanticLookupMs", label: "Semantic Resolver" },
+  { key: "llmGenerationMs", label: "SQL Generation" },
+  { key: "sqlValidationMs", label: "SQL Validation" },
+  { key: "sqlAutoRepairMs", label: "Auto Repair" },
+  { key: "executionMs", label: "Execution" },
+  { key: "renderMs", label: "Chart Recommendation" },
 ];
 
 /**

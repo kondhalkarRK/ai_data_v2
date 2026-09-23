@@ -122,6 +122,27 @@ export function mergeOntologyConcepts(snapshot: OntologySnapshot): OntologySnaps
   };
 }
 
+/** Drop the industry domain hub (Automotive / Insurance). It is not a business concept. */
+export function withoutDomainNodes(snapshot: OntologySnapshot): OntologySnapshot {
+  const nodes = snapshot.nodes.filter((node) => node.kind !== "domain");
+  const ids = new Set(nodes.map((node) => node.id));
+  const edges = snapshot.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target));
+  const clusters = snapshot.clusters.filter(
+    (cluster) => cluster.id !== "Domain" && nodes.some((node) => node.cluster === cluster.id),
+  );
+  return {
+    ...snapshot,
+    nodes,
+    edges,
+    clusters,
+    metadata: {
+      ...snapshot.metadata,
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+    },
+  };
+}
+
 /** Ontology view: vocabulary only — no leftover physical tables. */
 export function conceptOnlySnapshot(snapshot: OntologySnapshot): OntologySnapshot {
   const nodes = snapshot.nodes.filter((node) => node.kind !== "table");

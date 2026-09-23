@@ -62,6 +62,7 @@ MetricKind = Literal[
     "approval_rate",
     "renewal_rate",
     "loss_ratio",
+    "average_selling_price",
     "unknown",
 ]
 OrderDirection = Literal["asc", "desc"]
@@ -95,6 +96,7 @@ class QuestionPlan:
     partition_by: list[str] = field(default_factory=list)
     window_months: int | None = None
     window_years: int | None = None
+    year_filter: int | None = None
 
     @property
     def is_ambiguous(self) -> bool:

@@ -14,7 +14,7 @@ import { ResultChart } from "@/components/chat/result-chart";
 import { SQLViewer } from "@/components/chat/sql-viewer";
 import { SuggestedQuestions } from "@/components/chat/suggested-questions";
 import { TrustIndicators } from "@/components/chat/trust-indicators";
-import type { ChatMessage, InsightDepth, ResponseTab } from "@/components/chat/types";
+import type { ChatMessage, InsightDepth, QueryPlanTrace, ResponseTab } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 
 const ROUTE_LABEL: Record<string, string> = {
@@ -186,6 +186,8 @@ export function ResponseCard({
           />
         ) : null}
 
+        {meta?.queryPlan ? <QueryPlanNote plan={meta.queryPlan} /> : null}
+
         {!execFailed && (message.sql || message.rows?.length || meta) ? (
           <>
             <ResponseTabs value={tab} onChange={setTab} />
@@ -351,6 +353,24 @@ export function ResponseCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function QueryPlanNote({ plan }: { plan: QueryPlanTrace }) {
+  if (!plan.formula && !plan.joins?.length && !plan.filters?.length) return null;
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/15 px-3 py-2 text-xs text-muted-foreground">
+      {plan.formula ? (
+        <p>
+          <span className="font-medium text-foreground">
+            {(plan.metric || "Metric").replaceAll("_", " ")}
+          </span>{" "}
+          interpreted as {plan.formula}
+        </p>
+      ) : null}
+      {plan.joins?.length ? <p>Joins: {plan.joins.join(" · ")}</p> : null}
+      {plan.filters?.length ? <p>Filters: {plan.filters.join(", ")}</p> : null}
+    </div>
   );
 }
 

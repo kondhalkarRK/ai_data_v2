@@ -102,6 +102,11 @@ def _order_metric(metric: str) -> tuple[str, str]:
         return "SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold", "revenue"
     if metric == "orders":
         return "COUNT(DISTINCT f.order_id) AS orders, SUM(f.order_qty) AS units_sold", "orders"
+    if metric == "average_selling_price":
+        return (
+            "SUM(f.total_sales) / NULLIF(SUM(f.order_qty), 0) AS average_selling_price",
+            "average_selling_price",
+        )
     return "SUM(f.order_qty) AS units_sold, SUM(f.total_sales) AS revenue", "units_sold"
 
 
@@ -139,6 +144,8 @@ def _automotive_filter_parts(
             joins.append(join)
             aliases.add(alias)
         clauses.append(f"{alias}.{column} {filt.operator} {_sql_literal(filt.value)}")
+    if plan.year_filter:
+        clauses.append(f"EXTRACT(YEAR FROM f.sales_date)::int = {int(plan.year_filter)}")
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     return joins, where
 
@@ -149,11 +156,14 @@ def _governed_automotive(plan: QuestionPlan) -> TemplateHit | None:
         return None
     if plan.analysis == "year_window_compare":
         return _year_window_sql(plan)
-    if plan.analysis == "period_growth" and plan.entity == "metric_only":
+    if plan.analysis == "period_growth":
         return _growth_sql(plan)
+    if plan.year_filter or "year" in plan.dimensions:
+        if plan.metric in {"revenue", "orders", "units", "average_selling_price"}:
+            return _dimension_breakdown_sql(plan)
     if plan.entity != "metric_only":
         return None
-    if plan.metric not in {"revenue", "orders", "units"}:
+    if plan.metric not in {"revenue", "orders", "units", "average_selling_price"}:
         return None
     if plan.dimensions:
         return _dimension_breakdown_sql(plan)
@@ -201,30 +211,48 @@ LIMIT 36
 def _growth_sql(plan: QuestionPlan) -> TemplateHit:
     metrics, alias = _order_metric(plan.metric if plan.metric != "unknown" else "revenue")
     label = "yoy_growth_pct" if plan.time_grain == "year" else "mom_growth_pct"
-    grain_expr = (
-        "EXTRACT(YEAR FROM f.sales_date)::int"
-        if plan.time_grain == "year"
-        else "date_trunc('month', f.sales_date)::date"
-    )
-    grain_alias = "year" if plan.time_grain == "year" else "month"
+    grain_key = "year" if plan.time_grain == "year" else "month"
+    grain_expr, grain_alias, _grain_join = _DIM_EXPR[grain_key]
+    extras = [key for key in plan.dimensions if key not in {"month", "quarter", "year"} and key in _DIM_EXPR]
+    selects = [f"{grain_expr} AS {grain_alias}"]
+    joins: list[str] = []
+    aliases: set[str] = set()
+    for key in extras:
+        expr, dim_alias, join = _DIM_EXPR[key]
+        selects.append(f"{expr} AS {dim_alias}")
+        if join and join not in joins:
+            joins.append(join)
+            if " dim_region " in f" {join} ":
+                aliases.add("r")
+            if " dim_carline " in f" {join} ":
+                aliases.add("c")
+    extra_joins, where = _automotive_filter_parts(plan, base_aliases=aliases)
+    for join in extra_joins:
+        if join not in joins:
+            joins.append(join)
+    partition = ", ".join(_DIM_EXPR[key][1] for key in extras)
+    partition_sql = f"PARTITION BY {partition} " if partition else ""
+    group_cols = ", ".join(str(index) for index in range(1, len(selects) + 1))
+    order_cols = ", ".join(str(index) for index in range(1, len(selects) + 1))
     return TemplateHit(
         title=f"{alias.replace('_', ' ').title()} growth",
         glossary_matches=2,
         path="semantic_compiler",
         sql=f"""
 WITH aggregated AS (
-  SELECT {grain_expr} AS {grain_alias},
+  SELECT {", ".join(selects)},
          {metrics}
   FROM automotive.fact_sales f
-  GROUP BY 1
+  {chr(10).join(joins)}
+  {where}
+  GROUP BY {group_cols}
 )
-SELECT {grain_alias},
-       {alias},
-       LAG({alias}) OVER (ORDER BY {grain_alias}) AS previous_{alias},
-       100.0 * ({alias} - LAG({alias}) OVER (ORDER BY {grain_alias}))
-         / NULLIF(LAG({alias}) OVER (ORDER BY {grain_alias}), 0) AS {label}
+SELECT aggregated.*,
+       LAG({alias}) OVER ({partition_sql}ORDER BY {grain_alias}) AS previous_{alias},
+       100.0 * ({alias} - LAG({alias}) OVER ({partition_sql}ORDER BY {grain_alias}))
+         / NULLIF(LAG({alias}) OVER ({partition_sql}ORDER BY {grain_alias}), 0) AS {label}
 FROM aggregated
-ORDER BY 1
+ORDER BY {order_cols}
 LIMIT 36
 """.strip(),
     )

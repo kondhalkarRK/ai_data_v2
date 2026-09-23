@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 FailureCategory = Literal[
     "llm",
@@ -110,7 +110,7 @@ def classify_ambiguous(message: str) -> FailureInfo:
     return FailureInfo("ambiguous", "Ambiguous Question", message[:240], retryable=False)
 
 
-def propose_sql_repair(sql: str, error: str) -> str | None:
+def propose_sql_repair(sql: str, error: str, pack: Any | None = None) -> str | None:
     """Deterministic repair for common glossary mismatches. Returns None if unchanged."""
     if not sql or not error:
         return None
@@ -125,6 +125,34 @@ def propose_sql_repair(sql: str, error: str) -> str | None:
     for bad, good in replacements:
         if bad in lowered and bad in repaired.lower():
             repaired = re.sub(rf"\b{bad}\b", good, repaired, flags=re.I)
+    missing = re.search(r'column "?([a-z_][a-z0-9_]*)"? does not exist', lowered)
+    if missing and pack is not None:
+        bad_column = missing.group(1)
+        replacement = _column_from_pack(bad_column, pack)
+        if replacement and bad_column in repaired.lower():
+            repaired = re.sub(rf"\b{re.escape(bad_column)}\b", replacement, repaired, flags=re.I)
     if repaired == original:
         return None
     return repaired
+
+
+def _column_from_pack(missing: str, pack: Any) -> str | None:
+    """Pick a declared column when the database rejects a near-miss name."""
+    model = getattr(pack, "model", None)
+    tables = getattr(model, "tables", None) or {}
+    columns: list[str] = []
+    for table in tables.values():
+        columns.extend(str(name) for name in (getattr(table, "columns", None) or {}))
+    if not columns:
+        return None
+    if missing in columns:
+        return None
+    date_like = "date" in missing or missing.endswith("_dt")
+    if date_like:
+        for candidate in ("sales_date", "accounting_month", "reported_date"):
+            if candidate in columns:
+                return candidate
+    for candidate in columns:
+        if missing in candidate or candidate in missing:
+            return candidate
+    return None

@@ -53,6 +53,17 @@ export interface QueryMeta {
   dateRange: string | null;
 }
 
+export interface QueryPlanTrace {
+  rewritten?: string;
+  intent?: string;
+  metric?: string;
+  formula?: string;
+  joins?: string[];
+  filters?: string[];
+  dimensions?: string[];
+  chartType?: string;
+}
+
 export interface AnomalyMarker {
   index: number;
   x: unknown;
@@ -94,6 +105,7 @@ export interface ResponseMeta {
   dataAsOf: string | null;
   timings: QueryTimings;
   queryMeta: QueryMeta;
+  queryPlan?: QueryPlanTrace;
   insights: { executive: string; analyst: string };
   anomalies: AnomalyMarker[];
   alternateInterpretations: string[];
