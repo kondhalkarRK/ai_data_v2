@@ -12,8 +12,8 @@ import {
   type NodeTypes,
   type EdgeTypes,
 } from "@xyflow/react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Maximize2, Minimize2, Orbit, Search, Share2, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
+import { Orbit, Share2, Sparkles } from "lucide-react";
 import * as React from "react";
 
 import { ClusterLayer } from "@/components/ontology/cluster-layer";
@@ -23,14 +23,11 @@ import "@/components/ontology/galaxy-styles.css";
 import { NodeDrawer } from "@/components/ontology/node-drawer";
 import { ParticleField } from "@/components/ontology/particle-field";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   JOURNEYS,
   deriveAssetContext,
   displayName,
   journeyNodeIds,
-  matchesDiscoveryQuery,
-  snapshotTrustRate,
   storyLabel,
   type ContextOverlay,
 } from "@/lib/ontology/asset-context";
@@ -38,6 +35,7 @@ import { hopNeighborhood } from "@/lib/ontology/graph-metrics";
 import {
   ONTOLOGY_KIND_FILTERS,
   nodeMatchesKindFilter,
+  nodeMatchesKindFilters,
   type OntologyKindFilter,
 } from "@/lib/ontology/kind-filter";
 import {
@@ -103,16 +101,23 @@ const OVERLAYS: ReadonlyArray<{ id: ContextOverlay; label: string; hint: string 
   },
 ];
 
-const DISCOVERY_HINTS = [
-  "Revenue",
-  "Sales",
-  "Dealer",
-  "Customer",
-  "Claims",
-  "Premium",
-  "Vehicle",
-  "Policy",
+const KIND_PILL_ORDER: OntologyKindFilter[] = [
+  "all",
+  "entity",
+  "fact",
+  "measure",
+  "dimension",
+  "relationship",
 ];
+
+const KIND_PILL_LABEL: Record<OntologyKindFilter, string> = {
+  all: "All",
+  entity: "Actor",
+  fact: "Event",
+  measure: "Outcome",
+  dimension: "Attribute",
+  relationship: "Connected",
+};
 
 export function OntologyBrowser({
   snapshot,
@@ -139,15 +144,13 @@ function OntologyBrowserInner({
   const [mode, setMode] = React.useState<GalaxyMode>("semantic");
   const [metric, setMetric] = React.useState<CentralityMetric>("pagerank");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [search, setSearch] = React.useState("");
   const [pulseId, setPulseId] = React.useState<string | null>(null);
   const [activeCluster, setActiveCluster] = React.useState<string | null>(null);
   const [showClusters, setShowClusters] = React.useState(true);
   const [motionEnabled, setMotionEnabled] = React.useState(true);
-  const [kindFilter, setKindFilter] = React.useState<OntologyKindFilter>("all");
+  const [kindFilters, setKindFilters] = React.useState<OntologyKindFilter[]>(["all"]);
   const [overlay, setOverlay] = React.useState<ContextOverlay>("business");
   const [journeyId, setJourneyId] = React.useState<string | null>(null);
-  const [fullScreen, setFullScreen] = React.useState(false);
 
   const graph = React.useMemo(() => {
     const merged = withoutDomainNodes(mergeOntologyConcepts(snapshot));
@@ -205,14 +208,11 @@ function OntologyBrowserInner({
       if (activeCluster && node.cluster !== activeCluster && node.id !== selectedId) {
         dimmed = true;
       }
-      if (kindFilter !== "all") {
-        const matches = nodeMatchesKindFilter(node, kindFilter);
-        if (matches) {
-          focused = focused || !focus;
-        } else {
-          dimmed = true;
-          if (node.id !== selectedId) focused = false;
-        }
+      if (!nodeMatchesKindFilters(node, kindFilters)) {
+        dimmed = true;
+        if (node.id !== selectedId) focused = false;
+      } else if (!kindFilters.includes("all") && !focus) {
+        focused = true;
       }
       if (journeySet.size && !journeySet.has(node.id) && node.id !== selectedId) {
         dimmed = true;
@@ -247,7 +247,7 @@ function OntologyBrowserInner({
     selectedId,
     pulseId,
     activeCluster,
-    kindFilter,
+    kindFilters,
     motionEnabled,
     journeySet,
     nodeById,
@@ -273,14 +273,15 @@ function OntologyBrowserInner({
           emphasized = false;
         }
       }
-      if (kindFilter !== "all") {
+      if (!kindFilters.includes("all")) {
         const source = nodeById.get(edge.source);
         const target = nodeById.get(edge.target);
-        if (kindFilter === "relationship") {
+        const onlyConnected = kindFilters.length === 1 && kindFilters[0] === "relationship";
+        if (onlyConnected) {
           emphasized = !dimmed;
         } else {
-          const sourceMatch = source ? nodeMatchesKindFilter(source, kindFilter) : false;
-          const targetMatch = target ? nodeMatchesKindFilter(target, kindFilter) : false;
+          const sourceMatch = source ? nodeMatchesKindFilters(source, kindFilters) : false;
+          const targetMatch = target ? nodeMatchesKindFilters(target, kindFilters) : false;
           if (!sourceMatch && !targetMatch) {
             dimmed = true;
             emphasized = false;
@@ -314,36 +315,40 @@ function OntologyBrowserInner({
         zIndex: emphasized ? 4 : 0,
       };
     });
-  }, [graph.edges, nodeById, focus, activeCluster, kindFilter, motionEnabled, journeySet, overlay]);
+  }, [graph.edges, nodeById, focus, activeCluster, kindFilters, motionEnabled, journeySet, overlay]);
 
   const selectedNode = selectedId ? (nodeById.get(selectedId) ?? null) : null;
 
   const relationshipCount = focus?.one.edges.size ?? 0;
 
-  const searchHits = React.useMemo(() => {
-    if (!search.trim()) return [];
-    return graph.nodes.filter((node) => matchesDiscoveryQuery(node, search)).slice(0, 10);
-  }, [search, graph.nodes]);
+  const kindCounts = React.useMemo(() => {
+    const counts = {} as Record<OntologyKindFilter, number>;
+    for (const filter of ONTOLOGY_KIND_FILTERS) {
+      counts[filter.id] =
+        filter.id === "all"
+          ? graph.nodes.length
+          : graph.nodes.filter((node) => nodeMatchesKindFilter(node, filter.id)).length;
+    }
+    return counts;
+  }, [graph.nodes]);
 
-  const execStats = React.useMemo(() => {
-    const metrics = graph.nodes.filter((node) => node.kind === "measure").length;
-    const glossary = new Set(graph.nodes.flatMap((node) => node.synonyms)).size;
-    return {
-      concepts: graph.metadata.nodeCount,
-      communities: graph.clusters.length,
-      metrics,
-      glossary,
-      relationships: graph.metadata.edgeCount,
-      trusted: snapshotTrustRate(graph),
-    };
-  }, [graph]);
+  function toggleKind(id: OntologyKindFilter) {
+    setKindFilters((current) => {
+      if (id === "all") return ["all"];
+      const withoutAll = current.filter((item) => item !== "all");
+      const next = withoutAll.includes(id)
+        ? withoutAll.filter((item) => item !== id)
+        : [...withoutAll, id];
+      return next.length ? next : ["all"];
+    });
+  }
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
-      void fitView({ padding: 0.22, duration: 650 });
+      void fitView({ padding: 0.08, duration: 450 });
     }, 40);
     return () => window.clearTimeout(timer);
-  }, [mode, metric, graph, fitView, fullScreen]);
+  }, [mode, metric, graph, fitView]);
 
   const focusNode = React.useCallback(
     (nodeId: string) => {
@@ -378,143 +383,159 @@ function OntologyBrowserInner({
     return () => window.clearTimeout(timer);
   }, [initialFocusId, graph.nodes, focusNode]);
 
-  React.useEffect(() => {
-    if (!fullScreen) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setFullScreen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [fullScreen]);
-
   const positionedForClusters: PositionedNode[] = positioned;
+
+  function selectJourney(next: string | null) {
+    setJourneyId(next);
+    if (!next) return;
+    const journey = JOURNEYS.find((item) => item.id === next);
+    if (!journey) return;
+    const ids = journeyNodeIds(graph, journey.seeds);
+    if (ids[0]) focusNode(ids[0]);
+  }
 
   return (
     <div
-      className={cn(
-        "semantic-galaxy relative flex w-full flex-col",
-        fullScreen
-          ? "fixed inset-0 z-[80] h-dvh min-h-0 rounded-none"
-          : "h-[min(88vh,980px)] min-h-[680px]",
-      )}
+      className="semantic-galaxy relative flex h-full min-h-0 w-full flex-col"
       data-motion={motionEnabled ? "on" : "off"}
       data-mode={mode}
     >
       {motionEnabled ? <ParticleField /> : null}
 
-      <div className="relative z-20 border-b border-border/50 bg-surface-raised/55 px-3 py-3 backdrop-blur-xl">
-        <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
-          <ExecStat label="Concepts" value={String(execStats.concepts)} />
-          <ExecStat label="Communities" value={String(execStats.communities)} />
-          <ExecStat label="Metrics" value={String(execStats.metrics)} />
-          <ExecStat label="Glossary" value={String(execStats.glossary)} />
-          <ExecStat label="Relationships" value={String(execStats.relationships)} />
-          <ExecStat label="Trusted" value={`${execStats.trusted}%`} />
-        </div>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search concepts, glossary, relationships…"
-            className="h-11 border-border/60 bg-surface-raised/80 pl-10 text-sm shadow-sm backdrop-blur"
-            aria-label="Discover assets"
-          />
-          <AnimatePresence>
-            {searchHits.length > 0 ? (
-              <motion.ul
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 max-h-72 overflow-auto rounded-xl border border-border/70 bg-surface-raised/98 shadow-[var(--shadow-overlay)] backdrop-blur-xl"
+      <div className="galaxy-toolbar relative z-20 flex shrink-0 items-center gap-2 overflow-x-auto px-2 py-1.5">
+        <div className="flex shrink-0 items-center gap-1" role="tablist" aria-label="Graph type">
+          {MODES.map((item) => {
+            const Icon = item.icon;
+            const active = mode === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-label={`${item.label}. ${item.hint}`}
+                data-hint={item.hint}
+                className={cn(
+                  "galaxy-chip galaxy-hint inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                  active
+                    ? "border-primary/40 bg-primary/15 text-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                )}
+                data-active={active}
+                onClick={() => setMode(item.id)}
               >
-                {searchHits.map((hit) => (
-                  <li key={hit.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-muted/50"
-                      onClick={() => {
-                        setSearch("");
-                        setJourneyId(null);
-                        focusNode(hit.id);
-                      }}
-                    >
-                      <span
-                        className="size-2 shrink-0 rounded-full"
-                        style={{ background: hit.clusterColor }}
-                      />
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{displayName(hit, overlay)}</span>
-                        <span className="block truncate text-[11px] text-muted-foreground">
-                          {hit.domain} · {hit.kind}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </motion.ul>
-            ) : null}
-          </AnimatePresence>
+                <Icon className="size-3" />
+                {item.label}
+              </button>
+            );
+          })}
         </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {DISCOVERY_HINTS.map((hint) => (
+
+        <ToolbarDivider />
+
+        <div
+          className="flex shrink-0 items-center gap-1"
+          role="group"
+          aria-label="Concept categories"
+        >
+          {KIND_PILL_ORDER.map((id) => {
+            const meta = ONTOLOGY_KIND_FILTERS.find((item) => item.id === id);
+            const active = kindFilters.includes(id);
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={active}
+                data-hint={meta?.hint}
+                className={cn(
+                  "galaxy-chip galaxy-hint shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium tabular-nums transition-colors",
+                  active
+                    ? "border-primary/45 bg-primary/15 text-foreground"
+                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                )}
+                data-active={active}
+                onClick={() => toggleKind(id)}
+              >
+                {KIND_PILL_LABEL[id]} ({kindCounts[id]})
+              </button>
+            );
+          })}
+        </div>
+
+        <ToolbarDivider />
+
+        <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Labels">
+          {OVERLAYS.map((item) => (
             <button
-              key={hint}
+              key={item.id}
               type="button"
-              className="galaxy-chip rounded-full px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-              onClick={() => setSearch(hint)}
+              aria-pressed={overlay === item.id}
+              data-hint={item.hint}
+              className={cn(
+                "galaxy-chip galaxy-hint shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                overlay === item.id
+                  ? "border-info/40 bg-info/15 text-foreground"
+                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+              )}
+              data-active={overlay === item.id}
+              onClick={() => setOverlay(item.id)}
             >
-              {hint}
+              {item.label}
             </button>
           ))}
         </div>
-      </div>
 
-      <div className="galaxy-toolbar relative z-20 space-y-2 px-3 py-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="mr-1 flex items-center gap-2">
-            <Sparkles className="size-3.5 text-info" aria-hidden="true" />
-            <span className="text-xs font-semibold tracking-tight">Graph</span>
-          </div>
+        <ToolbarDivider />
 
-          <div className="flex flex-wrap gap-1" role="tablist" aria-label="Map view">
-            {MODES.map((item) => {
-              const Icon = item.icon;
-              const active = mode === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  aria-label={`${item.label}. ${item.hint}`}
-                  data-hint={item.hint}
-                  className={cn(
-                    "galaxy-chip galaxy-hint inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium",
-                    active
-                      ? "border-primary/40 bg-primary/15 text-foreground"
-                      : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-                  )}
-                  data-active={active}
-                  onClick={() => setMode(item.id)}
-                >
-                  <Icon className="size-3" />
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
+        <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Story">
+          <button
+            type="button"
+            aria-pressed={!journeyId}
+            data-hint="No guided path."
+            className={cn(
+              "galaxy-chip galaxy-hint shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+              !journeyId
+                ? "border-success/40 bg-success/15 text-foreground"
+                : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+            )}
+            data-active={!journeyId}
+            onClick={() => selectJourney(null)}
+          >
+            None
+          </button>
+          {JOURNEYS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={journeyId === item.id}
+              data-hint={`Follow ${item.seeds.join(" → ")}.`}
+              className={cn(
+                "galaxy-chip galaxy-hint shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                journeyId === item.id
+                  ? "border-success/40 bg-success/15 text-foreground"
+                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+              )}
+              data-active={journeyId === item.id}
+              onClick={() => selectJourney(item.id)}
+            >
+              {item.label.replace(" journey", "")}
+            </button>
+          ))}
+        </div>
 
-          {mode === "network" ? (
-            <div className="flex gap-1" role="tablist" aria-label="Influence metric">
+        {mode === "network" ? (
+          <>
+            <ToolbarDivider />
+            <div className="flex shrink-0 gap-1" role="group" aria-label="Influence metric">
               {METRICS.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   data-hint={item.hint}
+                  aria-pressed={metric === item.id}
                   aria-label={`${item.label}. ${item.hint}`}
                   className={cn(
-                    "galaxy-chip galaxy-hint rounded-full px-2.5 py-1 text-[11px] font-medium",
+                    "galaxy-chip galaxy-hint shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
                     metric === item.id
                       ? "border-success/40 bg-success/15 text-foreground"
                       : "text-muted-foreground hover:bg-muted/40",
@@ -526,87 +547,44 @@ function OntologyBrowserInner({
                 </button>
               ))}
             </div>
-          ) : null}
+          </>
+        ) : null}
 
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              type="button"
-              size="sm"
-              className="galaxy-hint h-8 gap-1.5 text-xs"
-              data-hint={
-                fullScreen
-                  ? "Exit full screen and return to the page layout."
-                  : "Expand the graph to fill the screen for exploration."
-              }
-              aria-pressed={fullScreen}
-              onClick={() => setFullScreen((value) => !value)}
-            >
-              {fullScreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
-              {fullScreen ? "Exit full screen" : "Full Screen"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="galaxy-hint h-8 gap-1.5 text-xs"
-              data-hint="Animate nodes and flowing relationship lines."
-              aria-pressed={motionEnabled}
-              aria-label={`Motion ${motionEnabled ? "on" : "off"}`}
-              onClick={() => setMotionEnabled((value) => !value)}
-            >
-              Motion: {motionEnabled ? "ON" : "OFF"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="galaxy-hint h-8 gap-1.5 text-xs"
-              data-hint="Show or hide colored domain boundaries on the constellation map."
-              onClick={() => setShowClusters((value) => !value)}
-            >
-              <Share2 className="size-3.5" />
-              {showClusters ? "Zones" : "Flat"}
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-2">
-          <ToolbarSelect
-            label="Labels"
-            hint="Change names on the same map — business, technical, or governance language."
-            value={overlay}
-            onChange={(value) => setOverlay(value as ContextOverlay)}
-            options={OVERLAYS.map((item) => ({ id: item.id, label: item.label, hint: item.hint }))}
-          />
-          <ToolbarSelect
-            label="Show"
-            hint="Focus the map on one asset type, such as measures or entities."
-            value={kindFilter}
-            onChange={(value) => setKindFilter(value as OntologyKindFilter)}
-            options={ONTOLOGY_KIND_FILTERS}
-          />
-          <ToolbarSelect
-            label="Story"
-            hint="Highlight a curated business path, such as Revenue through Dealer and Region."
-            value={journeyId ?? "none"}
-            onChange={(value) => {
-              const next = value === "none" ? null : value;
-              setJourneyId(next);
-              if (!next) return;
-              const journey = JOURNEYS.find((item) => item.id === next);
-              if (!journey) return;
-              const ids = journeyNodeIds(graph, journey.seeds);
-              if (ids[0]) focusNode(ids[0]);
-            }}
-            options={[
-              { id: "none", label: "None", hint: "No guided path." },
-              ...JOURNEYS.map((item) => ({
-                id: item.id,
-                label: item.label.replace(" journey", ""),
-                hint: `Follow ${item.seeds.join(" → ")}.`,
-              })),
-            ]}
-          />
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={motionEnabled ? "secondary" : "ghost"}
+            className="galaxy-hint h-7 shrink-0 px-2.5 text-[11px]"
+            data-hint="Animate nodes and flowing relationship lines."
+            aria-pressed={motionEnabled}
+            aria-label={`Motion ${motionEnabled ? "on" : "off"}`}
+            onClick={() => setMotionEnabled((value) => !value)}
+          >
+            Motion
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="galaxy-hint h-7 shrink-0 gap-1 px-2.5 text-[11px]"
+            data-hint="Show or hide colored community boundaries."
+            aria-pressed={showClusters}
+            onClick={() => setShowClusters((value) => !value)}
+          >
+            <Share2 className="size-3.5" />
+            {showClusters ? "Zones" : "Flat"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="galaxy-hint h-7 shrink-0 px-2.5 text-[11px]"
+            data-hint="Fit the graph to the canvas."
+            onClick={() => void fitView({ padding: 0.08, duration: 400 })}
+          >
+            Fit
+          </Button>
         </div>
       </div>
 
@@ -617,6 +595,7 @@ function OntologyBrowserInner({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
+          fitViewOptions={{ padding: 0.08 }}
           minZoom={0.2}
           maxZoom={2.4}
           proOptions={{ hideAttribution: true }}
@@ -708,49 +687,6 @@ function OntologyBrowserInner({
   );
 }
 
-function ExecStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border/50 bg-surface-raised/70 px-2.5 py-2">
-      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold tabular-nums">{value}</p>
-    </div>
-  );
-}
-
-function ToolbarSelect({
-  label,
-  hint,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: ReadonlyArray<{ id: string; label: string; hint?: string }>;
-}) {
-  const selected = options.find((item) => item.id === value);
-  return (
-    <label
-      className="galaxy-hint inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-surface-raised/70 px-2.5 py-1"
-      data-hint={selected?.hint ?? hint}
-    >
-      <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-        {label}
-      </span>
-      <select
-        value={value}
-        aria-label={`${label}. ${hint}`}
-        onChange={(event) => onChange(event.target.value)}
-        className="max-w-[9.5rem] cursor-pointer bg-transparent text-[11px] font-medium outline-none"
-      >
-        {options.map((item) => (
-          <option key={item.id} value={item.id} title={item.hint}>
-            {item.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
+function ToolbarDivider() {
+  return <span className="h-4 w-px shrink-0 bg-border/70" aria-hidden="true" />;
 }

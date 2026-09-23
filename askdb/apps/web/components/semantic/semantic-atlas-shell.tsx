@@ -8,6 +8,7 @@ import { LoadingState } from "@/components/loading/loading-state";
 import { OntologyBrowser } from "@/components/ontology/ontology-browser";
 import { GlossaryCatalog } from "@/components/semantic/glossary-catalog";
 import { SemanticModelPanel } from "@/components/semantic/semantic-model-panel";
+import { IndustrySwitcher } from "@/components/shell/industry-switcher";
 import { PageHeader } from "@/components/shell/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { useOntologySnapshot, useSemanticPack } from "@/hooks/use-semantic";
@@ -55,12 +56,29 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
     router.replace(`/semantic?${params.toString()}`, { scroll: false });
   }
 
+  const graphFirst = tab === "graph";
+
   return (
-    <>
-      <PageHeader
-        title="Semantic Atlas"
-        description="Governed catalog of business language, model contracts, and the knowledge graph."
-      />
+    <div
+      className={cn(
+        graphFirst &&
+          "flex h-[calc(100dvh-var(--topbar-height)-2rem)] min-h-0 flex-col overflow-hidden lg:h-[calc(100dvh-var(--topbar-height)-3rem)]",
+      )}
+    >
+      {graphFirst ? (
+        <div className="mb-2 flex shrink-0 items-center gap-2 overflow-x-auto">
+          <h1 className="shrink-0 text-base font-semibold tracking-tight text-foreground">
+            Semantic Atlas
+          </h1>
+          <IndustrySwitcher />
+          <AtlasTabs tab={tab} onSelect={selectTab} compact />
+        </div>
+      ) : (
+        <PageHeader
+          title="Semantic Atlas"
+          description="Governed catalog of business language, model contracts, and the knowledge graph."
+        />
+      )}
 
       {pack.isPending ? (
         <LoadingState title="Loading semantic pack" size="sm" />
@@ -70,6 +88,18 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
             The active semantic pack could not be loaded.
           </CardContent>
         </Card>
+      ) : graphFirst ? (
+        <>
+          <div className="min-h-0 flex-1">
+            {snapshot.isPending ? (
+              <LoadingState title="Building semantic relationships" size="lg" />
+            ) : snapshot.isError || !snapshot.data ? (
+              <p className="text-sm text-danger">The knowledge graph could not be loaded.</p>
+            ) : (
+              <OntologyBrowser snapshot={snapshot.data} initialFocusId={focus} />
+            )}
+          </div>
+        </>
       ) : (
         <>
           <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -83,50 +113,61 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
             <span>{pack.data.summary.glossaryTermCount} glossary terms</span>
           </div>
 
-          <div
-            className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3"
-            role="tablist"
-            aria-label="Semantic Atlas"
-          >
-            {TABS.map((item) => {
-              const Icon = item.icon;
-              const active = tab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={cn(
-                    "flex h-14 items-center justify-center gap-2 rounded-2xl border text-sm font-semibold shadow-sm",
-                    active
-                      ? "border-primary/45 bg-primary/10 text-foreground"
-                      : "border-border/60 bg-surface-raised/80 text-muted-foreground hover:bg-muted/40",
-                  )}
-                  onClick={() => selectTab(item.id)}
-                >
-                  <Icon className="size-4" />
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
+          <AtlasTabs tab={tab} onSelect={selectTab} />
 
           {tab === "glossary" ? (
             <GlossaryCatalog pack={pack.data} initialQuery={glossaryQuery} />
           ) : null}
           {tab === "model" ? <SemanticModelPanel pack={pack.data} /> : null}
-          {tab === "graph" ? (
-            snapshot.isPending ? (
-              <LoadingState title="Building semantic relationships" size="lg" />
-            ) : snapshot.isError || !snapshot.data ? (
-              <p className="text-sm text-danger">The knowledge graph could not be loaded.</p>
-            ) : (
-              <OntologyBrowser snapshot={snapshot.data} initialFocusId={focus} />
-            )
-          ) : null}
         </>
       )}
-    </>
+    </div>
+  );
+}
+
+function AtlasTabs({
+  tab,
+  onSelect,
+  compact = false,
+}: {
+  tab: AtlasTab;
+  onSelect: (next: AtlasTab) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        compact
+          ? "ml-auto flex shrink-0 gap-1"
+          : "mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3",
+      )}
+      role="tablist"
+      aria-label="Semantic Atlas"
+    >
+      {TABS.map((item) => {
+        const Icon = item.icon;
+        const active = tab === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className={cn(
+              compact
+                ? "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium"
+                : "flex h-14 items-center justify-center gap-2 rounded-2xl border text-sm font-semibold shadow-sm",
+              active
+                ? "border-primary/45 bg-primary/10 text-foreground"
+                : "border-border/60 bg-surface-raised/80 text-muted-foreground hover:bg-muted/40",
+            )}
+            onClick={() => onSelect(item.id)}
+          >
+            <Icon className={compact ? "size-3.5" : "size-4"} />
+            <span className={compact ? "hidden sm:inline" : undefined}>{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

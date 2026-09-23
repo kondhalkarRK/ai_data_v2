@@ -55,3 +55,12 @@ export function nodeMatchesKindFilter(
       return true;
   }
 }
+
+/** A node stays visible when it matches any selected category. "All" clears the filter. */
+export function nodeMatchesKindFilters(
+  node: Pick<OntologyNode, "kind" | "tableType" | "id" | "degree">,
+  filters: readonly OntologyKindFilter[],
+): boolean {
+  if (filters.length === 0 || filters.includes("all")) return true;
+  return filters.some((filter) => nodeMatchesKindFilter(node, filter));
+}

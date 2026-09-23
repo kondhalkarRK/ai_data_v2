@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isFactNode,
   nodeMatchesKindFilter,
+  nodeMatchesKindFilters,
   type OntologyKindFilter,
 } from "@/lib/ontology/kind-filter";
 
@@ -39,5 +40,12 @@ describe("ontology kind filter", () => {
   it("keeps connected nodes for relationship filter", () => {
     expect(nodeMatchesKindFilter(entity, "relationship")).toBe(true);
     expect(nodeMatchesKindFilter(isolated, "relationship")).toBe(false);
+  });
+
+  it("matches any selected category and treats all as a clear", () => {
+    expect(nodeMatchesKindFilters(measure, ["all"])).toBe(true);
+    expect(nodeMatchesKindFilters(measure, ["entity", "measure"])).toBe(true);
+    expect(nodeMatchesKindFilters(dimension, ["entity", "measure"])).toBe(false);
+    expect(nodeMatchesKindFilters(isolated, ["relationship"])).toBe(false);
   });
 });
