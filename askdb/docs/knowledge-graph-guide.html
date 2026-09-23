@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Knowledge Graph — simple guide</title>
+  <style>
+    :root {
+      --ink: #142033;
+      --muted: #5c6b80;
+      --line: #d7dee8;
+      --paper: #f4f7fb;
+      --card: #ffffff;
+      --actor: #059669;
+      --event: #2563eb;
+      --context: #7c3aed;
+      --outcome: #db2777;
+      --attribute: #ca8a04;
+      --canvas: #0e1726;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.55;
+    }
+    header {
+      padding: 28px 24px 8px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    h1 { margin: 0 0 8px; font-size: 32px; letter-spacing: -0.03em; }
+    h2 { margin: 0 0 8px; font-size: 22px; letter-spacing: -0.02em; }
+    h3 { margin: 0 0 6px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    .lede { font-size: 18px; max-width: 740px; color: #24344c; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 12px 24px 48px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px 18px 14px;
+      margin: 14px 0;
+    }
+    .story {
+      background: #eef6ff;
+      border: 1px solid #c9ddf7;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 17px;
+    }
+    .grid { display: grid; gap: 12px; }
+    @media (min-width: 800px) {
+      .grid-5 { grid-template-columns: repeat(5, 1fr); }
+      .grid-3 { grid-template-columns: repeat(3, 1fr); }
+      .split { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 14px; align-items: start; }
+    }
+    .kind {
+      border-radius: 14px;
+      padding: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+      min-height: 148px;
+    }
+    .kind strong { display: block; margin-bottom: 4px; }
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .stage {
+      background: var(--canvas);
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid #1e2b42;
+      min-height: 560px;
+      position: relative;
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 10px;
+      background: rgba(14, 23, 38, 0.92);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    button {
+      border: 1px solid transparent;
+      background: transparent;
+      color: #c9d4e5;
+      border-radius: 999px;
+      padding: 6px 11px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(255,255,255,0.06); color: white; }
+    button.active { background: rgba(255,255,255,0.12); color: white; border-color: rgba(255,255,255,0.2); }
+    svg { width: 100%; height: 520px; display: block; touch-action: none; }
+    .node-label { font-size: 12px; fill: #f8fafc; font-weight: 600; pointer-events: none; }
+    .edge-label { font-size: 10px; fill: #d6deea; }
+    .hint { color: var(--muted); font-size: 13px; }
+    ol.steps { margin: 8px 0 0; padding-left: 18px; }
+    ol.steps li { margin: 6px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+    .detail {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      max-width: 280px;
+      background: rgba(255,255,255,0.96);
+      color: var(--ink);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+    code { font-family: Consolas, ui-monospace, monospace; font-size: 0.92em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Knowledge Graph, in plain language</h1>
+    <p class="lede">A knowledge graph is a map of business ideas and how they connect. It is not a picture of database tables. Each circle is a meaning. Each line is a relationship with a name.</p>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>One example</h2>
+      <p class="story">A <b>Dealer</b> makes a <b>Sale</b> of a <b>Vehicle</b> to a <b>Customer</b> in a <b>Region</b> during a <b>Year</b>. That sale produces <b>Revenue</b> and <b>Units Sold</b>.</p>
+      <p>Read it as a sentence, not as a schema:</p>
+      <p><b>Dealer</b> (who) → <b>makes</b> → <b>Sale</b> (what happened) → <b>produces</b> → <b>Revenue</b> (the result), and the sale <b>happens in</b> a <b>Year</b> (how we slice it).</p>
+    </section>
+
+    <section class="card">
+      <h2>The five groups on the graph</h2>
+      <p>Every concept on the Semantic Atlas graph sits in one of these groups. The colors match the product.</p>
+      <div class="grid grid-5">
+        <article class="kind">
+          <strong><span class="dot" style="background:#059669"></span>Actor</strong>
+          Who or what takes part.<br />
+          Dealer, Customer, Vehicle, Salesperson.<br />
+          Insurance: Customer, Agent, Policy.
+        </article>
+        <article class="kind">
+          <strong><span class="dot" style="background:#2563eb"></span>Event</strong>
+          Something that happened.<br />
+          A Sale. A Claim.<br />
+          Events are the facts the numbers are counted from.
+        </article>
+        <article class="kind">
+          <strong><span class="dot" style="background:#7c3aed"></span>Context</strong>
+          The setting around an event.<br />
+          Dealer network, Geography catalogue.<br />
+          Context is the world the event sits in, not the result.
+        </article>
+        <article class="kind">
+          <strong><span class="dot" style="background:#db2777"></span>Outcome</strong>
+          The number the business cares about.<br />
+          Revenue, Units Sold, Loss Ratio.<br />
+          “Sales” in a question usually means Revenue.
+        </article>
+        <article class="kind">
+          <strong><span class="dot" style="background:#ca8a04"></span>Attribute</strong>
+          A way to describe or split a result.<br />
+          Year, Region, Car Type.<br />
+          “Per year” and “by region” are attributes.
+        </article>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Live example</h2>
+      <p>This canvas uses the same idea as the product: circles, named links, and a force layout (the product uses <b>d3-force</b> to place nodes and <b>React Flow</b> to draw them). Drag a circle. Switch the view. Filter a group.</p>
+      <div class="stage">
+        <div class="toolbar" id="toolbar">
+          <button type="button" data-mode="semantic" class="active">Knowledge Graph</button>
+          <button type="button" data-mode="network">Relationship Network</button>
+          <button type="button" data-mode="ontology">Concept Graph</button>
+          <span style="width:8px"></span>
+          <button type="button" data-filter="all" class="active">All</button>
+          <button type="button" data-filter="actor">Actor</button>
+          <button type="button" data-filter="event">Event</button>
+          <button type="button" data-filter="context">Context</button>
+          <button type="button" data-filter="outcome">Outcome</button>
+          <button type="button" data-filter="attribute">Attribute</button>
+        </div>
+        <svg id="graph" viewBox="0 0 1000 520" role="img" aria-label="Example knowledge graph"></svg>
+        <div class="detail" id="detail">Click a circle. Sale is the event everything else hangs from.</div>
+      </div>
+      <p class="hint">Knowledge Graph spreads related ideas. Relationship Network makes busy ideas larger. Concept Graph fans each group into its own arc, like a glossary.</p>
+    </section>
+
+    <section class="split">
+      <div class="card">
+        <h2>Three ways to look at the same map</h2>
+        <table>
+          <thead>
+            <tr><th>View in the product</th><th>What you see</th><th>Why it helps</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Knowledge Graph</b></td>
+              <td>A living network. One circle per business concept. Lines have names such as “makes” or “produces”.</td>
+              <td>The default view for a demo. You see the story, not a star schema.</td>
+            </tr>
+            <tr>
+              <td><b>Relationship Network</b></td>
+              <td>The same links, but important concepts grow. Size follows how connected a concept is (degree, betweenness, or PageRank).</td>
+              <td>Shows hubs. Sale and Revenue sit in the middle because many things depend on them.</td>
+            </tr>
+            <tr>
+              <td><b>Concept Graph</b></td>
+              <td>A fan of meaning: Actors together, Events together, Outcomes together. Physical tables stay in the background.</td>
+              <td>Good when the question is “what words do we use?”, not “how is the join written?”.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2>How a question uses the graph</h2>
+        <p>Ask: <b>show total sales per year</b></p>
+        <ol class="steps">
+          <li><b>Sales</b> is a glossary word for the outcome <b>Revenue</b>, which is the sum of <code>total_sales</code>.</li>
+          <li>Revenue is sourced from the event <b>Sale</b>.</li>
+          <li><b>Per year</b> is the attribute <b>Year</b>, taken from the sale date <code>sales_date</code>.</li>
+          <li>The system writes SQL that sums sales and groups by the year of that date.</li>
+          <li>You get a table and a chart. The graph is the map that made the path obvious.</li>
+        </ol>
+        <p class="hint">If the question is vague (“show me sales”), the chat asks which outcome you mean instead of guessing.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>How the graph is built</h2>
+      <ol class="steps">
+        <li>A semantic pack describes one industry: Automotive or Insurance. It lists actors, events, measures, dimensions, glossary synonyms, and allowed relationships.</li>
+        <li>The API turns that pack into a graph snapshot. Business entities become Actors. Fact tables become Events. Dimension tables become Context. Measures become Outcomes. Business dimensions become Attributes.</li>
+        <li>The page hides the industry hub, so “Automotive” or “Insurance” is not a circle in the middle. It also keeps one circle when the same idea appears twice.</li>
+        <li>d3-force pulls linked circles together and pushes others apart. React Flow draws the circles, the named lines, zoom, and fit.</li>
+        <li>Pills above the graph (Actor, Event, Outcome, Attribute, Connected) highlight one group. They do not build a new graph. They dim the rest.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Why this helps</h2>
+      <div class="grid grid-3">
+        <article class="kind">
+          <h3>Shared language</h3>
+          <p>“Sales”, “turnover”, and “revenue” point at one outcome. People and the AI chat use the same word.</p>
+        </article>
+        <article class="kind">
+          <h3>Safe joins</h3>
+          <p>A question can only walk links that exist. Revenue comes from Sale. Sale connects to Dealer and Region. The model does not invent a table.</p>
+        </article>
+        <article class="kind">
+          <h3>A demo people can see</h3>
+          <p>Leaders see Dealer, Sale, and Revenue as a story. They do not have to read a warehouse diagram to trust the answer.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const COLORS = {
+      actor: "#059669",
+      event: "#2563eb",
+      context: "#7c3aed",
+      outcome: "#db2777",
+      attribute: "#ca8a04"
+    };
+
+    const nodes = [
+      { id: "dealer", label: "Dealer", kind: "actor", x: 180, y: 150, info: "Actor. A dealer outlet that makes sales. Not the same as a salesperson." },
+      { id: "customer", label: "Customer", kind: "actor", x: 180, y: 300, info: "Actor. The person or company who buys." },
+      { id: "vehicle", label: "Vehicle", kind: "actor", x: 250, y: 430, info: "Actor. The car that was sold. One concept, even if the catalogue also describes it." },
+      { id: "person", label: "Salesperson", kind: "actor", x: 80, y: 220, info: "Actor. A person on the sales team. Questions about people use this, not the dealer." },
+      { id: "sale", label: "Sale", kind: "event", x: 470, y: 250, info: "Event. One sale that happened. Revenue and units are counted from sales." },
+      { id: "network", label: "Dealer network", kind: "context", x: 300, y: 80, info: "Context. The catalogue of dealers. It is the setting, not a single sale." },
+      { id: "geo", label: "Geography", kind: "context", x: 760, y: 120, info: "Context. The map of regions and cities a sale can happen in." },
+      { id: "revenue", label: "Revenue", kind: "outcome", x: 720, y: 250, info: "Outcome. Total sales value. In chat, the word sales usually means this." },
+      { id: "units", label: "Units sold", kind: "outcome", x: 720, y: 360, info: "Outcome. How many vehicles were sold. Used for “top selling” unless someone asks for revenue." },
+      { id: "year", label: "Year", kind: "attribute", x: 560, y: 90, info: "Attribute. “Per year” groups the sale date into a year." },
+      { id: "region", label: "Region", kind: "attribute", x: 860, y: 250, info: "Attribute. “By region” splits the result. Mumbai is a city inside geography." },
+      { id: "type", label: "Car type", kind: "attribute", x: 430, y: 450, info: "Attribute. Sedan, SUV, and the other body styles used to filter vehicles." }
+    ];
+
+    const links = [
+      { source: "dealer", target: "sale", label: "makes" },
+      { source: "customer", target: "sale", label: "buys in" },
+      { source: "vehicle", target: "sale", label: "sold in" },
+      { source: "person", target: "sale", label: "closes" },
+      { source: "sale", target: "revenue", label: "produces" },
+      { source: "sale", target: "units", label: "counts" },
+      { source: "sale", target: "year", label: "happens in" },
+      { source: "sale", target: "region", label: "happens in" },
+      { source: "vehicle", target: "type", label: "has" },
+      { source: "dealer", target: "network", label: "belongs to" },
+      { source: "region", target: "geo", label: "part of" },
+      { source: "network", target: "geo", label: "covers" }
+    ];
+
+    const byId = Object.fromEntries(nodes.map((node) => [node.id, node]));
+    links.forEach((link) => {
+      link.s = byId[link.source];
+      link.t = byId[link.target];
+    });
+
+    const degree = {};
+    nodes.forEach((node) => { degree[node.id] = 0; });
+    links.forEach((link) => { degree[link.source] += 1; degree[link.target] += 1; });
+
+    const svg = document.getElementById("graph");
+    const ns = "http://www.w3.org/2000/svg";
+    const edgeLayer = document.createElementNS(ns, "g");
+    const nodeLayer = document.createElementNS(ns, "g");
+    svg.appendChild(edgeLayer);
+    svg.appendChild(nodeLayer);
+
+    const edgeEls = links.map((link) => {
+      const g = document.createElementNS(ns, "g");
+      const line = document.createElementNS(ns, "line");
+      line.setAttribute("stroke", "rgba(226,232,240,0.55)");
+      line.setAttribute("stroke-width", "1.6");
+      const text = document.createElementNS(ns, "text");
+      text.setAttribute("class", "edge-label");
+      text.setAttribute("text-anchor", "middle");
+      text.textContent = link.label;
+      g.appendChild(line);
+      g.appendChild(text);
+      edgeLayer.appendChild(g);
+      return { link, line, text, g };
+    });
+
+    const nodeEls = nodes.map((node) => {
+      const g = document.createElementNS(ns, "g");
+      g.style.cursor = "pointer";
+      const circle = document.createElementNS(ns, "circle");
+      circle.setAttribute("fill", COLORS[node.kind]);
+      circle.setAttribute("stroke", "rgba(255,255,255,0.85)");
+      circle.setAttribute("stroke-width", "2");
+      const text = document.createElementNS(ns, "text");
+      text.setAttribute("class", "node-label");
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("dy", "4");
+      text.textContent = node.label;
+      g.appendChild(circle);
+      g.appendChild(text);
+      g.addEventListener("pointerdown", (event) => startDrag(event, node));
+      g.addEventListener("click", () => show(node));
+      nodeLayer.appendChild(g);
+      return { node, g, circle, text };
+    });
+
+    let mode = "semantic";
+    let filter = "all";
+    let drag = null;
+
+    function radius(node) {
+      const base = node.kind === "event" ? 28 : node.kind === "outcome" ? 26 : 22;
+      if (mode === "network") return base + degree[node.id] * 4;
+      return base;
+    }
+
+    function show(node) {
+      document.getElementById("detail").textContent = node.info;
+    }
+
+    function placeOntology() {
+      const groups = ["actor", "event", "outcome", "attribute", "context"];
+      groups.forEach((kind, index) => {
+        const members = nodes.filter((node) => node.kind === kind);
+        const arc = -Math.PI * 0.85 + index * (Math.PI * 1.7 / groups.length);
+        members.forEach((node, member) => {
+          const spread = (member - (members.length - 1) / 2) * 0.28;
+          const dist = 150 + (node.kind === "event" ? 0 : 70);
+          node.x = 500 + Math.cos(arc + spread) * dist;
+          node.y = 270 + Math.sin(arc + spread) * dist * 0.72;
+          node.vx = 0;
+          node.vy = 0;
+        });
+      });
+    }
+
+    function tick() {
+      if (mode === "ontology") {
+        draw();
+        return;
+      }
+      const pull = mode === "network" ? 0.012 : 0.02;
+      nodes.forEach((node) => {
+        node.vx = (node.vx || 0) * 0.82;
+        node.vy = (node.vy || 0) * 0.82;
+        nodes.forEach((other) => {
+          if (other === node) return;
+          const dx = node.x - other.x;
+          const dy = node.y - other.y;
+          const dist = Math.max(24, Math.hypot(dx, dy));
+          const force = 900 / (dist * dist);
+          node.vx += (dx / dist) * force;
+          node.vy += (dy / dist) * force;
+        });
+        node.vx += (500 - node.x) * pull;
+        node.vy += (260 - node.y) * pull;
+      });
+      links.forEach((link) => {
+        const dx = link.t.x - link.s.x;
+        const dy = link.t.y - link.s.y;
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const desired = mode === "network" ? 120 : 150;
+        const force = (dist - desired) * (mode === "network" ? 0.012 : 0.008);
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        link.s.vx += fx;
+        link.s.vy += fy;
+        link.t.vx -= fx;
+        link.t.vy -= fy;
+      });
+      nodes.forEach((node) => {
+        if (drag && drag.id === node.id) return;
+        node.x += node.vx;
+        node.y += node.vy;
+        node.x = Math.max(50, Math.min(950, node.x));
+        node.y = Math.max(40, Math.min(480, node.y));
+      });
+      draw();
+      if (!drag) requestAnimationFrame(tick);
+    }
+
+    function draw() {
+      edgeEls.forEach(({ link, line, text, g }) => {
+        const dim = filter !== "all" && link.s.kind !== filter && link.t.kind !== filter;
+        line.setAttribute("x1", link.s.x);
+        line.setAttribute("y1", link.s.y);
+        line.setAttribute("x2", link.t.x);
+        line.setAttribute("y2", link.t.y);
+        text.setAttribute("x", (link.s.x + link.t.x) / 2);
+        text.setAttribute("y", (link.s.y + link.t.y) / 2 - 6);
+        g.setAttribute("opacity", dim ? "0.08" : "1");
+      });
+      nodeEls.forEach(({ node, g, circle, text }) => {
+        const r = radius(node);
+        circle.setAttribute("cx", node.x);
+        circle.setAttribute("cy", node.y);
+        circle.setAttribute("r", r);
+        text.setAttribute("x", node.x);
+        text.setAttribute("y", node.y + r + 16);
+        const dim = filter !== "all" && node.kind !== filter;
+        g.setAttribute("opacity", dim ? "0.16" : "1");
+      });
+    }
+
+    function startDrag(event, node) {
+      drag = node;
+      show(node);
+      const move = (ev) => {
+        const point = svg.createSVGPoint();
+        point.x = ev.clientX;
+        point.y = ev.clientY;
+        const local = point.matrixTransform(svg.getScreenCTM().inverse());
+        node.x = local.x;
+        node.y = local.y;
+        node.vx = 0;
+        node.vy = 0;
+        draw();
+      };
+      const up = () => {
+        drag = null;
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        if (mode !== "ontology") tick();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    }
+
+    document.getElementById("toolbar").addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      if (button.dataset.mode) {
+        mode = button.dataset.mode;
+        document.querySelectorAll("[data-mode]").forEach((item) => item.classList.toggle("active", item === button));
+        if (mode === "ontology") placeOntology();
+        draw();
+        if (mode !== "ontology") tick();
+      }
+      if (button.dataset.filter) {
+        filter = button.dataset.filter;
+        document.querySelectorAll("[data-filter]").forEach((item) => item.classList.toggle("active", item === button));
+        draw();
+      }
+    });
+
+    draw();
+    tick();
+  </script>
+</body>
+</html>
