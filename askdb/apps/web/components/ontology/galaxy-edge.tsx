@@ -21,12 +21,17 @@ export const EDGE_STYLES: Record<EdgeVisualKind, { color: string; label: string 
 };
 
 export type GalaxyEdgeData = {
-  visualKind: EdgeVisualKind;
+  color: string;
   label: string;
+  /** Show the verb pill. Hidden labels still appear once the edge is emphasized. */
+  labelVisible: boolean;
   dimmed: boolean;
   emphasized: boolean;
+  /** Second-step edge around the selection: visible but quiet. */
+  secondary: boolean;
   curvature: number;
   labelT: number;
+  glow: boolean;
   motionEnabled: boolean;
 };
 
@@ -49,10 +54,10 @@ function GalaxyEdgeView({ id, source, target, data, markerEnd }: EdgeProps<Galax
   const to = circleOf(targetNode);
   if (!from || !to || !data) return null;
 
-  const visual = EDGE_STYLES[data.visualKind];
   const curve = curveBetween(from.center, to.center, from.radius, to.radius, data.curvature);
   const label = pointOnCurve(curve, data.labelT);
-  const opacity = data.dimmed ? 0.1 : data.emphasized ? 1 : 0.7;
+  const opacity = data.dimmed ? 0.08 : data.emphasized ? 1 : data.secondary ? 0.45 : 0.62;
+  const showLabel = Boolean(data.label) && !data.dimmed && (data.labelVisible || data.emphasized);
 
   return (
     <>
@@ -62,24 +67,27 @@ function GalaxyEdgeView({ id, source, target, data, markerEnd }: EdgeProps<Galax
         markerEnd={markerEnd}
         className={cn(
           "galaxy-edge-path",
+          data.glow && "galaxy-edge-path--glow",
           data.motionEnabled && data.emphasized && !data.dimmed && "galaxy-edge-path--animated",
         )}
-        style={{
-          stroke: visual.color,
-          strokeWidth: data.emphasized ? 2.6 : 1.6,
-          opacity,
-        }}
+        style={
+          {
+            stroke: data.color,
+            strokeWidth: data.emphasized ? 2.6 : 1.5,
+            opacity,
+            "--edge-color": data.color,
+          } as React.CSSProperties
+        }
       />
-      {data.label ? (
+      {showLabel ? (
         <EdgeLabelRenderer>
           <div
             className="galaxy-edge-label nodrag nopan"
             data-emphasized={data.emphasized}
-            data-dimmed={data.dimmed}
             style={
               {
                 transform: `translate(-50%, -50%) translate(${label.x}px, ${label.y}px)`,
-                "--edge-color": visual.color,
+                "--edge-color": data.color,
               } as React.CSSProperties
             }
           >

@@ -2,7 +2,7 @@ import type { OntologyNode, OntologySnapshot } from "@nql/shared-types";
 import { describe, expect, it } from "vitest";
 
 import { curveBetween, labelBox, placeEdgeLabels, pointOnCurve } from "@/lib/ontology/edge-geometry";
-import { CAPTION_HEIGHT, layoutGalaxy } from "@/lib/ontology/layouts";
+import { CAPTION_HEIGHT, influenceRingRadii, layoutGalaxy } from "@/lib/ontology/layouts";
 
 function node(id: string, label: string, kind: OntologyNode["kind"], cluster: string): OntologyNode {
   return {
@@ -65,8 +65,8 @@ function boxesOverlap(
 }
 
 describe("graph layouts", () => {
-  it.each(["semantic", "network"] as const)("%s layout leaves no overlapping nodes or captions", (mode) => {
-    const nodes = layoutGalaxy(SNAPSHOT, mode);
+  it.each(["knowledge", "grouped", "influence"] as const)("%s layout leaves no overlapping nodes or captions", (layout) => {
+    const nodes = layoutGalaxy(SNAPSHOT, layout);
     expect(nodes).toHaveLength(SNAPSHOT.nodes.length);
     for (let i = 0; i < nodes.length; i += 1) {
       for (let j = i + 1; j < nodes.length; j += 1) {
@@ -76,13 +76,24 @@ describe("graph layouts", () => {
   });
 
   it("is deterministic so the graph does not jump between renders", () => {
-    const a = layoutGalaxy(SNAPSHOT, "semantic").map((item) => [item.id, Math.round(item.x), Math.round(item.y)]);
-    const b = layoutGalaxy(SNAPSHOT, "semantic").map((item) => [item.id, Math.round(item.x), Math.round(item.y)]);
+    const a = layoutGalaxy(SNAPSHOT, "knowledge").map((item) => [item.id, Math.round(item.x), Math.round(item.y)]);
+    const b = layoutGalaxy(SNAPSHOT, "knowledge").map((item) => [item.id, Math.round(item.x), Math.round(item.y)]);
     expect(a).toEqual(b);
   });
 
-  it("hierarchy puts the containing concept above what rolls up into it", () => {
-    const nodes = layoutGalaxy(SNAPSHOT, "hierarchy");
+  it("influence puts the most connected concept at the centre and less central ones on outer rings", () => {
+    const nodes = layoutGalaxy(SNAPSHOT, "influence", "degree");
+    const distance = (id: string) => {
+      const item = nodes.find((entry) => entry.id === id)!;
+      return Math.hypot(item.x, item.y);
+    };
+    expect(distance("sale")).toBe(0);
+    expect(distance("region")).toBeGreaterThan(0);
+    expect(influenceRingRadii(nodes).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("rollup puts the containing concept above what rolls up into it", () => {
+    const nodes = layoutGalaxy(SNAPSHOT, "rollup");
     const y = (id: string) => nodes.find((item) => item.id === id)!.y;
     expect(y("region")).toBeLessThan(y("dealer"));
     expect(y("dealer")).toBeLessThan(y("sale"));

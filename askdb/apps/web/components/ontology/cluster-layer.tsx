@@ -42,6 +42,29 @@ export function clusterLabelBox(zone: ClusterZone) {
   return { x: zone.labelX - width / 2, y: zone.labelY - 16, width, height: 22 };
 }
 
+/** Concentric guide circles behind the influence layout. */
+export function RingLayer({ radii }: { radii: number[] }) {
+  return (
+    <ViewportPortal>
+      <svg
+        className="pointer-events-none"
+        style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, overflow: "visible" }}
+        aria-hidden="true"
+      >
+        {radii.map((radius, index) => (
+          <g key={radius}>
+            <circle cx={0} cy={0} r={radius} className="galaxy-ring" />
+            <text x={0} y={-radius - 10} textAnchor="middle" className="galaxy-ring-label">
+              {index === 0 ? "Closest to the core" : index === radii.length - 1 ? "Edge of the network" : ""}
+            </text>
+          </g>
+        ))}
+        <circle cx={0} cy={0} r={8} className="galaxy-ring-core" />
+      </svg>
+    </ViewportPortal>
+  );
+}
+
 /** Soft, static background zones per business category. They never react to the pointer. */
 export function ClusterLayer({
   clusters,

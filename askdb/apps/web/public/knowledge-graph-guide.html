@@ -17,6 +17,10 @@
     --kpi: #db2777;
     --time: #ca8a04;
     --accent: #4f46e5;
+    --actor: #059669;
+    --record: #7c3aed;
+    --attribute: #ca8a04;
+    --outcome: #db2777;
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -95,6 +99,20 @@
   table.simple { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
   table.simple th, table.simple td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 15px; vertical-align: top; }
   table.simple th { background: #f1f5f9; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--soft); }
+  .views { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  .view-card { border-radius: 18px; padding: 22px; border: 1px solid var(--line); background: #fff; }
+  .view-card h4 { margin: 0 0 2px; font-size: 18px; }
+  .view-card .tag { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .view-card p { color: var(--muted); font-size: 15px; margin: 8px 0 0; }
+  .view-card.kg { background: radial-gradient(400px 200px at 20% 0%, #312e81, #060a17 70%); color: #e2e8f0; border-color: #1e293b; }
+  .view-card.kg p { color: #cbd5e1; }
+  .view-card.kg .tag { color: #a5b4fc; }
+  .view-card.net { border-top: 4px solid #f59e0b; }
+  .view-card.net .tag { color: #b45309; }
+  .view-card.simple { border-top: 4px solid #14b8a6; }
+  .view-card.simple .tag { color: #0f766e; }
+  .dark-figure { background: radial-gradient(700px 300px at 20% 10%, rgba(99,102,241,.28), transparent 60%), #060a17; border-color: #1e293b; }
+  .dark-figure .caption { color: #94a3b8; }
   footer { padding: 40px 24px; text-align: center; color: var(--soft); font-size: 14px; }
 </style>
 </head>
@@ -114,10 +132,10 @@
     <a href="#what">What it is</a>
     <a href="#why">Why we use it</a>
     <a href="#problems">Problems it solves</a>
-    <a href="#colors">Reading the map</a>
-    <a href="#kg">Knowledge Graph view</a>
-    <a href="#network">Relationship Network view</a>
-    <a href="#hierarchy">Hierarchy view</a>
+    <a href="#choose">Which view to use</a>
+    <a href="#kg">Knowledge Graph</a>
+    <a href="#network">Relationship Network</a>
+    <a href="#simple">Simple Relationship View</a>
     <a href="#examples">Automobile examples</a>
     <a href="#questions">From map to answer</a>
   </div>
@@ -211,126 +229,178 @@
   </div>
 </section>
 
-<!-- 4. COLORS -->
-<section id="colors">
+<!-- 4. CHOOSE A VIEW -->
+<section id="choose">
   <div class="wrap">
-    <h2>Reading the map: four kinds of concept</h2>
-    <p class="lead">Every circle on the graph belongs to exactly one of four groups. The colour tells you which.</p>
-    <div class="grid g4">
-      <div class="card"><h4><span class="dot" style="background:var(--entity)"></span>Business Entities</h4><p>The things we deal with: Vehicle, Customer, Dealer, Region, Policy, Salesperson.</p></div>
-      <div class="card"><h4><span class="dot" style="background:var(--event)"></span>Business Events</h4><p>Things that happen and get recorded: a Sale, a Claim, a Premium payment.</p></div>
-      <div class="card"><h4><span class="dot" style="background:var(--kpi)"></span>KPIs</h4><p>The numbers leaders track: Revenue, Units Sold, Average Selling Price, Loss Ratio.</p></div>
-      <div class="card"><h4><span class="dot" style="background:var(--time)"></span>Time &amp; Breakdowns</h4><p>Ways to slice a KPI: by date, month, quarter or year.</p></div>
+    <h2>Three views, three jobs</h2>
+    <p class="lead">The same business knowledge can be looked at in three ways. Each view has its own purpose and its own
+      look, so you always know which one you are in.</p>
+    <div class="views">
+      <div class="view-card kg">
+        <span class="tag">Recommended · Explore</span>
+        <h4>Knowledge Graph</h4>
+        <p><b>What it answers:</b> "How does our business actually work?"</p>
+        <p>Glowing concepts on a dark canvas, grouped by the <b>role</b> they play: Actor, Entity, Event, Attribute, Outcome.
+          Click one and its neighbourhood lights up two steps out, just like exploring in Neo4j or GraphXR.</p>
+        <p><b>For:</b> business leaders, product owners, analysts discovering the domain.</p>
+      </div>
+      <div class="view-card net">
+        <span class="tag">Analyse · Find the hubs</span>
+        <h4>Relationship Network</h4>
+        <p><b>What it answers:</b> "What is most central? What would a change ripple into?"</p>
+        <p>Concentric rings like a target. The most central concept sits in the bullseye, ranked #1, #2, #3.
+          Each ring outwards is less central.</p>
+        <p><b>For:</b> programme managers, data owners, impact and priority decisions.</p>
+      </div>
+      <div class="view-card simple">
+        <span class="tag">Read · Quick understanding</span>
+        <h4>Simple Relationship View</h4>
+        <p><b>What it answers:</b> "What are the key things and how do they directly link?"</p>
+        <p>A clean, light diagram. Every business concept appears once, every arrow is labelled, grouped into
+          Business Entities, Events, KPIs and Time. Switch to <b>Top-down</b> to see how figures roll up.</p>
+        <p><b>For:</b> meetings, onboarding, report design, anyone new to the data.</p>
+      </div>
     </div>
-    <h3>Three kinds of arrow</h3>
+    <h3>At a glance</h3>
     <table class="simple">
-      <thead><tr><th>Arrow colour</th><th>Meaning</th><th>Example</th></tr></thead>
+      <thead><tr><th></th><th>Knowledge Graph</th><th>Relationship Network</th><th>Simple Relationship View</th></tr></thead>
       <tbody>
-        <tr><td><span class="dot" style="background:#60a5fa"></span>Blue</td><td>A business relationship</td><td>Sale → sold by → Dealer</td></tr>
-        <tr><td><span class="dot" style="background:#f472b6"></span>Pink</td><td>A KPI and where it is calculated from</td><td>Revenue → measured from → Sale</td></tr>
-        <tr><td><span class="dot" style="background:#fbbf24"></span>Amber</td><td>A way to break a figure down</td><td>Sales Date → describes → Sale</td></tr>
+        <tr><td><b>Look</b></td><td>Dark canvas, glowing orbs, soft role zones</td><td>Target rings, ranked discs, straight arrows</td><td>Light canvas, rounded tiles, every arrow labelled</td></tr>
+        <tr><td><b>Grouped by</b></td><td>Role: Actor · Entity · Event · Attribute · Outcome</td><td>Importance (distance from the centre)</td><td>Business category: Entities · Events · KPIs · Time</td></tr>
+        <tr><td><b>Clicking a concept</b></td><td>Lights up everything within two steps</td><td>Shows its direct links</td><td>Shows its direct links</td></tr>
+        <tr><td><b>Special controls</b></td><td>Connected filter, Motion, Groups</td><td>Rank by: Most connected · Bridges · Most influential</td><td>Layout: Grouped · Top-down</td></tr>
       </tbody>
     </table>
-    <p style="color:var(--muted)">Click any circle to highlight only what it is directly connected to. Everything else fades so you can focus.
-      The side panel lists its other names ("Also known as"), its connections as sentences, and example questions you can ask.</p>
   </div>
 </section>
 
 <!-- 5. KNOWLEDGE GRAPH VIEW -->
 <section id="kg">
   <div class="wrap">
-    <div class="view-head"><h2>Knowledge Graph view</h2><span class="badge">Default</span></div>
-    <p class="lead"><b>Purpose:</b> the big picture. Concepts are grouped into coloured zones by kind, so you
-      see at a glance what the business is made of and how the groups link up.</p>
-    <div class="figure">
-      <svg viewBox="0 0 960 420" role="img" aria-label="Knowledge Graph view with four coloured zones">
+    <div class="view-head"><h2>Knowledge Graph</h2><span class="badge">Recommended</span></div>
+    <p class="lead"><b>Purpose:</b> explore the business as connected ideas, not tables. Every concept plays one role,
+      and the roles read left to right: <i>who takes part → the records we keep about them → what happens → what we measure</i>.</p>
+
+    <div class="grid g3" style="margin-bottom:24px">
+      <div class="card"><h4><span class="dot" style="background:var(--actor)"></span>Actor</h4><p>Who or what takes part: Dealer, Vehicle, Salesperson, Region, Policy holder.</p></div>
+      <div class="card"><h4><span class="dot" style="background:var(--record)"></span>Entity</h4><p>The master record behind an actor: Car Line, Dealer Network, Geography.</p></div>
+      <div class="card"><h4><span class="dot" style="background:var(--event)"></span>Event</h4><p>Something that happens and is recorded: a Sale, a Claim, a Premium payment.</p></div>
+      <div class="card"><h4><span class="dot" style="background:var(--attribute)"></span>Attribute</h4><p>A property to slice by: Date, Colour, Accounting Month.</p></div>
+      <div class="card"><h4><span class="dot" style="background:var(--outcome)"></span>Outcome</h4><p>A result the business measures: Revenue, Units Sold, Loss Ratio.</p></div>
+      <div class="card"><h4>🔗 Connected</h4><p>Add this to any role to also show everything one step away, e.g. <i>Outcome + Connected</i> shows every KPI and the events it is measured from.</p></div>
+    </div>
+
+    <div class="figure dark-figure">
+      <svg viewBox="0 0 960 400" role="img" aria-label="Knowledge Graph: actors on the left, entity records, the sale event, and outcomes on the right">
         <defs>
-          <marker id="kb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#60a5fa"/></marker>
-          <marker id="kp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f472b6"/></marker>
-          <marker id="ka" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#fbbf24"/></marker>
+          <radialGradient id="orbA" cx="35%" cy="30%"><stop offset="0" stop-color="#d1fae5"/><stop offset=".35" stop-color="#34d399"/><stop offset="1" stop-color="#065f46"/></radialGradient>
+          <radialGradient id="orbN" cx="35%" cy="30%"><stop offset="0" stop-color="#ede9fe"/><stop offset=".35" stop-color="#a78bfa"/><stop offset="1" stop-color="#4c1d95"/></radialGradient>
+          <radialGradient id="orbE" cx="35%" cy="30%"><stop offset="0" stop-color="#dbeafe"/><stop offset=".35" stop-color="#60a5fa"/><stop offset="1" stop-color="#1e3a8a"/></radialGradient>
+          <radialGradient id="orbO" cx="35%" cy="30%"><stop offset="0" stop-color="#fce7f3"/><stop offset=".35" stop-color="#f472b6"/><stop offset="1" stop-color="#831843"/></radialGradient>
+          <radialGradient id="orbT" cx="35%" cy="30%"><stop offset="0" stop-color="#fef3c7"/><stop offset=".35" stop-color="#fbbf24"/><stop offset="1" stop-color="#78350f"/></radialGradient>
+          <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
-        <rect x="20" y="30" width="370" height="370" rx="40" fill="#059669" fill-opacity=".07" stroke="#059669" stroke-opacity=".3" stroke-dasharray="6 6"/>
-        <text x="40" y="22" font-size="13" font-weight="700" fill="#059669">BUSINESS ENTITIES</text>
-        <rect x="420" y="120" width="200" height="180" rx="40" fill="#2563eb" fill-opacity=".07" stroke="#2563eb" stroke-opacity=".3" stroke-dasharray="6 6"/>
-        <text x="440" y="112" font-size="13" font-weight="700" fill="#2563eb">BUSINESS EVENTS</text>
-        <rect x="660" y="30" width="280" height="250" rx="40" fill="#db2777" fill-opacity=".07" stroke="#db2777" stroke-opacity=".3" stroke-dasharray="6 6"/>
-        <text x="680" y="22" font-size="13" font-weight="700" fill="#db2777">KPIs</text>
-        <rect x="660" y="300" width="280" height="100" rx="40" fill="#ca8a04" fill-opacity=".07" stroke="#ca8a04" stroke-opacity=".3" stroke-dasharray="6 6"/>
-        <text x="680" y="294" font-size="13" font-weight="700" fill="#ca8a04">TIME &amp; BREAKDOWNS</text>
-
-        <path d="M468 200 Q 380 130 312 118" stroke="#60a5fa" stroke-width="2.5" fill="none" marker-end="url(#kb)"/>
-        <path d="M470 232 Q 390 300 300 310" stroke="#60a5fa" stroke-width="2.5" fill="none" marker-end="url(#kb)"/>
-        <path d="M250 330 Q 190 350 150 330" stroke="#60a5fa" stroke-width="2.5" fill="none" marker-end="url(#kb)"/>
-        <path d="M134 96 Q 180 60 230 92" stroke="#60a5fa" stroke-width="2.5" fill="none" marker-end="url(#kb)"/>
-        <path d="M728 100 Q 620 110 560 182" stroke="#f472b6" stroke-width="2.5" fill="none" marker-end="url(#kp)"/>
-        <path d="M740 210 Q 640 230 570 222" stroke="#f472b6" stroke-width="2.5" fill="none" marker-end="url(#kp)"/>
-        <path d="M728 350 Q 620 330 560 250" stroke="#fbbf24" stroke-width="2.5" fill="none" marker-end="url(#ka)"/>
-
-        <g font-size="11" font-weight="600" fill="#475569" text-anchor="middle">
-          <rect x="350" y="120" width="70" height="20" rx="10" fill="#fff" stroke="#e2e8f0"/><text x="385" y="134">for product</text>
-          <rect x="350" y="286" width="60" height="20" rx="10" fill="#fff" stroke="#e2e8f0"/><text x="380" y="300">sold by</text>
-          <rect x="160" y="340" width="74" height="20" rx="10" fill="#fff" stroke="#e2e8f0"/><text x="197" y="354">located in</text>
-          <rect x="150" y="54" width="54" height="20" rx="10" fill="#fff" stroke="#e2e8f0"/><text x="177" y="68">owns</text>
-          <rect x="590" y="98" width="96" height="20" rx="10" fill="#fff" stroke="#e2e8f0"/><text x="638" y="112">measured from</text>
-          <rect x="610" y="228" width="96" height="20" rx="10" fill="#fff" stroke="#e2e8f0"/><text x="658" y="242">measured from</text>
-          <rect x="600" y="322" width="70" height="20" rx="10" fill="#fff" stroke="#e2e8f0"/><text x="635" y="336">describes</text>
+        <g font-size="12" font-weight="700" letter-spacing="2">
+          <text x="80" y="36" fill="#6ee7b7">ACTOR</text>
+          <text x="280" y="36" fill="#c4b5fd">ENTITY</text>
+          <text x="470" y="36" fill="#93c5fd">EVENT</text>
+          <text x="730" y="36" fill="#f9a8d4">OUTCOME</text>
+          <text x="470" y="372" fill="#fcd34d">ATTRIBUTE</text>
         </g>
-
-        <g font-size="12" font-weight="700" fill="#fff" text-anchor="middle">
-          <circle cx="100" cy="110" r="36" fill="#059669"/><text x="100" y="115">Customer</text>
-          <circle cx="270" cy="105" r="40" fill="#059669"/><text x="270" y="110">Vehicle</text>
-          <circle cx="285" cy="325" r="36" fill="#059669"/><text x="285" y="330">Dealer</text>
-          <circle cx="115" cy="310" r="34" fill="#059669"/><text x="115" y="315">Region</text>
-          <circle cx="520" cy="215" r="50" fill="#2563eb"/><text x="520" y="212">Sales</text><text x="520" y="228">Transaction</text>
-          <circle cx="770" cy="95" r="40" fill="#db2777"/><text x="770" y="100">Revenue</text>
-          <circle cx="780" cy="210" r="38" fill="#db2777"/><text x="780" y="206">Units</text><text x="780" y="220">Sold</text>
-          <circle cx="770" cy="352" r="32" fill="#ca8a04"/><text x="770" y="357">Date</text>
+        <g fill="none" stroke-width="2.2">
+          <path d="M130 110 Q 220 100 280 130" stroke="#fbbf24"/>
+          <path d="M130 250 Q 220 250 280 240" stroke="#fbbf24"/>
+          <path d="M470 190 Q 400 150 330 140" stroke="#818cf8"/>
+          <path d="M470 205 Q 400 240 330 240" stroke="#818cf8"/>
+          <path d="M720 110 Q 620 120 545 180" stroke="#f472b6"/>
+          <path d="M720 200 Q 630 200 550 198" stroke="#f472b6"/>
+          <path d="M720 290 Q 620 270 545 220" stroke="#f472b6"/>
+          <path d="M500 320 Q 505 280 505 240" stroke="#2dd4bf"/>
+        </g>
+        <g font-size="10.5" font-weight="600" text-anchor="middle">
+          <rect x="178" y="92" width="74" height="18" rx="9" fill="#0b1224" stroke="#fbbf24" stroke-opacity=".6"/><text x="215" y="105" fill="#fde68a">recorded as</text>
+          <rect x="360" y="138" width="60" height="18" rx="9" fill="#0b1224" stroke="#818cf8" stroke-opacity=".6"/><text x="390" y="151" fill="#c7d2fe">involves</text>
+          <rect x="360" y="232" width="56" height="18" rx="9" fill="#0b1224" stroke="#818cf8" stroke-opacity=".6"/><text x="388" y="245" fill="#c7d2fe">sold by</text>
+          <rect x="590" y="110" width="92" height="18" rx="9" fill="#0b1224" stroke="#f472b6" stroke-opacity=".6"/><text x="636" y="123" fill="#fbcfe8">measured from</text>
+          <rect x="520" y="268" width="66" height="18" rx="9" fill="#0b1224" stroke="#2dd4bf" stroke-opacity=".6"/><text x="553" y="281" fill="#99f6e4">describes</text>
+        </g>
+        <g filter="url(#glow)">
+          <circle cx="110" cy="110" r="24" fill="url(#orbA)"/>
+          <circle cx="110" cy="250" r="24" fill="url(#orbA)"/>
+          <circle cx="305" cy="138" r="24" fill="url(#orbN)"/>
+          <circle cx="305" cy="240" r="24" fill="url(#orbN)"/>
+          <circle cx="505" cy="200" r="40" fill="url(#orbE)"/>
+          <circle cx="745" cy="105" r="22" fill="url(#orbO)"/>
+          <circle cx="745" cy="200" r="22" fill="url(#orbO)"/>
+          <circle cx="745" cy="295" r="22" fill="url(#orbO)"/>
+          <circle cx="500" cy="332" r="18" fill="url(#orbT)"/>
+        </g>
+        <g font-size="12" font-weight="600" fill="#e2e8f0" text-anchor="middle">
+          <text x="110" y="152">Vehicle</text>
+          <text x="110" y="292">Dealer</text>
+          <text x="305" y="180">Car Line</text>
+          <text x="305" y="282">Dealer Network</text>
+          <text x="505" y="258">Sales Transaction</text>
+          <text x="745" y="145">Revenue</text>
+          <text x="745" y="240">Units Sold</text>
+          <text x="745" y="335">Avg. Selling Price</text>
+          <text x="560" y="336" text-anchor="start">Date</text>
         </g>
       </svg>
-      <div class="caption">Knowledge Graph view — coloured zones group each kind of concept. The Sale sits in the middle, tying everything together.</div>
+      <div class="caption">Knowledge Graph: a Vehicle (actor) is recorded as a Car Line (entity); a Sale (event) involves it; Revenue (outcome) is measured from the Sale.</div>
     </div>
     <h3>Example: "How is Revenue produced?"</h3>
-    <p style="color:var(--muted)">Click <b>Revenue</b>. The map highlights <i>Revenue → measured from → Sales Transaction</i>,
-      and from there <i>sold by → Dealer</i> and <i>for product → Vehicle</i>. In one click you know Revenue can be broken down by dealer, vehicle and region.</p>
-    <p><b>Best for:</b> executive overviews, onboarding, explaining the business model in a meeting.</p>
+    <p style="color:var(--muted)">Click <b>Revenue</b>. It lights up <i>Revenue → measured from → Sales Transaction</i> directly, and one step further
+      the Car Line, Dealer Network and Date around that sale. In one click you know Revenue can be broken down by car line, dealer and month.</p>
+    <p><b>Best for:</b> exploring the domain, explaining the business model, discovering relationships you did not know existed.</p>
   </div>
 </section>
 
 <!-- 6. RELATIONSHIP NETWORK VIEW -->
 <section id="network">
   <div class="wrap">
-    <div class="view-head"><h2>Relationship Network view</h2></div>
-    <p class="lead"><b>Purpose:</b> find the hubs. The coloured zones are removed so the layout can follow the
-      connections, and each circle is sized by how important it is to the business — the bigger the circle, the more things depend on it.</p>
+    <div class="view-head"><h2>Relationship Network</h2></div>
+    <p class="lead"><b>Purpose:</b> find the hubs. Concepts are arranged on rings like a target: the most central one sits in the
+      bullseye, and each ring outwards is less central. The top five are numbered so you can say "our #1 hub is the Sale".</p>
     <div class="grid g2">
       <div class="figure">
-        <svg viewBox="0 0 480 340" role="img" aria-label="Relationship network with Sales Transaction as the largest hub">
-          <g stroke="#cbd5e1" stroke-width="2.5">
-            <line x1="240" y1="170" x2="90" y2="80"/><line x1="240" y1="170" x2="390" y2="70"/>
-            <line x1="240" y1="170" x2="400" y2="250"/><line x1="240" y1="170" x2="90" y2="270"/>
-            <line x1="240" y1="170" x2="250" y2="310"/><line x1="240" y1="170" x2="240" y2="40"/>
-            <line x1="90" y1="270" x2="40" y2="180"/><line x1="90" y1="80" x2="40" y2="180"/>
+        <svg viewBox="0 0 480 380" role="img" aria-label="Influence rings with Sales Transaction at the centre">
+          <g fill="none" stroke="#f59e0b" stroke-opacity=".45" stroke-dasharray="3 6" stroke-width="1.5">
+            <circle cx="240" cy="190" r="95"/><circle cx="240" cy="190" r="170"/>
           </g>
-          <g font-size="11" font-weight="700" fill="#fff" text-anchor="middle">
-            <circle cx="240" cy="170" r="62" fill="#2563eb"/><text x="240" y="166">Sales</text><text x="240" y="181">Transaction</text>
-            <circle cx="90" cy="270" r="40" fill="#059669"/><text x="90" y="275">Dealer</text>
-            <circle cx="90" cy="80" r="36" fill="#059669"/><text x="90" y="85">Vehicle</text>
-            <circle cx="40" cy="180" r="24" fill="#059669"/><text x="40" y="184" font-size="10">Region</text>
-            <circle cx="390" cy="70" r="28" fill="#db2777"/><text x="390" y="74" font-size="10">Revenue</text>
-            <circle cx="400" cy="250" r="26" fill="#db2777"/><text x="400" y="254" font-size="10">Units</text>
-            <circle cx="250" cy="310" r="22" fill="#ca8a04"/><text x="250" y="314" font-size="10">Date</text>
-            <circle cx="240" cy="40" r="22" fill="#059669"/><text x="240" y="44" font-size="9">Seller</text>
+          <text x="240" y="88" text-anchor="middle" font-size="11" font-weight="600" fill="#94a3b8">Closest to the core</text>
+          <g stroke-width="2">
+            <line x1="240" y1="190" x2="240" y2="95" stroke="#818cf8"/><line x1="240" y1="190" x2="322" y2="238" stroke="#818cf8"/>
+            <line x1="240" y1="190" x2="158" y2="238" stroke="#818cf8"/><line x1="240" y1="190" x2="410" y2="190" stroke="#f472b6"/>
+            <line x1="240" y1="190" x2="120" y2="70" stroke="#f472b6"/><line x1="158" y1="238" x2="75" y2="260" stroke="#fbbf24"/>
+          </g>
+          <g stroke="#fff" stroke-width="3">
+            <circle cx="240" cy="190" r="40" fill="#60a5fa"/>
+            <circle cx="240" cy="95" r="24" fill="#a78bfa"/>
+            <circle cx="322" cy="238" r="22" fill="#a78bfa"/>
+            <circle cx="158" cy="238" r="22" fill="#a78bfa"/>
+            <circle cx="410" cy="190" r="16" fill="#f472b6"/>
+            <circle cx="120" cy="70" r="16" fill="#f472b6"/>
+            <circle cx="75" cy="260" r="16" fill="#34d399"/>
+          </g>
+          <g font-size="13" font-weight="800" fill="#fff" text-anchor="middle">
+            <text x="240" y="195">#1</text><text x="240" y="100">#2</text><text x="322" y="243">#3</text><text x="158" y="243">#4</text>
+          </g>
+          <g font-size="11" font-weight="600" fill="#334155" text-anchor="middle">
+            <text x="240" y="246">Sales Transaction</text><text x="240" y="134">Dealer Network</text>
+            <text x="322" y="276">Geography</text><text x="158" y="276">Car Line</text>
+            <text x="410" y="222">Revenue</text><text x="120" y="102">Orders</text><text x="75" y="292">Vehicle</text>
           </g>
         </svg>
-        <div class="caption">The Sale is the biggest circle: almost every KPI and entity connects through it.</div>
+        <div class="caption">The Sale sits in the bullseye: almost every KPI and entity connects through it.</div>
       </div>
       <div>
-        <h3 style="margin-top:0">Three ways to size the circles</h3>
+        <h3 style="margin-top:0">Three ways to rank</h3>
         <div class="qa"><b>Most connected</b>Concepts with the most direct links. Answers "what touches the most other things?"</div>
         <div class="qa"><b>Bridges</b>Concepts that sit between groups. If a bridge breaks, parts of the business stop talking to each other.</div>
         <div class="qa"><b>Most influential</b>Concepts connected to other important concepts — the true centre of gravity.</div>
         <h3>Example</h3>
-        <p style="color:var(--muted)">Switch to <b>Bridges</b> and <b>Dealer</b> grows: it links Sales to Region.
+        <p style="color:var(--muted)">Switch to <b>Bridges</b> and <b>Dealer Network</b> moves towards the centre: it links Sales to Geography.
           That tells a programme manager that any change to dealer data will ripple into every regional report.</p>
         <p><b>Best for:</b> impact analysis, data-quality priorities, deciding where to invest first.</p>
       </div>
@@ -338,48 +408,56 @@
   </div>
 </section>
 
-<!-- 7. HIERARCHY VIEW -->
-<section id="hierarchy">
+<!-- 7. SIMPLE RELATIONSHIP VIEW -->
+<section id="simple">
   <div class="wrap">
-    <div class="view-head"><h2>Hierarchy view</h2></div>
-    <p class="lead"><b>Purpose:</b> see how things roll up. The broadest concepts sit at the top; the figures
-      that are calculated from them sit underneath. Read it top-down like a management report.</p>
-    <div class="figure">
-      <svg viewBox="0 0 900 420" role="img" aria-label="Hierarchy from Region down to Revenue">
+    <div class="view-head"><h2>Simple Relationship View</h2></div>
+    <p class="lead"><b>Purpose:</b> understand the model in thirty seconds. Every business concept appears once — "Car", "Automobile"
+      and "Car Line" are one Vehicle tile — and every arrow carries its label, so the diagram reads as sentences.</p>
+    <div class="grid g4" style="margin-bottom:24px">
+      <div class="card"><h4><span class="dot" style="background:var(--entity)"></span>Business Entities</h4><p>Vehicle, Customer, Dealer, Region, Policy, Salesperson.</p></div>
+      <div class="card"><h4><span class="dot" style="background:var(--event)"></span>Business Events</h4><p>A Sale, a Claim, a Premium payment.</p></div>
+      <div class="card"><h4><span class="dot" style="background:var(--kpi)"></span>KPIs</h4><p>Revenue, Units Sold, Average Selling Price, Loss Ratio.</p></div>
+      <div class="card"><h4><span class="dot" style="background:var(--time)"></span>Time &amp; Breakdowns</h4><p>Date, month, quarter, year.</p></div>
+    </div>
+    <div class="grid g2">
+      <div>
+        <h3 style="margin-top:0">Grouped layout</h3>
+        <p style="color:var(--muted)">Each category sits in its own shaded area. Blue arrows are business relationships
+          (<i>Sale → sold by → Dealer</i>), pink arrows show where a KPI is calculated from (<i>Revenue → measured from → Sale</i>),
+          amber arrows show breakdowns (<i>Date → describes → Sale</i>).</p>
+      </div>
+      <div>
+        <h3 style="margin-top:0">Top-down layout</h3>
+        <p style="color:var(--muted)">The broadest concepts at the top, the figures calculated from them underneath — read it like a management
+          report. Follow <b>Revenue</b> upwards: Revenue → Sales Transaction → Dealer → Region. That is exactly the drill path of a
+          regional revenue report.</p>
+      </div>
+    </div>
+    <div class="figure" style="margin-top:20px">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Top-down layout from Region down to Revenue">
         <defs><marker id="h1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker></defs>
-        <g stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#h1)">
-          <path d="M300 128 L 300 72"/>
-          <path d="M440 222 L 320 140"/>
-          <path d="M470 222 L 600 140"/>
-          <path d="M340 322 L 430 262"/>
-          <path d="M470 322 L 455 268"/>
-          <path d="M600 322 L 480 262"/>
+        <g stroke="#94a3b8" stroke-width="2.2" fill="none" marker-end="url(#h1)">
+          <path d="M300 104 L 300 62"/><path d="M430 170 L 322 120"/><path d="M480 170 L 598 120"/>
+          <path d="M340 236 L 432 200"/><path d="M462 236 L 458 204"/><path d="M590 236 L 484 200"/>
         </g>
         <g font-size="12" font-weight="700" fill="#fff" text-anchor="middle">
-          <circle cx="300" cy="45" r="28" fill="#059669"/><text x="300" y="50">Region</text>
-          <circle cx="300" cy="140" r="30" fill="#059669"/><text x="300" y="145">Dealer</text>
-          <circle cx="620" cy="140" r="30" fill="#059669"/><text x="620" y="145">Vehicle</text>
-          <circle cx="455" cy="240" r="38" fill="#2563eb"/><text x="455" y="236">Sales</text><text x="455" y="250">Transaction</text>
-          <circle cx="330" cy="345" r="30" fill="#db2777"/><text x="330" y="350">Revenue</text>
-          <circle cx="470" cy="345" r="30" fill="#db2777"/><text x="470" y="341" font-size="11">Units</text><text x="470" y="354" font-size="11">Sold</text>
-          <circle cx="610" cy="345" r="30" fill="#db2777"/><text x="610" y="341" font-size="11">Avg.</text><text x="610" y="354" font-size="11">Price</text>
+          <rect x="274" y="20" width="52" height="40" rx="11" fill="#059669"/><text x="300" y="45">Region</text>
+          <rect x="274" y="84" width="52" height="40" rx="11" fill="#059669"/><text x="300" y="109">Dealer</text>
+          <rect x="594" y="84" width="56" height="40" rx="11" fill="#059669"/><text x="622" y="109">Vehicle</text>
+          <rect x="410" y="160" width="90" height="42" rx="12" fill="#2563eb"/><text x="455" y="186">Sale</text>
+          <rect x="300" y="236" width="70" height="40" rx="11" fill="#db2777"/><text x="335" y="261">Revenue</text>
+          <rect x="425" y="236" width="80" height="40" rx="11" fill="#db2777"/><text x="465" y="261">Units Sold</text>
+          <rect x="560" y="236" width="80" height="40" rx="11" fill="#db2777"/><text x="600" y="261">Avg. Price</text>
         </g>
         <g font-size="12" fill="#64748b" font-weight="600">
-          <text x="30" y="50">Where</text>
-          <text x="30" y="145">Who &amp; what</text>
-          <text x="30" y="245">What happened</text>
-          <text x="30" y="350">What we measure</text>
+          <text x="30" y="45">Where</text><text x="30" y="109">Who &amp; what</text>
+          <text x="30" y="186">What happened</text><text x="30" y="261">What we measure</text>
         </g>
-        <line x1="20" y1="92" x2="880" y2="92" stroke="#e2e8f0" stroke-dasharray="4 6"/>
-        <line x1="20" y1="192" x2="880" y2="192" stroke="#e2e8f0" stroke-dasharray="4 6"/>
-        <line x1="20" y1="296" x2="880" y2="296" stroke="#e2e8f0" stroke-dasharray="4 6"/>
       </svg>
-      <div class="caption">Hierarchy view — Region at the top, KPIs at the bottom. Every arrow points up to what it belongs to.</div>
+      <div class="caption">Top-down layout: Region at the top, KPIs at the bottom. Every arrow points up to what it belongs to.</div>
     </div>
-    <h3>Example</h3>
-    <p style="color:var(--muted)">Follow <b>Revenue</b> upwards: Revenue → Sales Transaction → Dealer → Region. That is exactly the
-      drill path of a regional revenue report — "Revenue by Region, then by Dealer, then by Vehicle".</p>
-    <p><b>Best for:</b> designing reports and dashboards, explaining drill-downs, agreeing KPI ownership.</p>
+    <p><b>Best for:</b> meetings, onboarding, designing reports and dashboards, agreeing KPI ownership.</p>
   </div>
 </section>
 
@@ -450,7 +528,8 @@
     <h3>Tips for exploring the graph</h3>
     <ul class="tidy">
       <li><b>Click a circle</b> to focus on it; click empty space to reset.</li>
-      <li><b>Use the coloured filters</b> at the top to show only Entities, Events, KPIs or Breakdowns.</li>
+      <li><b>Pick a view</b> at the top left: Knowledge Graph to explore, Relationship Network to find hubs, Simple Relationship View to read quickly.</li>
+      <li><b>Use the coloured filters</b> to show only some roles or categories; in the Knowledge Graph add <b>Connected</b> to include their direct neighbours.</li>
       <li><b>Drag circles</b> to tidy a view for a presentation — the arrows follow.</li>
       <li><b>"Business names" / "Technical names"</b> switches between everyday names and the underlying system names for data teams.</li>
       <li><b>Fit</b> brings the whole map back into view.</li>

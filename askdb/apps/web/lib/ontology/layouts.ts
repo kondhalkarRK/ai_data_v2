@@ -18,7 +18,14 @@ import {
 } from "@/lib/ontology/graph-metrics";
 import { conceptCategory } from "@/lib/ontology/kind-filter";
 
-export type GalaxyMode = "semantic" | "network" | "hierarchy";
+/** Top-level graph experiences. */
+export type GalaxyMode = "knowledge" | "network" | "simple";
+
+/**
+ * knowledge: organic semantic clusters · influence: centrality rings ·
+ * grouped: business categories side by side · rollup: top-down hierarchy.
+ */
+export type GraphLayout = "knowledge" | "influence" | "grouped" | "rollup";
 
 export type CentralityMetric = "degree" | "betweenness" | "pagerank";
 
@@ -41,6 +48,16 @@ const CLUSTER_ANCHORS: Record<string, { x: number; y: number }> = {
   Outcomes: { x: 360, y: 200 },
   Attributes: { x: -200, y: 300 },
   Context: { x: -380, y: 220 },
+  Other: { x: 0, y: 0 },
+};
+
+/** Knowledge roles read left to right: actor → entity record → event → outcome, attributes below. */
+const KNOWLEDGE_ANCHORS: Record<string, { x: number; y: number }> = {
+  Actors: { x: -620, y: -120 },
+  Context: { x: -300, y: 140 },
+  Events: { x: 20, y: -80 },
+  Outcomes: { x: 420, y: 60 },
+  Attributes: { x: 60, y: 360 },
   Other: { x: 0, y: 0 },
 };
 
@@ -129,11 +146,13 @@ function runForce(
     charge: number;
     linkDistance: number;
     linkStrength: number;
+    anchors?: Record<string, { x: number; y: number }>;
   },
 ): PositionedNode[] {
   const spread = Math.max(1, Math.sqrt(snapshot.nodes.length / 14));
+  const anchors = options.anchors ?? CLUSTER_ANCHORS;
   const anchor = (cluster: string) => {
-    const base = CLUSTER_ANCHORS[cluster] ?? CLUSTER_ANCHORS.Other!;
+    const base = anchors[cluster] ?? anchors.Other!;
     return { x: base.x * spread, y: base.y * spread };
   };
 
@@ -264,21 +283,75 @@ export function layoutHierarchy(
   return placed;
 }
 
+const RING_GAP = 210;
+const RING_CAPACITY = [1, 6, 12, 18, 24, 30];
+
+/**
+ * Influence rings: the most central concept sits in the middle and every ring outwards is less
+ * central. Within a ring, concepts of the same role sit together so colours form sectors.
+ */
+export function layoutInfluence(snapshot: OntologySnapshot, centrality: Map<string, number>): PositionedNode[] {
+  const ranked = [...snapshot.nodes].sort(
+    (a, b) => (centrality.get(b.id) ?? 0) - (centrality.get(a.id) ?? 0) || a.label.localeCompare(b.label),
+  );
+  const rings: OntologyNode[][] = [];
+  let cursor = 0;
+  for (let ring = 0; cursor < ranked.length; ring += 1) {
+    const capacity = RING_CAPACITY[ring] ?? RING_CAPACITY[RING_CAPACITY.length - 1]! + ring * 6;
+    rings.push(ranked.slice(cursor, cursor + capacity));
+    cursor += capacity;
+  }
+
+  const placed: PositionedNode[] = [];
+  let previousRadius = 0;
+  rings.forEach((members, ring) => {
+    const ordered = [...members].sort((a, b) => a.cluster.localeCompare(b.cluster));
+    const sized = ordered.map((node) => {
+      const score = centrality.get(node.id) ?? 0;
+      return { node, score, radius: 18 + score * 34, caption: captionWidth(node.label) };
+    });
+    const slot = Math.max(...sized.map((item) => Math.max(item.radius * 2, item.caption))) + NODE_GAP;
+    const radius =
+      ring === 0 ? 0 : Math.max(previousRadius + RING_GAP, (sized.length * slot) / (2 * Math.PI));
+    previousRadius = radius;
+    const offset = ring * 0.37;
+    sized.forEach((item, index) => {
+      const angle = -Math.PI / 2 + offset + (index / Math.max(1, sized.length)) * Math.PI * 2;
+      placed.push({
+        ...item.node,
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius,
+        radius: item.radius,
+        centrality: item.score,
+        captionWidth: item.caption,
+      });
+    });
+  });
+  return placed;
+}
+
+/** Distinct ring radii of an influence layout, for drawing the guide circles. */
+export function influenceRingRadii(nodes: PositionedNode[]): number[] {
+  return [...new Set(nodes.map((node) => Math.round(Math.hypot(node.x, node.y))))].filter((r) => r > 0);
+}
+
 export function layoutGalaxy(
   snapshot: OntologySnapshot,
-  mode: GalaxyMode,
+  layout: GraphLayout,
   metric: CentralityMetric = "degree",
 ): PositionedNode[] {
-  const centrality = computeCentrality(snapshot, mode === "network" ? metric : "degree");
-  if (mode === "hierarchy") return layoutHierarchy(snapshot, centrality);
-  if (mode === "network") {
+  if (layout === "influence") return layoutInfluence(snapshot, computeCentrality(snapshot, metric));
+  const centrality = computeCentrality(snapshot, "degree");
+  if (layout === "rollup") return layoutHierarchy(snapshot, centrality);
+  if (layout === "knowledge") {
     return runForce(snapshot, {
       centrality,
-      sizeByCentrality: 26,
-      clusterPull: 0.02,
+      sizeByCentrality: 16,
+      clusterPull: 0.11,
       charge: -900,
       linkDistance: 170,
-      linkStrength: 0.5,
+      linkStrength: 0.25,
+      anchors: KNOWLEDGE_ANCHORS,
     });
   }
   return runForce(snapshot, {

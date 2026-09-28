@@ -41,12 +41,15 @@ export function NodeDrawer({
   node,
   snapshot,
   overlay = "business",
+  categoryLabel,
   onClose,
   onFocus,
 }: {
   node: OntologyNode | null;
   snapshot?: OntologySnapshot | null;
   overlay?: ContextOverlay;
+  /** Category name in the active view; defaults to the business category. */
+  categoryLabel?: string;
   onClose: () => void;
   onFocus?: (id: string) => void;
 }) {
@@ -58,6 +61,7 @@ export function NodeDrawer({
           node={node}
           snapshot={snapshot ?? EMPTY_SNAPSHOT}
           overlay={overlay}
+          categoryLabel={categoryLabel ?? categoryMeta(conceptCategory(node)).label}
           onClose={onClose}
           onFocus={onFocus}
         />
@@ -70,12 +74,14 @@ function DrawerContent({
   node,
   snapshot,
   overlay,
+  categoryLabel,
   onClose,
   onFocus,
 }: {
   node: OntologyNode;
   snapshot: OntologySnapshot;
   overlay: ContextOverlay;
+  categoryLabel: string;
   onClose: () => void;
   onFocus?: (id: string) => void;
 }) {
@@ -111,7 +117,7 @@ function DrawerContent({
                 style={{ backgroundColor: node.clusterColor }}
                 aria-hidden="true"
               />
-              {categoryMeta(conceptCategory(node)).label}
+              {categoryLabel}
             </p>
             <h2 className="truncate text-2xl font-semibold tracking-tight">{node.label}</h2>
             {overlay === "technical" ? (
