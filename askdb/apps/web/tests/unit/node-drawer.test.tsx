@@ -35,19 +35,27 @@ const NODE: OntologyNode = {
 };
 
 describe("NodeDrawer", () => {
-  it("opens immediately with overview and source bindings", () => {
+  it("opens with business names and aliases, hiding technical bindings", () => {
     render(<NodeDrawer node={NODE} onClose={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "Sales Transactions" })).toBeVisible();
-    expect(screen.getAllByText("automotive.fact_sales")).toHaveLength(2);
+    expect(screen.getByText("Business Events")).toBeVisible();
+    expect(screen.getByText("Also known as")).toBeVisible();
     expect(screen.getByText("sales")).toBeVisible();
+    expect(screen.queryByText("automotive.fact_sales")).toBeNull();
+  });
+
+  it("shows source bindings with the technical overlay", () => {
+    render(<NodeDrawer node={NODE} onClose={vi.fn()} overlay="technical" />);
+
+    expect(screen.getAllByText("automotive.fact_sales").length).toBeGreaterThanOrEqual(2);
   });
 
   it("shows field-level schema and reference targets", async () => {
     const user = userEvent.setup();
     render(<NodeDrawer node={NODE} onClose={vi.fn()} />);
 
-    await user.click(screen.getByRole("tab", { name: "Schema" }));
+    await user.click(screen.getByRole("tab", { name: "Fields" }));
     expect(screen.getByText("order_id")).toBeVisible();
     expect(screen.getByText("ref:dim_carline.carline_id")).toBeVisible();
     expect(screen.getByLabelText("Primary key")).toBeVisible();
@@ -57,11 +65,11 @@ describe("NodeDrawer", () => {
     const user = userEvent.setup();
     render(<NodeDrawer node={NODE} onClose={vi.fn()} />);
 
-    await user.click(screen.getByRole("tab", { name: "Reach" }));
+    await user.click(screen.getByRole("tab", { name: "Connections" }));
     expect(screen.getByText("7")).toBeVisible();
     expect(screen.getByText("Sales to Vehicle → Vehicle / Car Line")).toBeVisible();
 
-    await user.click(screen.getByRole("tab", { name: "Lineage" }));
+    await user.click(screen.getByRole("tab", { name: "Source" }));
     expect(screen.getByText("fact_sales.carline_id → dim_carline.carline_id")).toBeVisible();
   });
 

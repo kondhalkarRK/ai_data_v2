@@ -1,6 +1,6 @@
 import type { OntologyEdge, OntologyNode, OntologySnapshot } from "@nql/shared-types";
 
-export type ContextOverlay = "business" | "technical" | "governance";
+export type ContextOverlay = "business" | "technical";
 
 export type TrustBadge = "certified" | "trusted" | "popular" | "review";
 
@@ -14,12 +14,6 @@ export interface AssetContext {
   relatedMetrics: OntologyNode[];
   relatedGlossary: string[];
   connectedTables: string[];
-}
-
-function hashScore(id: string, min: number, max: number): number {
-  let n = 0;
-  for (let i = 0; i < id.length; i += 1) n = (n * 31 + id.charCodeAt(i)) % 997;
-  return min + (n % (max - min + 1));
 }
 
 export function deriveAssetContext(node: OntologyNode, snapshot: OntologySnapshot): AssetContext {
@@ -72,7 +66,7 @@ function sampleQueriesFor(node: OntologyNode): string[] {
 }
 
 export function storyVerb(edge: OntologyEdge): string {
-  if (edge.label && !/^[a-z_]+$/.test(edge.label) && edge.label.length > 2) {
+  if (edge.label && !/^[a-z]+_[a-z_]+$/.test(edge.label) && edge.label.length > 2) {
     return edge.label;
   }
   if (edge.kind === "maps_to") return "Means";
@@ -86,7 +80,6 @@ export function storyLabel(edge: OntologyEdge, overlay: ContextOverlay): string 
   if (overlay === "technical" && (edge.fromColumn || edge.toColumn)) {
     return [edge.fromColumn, edge.toColumn].filter(Boolean).join(" → ");
   }
-  if (overlay === "governance") return edge.kind.replace("_", " ");
   return edge.label || storyVerb(edge);
 }
 
@@ -99,27 +92,6 @@ export function snapshotTrustRate(snapshot: OntologySnapshot): number {
   if (!snapshot.nodes.length) return 0;
   const trusted = snapshot.nodes.filter((node) => node.kind === "measure" || node.degree >= 3).length;
   return Math.round((trusted / snapshot.nodes.length) * 100);
-}
-
-export const JOURNEYS: Array<{ id: string; label: string; seeds: string[] }> = [
-  { id: "revenue", label: "Revenue journey", seeds: ["revenue", "sales", "dealer", "region"] },
-  { id: "claims", label: "Claims journey", seeds: ["claim", "premium", "policy", "customer"] },
-  { id: "vehicle", label: "Vehicle journey", seeds: ["vehicle", "car", "make", "model"] },
-];
-
-export function journeyNodeIds(snapshot: OntologySnapshot, seeds: string[]): string[] {
-  const ids: string[] = [];
-  for (const seed of seeds) {
-    const needle = seed.toLowerCase();
-    const match = snapshot.nodes.find(
-      (node) =>
-        node.id.toLowerCase().includes(needle) ||
-        node.label.toLowerCase().includes(needle) ||
-        node.synonyms.some((item) => item.toLowerCase().includes(needle)),
-    );
-    if (match && !ids.includes(match.id)) ids.push(match.id);
-  }
-  return ids;
 }
 
 export function matchesDiscoveryQuery(node: OntologyNode, query: string): boolean {

@@ -1,29 +1,57 @@
 import type { OntologyNode } from "@nql/shared-types";
 
-export type OntologyKindFilter =
-  | "all"
-  | "measure"
-  | "dimension"
-  | "fact"
-  | "entity"
-  | "relationship";
+/** Business categories shown on the graph. Each concept belongs to exactly one. */
+export type ConceptCategory = "entities" | "events" | "kpis" | "breakdowns";
 
-export const ONTOLOGY_KIND_FILTERS: {
-  id: OntologyKindFilter;
+export type OntologyKindFilter = "all" | ConceptCategory;
+
+export const CONCEPT_CATEGORIES: ReadonlyArray<{
+  id: ConceptCategory;
+  cluster: string;
   label: string;
+  color: string;
   hint: string;
-}[] = [
-  { id: "all", label: "All concepts", hint: "Show every business concept on the graph." },
-  { id: "measure", label: "Outcomes", hint: "KPIs such as Revenue, Premium, or Loss ratio." },
-  { id: "dimension", label: "Attributes", hint: "Ways to describe a concept — region, product, date." },
-  { id: "fact", label: "Events", hint: "Business events such as a sale or a claim." },
-  { id: "entity", label: "Actors", hint: "People and organizations — Dealer, Customer, Vehicle." },
+}> = [
   {
-    id: "relationship",
-    label: "Connected",
-    hint: "Keep only concepts that share a relationship.",
+    id: "entities",
+    cluster: "Actors",
+    label: "Business Entities",
+    color: "#059669",
+    hint: "The things the business deals with — Vehicle, Dealer, Customer, Region, Policy.",
+  },
+  {
+    id: "events",
+    cluster: "Events",
+    label: "Business Events",
+    color: "#2563eb",
+    hint: "Things that happen and get recorded — a Sale, a Claim, a Premium payment.",
+  },
+  {
+    id: "kpis",
+    cluster: "Outcomes",
+    label: "KPIs",
+    color: "#db2777",
+    hint: "The numbers leaders track — Revenue, Units Sold, Loss Ratio.",
+  },
+  {
+    id: "breakdowns",
+    cluster: "Attributes",
+    label: "Time & Breakdowns",
+    color: "#ca8a04",
+    hint: "Ways to slice a KPI — by date, month, or year.",
   },
 ];
+
+const CATEGORY_BY_CLUSTER = new Map(CONCEPT_CATEGORIES.map((item) => [item.cluster, item]));
+
+export function categoryMeta(category: ConceptCategory) {
+  return CONCEPT_CATEGORIES.find((item) => item.id === category)!;
+}
+
+/** Business label for a cluster id coming from the API (Actors, Events, …). */
+export function categoryLabelForCluster(cluster: string): string {
+  return CATEGORY_BY_CLUSTER.get(cluster)?.label ?? cluster;
+}
 
 export function isFactNode(node: Pick<OntologyNode, "kind" | "tableType" | "id">): boolean {
   return (
@@ -32,33 +60,25 @@ export function isFactNode(node: Pick<OntologyNode, "kind" | "tableType" | "id">
   );
 }
 
-/** Whether a node should stay emphasized for the active kind filter. */
+export function conceptCategory(
+  node: Pick<OntologyNode, "kind" | "tableType" | "id">,
+): ConceptCategory {
+  if (isFactNode(node)) return "events";
+  if (node.kind === "measure") return "kpis";
+  if (node.kind === "dimension") return "breakdowns";
+  return "entities";
+}
+
 export function nodeMatchesKindFilter(
-  node: Pick<OntologyNode, "kind" | "tableType" | "id" | "degree">,
+  node: Pick<OntologyNode, "kind" | "tableType" | "id">,
   filter: OntologyKindFilter,
 ): boolean {
-  switch (filter) {
-    case "all":
-      return true;
-    case "measure":
-      return node.kind === "measure";
-    case "dimension":
-      return node.kind === "dimension";
-    case "fact":
-      return isFactNode(node);
-    case "entity":
-      return node.kind === "entity";
-    case "relationship":
-      // Keep connected nodes visible so relationship structure stays readable.
-      return (node.degree ?? 0) > 0;
-    default:
-      return true;
-  }
+  return filter === "all" || conceptCategory(node) === filter;
 }
 
 /** A node stays visible when it matches any selected category. "All" clears the filter. */
 export function nodeMatchesKindFilters(
-  node: Pick<OntologyNode, "kind" | "tableType" | "id" | "degree">,
+  node: Pick<OntologyNode, "kind" | "tableType" | "id">,
   filters: readonly OntologyKindFilter[],
 ): boolean {
   if (filters.length === 0 || filters.includes("all")) return true;

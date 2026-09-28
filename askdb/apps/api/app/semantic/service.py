@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from collections import defaultdict
 from datetime import UTC, datetime
@@ -355,17 +356,33 @@ class SemanticService:
                 )
             else:
                 # Cross-fact ratios (for example loss ratio) have no single source
-                # table. Keep them connected to the domain without inventing a lineage
-                # edge to one fact that would be misleading.
-                add_edge(
-                    OntologyEdge(
-                        id=f"dependency:{domain_id}:{node_id}",
-                        source=domain_id,
-                        target=node_id,
-                        kind="dependency",
-                        label="derived metric",
+                # table. Link them to every fact whose columns the expression uses.
+                referenced = set(re.findall(r"[a-z_][a-z0-9_]*", measure.expression.lower()))
+                source_facts = [
+                    name
+                    for name, table in model.tables.items()
+                    if table.type == "fact" and referenced & set(table.columns)
+                ]
+                for fact_name in source_facts:
+                    add_edge(
+                        OntologyEdge(
+                            id=f"maps:{node_id}:table:{fact_name}",
+                            source=node_id,
+                            target=f"table:{fact_name}",
+                            kind="maps_to",
+                            label="calculated from",
+                        )
                     )
-                )
+                if not source_facts:
+                    add_edge(
+                        OntologyEdge(
+                            id=f"dependency:{domain_id}:{node_id}",
+                            source=domain_id,
+                            target=node_id,
+                            kind="dependency",
+                            label="derived metric",
+                        )
+                    )
 
         for dimension_name, dimension in model.dimensions.items():
             node_id = f"dimension:{dimension_name}"

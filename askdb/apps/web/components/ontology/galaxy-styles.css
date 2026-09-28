@@ -96,32 +96,103 @@
   opacity: 1;
 }
 
+/* Node = circle + caption underneath. No transforms on state change: scale changes the
+   hit area under the pointer and made selection flicker. */
+.galaxy-node-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: opacity 180ms ease;
+}
+
+.galaxy-node-shell[data-dimmed="true"] {
+  opacity: 0.18;
+}
+
 .galaxy-node {
   position: relative;
   display: flex;
-  height: 100%;
-  width: 100%;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--node-color) 55%, white 20%);
+  border: 2px solid color-mix(in oklab, var(--node-color) 60%, white);
   background:
-    radial-gradient(circle at 30% 25%, color-mix(in oklab, white 35%, transparent), transparent 42%),
-    linear-gradient(
-      160deg,
-      color-mix(in oklab, var(--node-color) 38%, hsl(var(--surface-raised))),
-      color-mix(in oklab, hsl(var(--surface-raised)) 88%, transparent)
-    );
+    radial-gradient(circle at 32% 28%, color-mix(in oklab, white 28%, transparent), transparent 50%),
+    var(--node-color);
   box-shadow:
     0 0 0 1px color-mix(in oklab, var(--node-color) 18%, transparent),
-    0 10px 28px -14px color-mix(in oklab, var(--node-color) 65%, transparent),
-    inset 0 1px 0 color-mix(in oklab, white 35%, transparent);
-  backdrop-filter: blur(10px);
-  transition:
-    opacity 220ms ease,
-    transform 220ms ease,
-    box-shadow 220ms ease,
-    filter 220ms ease;
+    0 10px 26px -14px color-mix(in oklab, var(--node-color) 70%, transparent);
+  transition: box-shadow 160ms ease;
+}
+
+.galaxy-node__icon {
+  width: 42%;
+  height: 42%;
+  max-width: 22px;
+  max-height: 22px;
+  color: white;
+}
+
+.galaxy-node-shell[data-neighbor="true"] .galaxy-node {
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--node-color) 45%, transparent),
+    0 10px 26px -14px color-mix(in oklab, var(--node-color) 70%, transparent);
+}
+
+.galaxy-node-shell[data-selected="true"] .galaxy-node {
+  box-shadow:
+    0 0 0 3px hsl(var(--background)),
+    0 0 0 5px var(--node-color),
+    0 0 28px color-mix(in oklab, var(--node-color) 55%, transparent);
+}
+
+.galaxy-node__caption {
+  max-width: 100%;
+  border-radius: 8px;
+  padding: 1px 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--galaxy-ink);
+  background: color-mix(in oklab, hsl(var(--surface-sunken)) 70%, transparent);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.galaxy-node-shell[data-selected="true"] .galaxy-node__caption {
+  background: var(--node-color);
+  color: white;
+}
+
+.galaxy-edge-label {
+  position: absolute;
+  pointer-events: none;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--edge-color) 45%, transparent);
+  background: color-mix(in oklab, hsl(var(--surface-sunken)) 88%, transparent);
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  color: color-mix(in oklab, var(--edge-color) 55%, hsl(var(--foreground)));
+  transition: opacity 180ms ease;
+}
+
+.galaxy-edge-label[data-emphasized="true"] {
+  background: color-mix(in oklab, var(--edge-color) 28%, hsl(var(--surface-sunken)));
+  color: hsl(var(--foreground));
+}
+
+.galaxy-edge-label[data-dimmed="true"] {
+  opacity: 0.12;
 }
 
 .semantic-galaxy[data-mode="network"] {
@@ -131,50 +202,18 @@
     hsl(var(--surface-sunken));
 }
 
-.semantic-galaxy[data-mode="ontology"] {
+.semantic-galaxy[data-mode="hierarchy"] {
   background:
-    radial-gradient(circle at 50% 48%, color-mix(in oklab, hsl(var(--teal)) 16%, transparent), transparent 42%),
     radial-gradient(1000px 500px at 50% 0%, color-mix(in oklab, hsl(var(--primary)) 10%, transparent), transparent 55%),
     hsl(var(--surface-sunken));
-}
-
-.galaxy-node[data-focused="true"] {
-  transform: scale(1.08);
-  box-shadow:
-    0 0 0 2px color-mix(in oklab, var(--node-color) 70%, transparent),
-    0 0 32px color-mix(in oklab, var(--node-color) 45%, transparent),
-    0 16px 36px -16px rgb(0 0 0 / 0.35);
-}
-
-.galaxy-node[data-dimmed="true"] {
-  opacity: 0.14;
-  filter: grayscale(0.35) blur(0.2px);
-  box-shadow: none;
-}
-
-.galaxy-node[data-pulse="true"]::after {
-  content: "";
-  position: absolute;
-  inset: -8px;
-  border-radius: inherit;
-  border: 2px solid color-mix(in oklab, var(--node-color) 70%, transparent);
-  animation: galaxy-pulse 1.6s ease-out infinite;
-}
-
-.galaxy-node__label {
-  max-width: 92%;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  color: var(--galaxy-ink);
 }
 
 .galaxy-edge-path {
   fill: none;
   stroke-linecap: round;
-  filter: drop-shadow(0 0 4px color-mix(in oklab, var(--edge-color) 45%, transparent));
+  transition:
+    opacity 180ms ease,
+    stroke-width 180ms ease;
 }
 
 .galaxy-edge-path--animated {
@@ -182,37 +221,22 @@
   animation: galaxy-dash 2.4s linear infinite;
 }
 
-.galaxy-edge-path--dimmed {
-  opacity: 0.08;
-  filter: none;
-  animation: none;
-}
-
 .galaxy-cluster-zone {
-  fill: color-mix(in oklab, var(--cluster-color) 8%, transparent);
-  stroke: color-mix(in oklab, var(--cluster-color) 55%, transparent);
-  stroke-width: 1.5;
-  stroke-dasharray: 7 9;
-  animation: galaxy-dash 18s linear infinite;
-  transition:
-    fill 200ms ease,
-    stroke 200ms ease,
-    opacity 200ms ease;
-}
-
-.galaxy-cluster-zone[data-active="true"] {
-  fill: color-mix(in oklab, var(--cluster-color) 16%, transparent);
-  stroke: color-mix(in oklab, var(--cluster-color) 80%, transparent);
-  stroke-width: 2.2;
+  fill: color-mix(in oklab, var(--cluster-color) 6%, transparent);
+  stroke: color-mix(in oklab, var(--cluster-color) 40%, transparent);
+  stroke-width: 1.2;
+  stroke-dasharray: 6 8;
 }
 
 .galaxy-cluster-label {
-  fill: color-mix(in oklab, var(--cluster-color) 92%, white);
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  opacity: 0.78;
+  fill: color-mix(in oklab, var(--cluster-color) 85%, white);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  paint-order: stroke;
+  stroke: hsl(var(--surface-sunken));
+  stroke-width: 5px;
+  stroke-linejoin: round;
 }
 
 .galaxy-particles {
@@ -237,17 +261,6 @@
   }
 }
 
-@keyframes galaxy-pulse {
-  0% {
-    transform: scale(0.92);
-    opacity: 0.85;
-  }
-  100% {
-    transform: scale(1.35);
-    opacity: 0;
-  }
-}
-
 @keyframes galaxy-float {
   0%,
   100% {
@@ -260,8 +273,6 @@
 
 /* Explicit Motion: OFF — static graph without remounting React Flow. */
 .semantic-galaxy[data-motion="off"] .galaxy-edge-path--animated,
-.semantic-galaxy[data-motion="off"] .galaxy-cluster-zone,
-.semantic-galaxy[data-motion="off"] .galaxy-node[data-pulse="true"]::after,
 .semantic-galaxy[data-motion="off"] .galaxy-particle {
   animation: none !important;
 }
@@ -272,8 +283,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .galaxy-edge-path--animated,
-  .galaxy-cluster-zone,
-  .galaxy-node[data-pulse="true"]::after,
   .galaxy-particle {
     animation: none !important;
   }

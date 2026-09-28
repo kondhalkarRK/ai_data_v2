@@ -16,41 +16,43 @@ import {
   pageRank,
   type GraphLink,
 } from "@/lib/ontology/graph-metrics";
+import { conceptCategory } from "@/lib/ontology/kind-filter";
 
-/** Three knowledge-graph identities — not warehouse / lineage maps. */
-export type GalaxyMode = "semantic" | "network" | "ontology";
+export type GalaxyMode = "semantic" | "network" | "hierarchy";
 
 export type CentralityMetric = "degree" | "betweenness" | "pagerank";
 
+/** x/y is the circle centre; the caption sits underneath the circle. */
 export type PositionedNode = OntologyNode & {
   x: number;
   y: number;
   radius: number;
   centrality: number;
+  captionWidth: number;
 };
 
-type SimNode = SimulationNodeDatum & {
-  id: string;
-  kind: OntologyNode["kind"];
-  cluster: string;
-  radius: number;
-};
+export const CAPTION_HEIGHT = 30;
+const NODE_GAP = 26;
 
-/** Soft clouds around the canvas — never Facts/Dimensions corners. */
+/** Each business category settles in its own neighbourhood of the canvas. */
 const CLUSTER_ANCHORS: Record<string, { x: number; y: number }> = {
-  Domain: { x: 0, y: 0 },
-  Actors: { x: -280, y: -220 },
-  Events: { x: 260, y: -200 },
-  Context: { x: 300, y: 180 },
-  Outcomes: { x: -40, y: 300 },
-  Attributes: { x: -300, y: 160 },
-  Other: { x: 40, y: 40 },
+  Actors: { x: -320, y: -140 },
+  Events: { x: 60, y: -40 },
+  Outcomes: { x: 360, y: 200 },
+  Attributes: { x: -200, y: 300 },
+  Context: { x: -380, y: 220 },
+  Other: { x: 0, y: 0 },
 };
+
+export function captionWidth(label: string): number {
+  return Math.min(150, Math.max(64, label.length * 6.6 + 18));
+}
 
 function nodeBaseRadius(node: OntologyNode): number {
-  if (node.kind === "domain") return 36;
-  if (node.kind === "entity") return 26;
-  if (node.kind === "measure") return 22;
+  const category = conceptCategory(node);
+  if (category === "events") return 30;
+  if (category === "entities") return 25;
+  if (category === "kpis") return 21;
   return 18;
 }
 
@@ -69,118 +71,196 @@ export function computeCentrality(
   return degreeCentrality(ids, links);
 }
 
+type SimNode = SimulationNodeDatum & {
+  id: string;
+  cluster: string;
+  radius: number;
+  halfWidth: number;
+};
+
+function footprint(node: { radius: number; captionWidth: number }) {
+  const halfWidth = Math.max(node.radius, node.captionWidth / 2);
+  return { halfWidth, top: node.radius, bottom: node.radius + CAPTION_HEIGHT };
+}
+
+/** Push apart any node boxes (circle + caption) that still touch after the simulation. */
+export function resolveOverlaps(nodes: PositionedNode[], iterations = 60): PositionedNode[] {
+  const out = nodes.map((node) => ({ ...node }));
+  for (let pass = 0; pass < iterations; pass += 1) {
+    let moved = false;
+    for (let i = 0; i < out.length; i += 1) {
+      for (let j = i + 1; j < out.length; j += 1) {
+        const a = out[i]!;
+        const b = out[j]!;
+        const fa = footprint(a);
+        const fb = footprint(b);
+        const overlapX = fa.halfWidth + fb.halfWidth + NODE_GAP - Math.abs(a.x - b.x);
+        const aTop = a.y - fa.top;
+        const aBottom = a.y + fa.bottom;
+        const bTop = b.y - fb.top;
+        const bBottom = b.y + fb.bottom;
+        const overlapY = Math.min(aBottom, bBottom) + NODE_GAP - Math.max(aTop, bTop);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        moved = true;
+        if (overlapX < overlapY) {
+          const push = overlapX / 2 + 0.5;
+          const dir = a.x <= b.x ? -1 : 1;
+          a.x += dir * push;
+          b.x -= dir * push;
+        } else {
+          const push = overlapY / 2 + 0.5;
+          const dir = a.y <= b.y ? -1 : 1;
+          a.y += dir * push;
+          b.y -= dir * push;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  return out;
+}
+
 function runForce(
   snapshot: OntologySnapshot,
   options: {
-    strength?: number;
-    clusterPull?: number;
-    charge?: number;
-    centrality?: Map<string, number>;
-    linkDistance?: number;
-  } = {},
+    centrality: Map<string, number>;
+    sizeByCentrality: number;
+    clusterPull: number;
+    charge: number;
+    linkDistance: number;
+    linkStrength: number;
+  },
 ): PositionedNode[] {
-  const centrality =
-    options.centrality ??
-    degreeCentrality(
-      snapshot.nodes.map((n) => n.id),
-      linksOf(snapshot),
-    );
+  const spread = Math.max(1, Math.sqrt(snapshot.nodes.length / 14));
+  const anchor = (cluster: string) => {
+    const base = CLUSTER_ANCHORS[cluster] ?? CLUSTER_ANCHORS.Other!;
+    return { x: base.x * spread, y: base.y * spread };
+  };
 
   const nodes: SimNode[] = snapshot.nodes.map((node, index) => {
-    const score = centrality.get(node.id) ?? 0;
-    const radius = nodeBaseRadius(node) + score * 22;
-    const anchor = CLUSTER_ANCHORS[node.cluster] ?? CLUSTER_ANCHORS.Other!;
+    const score = options.centrality.get(node.id) ?? 0;
+    const radius = nodeBaseRadius(node) + score * options.sizeByCentrality;
+    const home = anchor(node.cluster);
     const angle = (index / Math.max(1, snapshot.nodes.length)) * Math.PI * 2;
     return {
       id: node.id,
-      kind: node.kind,
       cluster: node.cluster,
       radius,
-      x: (anchor.x || 0) + Math.cos(angle) * 90,
-      y: (anchor.y || 0) + Math.sin(angle) * 90,
+      halfWidth: Math.max(radius, captionWidth(node.label) / 2),
+      x: home.x + Math.cos(angle) * 80,
+      y: home.y + Math.sin(angle) * 80,
     };
   });
 
-  const idToNode = new Map(nodes.map((node) => [node.id, node]));
+  const ids = new Set(nodes.map((node) => node.id));
   const links = snapshot.edges
-    .filter((edge) => idToNode.has(edge.source) && idToNode.has(edge.target))
-    .map((edge) => ({
-      source: edge.source,
-      target: edge.target,
-      distance: options.linkDistance ?? 150,
-    }));
+    .filter((edge) => ids.has(edge.source) && ids.has(edge.target))
+    .map((edge) => ({ source: edge.source, target: edge.target }));
 
   const simulation = forceSimulation(nodes)
     .force(
       "link",
       forceLink(links)
         .id((d) => (d as SimNode).id)
-        .distance((d) => (d as { distance: number }).distance)
-        .strength(options.strength ?? 0.38),
+        .distance(options.linkDistance)
+        .strength(options.linkStrength),
     )
-    .force("charge", forceManyBody().strength(options.charge ?? -380))
-    .force("collide", forceCollide<SimNode>().radius((d) => d.radius + 22).iterations(3))
+    .force("charge", forceManyBody().strength(options.charge).distanceMax(900))
+    .force(
+      "collide",
+      forceCollide<SimNode>()
+        .radius((d) => Math.max(d.halfWidth, d.radius + CAPTION_HEIGHT / 2) + NODE_GAP)
+        .iterations(4),
+    )
     .force("center", forceCenter(0, 0))
-    .force(
-      "x",
-      forceX<SimNode>((d) => (CLUSTER_ANCHORS[d.cluster] ?? CLUSTER_ANCHORS.Other!).x).strength(
-        options.clusterPull ?? 0.04,
-      ),
-    )
-    .force(
-      "y",
-      forceY<SimNode>((d) => (CLUSTER_ANCHORS[d.cluster] ?? CLUSTER_ANCHORS.Other!).y).strength(
-        options.clusterPull ?? 0.04,
-      ),
-    )
+    .force("x", forceX<SimNode>((d) => anchor(d.cluster).x).strength(options.clusterPull))
+    .force("y", forceY<SimNode>((d) => anchor(d.cluster).y).strength(options.clusterPull))
     .stop();
 
-  const ticks = Math.min(360, 50 + nodes.length * 5);
+  const ticks = Math.min(600, 200 + nodes.length * 8);
   for (let i = 0; i < ticks; i += 1) simulation.tick();
 
   const byId = new Map(snapshot.nodes.map((node) => [node.id, node]));
-  return nodes.map((sim) => {
-    const source = byId.get(sim.id)!;
-    return {
-      ...source,
-      x: sim.x ?? 0,
-      y: sim.y ?? 0,
-      radius: sim.radius,
-      centrality: centrality.get(sim.id) ?? 0,
-    };
-  });
+  return resolveOverlaps(
+    nodes.map((sim) => {
+      const source = byId.get(sim.id)!;
+      return {
+        ...source,
+        x: sim.x ?? 0,
+        y: sim.y ?? 0,
+        radius: sim.radius,
+        centrality: options.centrality.get(sim.id) ?? 0,
+        captionWidth: captionWidth(source.label),
+      };
+    }),
+  );
 }
 
-/** Taxonomy fan — parent concepts with children, not concentric warehouse rings. */
-function layoutOntology(snapshot: OntologySnapshot, centrality: Map<string, number>): PositionedNode[] {
-  const families = new Map<string, OntologyNode[]>();
-  for (const node of snapshot.nodes) {
-    if (node.kind === "domain") continue;
-    const key = node.cluster || "Other";
-    families.set(key, [...(families.get(key) ?? []), node]);
+/**
+ * Roll-up view: each concept sits one row below the things it belongs to.
+ * Region → Dealer → Sale → Revenue reads top to bottom.
+ */
+export function layoutHierarchy(
+  snapshot: OntologySnapshot,
+  centrality: Map<string, number>,
+): PositionedNode[] {
+  const parents = new Map<string, string[]>();
+  for (const node of snapshot.nodes) parents.set(node.id, []);
+  for (const edge of snapshot.edges) {
+    if (parents.has(edge.source) && parents.has(edge.target)) parents.get(edge.source)!.push(edge.target);
   }
 
-  const keys = [...families.keys()];
+  const rank = new Map<string, number>();
+  const visiting = new Set<string>();
+  const rankOf = (id: string): number => {
+    const known = rank.get(id);
+    if (known !== undefined) return known;
+    if (visiting.has(id)) return 0;
+    visiting.add(id);
+    const ups = parents.get(id) ?? [];
+    const value = ups.length ? Math.max(...ups.map(rankOf)) + 1 : 0;
+    visiting.delete(id);
+    rank.set(id, value);
+    return value;
+  };
+  for (const node of snapshot.nodes) rankOf(node.id);
+
+  const rows = new Map<number, OntologyNode[]>();
+  for (const node of snapshot.nodes) {
+    const r = rank.get(node.id) ?? 0;
+    rows.set(r, [...(rows.get(r) ?? []), node]);
+  }
+
+  const columnWidth = Math.max(170, ...snapshot.nodes.map((node) => captionWidth(node.label) + 36));
+  const rowHeight = 190;
+  const xById = new Map<string, number>();
   const placed: PositionedNode[] = [];
 
-  keys.forEach((key, familyIndex) => {
-    const members = families.get(key) ?? [];
-    const sweep = (Math.PI * 1.55) / Math.max(1, keys.length);
-    const origin = -Math.PI / 2 + familyIndex * sweep + sweep / 2;
-    members.forEach((node, index) => {
-      const depth = node.kind === "entity" ? 1 : node.kind === "measure" ? 2 : 3;
-      const along = (index - (members.length - 1) / 2) * 0.22;
-      const radius = 160 + depth * 150;
+  for (const r of [...rows.keys()].sort((a, b) => a - b)) {
+    const members = rows.get(r)!;
+    const barycenter = (node: OntologyNode) => {
+      const xs = (parents.get(node.id) ?? []).map((id) => xById.get(id)).filter((x) => x !== undefined);
+      return xs.length ? xs.reduce((sum, x) => sum + x!, 0) / xs.length : 0;
+    };
+    const ordered =
+      r === 0
+        ? [...members].sort((a, b) => b.degree - a.degree || a.label.localeCompare(b.label))
+        : [...members].sort((a, b) => barycenter(a) - barycenter(b));
+    const offset = ((ordered.length - 1) * columnWidth) / 2;
+    ordered.forEach((node, index) => {
+      const x = index * columnWidth - offset;
+      xById.set(node.id, x);
       const score = centrality.get(node.id) ?? 0;
       placed.push({
         ...node,
-        x: Math.cos(origin + along) * radius,
-        y: Math.sin(origin + along) * radius,
-        radius: nodeBaseRadius(node) + score * 14,
+        x,
+        y: r * rowHeight,
+        radius: nodeBaseRadius(node) + score * 6,
         centrality: score,
+        captionWidth: captionWidth(node.label),
       });
     });
-  });
+  }
   return placed;
 }
 
@@ -189,35 +269,38 @@ export function layoutGalaxy(
   mode: GalaxyMode,
   metric: CentralityMetric = "degree",
 ): PositionedNode[] {
-  const centrality = computeCentrality(snapshot, metric);
-  if (mode === "ontology") return layoutOntology(snapshot, centrality);
+  const centrality = computeCentrality(snapshot, mode === "network" ? metric : "degree");
+  if (mode === "hierarchy") return layoutHierarchy(snapshot, centrality);
   if (mode === "network") {
     return runForce(snapshot, {
       centrality,
-      strength: 0.55,
-      clusterPull: 0.015,
-      charge: -520,
-      linkDistance: 130,
+      sizeByCentrality: 26,
+      clusterPull: 0.02,
+      charge: -900,
+      linkDistance: 170,
+      linkStrength: 0.5,
     });
   }
   return runForce(snapshot, {
     centrality,
-    strength: 0.32,
-    clusterPull: 0.05,
-    charge: -400,
-    linkDistance: 165,
+    sizeByCentrality: 8,
+    clusterPull: 0.06,
+    charge: -1100,
+    linkDistance: 210,
+    linkStrength: 0.3,
   });
 }
+
+export type EdgeVisualKind = "relationship" | "measure" | "describes";
 
 export function edgeVisualKind(
   edge: OntologyEdge,
   nodes: Map<string, OntologyNode>,
-): "primary_key" | "foreign_key" | "semantic" | "ai_inferred" | "lineage" {
-  if (edge.kind === "dependency") return "lineage";
-  if (edge.kind === "maps_to") return "ai_inferred";
-  if (edge.kind === "reference") return "semantic";
+): EdgeVisualKind {
   const source = nodes.get(edge.source);
-  if (source?.primaryKey && edge.fromColumn === source.primaryKey) return "primary_key";
-  if (edge.fromColumn || edge.toColumn) return "foreign_key";
-  return "semantic";
+  if (!source) return "relationship";
+  const category = conceptCategory(source);
+  if (category === "kpis") return "measure";
+  if (category === "breakdowns") return "describes";
+  return "relationship";
 }

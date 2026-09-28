@@ -11,15 +11,16 @@ import {
   storyVerb,
   type ContextOverlay,
 } from "@/lib/ontology/asset-context";
+import { categoryMeta, conceptCategory } from "@/lib/ontology/kind-filter";
 import { cn } from "@/lib/utils";
 
-type Tab = "overview" | "schema" | "reach" | "lineage";
+type Tab = "overview" | "fields" | "connections" | "source";
 
 const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
   { id: "overview", label: "Overview" },
-  { id: "schema", label: "Schema" },
-  { id: "reach", label: "Reach" },
-  { id: "lineage", label: "Lineage" },
+  { id: "fields", label: "Fields" },
+  { id: "connections", label: "Connections" },
+  { id: "source", label: "Source" },
 ];
 
 const EMPTY_SNAPSHOT: OntologySnapshot = {
@@ -110,10 +111,12 @@ function DrawerContent({
                 style={{ backgroundColor: node.clusterColor }}
                 aria-hidden="true"
               />
-              {node.cluster}
+              {categoryMeta(conceptCategory(node)).label}
             </p>
             <h2 className="truncate text-2xl font-semibold tracking-tight">{node.label}</h2>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{node.id}</p>
+            {overlay === "technical" ? (
+              <p className="mt-1 font-mono text-xs text-muted-foreground">{node.physicalName ?? node.id}</p>
+            ) : null}
             <div className="mt-2 flex flex-wrap gap-1">
               {context.badges.includes("certified") ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium">
@@ -177,17 +180,10 @@ function DrawerContent({
             onFocus={onFocus}
           />
         ) : null}
-        {tab === "schema" ? <Schema node={node} /> : null}
-        {tab === "reach" ? <Reach node={node} /> : null}
-        {tab === "lineage" ? <Lineage node={node} snapshot={snapshot} /> : null}
+        {tab === "fields" ? <Schema node={node} /> : null}
+        {tab === "connections" ? <Reach node={node} /> : null}
+        {tab === "source" ? <Lineage node={node} snapshot={snapshot} /> : null}
       </div>
-
-      <footer className="grid grid-cols-4 border-t border-border px-2 py-2 text-center text-xs text-muted-foreground">
-        <span>Contracts</span>
-        <span>Docs</span>
-        <span>Memory</span>
-        <span>Flow</span>
-      </footer>
     </motion.aside>
   );
 }
@@ -217,10 +213,6 @@ function Overview({
 
   return (
     <>
-      <p className="text-[11px] text-muted-foreground">
-        Business name · {node.label}
-        {overlay !== "business" ? ` · Technical ${node.physicalName ?? node.id}` : ""}
-      </p>
       {node.description ? (
         <p className="mt-2 text-sm leading-relaxed text-foreground">{node.description}</p>
       ) : (
@@ -241,7 +233,7 @@ function Overview({
         />
       </div>
 
-      <SectionLabel>Synonyms</SectionLabel>
+      <SectionLabel>Also known as</SectionLabel>
       {node.synonyms.length ? (
         <div className="flex flex-wrap gap-1.5">
           {node.synonyms.map((synonym) => (
@@ -254,54 +246,70 @@ function Overview({
           ))}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">None in the glossary.</p>
+        <p className="text-sm text-muted-foreground">No other names in the glossary.</p>
       )}
-
-      <SectionLabel>Source bindings</SectionLabel>
-      <dl className="divide-y divide-border rounded-[var(--radius-control)] border border-border text-sm">
-        <div className="grid grid-cols-[6rem_1fr] gap-3 px-3 py-2.5">
-          <dt className="font-medium">Semantic</dt>
-          <dd className="break-all font-mono text-xs text-muted-foreground">
-            {node.tables.join(", ") || "—"}
-          </dd>
-        </div>
-        <div className="grid grid-cols-[6rem_1fr] gap-3 px-3 py-2.5">
-          <dt className="font-medium">Physical</dt>
-          <dd className="break-all font-mono text-xs text-muted-foreground">
-            {node.physicalName ?? "—"}
-          </dd>
-        </div>
-      </dl>
-
-      {node.grain ? (
-        <>
-          <SectionLabel>Grain</SectionLabel>
-          <p className="text-sm">{node.grain}</p>
-        </>
-      ) : null}
 
       {neighbors.length ? (
         <>
-          <SectionLabel>Relationship story</SectionLabel>
+          <SectionLabel>How it connects</SectionLabel>
           <ol className="space-y-1.5 text-sm">
-            {neighbors.slice(0, 6).map((edge) => {
-              const otherId = edge.source === node.id ? edge.target : edge.source;
+            {neighbors.map((edge) => {
+              const outgoing = edge.source === node.id;
+              const otherId = outgoing ? edge.target : edge.source;
               const other = snapshot.nodes.find((item) => item.id === otherId);
+              const otherButton = (
+                <button
+                  type="button"
+                  className="font-medium text-primary hover:underline"
+                  onClick={() => other && onFocus?.(other.id)}
+                >
+                  {other?.label ?? otherId}
+                </button>
+              );
               return (
                 <li key={edge.id} className="rounded-lg border border-border/60 px-3 py-2">
-                  <p className="font-medium">{node.label}</p>
-                  <p className="text-[11px] text-muted-foreground">→ {storyVerb(edge)}</p>
-                  <button
-                    type="button"
-                    className="text-primary hover:underline"
-                    onClick={() => other && onFocus?.(other.id)}
-                  >
-                    {other?.label ?? otherId}
-                  </button>
+                  {outgoing ? (
+                    <>
+                      <span className="font-medium">{node.label}</span>{" "}
+                      <span className="text-muted-foreground">→ {storyVerb(edge)} →</span> {otherButton}
+                    </>
+                  ) : (
+                    <>
+                      {otherButton} <span className="text-muted-foreground">→ {storyVerb(edge)} →</span>{" "}
+                      <span className="font-medium">{node.label}</span>
+                    </>
+                  )}
                 </li>
               );
             })}
           </ol>
+        </>
+      ) : null}
+
+      {overlay === "technical" ? (
+        <>
+          <SectionLabel>Source bindings</SectionLabel>
+          <dl className="divide-y divide-border rounded-[var(--radius-control)] border border-border text-sm">
+            <div className="grid grid-cols-[6rem_1fr] gap-3 px-3 py-2.5">
+              <dt className="font-medium">Semantic</dt>
+              <dd className="break-all font-mono text-xs text-muted-foreground">
+                {node.tables.join(", ") || "—"}
+              </dd>
+            </div>
+            <div className="grid grid-cols-[6rem_1fr] gap-3 px-3 py-2.5">
+              <dt className="font-medium">Physical</dt>
+              <dd className="break-all font-mono text-xs text-muted-foreground">
+                {node.physicalName ?? "—"}
+              </dd>
+            </div>
+          </dl>
+        </>
+      ) : null}
+
+      {node.grain ? (
+        <>
+          <SectionLabel>One record means</SectionLabel>
+          <p className="text-sm">{node.grain}</p>
         </>
       ) : null}
 
@@ -325,7 +333,7 @@ function Overview({
 
       {context.sampleQueries.length ? (
         <>
-          <SectionLabel>Sample queries</SectionLabel>
+          <SectionLabel>Questions you can ask</SectionLabel>
           <ul className="space-y-1 text-xs text-muted-foreground">
             {context.sampleQueries.map((item) => (
               <li key={item} className="flex items-start gap-1.5">
@@ -393,7 +401,7 @@ function Reach({ node }: { node: OntologyNode }) {
   return (
     <>
       <div className="mb-4 rounded-[var(--radius-control)] bg-surface-sunken p-3">
-        <p className="text-2xs uppercase tracking-wide text-muted-foreground">Graph degree</p>
+        <p className="text-2xs uppercase tracking-wide text-muted-foreground">Direct relationships</p>
         <p className="mt-1 text-2xl font-semibold">{node.degree}</p>
       </div>
       <ul className="space-y-2">

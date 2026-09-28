@@ -2,82 +2,59 @@
 
 import type { OntologyNode } from "@nql/shared-types";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { motion } from "framer-motion";
+import { Box, CalendarDays, TrendingUp, Zap } from "lucide-react";
 import * as React from "react";
 
-import { cn } from "@/lib/utils";
+import { conceptCategory, type ConceptCategory } from "@/lib/ontology/kind-filter";
 
 export type GalaxyNodeData = OntologyNode & {
-  radius: number;
-  centrality: number;
+  diameter: number;
+  boxWidth: number;
   dimmed: boolean;
-  focused: boolean;
-  pulsing: boolean;
-  hop: 0 | 1 | 2 | null;
-  /** When false, idle float / pulse motion is suppressed. */
-  motionEnabled: boolean;
+  selectedConcept: boolean;
+  neighbor: boolean;
   displayLabel?: string;
-  certified?: boolean;
-  review?: boolean;
 };
 
 export type GalaxyFlowNode = Node<GalaxyNodeData, "galaxy">;
 
-export function GalaxyNode({ data, selected }: NodeProps<GalaxyFlowNode>) {
-  const size = Math.max(36, data.radius * 2);
+const ICONS: Record<ConceptCategory, React.ComponentType<{ className?: string }>> = {
+  entities: Box,
+  events: Zap,
+  kpis: TrendingUp,
+  breakdowns: CalendarDays,
+};
 
+const HANDLE_STYLE: React.CSSProperties = {
+  opacity: 0,
+  width: 1,
+  height: 1,
+  minWidth: 0,
+  minHeight: 0,
+  border: 0,
+  pointerEvents: "none",
+};
+
+function GalaxyNodeView({ data }: NodeProps<GalaxyFlowNode>) {
+  const Icon = ICONS[conceptCategory(data)];
+  const handleStyle = { ...HANDLE_STYLE, left: data.boxWidth / 2, top: data.diameter / 2 };
   return (
-    <motion.div
-      className="relative"
-      style={{ width: size + 24, height: size + 28 }}
-      initial={false}
-      animate={{
-        scale: selected || data.focused ? 1.06 : 1,
-        y: data.motionEnabled && data.pulsing ? [0, -3, 0] : 0,
-      }}
-      transition={{
-        scale: { type: "spring", stiffness: 380, damping: 24 },
-        y:
-          data.motionEnabled && data.pulsing
-            ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
-            : { duration: 0.2 },
-      }}
+    <div
+      className="galaxy-node-shell"
+      data-dimmed={data.dimmed}
+      data-selected={data.selectedConcept}
+      data-neighbor={data.neighbor}
+      style={{ width: data.boxWidth, "--node-color": data.clusterColor } as React.CSSProperties}
+      title={data.synonyms.length ? `${data.label} — also known as ${data.synonyms.join(", ")}` : data.label}
     >
-      <Handle type="target" position={Position.Left} className="!opacity-0" />
-      <Handle type="source" position={Position.Right} className="!opacity-0" />
-      <div
-        className={cn("galaxy-node")}
-        title={`${data.label}${data.domain ? ` · ${data.domain}` : ""}`}
-        data-kind={data.kind}
-        data-focused={data.focused || selected}
-        data-dimmed={data.dimmed}
-        data-pulse={data.motionEnabled && data.pulsing}
-        style={
-          {
-            "--node-color": data.clusterColor,
-            width: size,
-            height: size,
-            marginInline: "auto",
-          } as React.CSSProperties
-        }
-      >
-        <span className="galaxy-node__label">{data.displayLabel ?? data.label}</span>
+      <Handle type="target" position={Position.Top} style={handleStyle} isConnectable={false} />
+      <Handle type="source" position={Position.Bottom} style={handleStyle} isConnectable={false} />
+      <div className="galaxy-node" style={{ width: data.diameter, height: data.diameter }}>
+        <Icon className="galaxy-node__icon" />
       </div>
-      {data.certified ? (
-        <span className="pointer-events-none absolute -left-0.5 -top-0.5 rounded-full bg-success/90 px-1 text-[8px] font-bold text-white">
-          ✓
-        </span>
-      ) : null}
-      {data.review ? (
-        <span className="pointer-events-none absolute -left-0.5 -top-0.5 rounded-full bg-warning px-1 text-[8px] font-bold">
-          !
-        </span>
-      ) : null}
-      {data.hop != null && data.hop > 0 ? (
-        <span className="pointer-events-none absolute -right-1 -top-1 rounded-full border border-border/60 bg-surface-raised/90 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-muted-foreground shadow-sm backdrop-blur">
-          {data.hop}h
-        </span>
-      ) : null}
-    </motion.div>
+      <span className="galaxy-node__caption">{data.displayLabel ?? data.label}</span>
+    </div>
   );
 }
+
+export const GalaxyNode = React.memo(GalaxyNodeView);

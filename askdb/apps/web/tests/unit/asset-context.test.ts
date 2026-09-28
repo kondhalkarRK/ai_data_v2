@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   displayName,
-  journeyNodeIds,
   matchesDiscoveryQuery,
   snapshotTrustRate,
   storyVerb,
@@ -70,13 +69,6 @@ describe("asset-context", () => {
     expect(matchesDiscoveryQuery(revenue, "sales dollars")).toBe(true);
     expect(matchesDiscoveryQuery(dealer, "dealer_id")).toBe(true);
     expect(matchesDiscoveryQuery(dealer, "premium")).toBe(false);
-  });
-
-  it("builds a revenue journey from seeds", () => {
-    expect(journeyNodeIds(snapshot, ["revenue", "dealer"])).toEqual([
-      "measure:revenue",
-      "entity:dealer",
-    ]);
   });
 
   it("uses physical names in technical overlay", () => {

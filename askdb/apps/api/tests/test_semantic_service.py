@@ -54,6 +54,18 @@ async def test_snapshot_compiles_schema_relationships_and_glossary_synonyms(
     assert "best selling" in units.synonyms
 
 
+async def test_cross_fact_ratios_link_to_the_facts_they_are_calculated_from(
+    settings: Settings,
+) -> None:
+    snapshot = await SemanticService(settings).get_snapshot(Industry.INSURANCE)
+    loss_ratio_targets = {
+        edge.target for edge in snapshot.edges if edge.source == "measure:loss_ratio"
+    }
+
+    assert loss_ratio_targets
+    assert all(target.startswith("table:fact_") for target in loss_ratio_targets)
+
+
 async def test_pack_and_snapshot_are_cached(settings: Settings) -> None:
     service = SemanticService(settings)
 

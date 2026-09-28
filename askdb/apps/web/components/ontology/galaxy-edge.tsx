@@ -3,30 +3,21 @@
 import {
   BaseEdge,
   EdgeLabelRenderer,
-  getBezierPath,
+  useInternalNode,
   type Edge,
   type EdgeProps,
 } from "@xyflow/react";
 import * as React from "react";
 
+import type { GalaxyFlowNode } from "@/components/ontology/galaxy-node";
+import { curveBetween, pointOnCurve } from "@/lib/ontology/edge-geometry";
+import type { EdgeVisualKind } from "@/lib/ontology/layouts";
 import { cn } from "@/lib/utils";
 
-export type EdgeVisualKind =
-  | "primary_key"
-  | "foreign_key"
-  | "semantic"
-  | "ai_inferred"
-  | "lineage";
-
-export const EDGE_STYLES: Record<
-  EdgeVisualKind,
-  { color: string; width: number; animated: boolean; label: string }
-> = {
-  primary_key: { color: "#38bdf8", width: 2.4, animated: true, label: "Identifies" },
-  foreign_key: { color: "#34d399", width: 2, animated: true, label: "Links" },
-  semantic: { color: "#a78bfa", width: 2.1, animated: false, label: "Relates" },
-  ai_inferred: { color: "#fbbf24", width: 1.8, animated: true, label: "Means" },
-  lineage: { color: "#fb7185", width: 2.2, animated: true, label: "Includes" },
+export const EDGE_STYLES: Record<EdgeVisualKind, { color: string; label: string }> = {
+  relationship: { color: "#60a5fa", label: "Business relationship" },
+  measure: { color: "#f472b6", label: "KPI calculated from" },
+  describes: { color: "#fbbf24", label: "Breakdown of" },
 };
 
 export type GalaxyEdgeData = {
@@ -34,73 +25,70 @@ export type GalaxyEdgeData = {
   label: string;
   dimmed: boolean;
   emphasized: boolean;
-  /** When false, flowing dash animation is suppressed without remounting the graph. */
+  curvature: number;
+  labelT: number;
   motionEnabled: boolean;
 };
 
 export type GalaxyFlowEdge = Edge<GalaxyEdgeData, "galaxy">;
 
-export function GalaxyEdge({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  data,
-}: EdgeProps<GalaxyFlowEdge>) {
-  const visual = EDGE_STYLES[data?.visualKind ?? "semantic"];
-  const [path, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    curvature: 0.28,
-  });
+function circleOf(node: ReturnType<typeof useInternalNode<GalaxyFlowNode>>) {
+  if (!node) return null;
+  const { x, y } = node.internals.positionAbsolute;
+  const data = node.data;
+  return {
+    center: { x: x + data.boxWidth / 2, y: y + data.diameter / 2 },
+    radius: data.diameter / 2 + 4,
+  };
+}
 
-  const strokeWidth = data?.emphasized ? visual.width + 1.2 : visual.width;
-  const opacity = data?.dimmed ? 0.08 : data?.emphasized ? 1 : 0.72;
+function GalaxyEdgeView({ id, source, target, data, markerEnd }: EdgeProps<GalaxyFlowEdge>) {
+  const sourceNode = useInternalNode<GalaxyFlowNode>(source);
+  const targetNode = useInternalNode<GalaxyFlowNode>(target);
+  const from = circleOf(sourceNode);
+  const to = circleOf(targetNode);
+  if (!from || !to || !data) return null;
 
-  const animated =
-    Boolean(data?.motionEnabled) &&
-    !data?.dimmed &&
-    (visual.animated || Boolean(data?.emphasized));
+  const visual = EDGE_STYLES[data.visualKind];
+  const curve = curveBetween(from.center, to.center, from.radius, to.radius, data.curvature);
+  const label = pointOnCurve(curve, data.labelT);
+  const opacity = data.dimmed ? 0.1 : data.emphasized ? 1 : 0.7;
 
   return (
     <>
       <BaseEdge
         id={id}
-        path={path}
+        path={curve.path}
+        markerEnd={markerEnd}
         className={cn(
           "galaxy-edge-path",
-          animated && "galaxy-edge-path--animated",
-          data?.dimmed && "galaxy-edge-path--dimmed",
+          data.motionEnabled && data.emphasized && !data.dimmed && "galaxy-edge-path--animated",
         )}
-        style={
-          {
-            stroke: visual.color,
-            strokeWidth,
-            opacity,
-            "--edge-color": visual.color,
-          } as React.CSSProperties
-        }
+        style={{
+          stroke: visual.color,
+          strokeWidth: data.emphasized ? 2.6 : 1.6,
+          opacity,
+        }}
       />
-      {!data?.dimmed && data?.emphasized ? (
+      {data.label ? (
         <EdgeLabelRenderer>
           <div
-            className="nodrag nopan pointer-events-none absolute rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.12em] text-white/90 shadow-lg backdrop-blur"
-            style={{
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              background: `color-mix(in oklab, ${visual.color} 55%, #0b1220)`,
-            }}
+            className="galaxy-edge-label nodrag nopan"
+            data-emphasized={data.emphasized}
+            data-dimmed={data.dimmed}
+            style={
+              {
+                transform: `translate(-50%, -50%) translate(${label.x}px, ${label.y}px)`,
+                "--edge-color": visual.color,
+              } as React.CSSProperties
+            }
           >
-            {data.label || visual.label}
+            {data.label}
           </div>
         </EdgeLabelRenderer>
       ) : null}
     </>
   );
 }
+
+export const GalaxyEdge = React.memo(GalaxyEdgeView);
