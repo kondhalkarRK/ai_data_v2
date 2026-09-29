@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Literal
 
 from app.core.config import Industry
@@ -32,6 +33,7 @@ AnalysisKind = Literal[
     "contribution",
     "above_average",
     "year_window_compare",
+    "market_share",
 ]
 AggregationKind = Literal["sum", "count", "count_distinct", "avg", "ratio"]
 
@@ -75,6 +77,33 @@ class ExtractedFilter:
     value: str
     label: str
     source: str = "question"
+    # Several canonical values for one column (Compare MG and Maruti) render as IN.
+    values: tuple[str, ...] = ()
+    match_type: str = "exact"
+    matched_text: str = ""
+    confidence: float = 1.0
+
+    @property
+    def all_values(self) -> tuple[str, ...]:
+        return self.values or (self.value,)
+
+
+_FILTER_OPERATORS = {"=", "!=", "<>", ">", ">=", "<", "<=", "IN"}
+
+
+def sql_literal(value: str) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def filter_predicate(expression: str, filt: ExtractedFilter) -> str:
+    """Render one governed filter; multi-value filters become ``IN (...)``."""
+    operator = filt.operator.strip().upper()
+    if operator not in _FILTER_OPERATORS:
+        raise ValueError(f"Unsupported filter operator '{filt.operator}'")
+    values = filt.all_values
+    if operator == "IN" or len(values) > 1:
+        return f"{expression} IN ({', '.join(sql_literal(value) for value in values)})"
+    return f"{expression} {operator} {sql_literal(values[0])}"
 
 
 @dataclass(slots=True)
@@ -123,6 +152,7 @@ class QuestionPlan:
             in {
                 "colour",
                 "car_type",
+                "engine_type",
                 "make",
                 "city",
                 "state",
@@ -174,6 +204,37 @@ _VEHICLE = re.compile(
     re.I,
 )
 _REGION = re.compile(r"\b(region|regions|geo|geography|market|city|cities)\b", re.I)
+_BRAND_WORD = re.compile(
+    r"\b(brand|brands|make|makes|manufacturer|manufacturers|oem|oems|carmakers?|automakers?)\b",
+    re.I,
+)
+_MODEL_WORD = re.compile(r"\b(models?|carlines?|variants?)\b", re.I)
+_MARKET_SHARE = re.compile(
+    r"\bmarket\s+share\b|\bshare\s+of\s+(?:the\s+)?market\b|\b(?:brand|make|segment)\s+share\b|"
+    r"\bshare\s+(?:by|per|of\s+each)\s+(?:brand|make|manufacturer)\b",
+    re.I,
+)
+_COMPARE = re.compile(r"\b(compare|comparison|compared|versus|vs\.?|against)\b", re.I)
+_YEAR_LITERAL = re.compile(r"\b(20[12]\d)\b")
+_THIS_YEAR = re.compile(r"\b(this|current)\s+year\b|\bytd\b|\byear\s+to\s+date\b", re.I)
+_LAST_YEAR_PHRASE = re.compile(r"\b(last|previous|prior)\s+year\b", re.I)
+_SALES_TREND_ONLY = re.compile(
+    r"^(?:show\s+(?:me\s+)?|what\s+is\s+(?:the\s+)?|give\s+me\s+)?(?:the\s+)?(?:overall\s+)?"
+    r"(?:sales\s+trends?|trends?|trend\s+of\s+sales|sales\s+over\s+time)$",
+    re.I,
+)
+_TIME_DIMS = ("month", "quarter", "year")
+# Filter column -> GROUP BY dimension when several values are compared.
+FILTER_DIMENSION: dict[str, str] = {
+    "make": "make",
+    "model": "model",
+    "car_type": "car_type",
+    "engine_type": "engine_type",
+    "city": "city",
+    "region_name": "region",
+    "colour_name": "colour",
+    "state_code": "state",
+}
 
 # Seeded car_type values (automotive.dim_carline.car_type).
 _BODY_STYLES: list[tuple[re.Pattern[str], str]] = [
@@ -275,14 +336,77 @@ def understand_question(
         )
 
     if industry is Industry.AUTOMOTIVE:
-        plan = _understand_automotive(q)
+        plan = _understand_automotive(q, value_filters or [])
     else:
         plan = _understand_insurance(q)
     plan.order_direction = "asc" if _LOWEST.search(q) else "desc"
     plan.filters = _merge_filters(plan.filters, value_filters or [])
     _apply_value_inference(plan, q)
     _enrich_analytical_plan(plan, q)
+    if industry is Industry.AUTOMOTIVE and not plan.is_ambiguous:
+        _apply_business_shape(plan, q)
     return plan
+
+
+def _apply_business_shape(plan: QuestionPlan, question: str) -> None:
+    """Complete the plan from every part of the question: brand, comparison, period, share."""
+    dims = plan.dimensions
+
+    # Several named values of one column (MG and Maruti) are compared side by side.
+    compared = [f for f in plan.filters if len(f.all_values) > 1]
+    for filt in compared:
+        key = FILTER_DIMENSION.get(filt.column.rsplit(".", 1)[-1])
+        if key and key not in dims:
+            dims.append(key)
+    if compared or _COMPARE.search(question):
+        if plan.intent not in {"ranking"} or compared:
+            plan.intent = "comparison"
+        if not dims:
+            # "Compare MG sales" without a grain reads naturally as year over year.
+            dims.append("year")
+
+    if _MARKET_SHARE.search(question):
+        explicit = _explicit_dimensions(plan.industry, question)
+        share_keys = ("make", "car_type", "engine_type", "model", "city", "region")
+        filtered = [
+            FILTER_DIMENSION.get(f.column.rsplit(".", 1)[-1], "") for f in plan.filters
+        ]
+        share_dim = next(
+            (d for d in explicit if d in share_keys),
+            next((d for d in ("make", "car_type", "engine_type") if d in filtered), "make"),
+        )
+        # Share is measured against every value of the share dimension, so drop
+        # entity defaults (a model list) and keep only the period grain.
+        dims[:] = [d for d in dims if d in _TIME_DIMS]
+        dims.append(share_dim)
+        plan.analysis = "market_share"
+        plan.entity = "metric_only"
+        if plan.metric == "unknown" or not re.search(r"\b(revenue|value|turnover)\b", question, re.I):
+            plan.metric = "units"
+        plan.notes.append(f"Market share = share of total {plan.metric} across all {share_dim} values")
+
+    years = sorted({int(year) for year in _YEAR_LITERAL.findall(question)})
+    if plan.year_filter is None:
+        if len(years) == 1:
+            plan.year_filter = years[0]
+        elif len(years) >= 2 and "year" not in dims:
+            dims.insert(0, "year")
+        elif _THIS_YEAR.search(question):
+            plan.year_filter = datetime.now().year
+        elif _LAST_YEAR_PHRASE.search(question):
+            plan.year_filter = datetime.now().year - 1
+
+    plan.time_grain = next((g for g in ("month", "quarter", "year") if g in dims), None)
+    if plan.analysis == "basic" and dims:
+        plan.analysis = "breakdown"
+    if plan.analysis == "ranking" and plan.intent not in {"comparison"}:
+        plan.intent = "ranking"
+    if plan.metric == "unknown" and (plan.filters or dims):
+        plan.metric = "units" if _SELLING.search(question) else "revenue"
+    if plan.entity == "unknown" and plan.metric != "unknown":
+        plan.entity = "metric_only"
+    if plan.intent == "unknown" and plan.metric != "unknown":
+        plan.intent = "trend" if plan.time_grain else "aggregation"
 
 
 def _append_unique(items: list[str], value: str) -> None:
@@ -305,7 +429,11 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
             [
                 ("car_type", r"\bcar\s+type\b|\bvehicle\s+type\b|\bbody\s+style\b"),
                 ("colour", r"\bpaint\s+colou?r\b|\bcolou?r\b|\bpaint\b"),
-                ("make", r"\bcar\s+brand\b|\bvehicle\s+brand\b|\bby\s+(?:make|brand)\b"),
+                ("engine_type", r"\b(?:by|per|across)\s+(?:fuel(?:\s+type)?|engine\s+type|powertrain)s?\b"),
+                (
+                    "make",
+                    r"\bbrands?\b|\bmakes?\b|\bmanufacturers?\b|\boems?\b|\bcarmakers?\b|\bautomakers?\b",
+                ),
                 ("model", r"\bby\s+model\b|\bmodels?\s+(?:per|within\s+each)\b"),
                 ("dealer", r"\bdealers?\b"),
                 ("salesperson", r"\bsalespersons?\b|\bsalespeople\b|\bsales\s*rep\b"),
@@ -448,13 +576,40 @@ def _merge_filters(
     primary: list[ExtractedFilter],
     additional: list[ExtractedFilter],
 ) -> list[ExtractedFilter]:
-    merged: list[ExtractedFilter] = []
-    seen: set[tuple[str, str]] = set()
+    """One filter per column; several values on a column become ``IN`` (never AND)."""
+    by_column: dict[str, list[ExtractedFilter]] = {}
     for filt in [*primary, *additional]:
-        key = (filt.column.casefold(), filt.value.casefold())
-        if key not in seen:
-            merged.append(filt)
-            seen.add(key)
+        by_column.setdefault(filt.column.casefold(), []).append(filt)
+    merged: list[ExtractedFilter] = []
+    for items in by_column.values():
+        values = tuple(
+            dict.fromkeys(value for item in items for value in item.all_values)
+        )
+        first = items[0]
+        if len(items) == 1 or len(values) == len(first.all_values):
+            merged.append(first)
+            continue
+        if any(item.operator.strip().upper() not in {"=", "IN"} for item in items):
+            merged.extend(items)
+            continue
+        domain = first.label.split(" ", 1)[0] if first.label else first.column.rsplit(".", 1)[-1]
+        if " = " in first.label:
+            domain = first.label.split(" = ", 1)[0]
+        elif " in (" in first.label:
+            domain = first.label.split(" in (", 1)[0]
+        merged.append(
+            ExtractedFilter(
+                column=first.column,
+                operator="IN",
+                value=values[0],
+                label=f"{domain} in ({', '.join(values)})",
+                source=first.source,
+                values=values,
+                match_type=first.match_type,
+                matched_text=first.matched_text,
+                confidence=min(item.confidence for item in items),
+            )
+        )
     return merged
 
 
@@ -463,7 +618,12 @@ def _apply_value_inference(plan: QuestionPlan, question: str) -> None:
     columns = {f.column.casefold() for f in plan.filters}
     if plan.industry is Industry.AUTOMOTIVE:
         if any("dim_carline" in col for col in columns) and plan.entity == "unknown":
-            plan.entity = "vehicle"
+            # A named brand/model alone ("Maruti") asks for its performance, not a
+            # model leaderboard; only vehicle/ranking words make it a vehicle list.
+            vehicle_ask = bool(_VEHICLE.search(question) or _TOP.search(question))
+            plan.entity = "vehicle" if vehicle_ask else "metric_only"
+            if plan.entity == "metric_only" and plan.metric == "unknown":
+                plan.metric = "units" if _SELLING.search(question) else "revenue"
         elif any("dim_region" in col for col in columns) and plan.entity == "unknown":
             plan.entity = "region"
         if plan.entity != "unknown" and plan.intent == "unknown":
@@ -488,8 +648,24 @@ def _apply_value_inference(plan: QuestionPlan, question: str) -> None:
             plan.intent = "ranking" if _TOP.search(question) else "aggregation"
 
 
-def _understand_automotive(q: str) -> QuestionPlan:
+def _understand_automotive(
+    q: str, value_filters: list[ExtractedFilter] | None = None
+) -> QuestionPlan:
     normalized = _normalized_ask(q)
+    if _SALES_TREND_ONLY.match(normalized) and not value_filters:
+        return QuestionPlan(
+            industry=Industry.AUTOMOTIVE,
+            intent="ambiguous",
+            entity="metric_only",
+            metric="unknown",
+            ambiguity_options=[
+                "Total revenue trend by month",
+                "Units sold trend by month",
+                "Revenue by brand by year",
+                "Maruti Suzuki sales trend",
+            ],
+            notes=["A sales trend needs a scope: all brands, one brand, or a metric."],
+        )
     if normalized in _BARE_SALES:
         return QuestionPlan(
             industry=Industry.AUTOMOTIVE,
@@ -579,6 +755,22 @@ def _understand_automotive(q: str) -> QuestionPlan:
             limit=limit if _TOP.search(q) else 20,
             glossary_hits=hits,
             notes=notes,
+        )
+
+    if _BRAND_WORD.search(q) and not _MODEL_WORD.search(q):
+        # Brand questions group by dim_carline.make ("Top brand by revenue").
+        hits.append("Brand")
+        if metric == "unknown":
+            metric = "units" if _SELLING.search(q) else "revenue"
+        return QuestionPlan(
+            industry=Industry.AUTOMOTIVE,
+            intent="ranking" if _TOP.search(q) else "aggregation",
+            entity="metric_only",
+            metric=metric,
+            filters=filters,
+            limit=limit if _TOP.search(q) else 20,
+            glossary_hits=hits,
+            notes=["Brand means dim_carline.make."],
         )
 
     if _REGION.search(q) and (_TOP.search(q) or _TREND.search(q) or True):
@@ -823,7 +1015,7 @@ def plan_sql_requirements(plan: QuestionPlan) -> list[str]:
     if plan.entity == "vehicle":
         req.append("dim_carline")
     for filt in plan.filters:
-        req.append(filt.value)
+        req.extend(filt.all_values)
         if "car_type" in filt.column:
             req.append("car_type")
         if "engine_type" in filt.column:

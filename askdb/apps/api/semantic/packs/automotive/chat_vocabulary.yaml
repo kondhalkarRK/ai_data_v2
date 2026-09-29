@@ -1,0 +1,96 @@
+# AI Chat-only vocabulary. Business values and synonyms live in
+# semantic_model.yaml (value_domains) and definitions in business_glossary.yaml;
+# this file only holds conversational rules the Knowledge Graph never needs.
+version: "1.0"
+
+# Business terms users ask for that the warehouse cannot answer. The planner
+# replies with the message and alternatives instead of guessing or failing.
+unavailable:
+  - terms: [cng, compressed natural gas, lpg]
+    kind: value
+    message: >
+      CNG isn't recorded as a fuel type in the sales data. Available fuel types are
+      Petrol, Diesel, Hybrid and Electric.
+    alternatives:
+      - Petrol sales by year
+      - Electric vehicle sales by year
+      - Units sold by fuel type
+  - terms: [profit, profits, gross profit, net profit, earnings]
+    kind: metric
+    message: >
+      Profit can't be calculated because the sales data has selling prices but no cost
+      data. Revenue and average selling price are available.
+    alternatives:
+      - Revenue by year
+      - Average selling price by brand
+      - Top brand by revenue
+  - terms: [profit margin, margin, margins, gross margin]
+    kind: metric
+    message: >
+      Profit margin needs cost data, which isn't recorded. Average selling price is the
+      closest available pricing measure.
+    alternatives:
+      - Average selling price by brand
+      - Revenue by brand
+      - Average selling price by year
+
+# Model names that are also everyday words. They only resolve to the model when
+# the brand is named alongside them or the word is followed by model/car.
+generic_value_words: [city, venue, punch, safari, elevate, comet, amaze, thar]
+
+# Words that may look like names but are business vocabulary, never entities.
+known_words:
+  - sales
+  - sale
+  - sold
+  - selling
+  - revenue
+  - revenues
+  - units
+  - unit
+  - orders
+  - order
+  - volume
+  - trend
+  - trends
+  - growth
+  - share
+  - market
+  - brand
+  - brands
+  - make
+  - makes
+  - model
+  - models
+  - car
+  - cars
+  - vehicle
+  - vehicles
+  - dealer
+  - dealers
+  - region
+  - regions
+  - city
+  - cities
+  - state
+  - states
+  - year
+  - years
+  - month
+  - months
+  - quarter
+  - quarters
+  - week
+  - day
+  - today
+  - total
+  - overall
+  - average
+  - top
+  - best
+  - worst
+  - compare
+  - comparison
+  - performance
+  - india
+  - all

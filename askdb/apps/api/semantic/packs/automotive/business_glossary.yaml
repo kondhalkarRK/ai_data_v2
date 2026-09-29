@@ -176,6 +176,114 @@ terms:
     category: Planning
     maps_to_measure: target_revenue
 
+  Brand:
+    definition: >
+      The vehicle manufacturer (dim_carline.make). Canonical brands are Maruti Suzuki,
+      Hyundai, Tata, Mahindra, MG, Kia, Toyota, Honda, Skoda, Volkswagen, Renault and Nissan.
+    display_label: Brand (Make)
+    synonyms: [make, manufacturer, OEM, carmaker, automaker, company]
+    category: Product
+    maps_to_attribute: dim_carline.make
+    sql_expression: "automotive.dim_carline.make"
+    calculation_rules:
+      - Resolve brand synonyms to the canonical make (Maruti / Suzuki / MSIL -> Maruti Suzuki; Morris Garages / MG Motor -> MG).
+      - A named brand is a mandatory filter; several named brands become make IN (...).
+    example_questions:
+      - Maruti sales by year
+      - Top brand by revenue
+      - Compare MG and Maruti sales
+
+  MUV:
+    definition: Multi-utility vehicles / MPVs (MUV).
+    synonyms: [muvs, mpv, mpvs, people carrier]
+    category: Product Filter
+    maps_to_attribute: dim_carline.car_type
+    sql_expression: "automotive.dim_carline.car_type = 'MUV'"
+
+  Coupe:
+    definition: Two-door coupe body style.
+    synonyms: [coupes]
+    category: Product Filter
+    maps_to_attribute: dim_carline.car_type
+    sql_expression: "automotive.dim_carline.car_type = 'Coupe'"
+
+  Fuel Type:
+    definition: Powertrain of the vehicle — Petrol, Diesel, Hybrid or Electric (dim_carline.engine_type).
+    synonyms: [powertrain, engine type, fuel]
+    category: Product
+    maps_to_attribute: dim_carline.engine_type
+    sql_expression: "automotive.dim_carline.engine_type"
+    calculation_rules:
+      - CNG is not recorded in the sales data; offer Petrol, Diesel, Hybrid or Electric instead.
+
+  Petrol:
+    definition: Petrol (gasoline) powered vehicles.
+    synonyms: [gasoline]
+    category: Product Filter
+    maps_to_attribute: dim_carline.engine_type
+    sql_expression: "automotive.dim_carline.engine_type = 'Petrol'"
+
+  Diesel:
+    definition: Diesel powered vehicles.
+    synonyms: []
+    category: Product Filter
+    maps_to_attribute: dim_carline.engine_type
+    sql_expression: "automotive.dim_carline.engine_type = 'Diesel'"
+
+  Hybrid:
+    definition: Hybrid powertrain vehicles (not battery-electric).
+    synonyms: [hybrids, HEV, strong hybrid]
+    category: Product Filter
+    maps_to_attribute: dim_carline.engine_type
+    sql_expression: "automotive.dim_carline.engine_type = 'Hybrid'"
+
+  Location:
+    definition: >
+      The city where the sale was booked (dim_region.city). Common names resolve to the
+      canonical city — Bombay -> Mumbai, Bangalore -> Bengaluru, Delhi -> New Delhi, Madras -> Chennai.
+    synonyms: [city, town]
+    category: Geography
+    maps_to_attribute: dim_region.city
+    sql_expression: "automotive.dim_region.city"
+    example_questions:
+      - Maruti sales in Mumbai
+      - Revenue by city
+
+  Market Share:
+    definition: >
+      A brand's (or segment's) share of total units or revenue in the selected period,
+      computed as 100 * brand value / total value across all brands.
+    synonyms: [share of market, brand share, share]
+    category: Market
+    calculation_rules:
+      - Contribution percentage by make over the same filters and period.
+    example_questions:
+      - Market share by brand
+      - Maruti market share by year
+
+  Growth:
+    definition: Period-over-period change of a metric (month over month or year over year).
+    synonyms: [growth rate, yoy, mom, year over year, month over month, change]
+    category: Market
+    calculation_rules:
+      - Compare each period with the previous one using LAG over the time grain.
+
+  Profit:
+    definition: >
+      Revenue minus cost. The sales warehouse records selling prices only, so profit and
+      profit margin cannot be computed; answer with revenue or average selling price instead.
+    synonyms: [profits, gross profit, net profit, earnings]
+    category: Financial
+    calculation_rules:
+      - Not available — no cost data in automotive.fact_sales.
+
+  Profit Margin:
+    definition: Profit as a percentage of revenue. Not available because cost data is not recorded.
+    synonyms: [margin, margins, gross margin]
+    category: Financial
+    calculation_rules:
+      - Not available — suggest average selling price or revenue instead.
+
 domain_rules:
   always_rules:
     - SQL is the source of truth for numerical results.

@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 from app.core.config import Industry
-from app.services.chat.question_understanding import QuestionPlan
+from app.services.chat.question_understanding import QuestionPlan, filter_predicate
 
 
 def build_domain_sql_hints(
@@ -31,7 +31,7 @@ def build_domain_sql_hints(
     if plan.filters:
         lines.append("MATCHED BUSINESS VALUES — mandatory SQL filters:")
         for filt in plan.filters:
-            lines.append(f"  - {filt.column} {filt.operator} '{filt.value}'")
+            lines.append(f"  - {filter_predicate(filt.column, filt)}")
     for note in plan.notes:
         lines.append(f"Rule: {note}")
 
@@ -200,8 +200,9 @@ def validate_sql_against_plan(
     if required_table and required_table not in lowered:
         return False, f"{plan.entity.title()} questions must use {required_table}"
     for filt in plan.filters:
-        if filt.value.lower() not in lowered:
-            return False, f"Missing mandatory filter value '{filt.value}' in SQL"
+        for value in filt.all_values:
+            if value.lower().replace("'", "''") not in lowered:
+                return False, f"Missing mandatory filter value '{value}' in SQL"
         column_name = filt.column.rsplit(".", 1)[-1].lower()
         if column_name not in lowered:
             return False, f"Missing mandatory filter column '{column_name}' in SQL"

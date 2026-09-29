@@ -35,4 +35,28 @@ describe("chat SSE batching", () => {
     expect(message.latencyMs).toBe(40);
     expect(message.progress).toBeNull();
   });
+
+  it("keeps the server's clarification title and kind instead of a generic error", () => {
+    const message = applyChatSseEvent({ id: "a2", role: "assistant" }, "clarification", {
+      kind: "unresolved",
+      title: "Did you mean…",
+      question: "I couldn't find “Ferari” in the sales data.",
+      options: ["Ferrari sales by year", "Top brand by revenue"],
+    });
+    expect(message.clarificationTitle).toBe("Did you mean…");
+    expect(message.clarificationKind).toBe("unresolved");
+    expect(message.options).toHaveLength(2);
+    expect(message.error).toBeUndefined();
+  });
+
+  it("passes comparison chart series through", () => {
+    const message = applyChatSseEvent({ id: "a3", role: "assistant" }, "chart", {
+      type: "line",
+      x: "year",
+      y: "mg_revenue",
+      series: ["mg_revenue", "kia_revenue"],
+      points: [{ year: 2024, mg_revenue: 1, kia_revenue: 2 }],
+    });
+    expect(message.chart?.series).toEqual(["mg_revenue", "kia_revenue"]);
+  });
 });

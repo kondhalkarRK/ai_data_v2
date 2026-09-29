@@ -19,9 +19,8 @@ DOCUMENT_CUES = (
     "key finding",
     "concerns",
     "recommendations",
-    "catalog",
-    "policy",
-    "policies",
+    "policy document",
+    "policy wording",
     "what does the document",
     "what does the report",
     "in the document",
@@ -59,6 +58,8 @@ DOCUMENT_LIKE = (
     "findings",
     "recommendation",
     "policy",
+    "policies",
+    "catalog",
 )
 
 

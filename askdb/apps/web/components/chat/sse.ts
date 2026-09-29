@@ -57,6 +57,8 @@ export function applyChatSseEvent(
       return {
         ...message,
         clarification: String(data.question ?? data.message ?? ""),
+        clarificationTitle: data.title ? String(data.title) : undefined,
+        clarificationKind: data.kind ? String(data.kind) : undefined,
         options: (data.options as string[]) ?? [],
         progress: null,
       };

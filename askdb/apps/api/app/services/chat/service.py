@@ -22,15 +22,20 @@ from app.core.exceptions import ValidationError
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuestion
 from app.models.user import User
 from app.semantic.service import SemanticService
+from app.services.chat.clarification import (
+    assess_resolution,
+    plan_suggestions,
+    recovery_for_failure,
+    resolution_notes,
+)
+from app.services.chat.conversation_context import is_contextual_followup, plan_state
 from app.services.chat.failures import (
     FailureInfo,
     classify_database,
     classify_llm_failure,
-    classify_semantic,
     classify_sql_validation,
     propose_sql_repair,
 )
-from app.services.chat.conversation_context import is_contextual_followup, plan_state
 from app.services.chat.intents import (
     is_out_of_bounds,
     is_surprise_me,
@@ -42,12 +47,6 @@ from app.services.chat.intents import (
 from app.services.chat.profiler import PROFILER, QueryProfile
 from app.services.chat.query_cache import QUERY_CACHE, CachedAnswer
 from app.services.chat.query_router import knowledge_narrative, plan_entities, route_question
-from app.services.chat.semantic_query_planner import (
-    PIPELINE_STAGES,
-    plan_semantic_query,
-    recommend_chart,
-    rewrite_question,
-)
 from app.services.chat.question_understanding import QuestionPlan, understand_question
 from app.services.chat.response_meta import (
     QueryTimings,
@@ -65,12 +64,19 @@ from app.services.chat.semantic_context import (
     build_domain_sql_hints,
     validate_sql_against_plan,
 )
+from app.services.chat.semantic_query_planner import (
+    PIPELINE_STAGES,
+    plan_semantic_query,
+    recommend_chart,
+    rewrite_question,
+)
 from app.services.chat.sql_limits import ensure_result_limit
 from app.services.chat.templates import list_templates
 from app.services.chat.trust import compute_trust_score
 from app.services.chat.value_dictionary import (
     ValueDictionarySnapshot,
     get_value_dictionary,
+    resolver_for,
 )
 from app.services.knowledge import KnowledgeService
 from app.services.llm import complete_chat
@@ -79,6 +85,24 @@ from app.services.web_retrieval import WebRetrievalService
 logger = logging.getLogger(__name__)
 
 PROGRESS_STEPS = PIPELINE_STAGES
+_DIMENSION_COLUMNS = frozenset(
+    {
+        "year",
+        "quarter",
+        "month",
+        "make",
+        "model",
+        "car_type",
+        "engine_type",
+        "city",
+        "region_name",
+        "colour_name",
+        "dealer_name",
+        "dealer_grade",
+        "salesperson_name",
+        "state_code",
+    }
+)
 
 
 def _jsonable(value: Any) -> Any:
@@ -217,34 +241,32 @@ class ChatService:
         def maybe_slow() -> bool:
             return (time.perf_counter() - started) > 15.0
 
+        current_plan: QuestionPlan | None = None
+
         async def emit_failure(info: FailureInfo, *, sql: str | None = None) -> AsyncIterator[str]:
+            """Recover with suggestions; the technical reason stays in history/profiling."""
+            logger.info("nlq_recovery category=%s reason=%s", info.category, info.reason[:240])
             profile.error_category = info.category
             profile.error_reason = info.reason
             profile.sql = sql
-            profile.timings = timings.to_dict()
-            PROFILER.record(profile)
-            history.status = "failed"
             history.sql_text = sql
-            history.latency_ms = int((time.perf_counter() - started) * 1000)
-            history.trust_breakdown = {"failure": info.to_dict()}
-            await self._app.flush()
-            await self._app.commit()
-            payload = info.to_dict()
-            if sql:
-                payload["sql"] = sql
-            payload["historyId"] = str(history_id)
-            payload["timings"] = timings.to_dict()
-            yield _sse("error", payload)
-            yield _sse(
-                "done",
-                {
-                    "historyId": str(history_id),
-                    "conversationId": str(conversation.id),
-                    "latencyMs": history.latency_ms,
-                    "failed": True,
-                    "failureCategory": info.category,
-                },
+            recovery = recovery_for_failure(
+                info.category,
+                current_plan,
+                industry=self._industry,
+                question=question,
             )
+            async for frame in finish_without_sql(
+                path="recovery",
+                narrative=recovery.message,
+                event="clarification",
+                payload=recovery.payload(historyId=str(history_id)),
+                alternates=recovery.options,
+                history_status="failed",
+                extra_breakdown={"failure": info.to_dict()},
+                done_extra={"recovered": True, "failureCategory": info.category},
+            ):
+                yield frame
 
         async def finish_without_sql(
             *,
@@ -254,6 +276,9 @@ class ChatService:
             payload: dict[str, Any] | None = None,
             ambiguity: bool = False,
             alternates: list[str] | None = None,
+            history_status: str = "completed",
+            extra_breakdown: dict[str, Any] | None = None,
+            done_extra: dict[str, Any] | None = None,
         ) -> AsyncIterator[str]:
             if event:
                 yield _sse(event, payload or {})
@@ -283,18 +308,33 @@ class ChatService:
             )
             for token in narrative.split():
                 yield _sse("token", {"token": token + " "})
-            history.status = "completed"
+            history.status = history_status
             history.row_count = 0
             history.trust_score = 0
-            history.trust_breakdown = {"path": path, "ambiguityFlag": ambiguity}
+            history.trust_breakdown = {
+                "path": path,
+                "ambiguityFlag": ambiguity,
+                **(extra_breakdown or {}),
+            }
             history.latency_ms = int((time.perf_counter() - started) * 1000)
             await self._app.flush()
+            if history_status == "failed":
+                await self._app.commit()
             profile.path = path
             profile.timings = timings.to_dict()
             PROFILER.record(profile)
+            options = (payload or {}).get("options") or []
             yield _sse(
                 "followups",
-                {"items": suggested_followups(self._industry, path)},
+                {
+                    "items": [
+                        item
+                        for item in suggested_followups(self._industry, path)
+                        if item not in options
+                    ]
+                    if path not in {"clarification", "recovery"}
+                    else []
+                },
             )
             yield _sse(
                 "done",
@@ -304,6 +344,7 @@ class ChatService:
                     "latencyMs": history.latency_ms,
                     "trustScore": 0,
                     "ambiguityFlag": ambiguity,
+                    **(done_extra or {}),
                 },
             )
 
@@ -315,20 +356,6 @@ class ChatService:
                     f"I can only answer governed {self._industry.value} analytics questions. "
                     "Try asking about a business metric in the available data."
                 ),
-            ):
-                yield frame
-            return
-
-        clarification = needs_clarification(question)
-        if clarification is not None:
-            options = suggested_followups(self._industry, "clarification")
-            async for frame in finish_without_sql(
-                path="clarification",
-                narrative=clarification,
-                event="clarification",
-                payload={"question": clarification, "options": options},
-                ambiguity=True,
-                alternates=options,
             ):
                 yield frame
             return
@@ -347,10 +374,33 @@ class ChatService:
         except Exception:
             await self._recover_analytics()
             logger.warning(
-                "Value dictionary unavailable; continuing with semantic rules", exc_info=True
+                "Value dictionary unavailable; continuing with pack vocabulary", exc_info=True
             )
             value_dictionary = ValueDictionarySnapshot(self._industry, ())
-        value_filters = value_dictionary.match(question)
+        # Canonical names + synonyms from the pack still resolve when the live
+        # dictionary is down: exact -> synonym -> fuzzy -> alias -> glossary.
+        resolution = value_dictionary.resolve(question, pack=semantic_pack)
+        value_filters = resolution.filters()
+
+        clarification = None if resolution.matches else needs_clarification(question)
+        if clarification is not None:
+            options = plan_suggestions(None, industry=self._industry, question=question)
+            async for frame in finish_without_sql(
+                path="clarification",
+                narrative=clarification,
+                event="clarification",
+                payload={
+                    "kind": "clarify",
+                    "title": "What should I analyze?",
+                    "question": clarification,
+                    "options": options,
+                },
+                ambiguity=True,
+                alternates=options,
+            ):
+                yield frame
+            return
+
         allowed_schema = build_allowed_schema(semantic_pack)
         rewritten = rewrite_question(question)
         completed_steps.append("rewrite")
@@ -360,6 +410,7 @@ class ChatService:
             rewritten,
             value_filters=value_filters,
         )
+        current_plan = plan
         logger.info(
             "nlq_plan question=%r rewritten=%r intent=%s entity=%s metric=%s analysis=%s "
             "dimensions=%s filters=%s ambiguous=%s",
@@ -376,14 +427,48 @@ class ChatService:
         completed_steps.append("intent")
         yield _progress("ambiguity", completed_steps, slow=maybe_slow())
         if plan.is_ambiguous and plan.ambiguity_options:
-            msg = "Your question is ambiguous. Did you mean one of these?"
+            msg = (
+                plan.notes[0]
+                if plan.notes
+                else "This question can be read several ways."
+            ) + " Did you mean one of these?"
             async for frame in finish_without_sql(
                 path="clarification",
                 narrative=msg,
                 event="clarification",
-                payload={"question": msg, "options": plan.ambiguity_options},
+                payload={
+                    "kind": "clarify",
+                    "title": "Did you mean…",
+                    "question": msg,
+                    "options": plan.ambiguity_options,
+                },
                 ambiguity=True,
                 alternates=plan.ambiguity_options,
+            ):
+                yield frame
+            return
+
+        needs_answer = assess_resolution(
+            question,
+            plan,
+            resolution,
+            industry=self._industry,
+            brands=resolver_for(value_dictionary, semantic_pack).canonical_values("make"),
+        )
+        if needs_answer is not None and not is_contextual_followup(question):
+            logger.info(
+                "nlq_clarify kind=%s unresolved=%s unsupported=%s",
+                needs_answer.kind,
+                [item.text for item in resolution.unresolved],
+                [item.term for item in resolution.unsupported],
+            )
+            async for frame in finish_without_sql(
+                path="clarification",
+                narrative=needs_answer.message,
+                event="clarification",
+                payload=needs_answer.payload(),
+                ambiguity=True,
+                alternates=needs_answer.options,
             ):
                 yield frame
             return
@@ -599,8 +684,11 @@ class ChatService:
             pack=semantic_pack,
             surprise_sql=surprise_sql,
             prior_state=prior_state,
+            resolved=resolution.trace(),
         )
         plan = planned.plan
+        current_plan = plan
+        logger.info("nlq_structured_plan %s", json.dumps(planned.structured_plan(), default=str))
         yield _sse("stage", {"stage": "semantic_plan", **planned.trace()})
         timings.semantic_lookup_ms = int((time.perf_counter() - semantic_t0) * 1000)
         for step in ("context", "semantic", "joins", "formula"):
@@ -634,7 +722,15 @@ class ChatService:
                     return
             path = planned.path
             glossary_matches = planned.glossary_matches
-            narrative += f"Answered with governed template: {planned.title}."
+            notes = resolution_notes(resolution)
+            if planned.defaulted_grain:
+                notes.append(
+                    "No period was given, so this is the monthly trend for the latest 24 months."
+                )
+                alternate_interpretations = plan_suggestions(
+                    plan, industry=self._industry, question=question
+                )
+            narrative += " ".join([*notes, f"Answered with governed template: {planned.title}."])
             yield _sse("stage", {"stage": "template", "title": planned.title})
         elif planned.path == "followup" or planned.sql is None:
             if plan.entity:
@@ -698,16 +794,20 @@ class ChatService:
                     async for frame in emit_failure(classify_llm_failure(llm.error)):
                         yield frame
                     return
-                if plan.entity in {"vehicle", "salesperson", "dealer"}:
-                    async for frame in emit_failure(classify_semantic(question)):
-                        yield frame
-                    return
-                narrative += llm.narrative or (
-                    "No matching governed template and no LLM key is configured. "
-                    "Try questions like 'loss ratio', 'claims by status', "
-                    "'revenue by month', or 'top selling sedan by units'."
+                category = (
+                    "semantic"
+                    if plan.metric == "unknown" and plan.entity in {"unknown", "metric_only"}
+                    else "sql_generation"
                 )
-                path = "fallback"
+                async for frame in emit_failure(
+                    FailureInfo(
+                        category,
+                        "No governed query",
+                        "No governed template matched and no language model is configured.",
+                    )
+                ):
+                    yield frame
+                return
 
         if scenario is not None:
             direction = str(scenario["direction"])
@@ -846,11 +946,19 @@ class ChatService:
             render_t0 = time.perf_counter()
             chart_type = recommend_chart(plan, columns)
             if rows and len(columns) >= 2 and chart_type != "table":
+                measures = [
+                    column
+                    for column in columns[1:]
+                    if column not in _DIMENSION_COLUMNS
+                    and isinstance(rows[0].get(column), (int, float))
+                ]
+                series = [column for column in planned.chart_series if column in columns]
                 chart_payload = {
                     "type": chart_type,
                     "x": columns[0],
-                    "y": columns[1],
-                    "points": rows[:40],
+                    "y": (series or measures or columns[1:])[0],
+                    "series": series,
+                    "points": rows[:60],
                     "anomalies": detect_anomalies(columns, rows),
                 }
                 yield _sse("chart", chart_payload)
@@ -976,13 +1084,25 @@ class ChatService:
         history.status = "completed"
         await self._app.flush()
 
-        followups = semantic_followups(
-            self._industry,
-            dimensions=query_meta.dimensions_used,
-            metrics=query_meta.metrics_used,
-            tables=query_meta.tables_used,
-            path=path,
+        scoped = (
+            plan_suggestions(plan, industry=self._industry, question=question, limit=3)
+            if plan.filters
+            else []
         )
+        followups = list(
+            dict.fromkeys(
+                [
+                    *(item for item in scoped if item not in alternate_interpretations),
+                    *semantic_followups(
+                        self._industry,
+                        dimensions=query_meta.dimensions_used,
+                        metrics=query_meta.metrics_used,
+                        tables=query_meta.tables_used,
+                        path=path,
+                    ),
+                ]
+            )
+        )[:5]
         yield _sse("followups", {"items": followups})
 
         if sql_text and path != "fallback" and not is_contextual_followup(question):

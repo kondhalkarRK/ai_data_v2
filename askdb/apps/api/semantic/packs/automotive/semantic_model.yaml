@@ -141,21 +141,155 @@ hierarchies:
   Geography: [country, state_code, city, region_name]
   Sales Organization: [region_name, city, dealer_name, salesperson]
 
+# Canonical business values and the synonyms business users type for them.
+# AI Chat resolves these (exact -> synonym -> fuzzy -> alias -> glossary) before
+# planning SQL. The Knowledge Graph builder does not read value_domains.
 value_domains:
-  car_type: {table: dim_carline, column: car_type, label: Car Type, max_values: 30, aliases: [body style, vehicle type, segment]}
-  make: {table: dim_carline, column: make, label: Make, max_values: 100, aliases: [brand, manufacturer]}
-  model: {table: dim_carline, column: model, label: Model, max_values: 150}
-  engine_type: {table: dim_carline, column: engine_type, label: Engine Type, max_values: 30, aliases: [powertrain, fuel type]}
+  car_type:
+    table: dim_carline
+    column: car_type
+    label: Car Type
+    max_values: 30
+    aliases: [body style, vehicle type, segment]
+    value_aliases:
+      SUV: [SUVs, sport utility, sport utility vehicle, crossover, crossovers, compact SUV]
+      Sedan: [sedans, saloon, saloons]
+      Hatchback: [hatchbacks, hatch, hatches]
+      MUV: [MUVs, MPV, MPVs, multi utility vehicle, people carrier]
+      Coupe: [coupes, coupé]
+  make:
+    table: dim_carline
+    column: make
+    label: Make
+    max_values: 100
+    aliases: [brand, manufacturer, OEM, company, carmaker, automaker]
+    value_aliases:
+      Maruti Suzuki: [Maruti, Suzuki, MSIL, Maruti Suzuki India, Maruti Suzuki India Limited, Maruthi]
+      MG: [MG Motor, MG Motors, MG Motor India, Morris Garages, JSW MG]
+      Tata: [Tata Motors, Tata Motor, Tata Passenger Vehicles]
+      Mahindra: [M&M, Mahindra & Mahindra, Mahindra and Mahindra, Mahindra Auto]
+      Hyundai: [Hyundai Motor, Hyundai Motors, Hyundai India, Hyundai Motor India]
+      Kia: [Kia Motors, Kia India]
+      Toyota: [Toyota Kirloskar, Toyota Kirloskar Motor, TKM]
+      Honda: [Honda Cars, Honda Cars India]
+      Skoda: [Skoda Auto, Škoda]
+      Volkswagen: [VW, Volkswagen India]
+      Renault: [Renault India]
+      Nissan: [Nissan Motor, Nissan India]
+  model:
+    table: dim_carline
+    column: model
+    label: Model
+    max_values: 150
+    value_aliases:
+      Swift: [Maruti Swift, Swift Dzire]
+      Baleno: []
+      Brezza: [Vitara Brezza]
+      Ertiga: []
+      Grand Vitara: []
+      i20: [Hyundai i20, i 20]
+      Creta: [Hyundai Creta]
+      Venue: []
+      Verna: []
+      Alcazar: []
+      Nexon: [Tata Nexon]
+      Punch: []
+      Harrier: []
+      Safari: []
+      Tiago: []
+      XUV700: [XUV 700, XUV-700]
+      Scorpio-N: [Scorpio N, Scorpio]
+      Thar: []
+      Bolero: []
+      XUV3XO: [XUV 3XO, XUV300, XUV 300]
+      City: [Honda City]
+      Amaze: []
+      Elevate: []
+      Innova Crysta: [Innova]
+      Fortuner: []
+      Glanza: []
+      Hyryder: [Urban Cruiser Hyryder]
+      Seltos: []
+      Sonet: []
+      Carens: []
+      EV6: [EV 6]
+      Hector: []
+      Astor: []
+      ZS EV: [ZS]
+      Comet EV: [Comet]
+      Kushaq: []
+      Slavia: []
+      Kodiaq: []
+      Taigun: []
+      Virtus: []
+      Tiguan: []
+      Kiger: []
+      Triber: []
+      Kwid: []
+      Magnite: []
+      X-Trail: [X Trail, Xtrail]
+  engine_type:
+    table: dim_carline
+    column: engine_type
+    label: Engine Type
+    max_values: 30
+    aliases: [powertrain, fuel type, fuel]
+    value_aliases:
+      Electric: [EV, EVs, electric vehicle, electric vehicles, electric car, electric cars, battery electric, BEV]
+      Petrol: [gasoline, petrol cars, petrol vehicles]
+      Diesel: [diesel cars, diesel vehicles]
+      Hybrid: [hybrids, HEV, strong hybrid, hybrid cars]
   colour: {table: dim_color, column: colour_name, label: Colour, max_values: 100, aliases: [color, paint]}
   city:
     table: dim_region
     column: city
     label: City
     max_values: 100
+    aliases: [location, town]
     value_aliases:
-      New Delhi: [Delhi, Delhi NCR]
+      Mumbai: [Bombay]
+      New Delhi: [Delhi, Delhi NCR, NCR]
       Gurugram: [Gurgaon]
-      Bengaluru: [Bangalore]
+      Noida: []
+      Pune: [Poona]
+      Bengaluru: [Bangalore, Bengalooru]
+      Hyderabad: []
+      Chennai: [Madras]
+      Kolkata: [Calcutta]
+      Ahmedabad: []
+      Surat: []
+      Jaipur: []
+      Lucknow: []
+      Chandigarh: []
+      Indore: []
+      Bhopal: []
+      Kochi: [Cochin]
+      Thiruvananthapuram: [Trivandrum]
+      Coimbatore: []
+      Madurai: []
+      Visakhapatnam: [Vizag]
+      Vijayawada: []
+      Nagpur: []
+      Nashik: []
+      Vadodara: [Baroda]
+      Rajkot: []
+      Patna: []
+      Ranchi: []
+      Bhubaneswar: []
+      Guwahati: []
+      Dehradun: []
+      Shimla: []
+      Panaji: [Goa, Panjim]
+      Mysuru: [Mysore]
+      Mangaluru: [Mangalore]
+      Hubballi: [Hubli]
+      Chhatrapati Sambhajinagar: [Aurangabad]
+      Amritsar: []
+      Ludhiana: []
+      Kanpur: []
+      Varanasi: [Benares, Banaras]
+      Raipur: []
+      Jodhpur: []
   region: {table: dim_region, column: region_name, label: Region, max_values: 100, aliases: [territory, geography]}
   state: {table: dim_region, column: state_code, label: State, max_values: 100}
   dealer_grade: {table: dim_dealer, column: dealer_grade, label: Dealer Grade, max_values: 10}

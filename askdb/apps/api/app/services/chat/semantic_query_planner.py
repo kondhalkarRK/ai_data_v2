@@ -22,6 +22,7 @@ from app.services.chat.conversation_context import (
     state_to_plan,
 )
 from app.services.chat.glossary_resolve import apply_glossary
+from app.services.chat.intents import is_followup
 from app.services.chat.question_understanding import QuestionPlan, understand_question
 from app.services.chat.templates import resolve_template
 
@@ -63,6 +64,7 @@ _JOIN_FOR_DIMENSION: dict[str, str] = {
     "model": "fact_sales → dim_carline",
     "make": "fact_sales → dim_carline",
     "car_type": "fact_sales → dim_carline",
+    "engine_type": "fact_sales → dim_carline",
     "colour": "fact_sales → dim_color",
     "product": "fact_policy_monthly → dim_product",
     "agent": "fact_policy_monthly → dim_agent",
@@ -86,6 +88,37 @@ class SemanticQuery:
     path: str = "fallback"
     glossary_matches: int = 0
     chart_type: str = "bar"
+    chart_series: tuple[str, ...] = ()
+    resolved: list[dict[str, Any]] = field(default_factory=list)
+    contextual: bool = False
+    defaulted_grain: bool = False
+
+    def structured_plan(self) -> dict[str, Any]:
+        """The business plan SQL is generated from (never from the raw prompt)."""
+        plan = self.plan
+        brands = [
+            value
+            for item in plan.filters
+            if item.column.endswith(".make")
+            for value in item.all_values
+        ]
+        return {
+            "intent": plan.intent,
+            "brand": brands[0] if len(brands) == 1 else (brands or None),
+            "metric": plan.metric,
+            "dimension": plan.dimensions[0] if len(plan.dimensions) == 1 else list(plan.dimensions),
+            "filters": [
+                {
+                    "column": item.column.rsplit(".", 1)[-1],
+                    "operator": "IN" if len(item.all_values) > 1 else item.operator,
+                    "values": list(item.all_values),
+                }
+                for item in plan.filters
+            ],
+            "year": plan.year_filter,
+            "analysis": plan.analysis,
+            "chart": self.chart_type,
+        }
 
     def trace(self) -> dict[str, Any]:
         return {
@@ -102,6 +135,9 @@ class SemanticQuery:
             "options": list(self.plan.ambiguity_options),
             "chartType": self.chart_type,
             "hasPriorSql": bool(self.prior_sql),
+            "resolved": list(self.resolved),
+            "structured": self.structured_plan(),
+            "contextual": self.contextual,
         }
 
 
@@ -154,10 +190,12 @@ def recommend_chart(plan: QuestionPlan | None, columns: list[str]) -> str:
     """Pick a chart from intent, not from a default bar."""
     if plan is None or len(columns) < 2:
         return "table"
-    if plan.intent in {"trend", "comparison"} or plan.time_grain in {"month", "quarter", "year"}:
+    if plan.time_grain in {"month", "quarter", "year"} or plan.intent == "trend":
         return "line"
     if plan.analysis == "year_window_compare":
         return "line"
+    if plan.analysis == "market_share":
+        return "pie" if len(plan.dimensions) == 1 else "bar"
     if plan.intent == "ranking" or plan.analysis == "ranking":
         return "bar"
     return "bar"
@@ -172,12 +210,19 @@ def plan_semantic_query(
     pack: object | None = None,
     surprise_sql: tuple[str, str, int] | None = None,
     prior_state: dict[str, Any] | None = None,
+    resolved: list[dict[str, Any]] | None = None,
 ) -> SemanticQuery:
     """Run rewrite through SQL generation. Stops SQL when the question is ambiguous."""
     rewritten = rewrite_question(question)
-    contextual = bool(prior_state) and is_contextual_followup(question)
+    contextual = (
+        bool(prior_state)
+        and is_contextual_followup(question)
+        and not is_self_contained(rewritten, value_filters or [])
+    )
     if contextual and prior_state is not None:
-        plan = apply_followup(state_to_plan(industry, prior_state), rewritten)
+        plan = apply_followup(
+            state_to_plan(industry, prior_state), rewritten, value_filters=value_filters or []
+        )
     else:
         plan = understand_question(industry, rewritten, value_filters=value_filters)
     formula = apply_glossary(plan, rewritten, pack)
@@ -190,6 +235,8 @@ def plan_semantic_query(
         joins=join_path(plan),
         chart_type=recommend_chart(plan, ["dimension", "metric"]),
         glossary_matches=len(plan.glossary_hits),
+        resolved=list(resolved or []),
+        contextual=contextual,
     )
     if plan.is_ambiguous and not contextual:
         query.chart_type = "table"
@@ -206,10 +253,28 @@ def plan_semantic_query(
         query.glossary_matches = matches
         query.path = "template"
         return query
+    grain_before = plan.time_grain
     hit = resolve_template(industry, rewritten, plan=plan, pack=pack)
     if hit is not None:
         query.sql = hit.sql
         query.title = hit.title
         query.glossary_matches = hit.glossary_matches
         query.path = hit.path
+        query.chart_series = hit.series
+        query.defaulted_grain = grain_before is None and plan.time_grain is not None
+        query.chart_type = recommend_chart(plan, ["dimension", "metric"])
     return query
+
+
+_METRIC_WORDS = re.compile(
+    r"\b(sales|sold|selling|revenue|units?|orders?|volume|premium|claims?|loss\s+ratio|"
+    r"market\s+share|share|asp|average\s+selling\s+price)\b",
+    re.I,
+)
+
+
+def is_self_contained(question: str, value_filters: list[Any]) -> bool:
+    """A question naming its own metric and scope starts fresh even if it says "last year"."""
+    if is_followup(question):
+        return False
+    return bool(_METRIC_WORDS.search(question or "")) and bool(value_filters)

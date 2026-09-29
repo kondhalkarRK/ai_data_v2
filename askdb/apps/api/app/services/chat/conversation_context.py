@@ -36,6 +36,7 @@ def plan_state(plan: QuestionPlan) -> dict[str, Any]:
                 "column": item.column,
                 "operator": item.operator,
                 "value": item.value,
+                "values": list(item.values),
                 "label": item.label,
             }
             for item in plan.filters
@@ -50,6 +51,7 @@ def state_to_plan(industry: Industry, state: dict[str, Any]) -> QuestionPlan:
             operator=str(item.get("operator") or "="),
             value=str(item["value"]),
             label=str(item.get("label") or item["value"]),
+            values=tuple(str(value) for value in (item.get("values") or [])),
         )
         for item in (state.get("filters") or [])
         if item.get("column") and item.get("value")
@@ -68,21 +70,32 @@ def state_to_plan(industry: Industry, state: dict[str, Any]) -> QuestionPlan:
     )
 
 
-def apply_followup(prior: QuestionPlan, question: str) -> QuestionPlan:
+def apply_followup(
+    prior: QuestionPlan,
+    question: str,
+    *,
+    value_filters: list[ExtractedFilter] | None = None,
+) -> QuestionPlan:
     """Keep the previous metric and grain, then apply the new constraint."""
     text = (question or "").lower()
     plan = state_to_plan(prior.industry, plan_state(prior))
     plan.notes.append("Continued from the previous question.")
 
-    if "mumbai" in text:
-        city = ExtractedFilter(
-            column="automotive.dim_region.city",
-            operator="=",
-            value="Mumbai",
-            label="City = Mumbai",
+    extra = list(value_filters or [])
+    if not extra and "mumbai" in text:
+        extra.append(
+            ExtractedFilter(
+                column="automotive.dim_region.city",
+                operator="=",
+                value="Mumbai",
+                label="City = Mumbai",
+            )
         )
-        if not any(item.column == city.column and item.value == city.value for item in plan.filters):
-            plan.filters.append(city)
+    # A newly named value replaces the previous value of the same column
+    # ("what about Pune?" after a Mumbai question).
+    for filt in extra:
+        plan.filters = [item for item in plan.filters if item.column != filt.column]
+        plan.filters.append(filt)
 
     if _COMPARE_YEAR.search(text):
         plan.analysis = "period_growth"

@@ -53,6 +53,27 @@ export interface QueryMeta {
   dateRange: string | null;
 }
 
+/** How a word in the question was mapped to a canonical business value. */
+export interface ResolvedEntity {
+  text: string;
+  canonical: string;
+  domain: string;
+  column: string;
+  method: "exact" | "synonym" | "fuzzy" | "alias" | "glossary";
+  confidence: number;
+}
+
+export interface StructuredPlan {
+  intent: string;
+  brand: string | string[] | null;
+  metric: string;
+  dimension: string | string[];
+  filters: Array<{ column: string; operator: string; values: string[] }>;
+  year: number | null;
+  analysis: string;
+  chart: string;
+}
+
 export interface QueryPlanTrace {
   rewritten?: string;
   intent?: string;
@@ -62,6 +83,8 @@ export interface QueryPlanTrace {
   filters?: string[];
   dimensions?: string[];
   chartType?: string;
+  resolved?: ResolvedEntity[];
+  structured?: StructuredPlan;
 }
 
 export interface AnomalyMarker {
@@ -91,6 +114,8 @@ export interface ChartPayload {
   type: string;
   x: string;
   y: string;
+  /** Wide comparison results: one plotted series per column (mg_revenue, kia_revenue). */
+  series?: string[];
   points: Array<Record<string, unknown>>;
   anomalies?: AnomalyMarker[];
 }
@@ -131,6 +156,9 @@ export interface ChatMessage {
   narrative?: string;
   path?: string;
   clarification?: string;
+  clarificationTitle?: string;
+  /** clarify | unsupported | unresolved | recovery */
+  clarificationKind?: string;
   options?: string[];
   followups?: string[];
   citations?: ChatCitation[];

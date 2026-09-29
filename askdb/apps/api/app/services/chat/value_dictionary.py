@@ -7,7 +7,6 @@ plan or LLM prompt.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.core.cache import TTLCache
 from app.core.config import Industry
+from app.services.chat.entity_resolver import (
+    EntityResolver,
+    Resolution,
+    catalog_from_domains,
+    load_chat_vocabulary,
+)
 from app.services.chat.question_understanding import ExtractedFilter
 
 
@@ -47,42 +52,36 @@ class ValueDictionarySnapshot:
     industry: Industry
     values: tuple[BusinessValue, ...]
 
-    def match(self, question: str, *, limit: int = 8) -> list[ExtractedFilter]:
-        """Resolve literals in a question using canonical database spelling."""
-        normalized_question = _normalize(question)
-        matches: list[tuple[int, int, str, BusinessValue]] = []
-        for item in self.values:
-            for alias in {*_aliases(item.value), *(_normalize(a) for a in item.aliases)}:
-                if len(alias) < 3:
-                    continue
-                if re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", normalized_question):
-                    matches.append((len(alias), item.frequency, alias, item))
-                    break
+    def resolve(self, question: str, *, pack: Any | None = None) -> Resolution:
+        """Resolve business values: exact -> synonym -> fuzzy -> alias -> glossary."""
+        return resolver_for(self, pack).resolve(question)
 
-        matches.sort(key=lambda row: (row[0], row[1]), reverse=True)
-        selected: list[ExtractedFilter] = []
-        seen_columns: set[str] = set()
-        occupied_aliases: set[str] = set()
-        for _, _, matched_alias, item in matches:
-            value_key = _normalize(item.value)
-            # Prefer the highest-frequency/longest match when aliases collide.
-            if item.column in seen_columns or matched_alias in occupied_aliases:
-                continue
-            selected.append(
-                ExtractedFilter(
-                    column=item.column,
-                    operator="=",
-                    value=item.value,
-                    label=f"{item.domain} = {item.value}",
-                    source="value_dictionary",
-                )
-            )
-            seen_columns.add(item.column)
-            occupied_aliases.add(matched_alias)
-            occupied_aliases.add(value_key)
-            if len(selected) >= limit:
-                break
-        return selected
+    def match(
+        self, question: str, *, limit: int = 8, pack: Any | None = None
+    ) -> list[ExtractedFilter]:
+        """Mandatory filters for every business value named in the question."""
+        return self.resolve(question, pack=pack).filters()[:limit]
+
+
+_RESOLVERS: dict[tuple[int, int], tuple[ValueDictionarySnapshot, Any, EntityResolver]] = {}
+
+
+def resolver_for(snapshot: ValueDictionarySnapshot, pack: Any | None = None) -> EntityResolver:
+    """One resolver per (dictionary snapshot, pack); both are long-lived cached objects."""
+    key = (id(snapshot), id(pack))
+    cached = _RESOLVERS.get(key)
+    if cached is not None and cached[0] is snapshot and cached[1] is pack:
+        return cached[2]
+    catalog = catalog_from_domains(domains_for(snapshot.industry, pack), snapshot.values)
+    resolver = EntityResolver(
+        catalog,
+        pack=pack,
+        vocabulary=load_chat_vocabulary(snapshot.industry),
+    )
+    if len(_RESOLVERS) >= 8:
+        _RESOLVERS.clear()
+    _RESOLVERS[key] = (snapshot, pack, resolver)
+    return resolver
 
 
 AUTOMOTIVE_DOMAINS: tuple[ValueDomain, ...] = (
@@ -113,9 +112,6 @@ INSURANCE_DOMAINS: tuple[ValueDomain, ...] = (
 )
 
 _CACHE: TTLCache[ValueDictionarySnapshot] = TTLCache(ttl_seconds=1800, max_entries=4)
-_GENERIC_SUFFIXES = re.compile(
-    r"\b(metro|metropolitan|hub|belt|circle|coast|coastal|central|west|east|north|south|city)\b"
-)
 
 
 def domains_for(industry: Industry, pack: Any | None = None) -> tuple[ValueDomain, ...]:
@@ -195,16 +191,3 @@ async def get_value_dictionary(
         return ValueDictionarySnapshot(industry=industry, values=values)
 
     return await _CACHE.get_or_set(industry.value, load)
-
-
-def _normalize(value: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[^\w]+", " ", value.casefold())).strip()
-
-
-def _aliases(value: str) -> set[str]:
-    normalized = _normalize(value)
-    aliases = {normalized}
-    simplified = re.sub(r"\s+", " ", _GENERIC_SUFFIXES.sub(" ", normalized)).strip()
-    if len(simplified) >= 3:
-        aliases.add(simplified)
-    return aliases

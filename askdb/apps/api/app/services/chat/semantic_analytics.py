@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core.config import Industry
-from app.services.chat.question_understanding import QuestionPlan
+from app.services.chat.question_understanding import QuestionPlan, filter_predicate
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +88,7 @@ _AUTOMOTIVE_DIMENSIONS = {
         "year",
     ),
     "car_type": DimensionSpec("car_type", "dim_carline", "car_type", "car_type"),
+    "engine_type": DimensionSpec("engine_type", "dim_carline", "engine_type", "engine_type"),
     "colour": DimensionSpec("colour", "dim_color", "colour_name", "colour_name"),
     "make": DimensionSpec("make", "dim_carline", "make", "make"),
     "model": DimensionSpec("model", "dim_carline", "model", "model"),
@@ -331,10 +332,10 @@ def _where_clauses(plan: QuestionPlan, pack: Any, required_tables: set[str]) -> 
         table = _model_tables(pack)[logical]
         if column not in (getattr(table, "columns", {}) or {}):
             raise SemanticCompileError(f"Filter column '{filt.column}' is not in semantic pack")
-        if filt.operator not in {"=", "!=", "<>", ">", ">=", "<", "<="}:
-            raise SemanticCompileError(f"Unsupported filter operator '{filt.operator}'")
-        value = filt.value.replace("'", "''")
-        clauses.append(f"{_ALIASES[logical]}.{column} {filt.operator} '{value}'")
+        try:
+            clauses.append(filter_predicate(f"{_ALIASES[logical]}.{column}", filt))
+        except ValueError as exc:
+            raise SemanticCompileError(str(exc)) from exc
     if plan.year_filter and plan.industry is Industry.AUTOMOTIVE:
         clauses.append(f"f.sales_date IS NOT NULL AND EXTRACT(YEAR FROM f.sales_date)::int = {int(plan.year_filter)}")
     return clauses

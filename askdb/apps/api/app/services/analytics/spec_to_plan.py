@@ -212,16 +212,22 @@ def spec_to_plan(spec: AnalyticsSpec, industry: Industry, pack: Any | None) -> Q
         if not filt.values:
             continue
         column = _domain_column(filt.domain, pack, industry)
-        for value in filt.values:
-            filters.append(
-                ExtractedFilter(
-                    column=column,
-                    operator=filt.operator or "=",
-                    value=value,
-                    label=f"{filt.domain} = {value}",
-                    source="analytics_builder",
-                )
+        values = tuple(dict.fromkeys(filt.values))
+        multi = len(values) > 1
+        filters.append(
+            ExtractedFilter(
+                column=column,
+                operator="IN" if multi else (filt.operator or "="),
+                value=values[0],
+                label=(
+                    f"{filt.domain} in ({', '.join(values)})"
+                    if multi
+                    else f"{filt.domain} = {values[0]}"
+                ),
+                source="analytics_builder",
+                values=values if multi else (),
             )
+        )
 
     entity: EntityKind = "metric_only"
     if "dealer" in dimensions:
@@ -288,7 +294,13 @@ def plan_to_builder_spec(plan: QuestionPlan, pack: Any | None = None) -> Analyti
             if key == leaf or alias == leaf:
                 domain = alias if alias in {"region", "city", "make", "car_type", "colour"} else key
                 break
-        filters.append(AnalyticsFilterSpec(domain=domain, values=[filt.value], operator=filt.operator))
+        filters.append(
+            AnalyticsFilterSpec(
+                domain=domain,
+                values=list(filt.all_values),
+                operator="=" if filt.operator.upper() == "IN" else filt.operator,
+            )
+        )
 
     return Spec(
         metrics=[measure],

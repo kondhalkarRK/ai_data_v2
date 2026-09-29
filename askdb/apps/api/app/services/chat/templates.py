@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.core.config import Industry
 from app.services.chat.question_understanding import (
     QuestionPlan,
+    filter_predicate,
     understand_question,
 )
 from app.services.chat.semantic_analytics import (
@@ -22,6 +23,8 @@ class TemplateHit:
     title: str
     glossary_matches: int
     path: str = "template"
+    # Wide comparison results chart one series per compared value.
+    series: tuple[str, ...] = ()
 
 
 def list_templates(industry: Industry) -> list[TemplateHit]:
@@ -56,6 +59,11 @@ def resolve_template(
     plan = plan or understand_question(industry, q)
     if plan.is_ambiguous:
         return None
+
+    if industry is Industry.AUTOMOTIVE:
+        special = _automotive_business_shape(plan)
+        if special is not None:
+            return special
 
     # Rich plans must be compiled before narrow legacy templates get a chance to
     # collapse the grain (for example month + car type + colour -> month only).
@@ -143,7 +151,7 @@ def _automotive_filter_parts(
         if alias not in aliases:
             joins.append(join)
             aliases.add(alias)
-        clauses.append(f"{alias}.{column} {filt.operator} {_sql_literal(filt.value)}")
+        clauses.append(filter_predicate(f"{alias}.{column}", filt))
     if plan.year_filter:
         clauses.append(f"EXTRACT(YEAR FROM f.sales_date)::int = {int(plan.year_filter)}")
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
@@ -160,7 +168,7 @@ def _governed_automotive(plan: QuestionPlan) -> TemplateHit | None:
         return _growth_sql(plan)
     if plan.year_filter or "year" in plan.dimensions:
         if plan.metric in {"revenue", "orders", "units", "average_selling_price"}:
-            return _dimension_breakdown_sql(plan)
+            return _dimension_breakdown_sql(plan if plan.dimensions else _with_month(plan))
     if plan.entity != "metric_only":
         return None
     if plan.metric not in {"revenue", "orders", "units", "average_selling_price"}:
@@ -277,6 +285,11 @@ _DIM_EXPR: dict[str, tuple[str, str, str | None]] = {
         "car_type",
         "JOIN automotive.dim_carline c ON c.carline_id = f.carline_id",
     ),
+    "engine_type": (
+        "c.engine_type",
+        "engine_type",
+        "JOIN automotive.dim_carline c ON c.carline_id = f.carline_id",
+    ),
     "model": (
         "c.model",
         "model",
@@ -295,8 +308,24 @@ _DIM_EXPR: dict[str, tuple[str, str, str | None]] = {
 }
 
 
-def _dimension_breakdown_sql(plan: QuestionPlan) -> TemplateHit | None:
-    dims = [key for key in plan.dimensions if key in _DIM_EXPR] or ["month"]
+_TIME_KEYS = ("year", "quarter", "month")
+_TREND_MONTHS = 24
+# Monthly trends without a year show the latest window, not the oldest rows.
+_RECENT_MONTHS = (
+    "f.sales_date >= (SELECT date_trunc('month', MAX(latest.sales_date)) "
+    f"FROM automotive.fact_sales latest) - INTERVAL '{_TREND_MONTHS - 1} months'"
+)
+_FILTER_KEY_COLUMN = {
+    "make": "make",
+    "model": "model",
+    "car_type": "car_type",
+    "engine_type": "engine_type",
+    "city": "city",
+    "region": "region_name",
+}
+
+
+def _dimension_joins(dims: list[str]) -> tuple[list[str], list[str], set[str]]:
     selects: list[str] = []
     joins: list[str] = []
     aliases: set[str] = set()
@@ -311,13 +340,32 @@ def _dimension_breakdown_sql(plan: QuestionPlan) -> TemplateHit | None:
                 aliases.add("c")
             if " dim_dealer " in f" {join} ":
                 aliases.add("d")
+    return selects, joins, aliases
+
+
+def _where_with(where: str, *predicates: str) -> str:
+    parts = [where.removeprefix("WHERE ")] if where else []
+    parts.extend(predicate for predicate in predicates if predicate)
+    return "WHERE " + " AND ".join(parts) if parts else ""
+
+
+def _dimension_breakdown_sql(plan: QuestionPlan) -> TemplateHit | None:
+    dims = [key for key in plan.dimensions if key in _DIM_EXPR] or ["month"]
+    selects, joins, aliases = _dimension_joins(dims)
     extra_joins, where = _automotive_filter_parts(plan, base_aliases=aliases)
     for join in extra_joins:
         if join not in joins:
             joins.append(join)
     metrics, order_alias = _order_metric(plan.metric if plan.metric != "unknown" else "revenue")
-    chronological = any(key in dims for key in ("year", "quarter", "month"))
-    order = "1" if chronological else f"{order_alias} {plan.order_direction.upper()}"
+    chronological = any(key in dims for key in _TIME_KEYS)
+    if "month" in dims and not plan.year_filter:
+        where = _where_with(where, _RECENT_MONTHS)
+    order = (
+        ", ".join(str(i) for i in range(1, len(selects) + 1))
+        if chronological
+        else f"{order_alias} {plan.order_direction.upper()}"
+    )
+    limit = 100 if chronological else max(1, min(plan.limit or 36, 100))
     title_dims = ", ".join(alias for _expr, alias, _join in (_DIM_EXPR[key] for key in dims))
     return TemplateHit(
         title=f"{order_alias.replace('_', ' ').title()} by {title_dims}",
@@ -331,7 +379,143 @@ FROM automotive.fact_sales f
 {where}
 GROUP BY {", ".join(str(i) for i in range(1, len(selects) + 1))}
 ORDER BY {order}
-LIMIT {max(1, min(plan.limit or 36, 100))}
+LIMIT {limit}
+""".strip(),
+    )
+
+
+def _automotive_business_shape(plan: QuestionPlan) -> TemplateHit | None:
+    """Market share and side-by-side comparisons need shapes the compiler lacks."""
+    if plan.metric not in {"revenue", "units", "orders", "average_selling_price"}:
+        return None
+    if plan.analysis == "market_share":
+        return _market_share_sql(plan)
+    if plan.intent == "comparison" and plan.analysis in {"basic", "breakdown"}:
+        return _comparison_pivot_sql(plan)
+    return None
+
+
+def _market_share_sql(plan: QuestionPlan) -> TemplateHit | None:
+    time_keys = [key for key in plan.dimensions if key in _TIME_KEYS][:1]
+    share_key = next(
+        (key for key in plan.dimensions if key in _FILTER_KEY_COLUMN and key not in _TIME_KEYS),
+        "make",
+    )
+    share_column = _FILTER_KEY_COLUMN[share_key]
+    focus = [f for f in plan.filters if f.column.rsplit(".", 1)[-1] == share_column]
+    scoped = replace(plan, filters=[f for f in plan.filters if f not in focus])
+    dims = [*time_keys, share_key]
+    selects, joins, aliases = _dimension_joins(dims)
+    extra_joins, where = _automotive_filter_parts(scoped, base_aliases=aliases)
+    for join in extra_joins:
+        if join not in joins:
+            joins.append(join)
+    if "month" in time_keys and not plan.year_filter:
+        where = _where_with(where, _RECENT_MONTHS)
+    metric = "revenue" if plan.metric == "revenue" else "units_sold"
+    dim_aliases = [_DIM_EXPR[key][1] for key in dims]
+    time_aliases = dim_aliases[:-1]
+    share_alias = dim_aliases[-1]
+    partition = f"PARTITION BY {', '.join(time_aliases)}" if time_aliases else ""
+    outer_where = ""
+    if focus:
+        values = [value for f in focus for value in f.all_values]
+        outer_where = f"WHERE {share_alias} IN ({', '.join(_sql_literal(v) for v in values)})"
+    order = ", ".join([*time_aliases, "market_share_pct DESC"])
+    group_cols = ", ".join(str(i) for i in range(1, len(selects) + 1))
+    return TemplateHit(
+        title=f"Market share by {share_alias.replace('_', ' ')} ({metric.replace('_', ' ')})",
+        glossary_matches=3,
+        path="semantic_compiler",
+        sql=f"""
+WITH base AS (
+  SELECT {", ".join(selects)},
+         SUM(f.order_qty) AS units_sold,
+         SUM(f.total_sales) AS revenue
+  FROM automotive.fact_sales f
+  {chr(10).join(joins)}
+  {where}
+  GROUP BY {group_cols}
+), shared AS (
+  SELECT base.*,
+         100.0 * {metric} / NULLIF(SUM({metric}) OVER ({partition}), 0) AS market_share_pct
+  FROM base
+)
+SELECT {", ".join(dim_aliases)}, market_share_pct, units_sold, revenue
+FROM shared
+{outer_where}
+ORDER BY {order}
+LIMIT 100
+""".strip(),
+    )
+
+
+_PIVOT_METRIC = {
+    "revenue": ("SUM(f.total_sales) FILTER (WHERE {cond})", "revenue"),
+    "units": ("SUM(f.order_qty) FILTER (WHERE {cond})", "units_sold"),
+    "orders": ("COUNT(DISTINCT f.order_id) FILTER (WHERE {cond})", "orders"),
+    "average_selling_price": (
+        "SUM(f.total_sales) FILTER (WHERE {cond}) / "
+        "NULLIF(SUM(f.order_qty) FILTER (WHERE {cond}), 0)",
+        "average_selling_price",
+    ),
+}
+
+
+def _column_slug(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
+    return slug if slug and not slug[0].isdigit() else f"v_{slug}"
+
+
+def _comparison_pivot_sql(plan: QuestionPlan) -> TemplateHit | None:
+    """One column per compared value over time: year | mg_revenue | maruti_suzuki_revenue."""
+    time_keys = [key for key in plan.dimensions if key in _TIME_KEYS]
+    other = [key for key in plan.dimensions if key not in _TIME_KEYS]
+    if len(time_keys) != 1 or len(other) != 1 or other[0] not in _FILTER_KEY_COLUMN:
+        return None
+    compare_key = other[0]
+    column = _FILTER_KEY_COLUMN[compare_key]
+    compared = next(
+        (
+            f
+            for f in plan.filters
+            if f.column.rsplit(".", 1)[-1] == column and len(f.all_values) > 1
+        ),
+        None,
+    )
+    if compared is None or len(compared.all_values) > 6:
+        return None
+    expr, _alias, join = _DIM_EXPR[compare_key]
+    selects, joins, aliases = _dimension_joins(time_keys)
+    if join and join not in joins:
+        joins.append(join)
+        aliases.add("r" if " dim_region " in f" {join} " else "c")
+    extra_joins, where = _automotive_filter_parts(plan, base_aliases=aliases)
+    for extra in extra_joins:
+        if extra not in joins:
+            joins.append(extra)
+    if "month" in time_keys and not plan.year_filter:
+        where = _where_with(where, _RECENT_MONTHS)
+    template, suffix = _PIVOT_METRIC[plan.metric]
+    series: list[str] = []
+    for value in compared.all_values:
+        name = f"{_column_slug(value)}_{suffix}"
+        series.append(name)
+        selects.append(f"{template.format(cond=f'{expr} = {_sql_literal(value)}')} AS {name}")
+    time_alias = _DIM_EXPR[time_keys[0]][1]
+    return TemplateHit(
+        title=f"{' vs '.join(compared.all_values)} — {suffix.replace('_', ' ')} by {time_alias}",
+        glossary_matches=3,
+        path="semantic_compiler",
+        series=tuple(series),
+        sql=f"""
+SELECT {(',' + chr(10) + '       ').join(selects)}
+FROM automotive.fact_sales f
+{chr(10).join(joins)}
+{where}
+GROUP BY 1
+ORDER BY 1
+LIMIT 100
 """.strip(),
     )
 
@@ -547,7 +731,7 @@ def _insurance_filter_parts(
         table, _, column = filt.column.rpartition(".")
         if table == "insurance.fact_claims":
             if fact_alias == "c":
-                clauses.append(f"c.{column} {filt.operator} {_sql_literal(filt.value)}")
+                clauses.append(filter_predicate(f"c.{column}", filt))
             continue
         mapping = joins_by_table.get(table)
         if mapping is None:
@@ -559,7 +743,7 @@ def _insurance_filter_parts(
             aliases.add(alias)
             if " dim_policy po " in f" {join} ":
                 aliases.add("po")
-        clauses.append(f"{alias}.{column} {filt.operator} {_sql_literal(filt.value)}")
+        clauses.append(filter_predicate(f"{alias}.{column}", filt))
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     return joins, where
 

@@ -33,6 +33,7 @@ export function ResultChart({
   yKey: initialY,
   rows,
   columns,
+  series,
   anomalies = [],
   className,
   initialType = "bar",
@@ -42,6 +43,7 @@ export function ResultChart({
   yKey: string;
   rows: Array<Record<string, unknown>>;
   columns?: string[];
+  series?: string[];
   anomalies?: AnomalyMarker[];
   className?: string;
   initialType?: ChartKind;
@@ -63,6 +65,12 @@ export function ResultChart({
   );
   const [chartType, setChartType] = React.useState<ChartKind>(initialType);
   const [hover, setHover] = React.useState<number | null>(null);
+  const seriesKeys = React.useMemo(
+    () => (series ?? []).filter((key) => numericKeys.includes(key)),
+    [series, numericKeys],
+  );
+  const [showAll, setShowAll] = React.useState(true);
+  const multi = showAll && seriesKeys.length > 1 && chartType !== "pie";
 
   React.useEffect(() => {
     if (keys.includes(initialX)) setXKey(initialX);
@@ -97,7 +105,7 @@ export function ResultChart({
     <div className={cn("space-y-3", className)}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold tracking-tight">
-          {yKey.replace(/_/g, " ")} by {xKey.replace(/_/g, " ")}
+          {multi ? seriesKeys.map(prettyKey).join(" vs ") : prettyKey(yKey)} by {prettyKey(xKey)}
         </p>
         <p className="text-[10px] text-muted-foreground">Hover a point for exact values</p>
       </div>
@@ -112,9 +120,16 @@ export function ResultChart({
         <FieldSelect
           id="chart-y"
           label="Y Axis"
-          value={yKey}
-          options={numericKeys.length ? numericKeys : keys}
-          onChange={setYKey}
+          value={multi ? ALL_SERIES : yKey}
+          options={[
+            ...(seriesKeys.length > 1 ? [ALL_SERIES] : []),
+            ...(numericKeys.length ? numericKeys : keys),
+          ]}
+          labels={{ [ALL_SERIES]: "All series" }}
+          onChange={(value) => {
+            setShowAll(value === ALL_SERIES);
+            if (value !== ALL_SERIES) setYKey(value);
+          }}
         />
         {hideTypeSelect ? null : (
           <FieldSelect
@@ -128,7 +143,14 @@ export function ResultChart({
         )}
       </div>
 
-      {chartType === "pie" ? (
+      {multi ? (
+        <MultiSeriesChart
+          rows={rows.slice(0, 48)}
+          xKey={xKey}
+          seriesKeys={seriesKeys}
+          chartType={chartType as Exclude<ChartKind, "pie">}
+        />
+      ) : chartType === "pie" ? (
         <PieChart points={points} hover={hover} setHover={setHover} yKey={yKey} />
       ) : (
         <CartesianChart
@@ -141,6 +163,155 @@ export function ResultChart({
           anomalies={anomalies}
         />
       )}
+    </div>
+  );
+}
+
+const ALL_SERIES = "__all_series__";
+
+const SERIES_PALETTE = [
+  CHART_SERIES.primary,
+  CHART_SERIES.secondary,
+  CHART_SERIES.positive,
+  CHART_SERIES.attention,
+  CHART_SERIES.ai,
+  CHART_SERIES.muted,
+];
+
+function prettyKey(key: string): string {
+  return key.replace(/_/g, " ");
+}
+
+function numberOf(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function MultiSeriesChart({
+  rows,
+  xKey,
+  seriesKeys,
+  chartType,
+}: {
+  rows: Array<Record<string, unknown>>;
+  xKey: string;
+  seriesKeys: string[];
+  chartType: Exclude<ChartKind, "pie">;
+}) {
+  const [hover, setHover] = React.useState<number | null>(null);
+  const width = 640;
+  const height = 260;
+  const pad = { top: 28, right: 16, bottom: 52, left: 58 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const maxY = Math.max(1, ...rows.flatMap((row) => seriesKeys.map((key) => numberOf(row[key]))));
+  const slot = plotW / Math.max(rows.length, 1);
+  const barW = Math.max(3, (slot - 6) / seriesKeys.length);
+  const cx = (index: number) => pad.left + index * slot + slot / 2;
+  const cy = (value: number) => pad.top + (1 - value / maxY) * plotH;
+
+  return (
+    <div className="relative w-full space-y-2 overflow-x-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[260px] w-full min-w-[320px]">
+        {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+          const y = pad.top + (1 - t) * plotH;
+          return (
+            <g key={t}>
+              <line x1={pad.left} x2={width - pad.right} y1={y} y2={y} stroke="currentColor" className="text-border" />
+              <text x={pad.left - 8} y={y + 3} textAnchor="end" className="fill-muted-foreground text-[10px]">
+                {Math.round(maxY * t).toLocaleString()}
+              </text>
+            </g>
+          );
+        })}
+        {seriesKeys.map((key, s) => {
+          const color = SERIES_PALETTE[s % SERIES_PALETTE.length];
+          if (chartType === "bar") {
+            return rows.map((row, index) => {
+              const value = numberOf(row[key]);
+              const h = (value / maxY) * plotH;
+              return (
+                <rect
+                  key={`${key}-${index}`}
+                  x={pad.left + index * slot + 3 + s * barW}
+                  y={pad.top + plotH - h}
+                  width={Math.max(1, barW - 1)}
+                  height={Math.max(1, h)}
+                  rx={2}
+                  fill={color}
+                  opacity={hover == null || hover === index ? 0.9 : 0.45}
+                />
+              );
+            });
+          }
+          const path = rows
+            .map((row, index) => `${index === 0 ? "M" : "L"} ${cx(index)} ${cy(numberOf(row[key]))}`)
+            .join(" ");
+          return (
+            <g key={key}>
+              {chartType === "area" ? (
+                <path
+                  d={`${path} L ${cx(rows.length - 1)} ${pad.top + plotH} L ${cx(0)} ${pad.top + plotH} Z`}
+                  fill={color}
+                  opacity={0.12}
+                />
+              ) : null}
+              {chartType !== "scatter" ? (
+                <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+              ) : null}
+              {rows.map((row, index) => (
+                <circle
+                  key={index}
+                  cx={cx(index)}
+                  cy={cy(numberOf(row[key]))}
+                  r={chartType === "scatter" ? 4 : hover === index ? 4 : 2.25}
+                  fill={color}
+                />
+              ))}
+            </g>
+          );
+        })}
+        {rows.map((row, index) => (
+          <g key={`x-${index}`}>
+            <rect
+              x={pad.left + index * slot}
+              y={pad.top}
+              width={slot}
+              height={plotH}
+              fill="transparent"
+              onMouseEnter={() => setHover(index)}
+              onMouseLeave={() => setHover(null)}
+            />
+            {index % Math.ceil(rows.length / 6) === 0 ? (
+              <text x={cx(index)} y={height - 22} textAnchor="middle" className="fill-muted-foreground text-[9px]">
+                {String(row[xKey] ?? index).slice(0, 10)}
+              </text>
+            ) : null}
+          </g>
+        ))}
+        <text x={width / 2} y={height - 6} textAnchor="middle" className="fill-muted-foreground text-[10px]">
+          {prettyKey(xKey)}
+        </text>
+      </svg>
+      <ul className="flex flex-wrap gap-3 text-xs">
+        {seriesKeys.map((key, s) => (
+          <li key={key} className="flex items-center gap-1.5">
+            <span
+              className="size-2.5 rounded-sm"
+              style={{ backgroundColor: SERIES_PALETTE[s % SERIES_PALETTE.length] }}
+            />
+            {prettyKey(key)}
+          </li>
+        ))}
+      </ul>
+      {hover != null && rows[hover] ? (
+        <HoverCard
+          title={String(rows[hover]?.[xKey] ?? "")}
+          detail={seriesKeys
+            .map((key) => `${prettyKey(key)}: ${numberOf(rows[hover]?.[key]).toLocaleString()}`)
+            .join(" · ")}
+        />
+      ) : null}
     </div>
   );
 }

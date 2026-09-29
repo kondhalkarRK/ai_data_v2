@@ -10,7 +10,7 @@ import {
 } from "@/components/chat/response-error-state";
 import { InsightSummary } from "@/components/chat/insight-summary";
 import { ResponseTabs } from "@/components/chat/response-tabs";
-import { ResultChart } from "@/components/chat/result-chart";
+import { ResultChart, type ChartKind } from "@/components/chat/result-chart";
 import { SQLViewer } from "@/components/chat/sql-viewer";
 import { SuggestedQuestions } from "@/components/chat/suggested-questions";
 import { TrustIndicators } from "@/components/chat/trust-indicators";
@@ -67,11 +67,12 @@ export function ResponseCard({
     return (
       <ResponseErrorState
         kind={kind}
-        title={failure?.title || "Couldn't run this query"}
+        title="I couldn't answer that yet"
         detail={
-          failure?.reason
-            ? `Reason: ${failure.reason}`
-            : failure?.message || message.error || "Something went wrong."
+          failure?.reason ||
+          failure?.message ||
+          message.error ||
+          "Try rephrasing with a brand, a metric such as revenue or units sold, and a period."
         }
         sql={failure?.sql || message.sql}
         onRetry={failure?.retryable !== false ? onRetry : undefined}
@@ -90,7 +91,7 @@ export function ResponseCard({
       >
         <ResponseErrorState
           kind="ambiguous"
-          title="Your question is ambiguous"
+          title={message.clarificationTitle || "Did you mean…"}
           detail={message.clarification}
           suggestions={message.options}
           onAsk={onAsk}
@@ -151,13 +152,15 @@ export function ResponseCard({
         {execFailed ? (
           <ResponseErrorState
             kind="execution"
-            title="SQL Execution Error"
+            title="This version of the question didn't finish"
             detail={
-              meta?.executionError
-                ? `Reason: ${meta.executionError}`
-                : message.error || "The query did not finish. Try a more specific business question."
+              meta?.executionError ||
+              message.error ||
+              "Try a narrower period or a single brand, or pick one of the suggestions below."
             }
             sql={message.sql}
+            suggestions={meta?.alternateInterpretations?.slice(0, 3)}
+            onAsk={onAsk}
             onRetry={onRetry}
           />
         ) : null}
@@ -187,6 +190,23 @@ export function ResponseCard({
         ) : null}
 
         {meta?.queryPlan ? <QueryPlanNote plan={meta.queryPlan} /> : null}
+
+        {meta && !meta.ambiguityFlag && meta.alternateInterpretations?.length ? (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-medium text-muted-foreground">Did you mean:</span>
+            {meta.alternateInterpretations.map((item) => (
+              <button
+                key={item}
+                type="button"
+                disabled={busy}
+                className="rounded-full border border-border/70 px-2.5 py-1 text-foreground hover:bg-muted/50 disabled:opacity-50"
+                onClick={() => onAsk(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {!execFailed && (message.sql || message.rows?.length || meta) ? (
           <>
@@ -233,6 +253,8 @@ export function ResponseCard({
                     yKey={message.chart?.y ?? message.columns[1]!}
                     rows={message.chart?.points ?? message.rows}
                     columns={message.columns}
+                    series={message.chart?.series}
+                    initialType={chartKind(message.chart?.type)}
                     anomalies={message.chart?.anomalies ?? meta?.anomalies ?? []}
                   />
                 ) : (
@@ -356,10 +378,52 @@ export function ResponseCard({
   );
 }
 
+const METHOD_LABEL: Record<string, string> = {
+  synonym: "synonym",
+  fuzzy: "spelling match",
+  alias: "short name",
+  glossary: "business glossary",
+};
+
+function planSummary(plan: QueryPlanTrace): string[] {
+  const structured = plan.structured;
+  if (!structured) return [];
+  const parts: string[] = [];
+  const brand = Array.isArray(structured.brand) ? structured.brand.join(" vs ") : structured.brand;
+  if (brand) parts.push(brand);
+  if (structured.metric) parts.push(structured.metric.replaceAll("_", " "));
+  const dims = (Array.isArray(structured.dimension) ? structured.dimension : [structured.dimension]).filter(
+    Boolean,
+  );
+  if (dims.length) parts.push(`by ${dims.join(", ").replaceAll("_", " ")}`);
+  for (const item of structured.filters) {
+    if (item.column === "make") continue;
+    parts.push(`${item.column.replaceAll("_", " ")}: ${item.values.join(", ")}`);
+  }
+  if (structured.year) parts.push(String(structured.year));
+  return parts;
+}
+
 function QueryPlanNote({ plan }: { plan: QueryPlanTrace }) {
-  if (!plan.formula && !plan.joins?.length && !plan.filters?.length) return null;
+  const summary = planSummary(plan);
+  const mapped = (plan.resolved ?? []).filter(
+    (item) => item.method !== "exact" && item.text.toLowerCase() !== item.canonical.toLowerCase(),
+  );
+  if (!plan.formula && !plan.joins?.length && !plan.filters?.length && !summary.length) return null;
   return (
     <div className="rounded-xl border border-border/60 bg-muted/15 px-3 py-2 text-xs text-muted-foreground">
+      {summary.length ? (
+        <p>
+          <span className="font-medium text-foreground">Understood as:</span> {summary.join(" · ")}
+        </p>
+      ) : null}
+      {mapped.length ? (
+        <p>
+          {mapped
+            .map((item) => `“${item.text}” → ${item.canonical} (${METHOD_LABEL[item.method] ?? item.method})`)
+            .join(" · ")}
+        </p>
+      ) : null}
       {plan.formula ? (
         <p>
           <span className="font-medium text-foreground">
@@ -372,6 +436,10 @@ function QueryPlanNote({ plan }: { plan: QueryPlanTrace }) {
       {plan.filters?.length ? <p>Filters: {plan.filters.join(", ")}</p> : null}
     </div>
   );
+}
+
+function chartKind(type: string | undefined): ChartKind {
+  return type === "line" || type === "area" || type === "pie" || type === "scatter" ? type : "bar";
 }
 
 function sumTimings(timings: NonNullable<ChatMessage["meta"]>["timings"]): number {
