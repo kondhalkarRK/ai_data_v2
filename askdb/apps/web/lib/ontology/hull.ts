@@ -61,6 +61,19 @@ export function hullToPath(points: Point[]): string {
   );
 }
 
+/** Closed curve through the midpoints of each hull side, rounding every corner into a soft blob. */
+export function smoothHullPath(points: Point[]): string {
+  if (points.length < 3) return hullToPath(points);
+  const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const start = mid(points[points.length - 1]!, points[0]!);
+  let path = `M ${start.x.toFixed(1)} ${start.y.toFixed(1)}`;
+  points.forEach((corner, index) => {
+    const end = mid(corner, points[(index + 1) % points.length]!);
+    path += ` Q ${corner.x.toFixed(1)} ${corner.y.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+  });
+  return `${path} Z`;
+}
+
 export function centroid(points: Point[]): Point {
   if (!points.length) return { x: 0, y: 0 };
   return {

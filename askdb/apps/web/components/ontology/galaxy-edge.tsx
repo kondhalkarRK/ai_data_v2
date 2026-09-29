@@ -33,6 +33,8 @@ export type GalaxyEdgeData = {
   labelT: number;
   glow: boolean;
   motionEnabled: boolean;
+  /** Ontology Map: the relationship joins two business domains. */
+  crossDomain?: boolean;
 };
 
 export type GalaxyFlowEdge = Edge<GalaxyEdgeData, "galaxy">;
@@ -68,12 +70,13 @@ function GalaxyEdgeView({ id, source, target, data, markerEnd }: EdgeProps<Galax
         className={cn(
           "galaxy-edge-path",
           data.glow && "galaxy-edge-path--glow",
+          data.crossDomain && "galaxy-edge-path--cross",
           data.motionEnabled && data.emphasized && !data.dimmed && "galaxy-edge-path--animated",
         )}
         style={
           {
             stroke: data.color,
-            strokeWidth: data.emphasized ? 2.6 : 1.5,
+            strokeWidth: data.emphasized ? 2.8 : data.crossDomain ? 2.1 : 1.5,
             opacity,
             "--edge-color": data.color,
           } as React.CSSProperties

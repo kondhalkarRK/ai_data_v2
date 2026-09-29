@@ -19,13 +19,14 @@ import {
 import { conceptCategory } from "@/lib/ontology/kind-filter";
 
 /** Top-level graph experiences. */
-export type GalaxyMode = "knowledge" | "network" | "simple";
+export type GalaxyMode = "knowledge" | "network" | "simple" | "ontology";
 
 /**
  * knowledge: organic semantic clusters · influence: centrality rings ·
- * grouped: business categories side by side · rollup: top-down hierarchy.
+ * grouped: business categories side by side · rollup: top-down hierarchy ·
+ * ontology: business domains (laid out by lib/ontology/ontology-map).
  */
-export type GraphLayout = "knowledge" | "influence" | "grouped" | "rollup";
+export type GraphLayout = "knowledge" | "influence" | "grouped" | "rollup" | "ontology";
 
 export type CentralityMetric = "degree" | "betweenness" | "pagerank";
 

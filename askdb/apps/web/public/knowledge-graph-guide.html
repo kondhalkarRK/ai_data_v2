@@ -136,6 +136,7 @@
     <a href="#kg">Knowledge Graph</a>
     <a href="#network">Relationship Network</a>
     <a href="#simple">Simple Relationship View</a>
+    <a href="#ontology">Ontology Map</a>
     <a href="#examples">Automobile examples</a>
     <a href="#questions">From map to answer</a>
   </div>
@@ -461,6 +462,33 @@
   </div>
 </section>
 
+<!-- 7b. ONTOLOGY MAP VIEW -->
+<section id="ontology">
+  <div class="wrap">
+    <div class="view-head"><h2>Ontology Map</h2><span class="badge">New</span></div>
+    <p class="lead"><b>Purpose:</b> see the business as <b>domains</b>. Each domain is a community of related concepts inside a soft
+      dashed outline: Vehicle, Sales, Dealer and Geography for automotive; Policy &amp; Customer, Premium, Claims &amp; Risk,
+      Distribution and Geography for insurance. Business glossary terms such as SUV, Sedan, EV, Petrol, Brand and Market Share
+      appear as concepts next to what they classify.</p>
+    <div class="grid g2">
+      <div>
+        <h3 style="margin-top:0">Reading it</h3>
+        <p style="color:var(--muted)">Violet arrows cross from one domain to another. They are the story:
+          <i>Sale → involves → Vehicle</i>, <i>Sale → sold by → Dealer</i>, <i>Dealer → located in → Region</i>.
+          Haloed concepts are the core of the business, and the panel on the right lists them with the strongest domain bridges.</p>
+      </div>
+      <div>
+        <h3 style="margin-top:0">Controls</h3>
+        <p style="color:var(--muted)"><b>Domain pills</b> zoom into one domain and show what connects to it from elsewhere.
+          <b>Search</b> (try "SUV") lights up the concept and its route to the core: SUV → Car Type → Vehicle → Sale → Revenue.
+          <b>Force</b> keeps domains apart, <b>Centrality</b> grows core concepts and pulls them to the middle, <b>Hierarchy</b>
+          draws each domain as a tree.</p>
+      </div>
+    </div>
+    <p><b>Best for:</b> leadership overviews, explaining what the data covers, spotting which business areas depend on each other.</p>
+  </div>
+</section>
+
 <!-- 8. EXAMPLES -->
 <section id="examples">
   <div class="wrap">
@@ -528,7 +556,7 @@
     <h3>Tips for exploring the graph</h3>
     <ul class="tidy">
       <li><b>Click a circle</b> to focus on it; click empty space to reset.</li>
-      <li><b>Pick a view</b> at the top left: Knowledge Graph to explore, Relationship Network to find hubs, Simple Relationship View to read quickly.</li>
+      <li><b>Pick a view</b> at the top left: Knowledge Graph to explore, Relationship Network to find hubs, Simple Relationship View to read quickly, Ontology Map to see business domains.</li>
       <li><b>Use the coloured filters</b> to show only some roles or categories; in the Knowledge Graph add <b>Connected</b> to include their direct neighbours.</li>
       <li><b>Drag circles</b> to tidy a view for a presentation — the arrows follow.</li>
       <li><b>"Business names" / "Technical names"</b> switches between everyday names and the underlying system names for data teams.</li>

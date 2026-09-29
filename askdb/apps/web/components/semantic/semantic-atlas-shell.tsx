@@ -96,7 +96,11 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
             ) : snapshot.isError || !snapshot.data ? (
               <p className="text-sm text-danger">The knowledge graph could not be loaded.</p>
             ) : (
-              <OntologyBrowser snapshot={snapshot.data} initialFocusId={focus} />
+              <OntologyBrowser
+                snapshot={snapshot.data}
+                initialFocusId={focus}
+                glossary={pack.data.glossary.terms}
+              />
             )}
           </div>
         </>

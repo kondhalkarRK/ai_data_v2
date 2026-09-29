@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import * as React from "react";
 
-/** orb: knowledge graph · hub: relationship network · concept: simple relationship view. */
-export type NodeVariant = "orb" | "hub" | "concept";
+/** orb: knowledge graph · hub: relationship network · concept: simple relationship view · ontology: ontology map. */
+export type NodeVariant = "orb" | "hub" | "concept" | "ontology";
 
 export type GalaxyNodeData = OntologyNode & {
   variant: NodeVariant;
@@ -30,6 +30,8 @@ export type GalaxyNodeData = OntologyNode & {
   hop: 1 | 2 | null;
   rank?: number;
   displayLabel?: string;
+  /** One of the most central concepts in the Ontology Map. */
+  core?: boolean;
 };
 
 export type GalaxyFlowNode = Node<GalaxyNodeData, "galaxy">;
@@ -66,6 +68,7 @@ function GalaxyNodeView({ data }: NodeProps<GalaxyFlowNode>) {
       data-dimmed={data.dimmed}
       data-selected={data.selectedConcept}
       data-hop={data.hop ?? undefined}
+      data-core={data.core || undefined}
       style={{ width: data.boxWidth, "--node-color": data.color } as React.CSSProperties}
       title={data.synonyms.length ? `${data.label} — also known as ${data.synonyms.join(", ")}` : data.label}
     >

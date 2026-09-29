@@ -334,6 +334,96 @@
   border-radius: 14px;
 }
 
+/* ───────────── View identity: Ontology Map (business domains as communities) ───────────── */
+
+.galaxy-canvas[data-mode="ontology"] {
+  background:
+    radial-gradient(820px 520px at 50% 45%, color-mix(in oklab, #6366f1 6%, transparent), transparent 70%),
+    hsl(var(--background));
+}
+
+.ontology-domain {
+  transition: opacity 220ms ease;
+}
+
+.ontology-domain[data-dimmed="true"] {
+  opacity: 0.22;
+}
+
+.ontology-domain__zone {
+  fill: color-mix(in oklab, var(--cluster-color) 7%, transparent);
+  stroke: color-mix(in oklab, var(--cluster-color) 62%, transparent);
+  stroke-width: 1.6;
+  stroke-dasharray: 7 7;
+  stroke-linejoin: round;
+}
+
+.ontology-domain__label {
+  fill: color-mix(in oklab, var(--cluster-color) 80%, hsl(var(--foreground)));
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  paint-order: stroke;
+  stroke: hsl(var(--background));
+  stroke-width: 6px;
+  stroke-linejoin: round;
+}
+
+.galaxy-node-shell[data-variant="ontology"] .galaxy-node {
+  border: 2.5px solid hsl(var(--background));
+  background:
+    radial-gradient(circle at 34% 28%, color-mix(in oklab, white 38%, transparent), transparent 52%),
+    var(--node-color);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--node-color) 55%, transparent),
+    0 8px 18px -10px color-mix(in oklab, var(--node-color) 80%, transparent);
+}
+
+.galaxy-node-shell[data-variant="ontology"][data-core="true"] .galaxy-node {
+  box-shadow:
+    0 0 0 1.5px var(--node-color),
+    0 0 0 8px color-mix(in oklab, var(--node-color) 16%, transparent),
+    0 0 30px color-mix(in oklab, var(--node-color) 45%, transparent);
+}
+
+.galaxy-node-shell[data-variant="ontology"][data-selected="true"] .galaxy-node {
+  box-shadow:
+    0 0 0 3px hsl(var(--background)),
+    0 0 0 5px var(--node-color),
+    0 0 32px color-mix(in oklab, var(--node-color) 60%, transparent);
+}
+
+.galaxy-node-shell[data-variant="ontology"] .galaxy-node__caption {
+  font-size: 11px;
+  background: color-mix(in oklab, hsl(var(--background)) 82%, transparent);
+}
+
+.galaxy-node-shell[data-variant="ontology"][data-core="true"] .galaxy-node__caption {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.galaxy-edge-path--cross {
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 3px color-mix(in oklab, var(--edge-color) 55%, transparent));
+}
+
+.ontology-search {
+  height: 28px;
+  width: 15rem;
+  border-radius: 999px;
+  border: 1px solid var(--galaxy-stroke, hsl(var(--border)));
+  background: hsl(var(--background));
+  padding: 0 0.75rem 0 1.9rem;
+  font-size: 12px;
+  outline: none;
+}
+
+.ontology-search:focus {
+  box-shadow: 0 0 0 2px color-mix(in oklab, #6366f1 35%, transparent);
+}
+
 /* ───────────── Toolbar view tabs, panels, minimap ───────────── */
 
 .galaxy-view-tab[data-active="true"] {
@@ -352,6 +442,10 @@
 
 .galaxy-view-tab[data-view="simple"] {
   --view-color: #14b8a6;
+}
+
+.galaxy-view-tab[data-view="ontology"] {
+  --view-color: #6366f1;
 }
 
 .galaxy-view-tab__badge {

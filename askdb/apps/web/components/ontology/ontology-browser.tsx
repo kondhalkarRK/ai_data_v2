@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  GlossaryTerm,
   OntologyEdge,
   OntologyNode,
   OntologySnapshot,
@@ -18,14 +19,25 @@ import {
   type NodeChange,
   type NodeTypes,
 } from "@xyflow/react";
-import { BookOpen, Network, Orbit, Radar, Share2, Tags } from "lucide-react";
+import {
+  BookOpen,
+  Network,
+  Orbit,
+  Radar,
+  Search,
+  Shapes,
+  Share2,
+  Tags,
+} from "lucide-react";
 import * as React from "react";
 
 import {
   ClusterLayer,
+  DomainLayer,
   RingLayer,
   clusterLabelBox,
   clusterZones,
+  organicZones,
 } from "@/components/ontology/cluster-layer";
 import {
   GalaxyEdge,
@@ -54,6 +66,7 @@ import {
   CONCEPT_CATEGORIES,
   categoryMeta,
   conceptCategory,
+  isFactNode,
   nodeMatchesKindFilter,
   nodeMatchesKindFilters,
   type OntologyKindFilter,
@@ -83,6 +96,13 @@ import {
   mergeOntologyConcepts,
   withoutDomainNodes,
 } from "@/lib/ontology/merge-concepts";
+import {
+  buildOntologyMap,
+  coreConcepts,
+  layoutOntologyMap,
+  searchOntology,
+  type OntologyMapStyle,
+} from "@/lib/ontology/ontology-map";
 import { cn } from "@/lib/utils";
 
 const nodeTypes: NodeTypes = { galaxy: GalaxyNode };
@@ -114,7 +134,38 @@ const MODES: ReadonlyArray<{
     hint: "Every business concept once, every relationship labelled. The quickest way to read the model.",
     icon: Share2,
   },
+  {
+    id: "ontology",
+    label: "Ontology Map",
+    badge: "New",
+    hint: "Business domains as communities: what areas exist, which concepts matter most, and how the areas connect.",
+    icon: Shapes,
+  },
 ];
+
+const MAP_STYLES: ReadonlyArray<{
+  id: OntologyMapStyle;
+  label: string;
+  hint: string;
+}> = [
+  {
+    id: "force",
+    label: "Force",
+    hint: "Each business domain settles into its own community.",
+  },
+  {
+    id: "centrality",
+    label: "Centrality",
+    hint: "Core concepts grow and move to the middle, where domains meet.",
+  },
+  {
+    id: "hierarchy",
+    label: "Hierarchy",
+    hint: "Each domain as a tree: its most central concept on top.",
+  },
+];
+
+const CROSS_DOMAIN_COLOR = "#8b5cf6";
 
 const SIMPLE_LAYOUTS: ReadonlyArray<{
   id: GraphLayout;
@@ -176,18 +227,20 @@ const MODE_HINT: Record<GalaxyMode, string> = {
   knowledge: "Click a concept to expand its neighbourhood two steps out",
   network: "Centre = most central concept · outer rings = less central",
   simple: "Each business concept once, grouped by category · every relationship labelled",
+  ontology: "Pick a domain or search a concept · violet links connect two domains",
 };
 
 const VARIANT: Record<GalaxyMode, NodeVariant> = {
   knowledge: "orb",
   network: "hub",
   simple: "concept",
+  ontology: "ontology",
 };
 
 type Geometry = { diameter: number; boxWidth: number };
 
 function geometryOf(node: PositionedNode, mode: GalaxyMode): Geometry {
-  const min = mode === "network" ? 34 : 40;
+  const min = mode === "ontology" ? 26 : mode === "network" ? 34 : 40;
   const diameter = Math.round(Math.min(110, Math.max(min, node.radius * 2)));
   return { diameter, boxWidth: Math.max(diameter, node.captionWidth) };
 }
@@ -230,18 +283,29 @@ function focusOf(
   return { hop1, hop2, edges1, edges2 };
 }
 
+function ontologyIcon(node: OntologyNode): string {
+  if (isFactNode(node)) return "events";
+  if (node.kind === "measure") return "kpis";
+  if (node.kind === "dimension") return "attribute";
+  return "entities";
+}
+
 export function OntologyBrowser({
   snapshot,
   initialFocusId,
+  glossary,
 }: {
   snapshot: OntologySnapshot;
   initialFocusId?: string | null;
+  /** Business glossary terms; the Ontology Map adds them as concepts. */
+  glossary?: Record<string, GlossaryTerm>;
 }) {
   return (
     <ReactFlowProvider>
       <OntologyBrowserInner
         snapshot={snapshot}
         initialFocusId={initialFocusId}
+        glossary={glossary}
       />
     </ReactFlowProvider>
   );
@@ -250,9 +314,11 @@ export function OntologyBrowser({
 function OntologyBrowserInner({
   snapshot,
   initialFocusId,
+  glossary,
 }: {
   snapshot: OntologySnapshot;
   initialFocusId?: string | null;
+  glossary?: Record<string, GlossaryTerm>;
 }) {
   const { fitView, setCenter, getZoom } = useReactFlow();
   const [mode, setMode] = React.useState<GalaxyMode>("knowledge");
@@ -270,16 +336,23 @@ function OntologyBrowserInner({
     OntologyKindFilter[]
   >(["all"]);
   const [overlay, setOverlay] = React.useState<ContextOverlay>("business");
+  const [mapStyle, setMapStyle] = React.useState<OntologyMapStyle>("force");
+  const [domainFocus, setDomainFocus] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
 
   const isSimple = mode === "simple";
+  const isOntology = mode === "ontology";
   const layout: GraphLayout =
     mode === "knowledge"
       ? "knowledge"
       : mode === "network"
         ? "influence"
-        : simpleLayout;
+        : isOntology
+          ? "ontology"
+          : simpleLayout;
   const zonesVisible =
     showZones && (layout === "knowledge" || layout === "grouped");
+  const domainsVisible = showZones && isOntology;
   const labelsVisible = isSimple || showLabels;
 
   const knowledgeGraph = React.useMemo(
@@ -290,24 +363,50 @@ function OntologyBrowserInner({
     () => mergeOntologyConcepts(withoutDomainNodes(snapshot)),
     [snapshot],
   );
-  const graph = isSimple ? simpleGraph : knowledgeGraph;
+  const ontologyMap = React.useMemo(
+    () => buildOntologyMap(snapshot, glossary),
+    [snapshot, glossary],
+  );
+  const graph = isOntology
+    ? ontologyMap.graph
+    : isSimple
+      ? simpleGraph
+      : knowledgeGraph;
+
+  const domainLabel = React.useMemo(
+    () => new Map(ontologyMap.domains.map((domain) => [domain.id, domain.label])),
+    [ontologyMap.domains],
+  );
+  const cores = React.useMemo(
+    () => coreConcepts(ontologyMap.graph, 5),
+    [ontologyMap.graph],
+  );
 
   const categoryOf = React.useCallback(
     (node: OntologyNode) =>
-      isSimple ? conceptCategory(node) : knowledgeCategory(node),
-    [isSimple],
+      isOntology
+        ? ontologyIcon(node)
+        : isSimple
+          ? conceptCategory(node)
+          : knowledgeCategory(node),
+    [isSimple, isOntology],
   );
   const categoryLabelOf = React.useCallback(
     (node: OntologyNode) =>
-      isSimple
-        ? categoryMeta(conceptCategory(node)).label
-        : knowledgeMeta(knowledgeCategory(node)).label,
-    [isSimple],
+      isOntology
+        ? `${domainLabel.get(node.cluster) ?? "Other"} domain`
+        : isSimple
+          ? categoryMeta(conceptCategory(node)).label
+          : knowledgeMeta(knowledgeCategory(node)).label,
+    [isSimple, isOntology, domainLabel],
   );
 
   const positioned = React.useMemo(
-    () => layoutGalaxy(graph, layout, metric),
-    [graph, layout, metric],
+    () =>
+      isOntology
+        ? layoutOntologyMap(ontologyMap, mapStyle)
+        : layoutGalaxy(graph, layout, metric),
+    [isOntology, ontologyMap, mapStyle, graph, layout, metric],
   );
 
   // Dragged positions belong to one layout; switching view starts from a clean layout.
@@ -342,20 +441,26 @@ function OntologyBrowserInner({
   );
 
   const edgeColor = React.useCallback(
-    (edge: OntologyEdge) =>
-      isSimple
+    (edge: OntologyEdge) => {
+      if (isOntology) {
+        return ontologyMap.crossEdges.has(edge.id)
+          ? CROSS_DOMAIN_COLOR
+          : (nodeById.get(edge.source)?.clusterColor ?? "#94a3b8");
+      }
+      return isSimple
         ? EDGE_STYLES[edgeVisualKind(edge, nodeById)].color
-        : KNOWLEDGE_EDGE_STYLES[knowledgeEdgeKind(edge, nodeById)].color,
-    [isSimple, nodeById],
+        : KNOWLEDGE_EDGE_STYLES[knowledgeEdgeKind(edge, nodeById)].color;
+    },
+    [isOntology, isSimple, nodeById, ontologyMap.crossEdges],
   );
 
   const edgeLabel = React.useCallback(
     (edge: OntologyEdge) =>
       storyLabel(edge, overlay) ||
-      (isSimple
+      (isSimple || isOntology
         ? EDGE_STYLES[edgeVisualKind(edge, nodeById)].label
         : KNOWLEDGE_EDGE_STYLES[knowledgeEdgeKind(edge, nodeById)].label),
-    [overlay, isSimple, nodeById],
+    [overlay, isSimple, isOntology, nodeById],
   );
 
   const baseCurve =
@@ -365,7 +470,11 @@ function OntologyBrowserInner({
         ? 0.08
         : layout === "knowledge"
           ? 0.22
-          : 0.16;
+          : layout === "ontology"
+            ? mapStyle === "hierarchy"
+              ? 0.1
+              : 0.2
+            : 0.16;
 
   const labelPlacement = React.useMemo(() => {
     const byId = new Map(positioned.map((node) => [node.id, node]));
@@ -380,6 +489,10 @@ function OntologyBrowserInner({
     });
     if (zonesVisible) {
       for (const zone of clusterZones(graph.clusters, positioned))
+        obstacles.push(clusterLabelBox(zone));
+    }
+    if (domainsVisible) {
+      for (const zone of organicZones(graph.clusters, positioned))
         obstacles.push(clusterLabelBox(zone));
     }
     const inputs = graph.edges.flatMap((edge) => {
@@ -406,6 +519,7 @@ function OntologyBrowserInner({
     graph.clusters,
     edgeLabel,
     zonesVisible,
+    domainsVisible,
     baseCurve,
   ]);
 
@@ -417,7 +531,45 @@ function OntologyBrowserInner({
     [selectedId, graph.edges, mode],
   );
 
+  const searchResult = React.useMemo(
+    () => (isOntology ? searchOntology(graph, search, cores) : null),
+    [isOntology, graph, search, cores],
+  );
+
+  /** Ontology Map emphasis: a search wins over a focused domain. */
+  const highlight = React.useMemo(() => {
+    if (!isOntology) return null;
+    if (searchResult) {
+      return {
+        strong: searchResult.matches,
+        near: searchResult.related,
+        edges: searchResult.edges,
+        quiet: new Set<string>(),
+      };
+    }
+    if (!domainFocus) return null;
+    const strong = new Set(
+      graph.nodes.filter((node) => node.cluster === domainFocus).map((node) => node.id),
+    );
+    const near = new Set(strong);
+    // Links out of the domain are the story; links inside it stay visible but unlabelled.
+    const edges = new Set<string>();
+    const quiet = new Set<string>();
+    for (const edge of graph.edges) {
+      const touches = strong.has(edge.source) || strong.has(edge.target);
+      if (!touches) continue;
+      if (ontologyMap.crossEdges.has(edge.id)) edges.add(edge.id);
+      else quiet.add(edge.id);
+      near.add(edge.source);
+      near.add(edge.target);
+    }
+    return { strong, near, edges, quiet };
+  }, [isOntology, searchResult, domainFocus, graph, ontologyMap.crossEdges]);
+
+  const coreIds = React.useMemo(() => new Set(cores), [cores]);
+
   const visibleIds = React.useMemo(() => {
+    if (isOntology) return null;
     if (isSimple) {
       if (simpleFilters.includes("all")) return null;
       return new Set(
@@ -427,23 +579,28 @@ function OntologyBrowserInner({
       );
     }
     return knowledgeVisibleIds(graph, knowledgeFilters);
-  }, [isSimple, simpleFilters, knowledgeFilters, graph]);
+  }, [isOntology, isSimple, simpleFilters, knowledgeFilters, graph]);
 
   const flowNodes: GalaxyFlowNode[] = React.useMemo(
     () =>
       live.map((node) => {
         const geo = geometry.get(node.id)!;
         const selected = node.id === selectedId;
+        const highlighted = !focus && Boolean(highlight?.strong.has(node.id));
         const hop = focus?.hop1.has(node.id)
           ? 1
           : focus?.hop2.has(node.id)
             ? 2
-            : null;
+            : !focus && highlight?.near.has(node.id) && !highlighted
+              ? 1
+              : null;
         const dimmed = focus
           ? !selected && hop === null
-          : visibleIds
-            ? !visibleIds.has(node.id)
-            : false;
+          : highlight
+            ? !highlight.near.has(node.id)
+            : visibleIds
+              ? !visibleIds.has(node.id)
+              : false;
         return {
           id: node.id,
           type: "galaxy",
@@ -461,12 +618,13 @@ function OntologyBrowserInner({
             diameter: geo.diameter,
             boxWidth: geo.boxWidth,
             dimmed,
-            selectedConcept: selected,
+            selectedConcept: selected || (highlighted && Boolean(searchResult)),
             hop,
             rank: rankById.get(node.id),
             displayLabel: displayName(node, overlay),
+            core: isOntology && mapStyle !== "hierarchy" && coreIds.has(node.id),
           },
-          zIndex: selected
+          zIndex: selected || highlighted
             ? 30
             : hop === 1
               ? 20
@@ -487,6 +645,11 @@ function OntologyBrowserInner({
       categoryOf,
       rankById,
       overlay,
+      highlight,
+      searchResult,
+      isOntology,
+      mapStyle,
+      coreIds,
     ],
   );
 
@@ -498,11 +661,18 @@ function OntologyBrowserInner({
           (isSimple
             ? visibleIds.has(edge.source) || visibleIds.has(edge.target)
             : visibleIds.has(edge.source) && visibleIds.has(edge.target));
+        const crossDomain = isOntology && ontologyMap.crossEdges.has(edge.id);
         const emphasized = focus
           ? focus.edges1.has(edge.id)
-          : Boolean(visibleIds) && touchesFilter;
+          : highlight
+            ? highlight.edges.has(edge.id)
+            : Boolean(visibleIds) && touchesFilter;
         const secondary = Boolean(focus?.edges2.has(edge.id));
-        const dimmed = focus ? !emphasized && !secondary : !touchesFilter;
+        const dimmed = focus
+          ? !emphasized && !secondary
+          : highlight
+            ? !emphasized && !highlight.quiet.has(edge.id)
+            : !touchesFilter;
         const placement: LabelPlacement = labelPlacement.get(edge.id) ?? {
           curvature: baseCurve,
           labelT: 0.5,
@@ -523,7 +693,7 @@ function OntologyBrowserInner({
           data: {
             color,
             label: edgeLabel(edge),
-            labelVisible: labelsVisible,
+            labelVisible: labelsVisible || (crossDomain && !highlight),
             dimmed,
             emphasized,
             secondary,
@@ -531,12 +701,16 @@ function OntologyBrowserInner({
             labelT: placement.labelT,
             glow: mode === "knowledge",
             motionEnabled,
+            crossDomain,
           },
-          zIndex: emphasized ? 4 : secondary ? 2 : 0,
+          zIndex: emphasized ? 4 : crossDomain ? 3 : secondary ? 2 : 0,
         };
       }),
     [
       graph.edges,
+      isOntology,
+      ontologyMap.crossEdges,
+      highlight,
       visibleIds,
       isSimple,
       focus,
@@ -608,8 +782,30 @@ function OntologyBrowserInner({
 
   function switchMode(next: GalaxyMode) {
     setSelectedId(null);
+    setDomainFocus(null);
+    setSearch("");
     setMode(next);
   }
+
+  function focusDomain(next: string | null) {
+    setSelectedId(null);
+    setSearch("");
+    setDomainFocus(next);
+    const ids = next
+      ? graph.nodes.filter((node) => node.cluster === next).map((node) => ({ id: node.id }))
+      : undefined;
+    window.setTimeout(() => {
+      void fitView({ nodes: ids, padding: next ? 0.35 : 0.1, duration: 450 });
+    }, 30);
+  }
+
+  const domainCounts = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const node of ontologyMap.graph.nodes) {
+      counts.set(node.cluster, (counts.get(node.cluster) ?? 0) + 1);
+    }
+    return counts;
+  }, [ontologyMap.graph.nodes]);
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -702,6 +898,30 @@ function OntologyBrowserInner({
             })}
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            {isOntology ? (
+              <label className="relative mr-1 shrink-0">
+                <span className="sr-only">Search the ontology</span>
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={search}
+                  placeholder="Search ontology — try SUV, Dealer, Revenue"
+                  className="ontology-search"
+                  onChange={(event) => {
+                    setSelectedId(null);
+                    setDomainFocus(null);
+                    setSearch(event.target.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setSearch("");
+                    if (event.key === "Enter" && searchResult?.matches.size) {
+                      const ids = [...searchResult.related].map((id) => ({ id }));
+                      void fitView({ nodes: ids, padding: 0.25, duration: 450 });
+                    }
+                  }}
+                />
+              </label>
+            ) : null}
             {!isSimple ? (
               <ToggleButton
                 active={showLabels}
@@ -712,13 +932,19 @@ function OntologyBrowserInner({
                 Labels
               </ToggleButton>
             ) : null}
-            {layout === "knowledge" || layout === "grouped" ? (
+            {layout === "knowledge" ||
+            layout === "grouped" ||
+            layout === "ontology" ? (
               <ToggleButton
                 active={showZones}
-                hint="Shade the area each group occupies."
+                hint={
+                  isOntology
+                    ? "Outline each business domain as a community."
+                    : "Shade the area each group occupies."
+                }
                 onClick={() => setShowZones((value) => !value)}
               >
-                Groups
+                {isOntology ? "Domains" : "Groups"}
               </ToggleButton>
             ) : null}
             {mode === "knowledge" ? (
@@ -754,7 +980,46 @@ function OntologyBrowserInner({
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto border-t border-border/40 px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {isSimple ? (
+          {isOntology ? (
+            <>
+              <div
+                className="flex shrink-0 items-center gap-1"
+                role="group"
+                aria-label="Business domains"
+              >
+                <CategoryPill
+                  label="All"
+                  count={ontologyMap.graph.nodes.length}
+                  active={domainFocus === null}
+                  hint="Show every business domain."
+                  onClick={() => focusDomain(null)}
+                />
+                {ontologyMap.domains.map((domain) => (
+                  <CategoryPill
+                    key={domain.id}
+                    label={domain.label}
+                    count={domainCounts.get(domain.id) ?? 0}
+                    color={domain.color}
+                    active={domainFocus === domain.id}
+                    hint={domain.hint}
+                    onClick={() =>
+                      focusDomain(domainFocus === domain.id ? null : domain.id)
+                    }
+                  />
+                ))}
+              </div>
+              <ToolbarDivider />
+              <SegmentGroup
+                label="Layout"
+                items={MAP_STYLES}
+                value={mapStyle}
+                onChange={(value) => {
+                  setSelectedId(null);
+                  setMapStyle(value);
+                }}
+              />
+            </>
+          ) : isSimple ? (
             <div
               className="flex shrink-0 items-center gap-1"
               role="group"
@@ -924,24 +1189,52 @@ function OntologyBrowserInner({
           {zonesVisible ? (
             <ClusterLayer clusters={graph.clusters} nodes={live} />
           ) : null}
+          {domainsVisible ? (
+            <DomainLayer
+              clusters={graph.clusters}
+              nodes={live}
+              focusId={searchResult ? null : domainFocus}
+            />
+          ) : null}
           <Panel position="top-left" className="m-3">
             <div className="galaxy-panel rounded-2xl border px-3 py-2 text-[11px] shadow-lg backdrop-blur-xl">
               <div className="flex items-center gap-2 font-semibold tracking-tight">
                 <activeMode.icon className="size-3.5" />
-                {activeMode.label} · {graph.metadata.nodeCount} concepts ·{" "}
-                {graph.metadata.edgeCount} relationships
+                {activeMode.label} ·{" "}
+                {isOntology ? `${ontologyMap.domains.length} domains · ` : null}
+                {graph.metadata.nodeCount} concepts ·{" "}
+                {isOntology
+                  ? `${ontologyMap.crossEdges.size} cross-domain links`
+                  : `${graph.metadata.edgeCount} relationships`}
               </div>
               <p className="galaxy-panel__muted mt-1 max-w-[20rem]">
                 {selectedNode
                   ? mode === "knowledge"
                     ? `${selectedNode.label} · ${focus?.hop1.size ?? 0} direct, ${focus?.hop2.size ?? 0} two steps away`
                     : `${selectedNode.label} · ${focus?.hop1.size ?? 0} direct relationships`
-                  : MODE_HINT[mode]}
+                  : searchResult
+                    ? searchResult.matches.size
+                      ? `${searchResult.matches.size} match${searchResult.matches.size === 1 ? "" : "es"} · ${searchResult.related.size - searchResult.matches.size} connected concepts on the way to the core`
+                      : `No concept matches “${search.trim()}”`
+                    : isOntology && domainFocus
+                      ? `${domainLabel.get(domainFocus)} domain · ${highlight ? highlight.near.size - highlight.strong.size : 0} concepts in other domains connect to it`
+                      : MODE_HINT[mode]}
               </p>
             </div>
           </Panel>
           <Panel position="top-right" className="m-3">
-            <Legend mode={mode} metric={metric} />
+            {isOntology ? (
+              <OntologyLegend
+                style={mapStyle}
+                cores={cores.map((id) => nodeById.get(id)?.label ?? id)}
+                bridges={ontologyMap.bridges.slice(0, 4).map((bridge) => ({
+                  label: `${domainLabel.get(bridge.from)} ↔ ${domainLabel.get(bridge.to)}`,
+                  count: bridge.count,
+                }))}
+              />
+            ) : (
+              <Legend mode={mode} metric={metric} />
+            )}
           </Panel>
         </ReactFlow>
 
@@ -1008,6 +1301,58 @@ function Legend({
       {mode === "knowledge" ? (
         <LegendLines styles={KNOWLEDGE_EDGE_STYLES} />
       ) : null}
+    </div>
+  );
+}
+
+function OntologyLegend({
+  style,
+  cores,
+  bridges,
+}: {
+  style: OntologyMapStyle;
+  cores: string[];
+  bridges: Array<{ label: string; count: number }>;
+}) {
+  return (
+    <div className="galaxy-panel max-w-[15rem] rounded-2xl border px-3 py-2 text-[10px] shadow-lg backdrop-blur-xl">
+      <p className="mb-1 font-semibold">Core business concepts</p>
+      <p className="galaxy-panel__muted mb-1.5">
+        {style === "centrality"
+          ? "Bigger and nearer the middle = more central"
+          : "Haloed = most connected across the map"}
+      </p>
+      <ol className="mb-2 space-y-0.5">
+        {cores.map((label, index) => (
+          <li key={label} className="flex gap-1.5">
+            <span className="galaxy-panel__muted tabular-nums">{index + 1}.</span>
+            <span className="font-medium">{label}</span>
+          </li>
+        ))}
+      </ol>
+      {bridges.length ? (
+        <>
+          <p className="mb-1 font-semibold">How domains connect</p>
+          <ul className="mb-2 space-y-0.5">
+            {bridges.map((bridge) => (
+              <li key={bridge.label} className="galaxy-panel__muted flex justify-between gap-2">
+                <span>{bridge.label}</span>
+                <span className="tabular-nums">{bridge.count}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      <div className="flex flex-col gap-1">
+        <span className="galaxy-panel__muted inline-flex items-center gap-1.5">
+          <span className="h-0.5 w-4 rounded-full" style={{ background: CROSS_DOMAIN_COLOR }} />
+          Connects two domains
+        </span>
+        <span className="galaxy-panel__muted inline-flex items-center gap-1.5">
+          <span className="h-px w-4 rounded-full bg-muted-foreground/60" />
+          Within one domain
+        </span>
+      </div>
     </div>
   );
 }

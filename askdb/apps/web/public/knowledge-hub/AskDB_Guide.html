@@ -4,7 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ask DB — Platform Knowledge Hub</title>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    (function () {
+      var stored = localStorage.getItem("askdb-docs-theme");
+      var theme = stored || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
   <style>
     :root {
       --bg: #f4f6fb;
@@ -15,6 +21,9 @@
       --accent: #2563eb;
       --accent-soft: #dbeafe;
       --ok: #047857;
+      --warn: #b45309;
+      --bad: #b91c1c;
+      --code-bg: #eef2f8;
       --sidebar: #0f172a;
       --sidebar-ink: #e2e8f0;
       --sidebar-mute: #94a3b8;
@@ -25,11 +34,14 @@
       --bg: #0b1220;
       --panel: #121a2b;
       --ink: #eef3fb;
-      --mute: #9aa8bc;
+      --mute: #a3b1c5;
       --line: #243049;
       --accent: #7aa2ff;
       --accent-soft: #1d2a4a;
       --ok: #34d399;
+      --warn: #fbbf24;
+      --bad: #f87171;
+      --code-bg: #0b1322;
       --sidebar: #070b14;
       --sidebar-ink: #e8eef8;
       --sidebar-mute: #8b9bb3;
@@ -37,12 +49,31 @@
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
+    html { scroll-behavior: smooth; scroll-padding-top: 1rem; }
     body {
       font: 16px/1.55 "Segoe UI", system-ui, sans-serif;
       background: var(--bg);
       color: var(--ink);
     }
     a { color: var(--accent); text-decoration: none; }
+    code {
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0.05rem 0.35rem;
+      font-size: 0.86em;
+    }
+    pre.sql {
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.75rem 0.9rem;
+      overflow: auto;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      margin: 0.5rem 0 0;
+    }
     .app { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
     aside {
       background: var(--sidebar);
@@ -64,21 +95,26 @@
       padding: 0.55rem 0.7rem;
       margin-bottom: 0.9rem;
     }
-    nav a, nav button.nav-link {
+    nav a {
       display: block;
       width: 100%;
-      text-align: left;
-      background: none;
-      border: 0;
       color: var(--sidebar-ink);
-      padding: 0.38rem 0.55rem;
+      padding: 0.36rem 0.55rem;
       border-radius: 8px;
-      cursor: pointer;
       font-size: 0.86rem;
     }
-    nav a:hover, nav button.nav-link:hover, nav a.active { background: #1e293b; }
+    nav a:hover, nav a.active { background: #1e293b; }
+    nav a .new {
+      background: #7c3aed;
+      color: #fff;
+      border-radius: 999px;
+      font-size: 0.62rem;
+      padding: 0.05rem 0.4rem;
+      margin-left: 0.35rem;
+      vertical-align: 1px;
+    }
     nav .group { color: var(--sidebar-mute); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; margin: 0.85rem 0.4rem 0.3rem; }
-    main { padding: 1.5rem 1.8rem 4rem; max-width: 1100px; }
+    main { padding: 1.5rem 1.8rem 4rem; max-width: 1180px; }
     .topbar { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-bottom: 1.2rem; }
     .btn {
       border: 1px solid var(--line);
@@ -95,16 +131,159 @@
       box-shadow: var(--shadow);
     }
     .hero { padding: 1.6rem 1.7rem; margin-bottom: 1.2rem; }
-    .hero p { color: var(--mute); max-width: 46rem; }
-    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; margin-top: 1rem; }
+    .hero p { color: var(--mute); max-width: 50rem; }
+    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; margin-top: 1rem; }
     .kpi { background: var(--accent-soft); border-radius: 12px; padding: 0.7rem 0.8rem; }
     .kpi b { display: block; font-size: 1.15rem; }
-    .kpi span { color: var(--mute); font-size: 0.78rem; }
-    h2 { margin: 2rem 0 0.7rem; font-size: 1.35rem; }
+    .kpi span { color: var(--mute); font-size: 0.8rem; }
+    h2 { margin: 2.2rem 0 0.7rem; font-size: 1.4rem; }
     h3 { margin: 1.1rem 0 0.45rem; font-size: 1.05rem; }
-    .card { padding: 1rem 1.1rem; margin: 0.8rem 0; }
-    .mermaid { background: #0b1220; border-radius: 12px; padding: 0.8rem; overflow: auto; }
-    html:not([data-theme="dark"]) .mermaid { background: #f8fafc; }
+    .lead { color: var(--mute); margin-top: -0.3rem; }
+    .card { padding: 1rem 1.2rem; margin: 0.8rem 0; }
+    .card > p:first-child { margin-top: 0.2rem; }
+
+    /* Diagrams always sit on a light panel so text stays dark-on-light in both themes. */
+    .diagram {
+      background: #ffffff;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 1.1rem;
+      margin: 0.8rem 0 0.3rem;
+      overflow-x: auto;
+    }
+    .caption { color: var(--mute); font-size: 0.84rem; margin: 0.25rem 0 0; }
+
+    /* Diagram building blocks: plain HTML boxes and arrows, no external library. */
+    .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.25rem; }
+    .flow.center { justify-content: center; }
+    .flow.v { flex-direction: column; align-items: center; }
+    .node {
+      border: 1.5px solid #94a3b8;
+      border-radius: 10px;
+      padding: 0.5rem 0.7rem;
+      min-width: 118px;
+      max-width: 240px;
+      text-align: center;
+      line-height: 1.3;
+      background: #ffffff;
+      color: #0f172a;
+    }
+    .node b { display: block; font-weight: 650; font-size: 0.9rem; color: #0f172a; }
+    .node span { display: block; font-size: 0.76rem; color: #334155; margin-top: 0.15rem; }
+    .node code { background: rgba(255, 255, 255, 0.7); border-color: rgba(15, 23, 42, 0.15); color: #0f172a; }
+    .node.ui { background: #e0f2fe; border-color: #0284c7; }
+    .node.api { background: #eef2ff; border-color: #4f46e5; }
+    .node.data { background: #dcfce7; border-color: #16a34a; }
+    .node.db { background: #dcfce7; border-color: #16a34a; border-top-width: 5px; border-radius: 14px 14px 10px 10px; }
+    .node.cfg { background: #fef9c3; border-color: #ca8a04; }
+    .node.ai { background: #fae8ff; border-color: #c026d3; }
+    .node.warn { background: #ffedd5; border-color: #ea580c; }
+    .node.gate { background: #fff7ed; border-color: #ea580c; border-radius: 999px; }
+    .node.gate b::before { content: "◆ "; color: #ea580c; }
+    .node.clar { background: #fef3c7; border-color: #d97706; }
+    .node.stop { background: #fee2e2; border-color: #dc2626; }
+    .node.store { background: #ede9fe; border-color: #7c3aed; border-top-width: 5px; border-radius: 14px 14px 10px 10px; }
+    .node.alt { background: #f1f5f9; border-color: #64748b; }
+    .node.opt { background: #f8fafc; border-color: #94a3b8; border-style: dashed; }
+    .node.new { background: #ede9fe; border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15); }
+    .node.wide { max-width: 320px; }
+    .arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #475569;
+      font-size: 0.7rem;
+      line-height: 1.15;
+      padding: 0 0.15rem;
+      min-width: 26px;
+      max-width: 120px;
+      text-align: center;
+      font-weight: 600;
+    }
+    .arrow::after { content: "➜"; font-size: 1.2rem; color: #475569; line-height: 1; }
+    .arrow.dashed::after { content: "⇢"; font-size: 1.35rem; color: #94a3b8; }
+    .arrow.down, .arrow.up { max-width: none; }
+    .arrow.down { flex-direction: row; gap: 0.35rem; min-height: 26px; }
+    .arrow.down::after { content: "↓"; font-size: 1.25rem; font-weight: 700; }
+    .arrow.up::after { content: "↑"; font-size: 1.25rem; font-weight: 700; }
+    .arrow.up { flex-direction: row; gap: 0.35rem; min-height: 26px; }
+    .diagram .group {
+      border: 1.5px dashed #94a3b8;
+      border-radius: 12px;
+      padding: 0.7rem 0.8rem 0.8rem;
+      background: #f8fafc;
+      min-width: 0;
+    }
+    .diagram .group > .gt {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #475569;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .fan { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: stretch; }
+    .fan .node { flex: 1 1 130px; }
+    .lanes { display: grid; gap: 0.6rem; }
+    .lane { display: grid; grid-template-columns: 110px 1fr; gap: 0.6rem; align-items: center; }
+    .lane > .lt { font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.06em; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .ladder { display: grid; grid-template-columns: minmax(230px, 300px) 1fr; column-gap: 0.8rem; }
+    .ladder .m { display: flex; flex-direction: column; align-items: center; }
+    .ladder .m .node { width: 100%; max-width: 300px; }
+    .ladder .s { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; align-self: end; padding-bottom: 0.25rem; min-height: 48px; }
+    .ladder .s .node { max-width: 280px; }
+    .diagram { counter-reset: seq; }
+    ol.seq { list-style: none; margin: 0; padding: 0; }
+    ol.seq > li {
+      display: grid;
+      grid-template-columns: 26px minmax(170px, 230px) 1fr;
+      gap: 0.6rem;
+      align-items: center;
+      padding: 0.35rem 0;
+      border-bottom: 1px dashed #e2e8f0;
+      counter-increment: seq;
+      color: #0f172a;
+      font-size: 0.88rem;
+    }
+    ol.seq > li::before {
+      content: counter(seq);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #4f46e5;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    ol.seq > li.back::before { background: #16a34a; }
+    .who { font-size: 0.78rem; color: #475569; white-space: nowrap; }
+    .who i { font-style: normal; font-weight: 650; padding: 0.08rem 0.45rem; border-radius: 6px; color: #0f172a; border: 1px solid transparent; }
+    .who i.u { background: #e0f2fe; border-color: #7dd3fc; }
+    .who i.w { background: #e0f2fe; border-color: #0284c7; }
+    .who i.a { background: #eef2ff; border-color: #a5b4fc; }
+    .who i.h { background: #ede9fe; border-color: #c4b5fd; }
+    .who i.p { background: #eef2ff; border-color: #6366f1; }
+    .who i.l { background: #fae8ff; border-color: #e879f9; }
+    .who i.d { background: #dcfce7; border-color: #86efac; }
+    .seq-block { border: 1.5px solid #d97706; border-radius: 10px; margin: 0.45rem 0; padding: 0.25rem 0.7rem 0.3rem; background: #fffbeb; }
+    .seq-block.ok { border-color: #16a34a; background: #f0fdf4; }
+    .seq-block.opt { border-color: #c026d3; background: #fdf4ff; border-style: dashed; }
+    .seq-block > .bt { font-size: 0.7rem; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.06em; padding-top: 0.2rem; }
+    .seq-block.ok > .bt { color: #166534; }
+    .seq-block.opt > .bt { color: #86198f; }
+    .key { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.2rem 0 0.2rem; }
+    .key .node { min-width: 0; padding: 0.15rem 0.5rem; font-size: 0.74rem; font-weight: 600; }
+    @media (max-width: 900px) {
+      .split, .ladder { grid-template-columns: 1fr; }
+      .ladder .s { align-self: auto; padding-left: 1rem; }
+      .lane { grid-template-columns: 1fr; }
+    }
+
     details.mod { margin: 0.75rem 0; }
     details.mod > summary {
       cursor: pointer;
@@ -113,20 +292,90 @@
       list-style: none;
     }
     details.mod > summary::-webkit-details-marker { display: none; }
+    details.mod > summary::after { content: "+"; float: right; color: var(--mute); }
+    details.mod[open] > summary::after { content: "–"; }
     details.mod[open] > summary { border-bottom: 1px solid var(--line); }
     .body { padding: 0 1.1rem 1.1rem; }
     table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 0.45rem 0.3rem; vertical-align: top; }
+    th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 0.5rem 0.4rem; vertical-align: top; }
     th { color: var(--mute); font-weight: 600; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
-    .tag { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 0.1rem 0.5rem; font-size: 0.72rem; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; }
+    .tile { border: 1px solid var(--line); border-radius: 12px; padding: 0.8rem 0.9rem; }
+    .tile h4 { margin: 0 0 0.3rem; font-size: 0.95rem; }
+    .tile p { margin: 0; color: var(--mute); font-size: 0.88rem; }
+    .tag { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.72rem; font-weight: 600; }
+    .pill { display: inline-block; border-radius: 999px; padding: 0.08rem 0.5rem; font-size: 0.74rem; font-weight: 600; border: 1px solid currentColor; }
+    .pill.ok { color: var(--ok); }
+    .pill.warn { color: var(--warn); }
+    .pill.bad { color: var(--bad); }
+    .pill.info { color: var(--accent); }
     .hidden { display: none !important; }
+
+    /* Phase-by-phase walkthrough (plain HTML so it is readable without Mermaid). */
+    .phases { list-style: none; margin: 0.6rem 0 0; padding: 0; position: relative; }
+    .phases::before {
+      content: "";
+      position: absolute;
+      left: 19px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: var(--line);
+    }
+    .phase { position: relative; padding: 0 0 0.95rem 3.3rem; }
+    .phase .num {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 0 4px var(--panel);
+    }
+    .phase.gate .num { background: #d97706; }
+    .phase.data .num { background: #059669; }
+    .phase.store .num { background: #7c3aed; }
+    .phase h4 { margin: 0.35rem 0 0.15rem; font-size: 1rem; }
+    .phase h4 small { color: var(--mute); font-weight: 500; font-size: 0.78rem; margin-left: 0.4rem; }
+    .phase p { margin: 0.1rem 0; color: var(--mute); font-size: 0.9rem; }
+    .phase .out {
+      margin-top: 0.35rem;
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.86rem;
+      color: var(--ink);
+    }
+    .phase.gate .out { border-left-color: #d97706; }
+    .phase.data .out { border-left-color: #059669; }
+    .phase.store .out { border-left-color: #7c3aed; }
+    .legend-row { display: flex; flex-wrap: wrap; gap: 0.9rem; font-size: 0.82rem; color: var(--mute); margin: 0.2rem 0 0.4rem; }
+    .legend-row span::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 0.35rem;
+      vertical-align: -1px;
+      background: var(--c);
+    }
+
     @media (max-width: 900px) {
       .app { grid-template-columns: 1fr; }
       aside { height: auto; position: relative; }
-      .kpis, .grid2 { grid-template-columns: 1fr 1fr; }
+      .kpis, .grid2, .grid3 { grid-template-columns: 1fr 1fr; }
     }
-    @media (max-width: 640px) { .kpis, .grid2 { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .kpis, .grid2, .grid3 { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -138,9 +387,20 @@
     <nav id="nav">
       <div class="group">Overview</div>
       <a href="#intro">Introduction</a>
+      <a href="#whats-new">What's new<span class="new">NEW</span></a>
       <a href="#solution">Solution architecture</a>
       <a href="#e2e">End-to-end data flow</a>
-      <a href="#query">Query processing</a>
+      <div class="group">AI Chat</div>
+      <a href="#chat-arch">Chat architecture</a>
+      <a href="#lifecycle">Question lifecycle (14 phases)</a>
+      <a href="#walkthrough">Phase-by-phase example</a>
+      <a href="#query">Request sequence</a>
+      <a href="#resolver">Entity resolution</a>
+      <a href="#clarify">Clarification &amp; recovery</a>
+      <a href="#followups">Follow-up questions</a>
+      <a href="#history">Question history<span class="new">NEW</span></a>
+      <a href="#examples">Question catalogue</a>
+      <div class="group">Platform</div>
       <a href="#llm">LLM reasoning</a>
       <a href="#semantic-flow">Semantic &amp; ontology</a>
       <a href="#dq-flow">Quality &amp; governance</a>
@@ -154,9 +414,10 @@
       <a href="#m-preview">Data Preview</a>
       <a href="#m-exec">Executive Intelligence</a>
       <a href="#m-explorer">Progressive Explorer</a>
-      <a href="#m-ask">ASK DB / NLQ</a>
+      <a href="#m-ask">ASK DB / AI Chat</a>
+      <a href="#m-history">Query History<span class="new">NEW</span></a>
       <a href="#m-semantic">Semantic Layer</a>
-      <a href="#m-ontology">Ontology Explorer</a>
+      <a href="#m-ontology">Knowledge Graph / Ontology</a>
       <a href="#m-kb">Knowledge Base</a>
       <a href="#m-trust">Data Trust Center</a>
       <a href="#m-glossary">Business Glossary</a>
@@ -178,184 +439,750 @@
       <button class="btn" id="themeBtn" type="button">Toggle theme</button>
     </div>
 
-    <section class="hero" id="intro" data-search="ask db nql insight introduction stakeholders">
+    <section class="hero" id="intro" data-search="ask db nlq insight introduction stakeholders">
       <span class="tag">Knowledge portal</span>
       <h2 style="margin-top:0.4rem">One place to understand Ask DB</h2>
-      <p>This hub is for developers, architects, business users, and stakeholders. It explains what each workspace does, how a question becomes a governed number, and how the hosted stack (Vercel UI, Render API, Supabase Postgres, optional Mongo/Qdrant, Capgemini-compatible LLM) fits together.</p>
+      <p>This hub is for developers, architects, business users, and stakeholders. It explains what each workspace does, how a question in AI Chat becomes a governed number, how every question is recorded in history, and how the hosted stack (Vercel UI, Render API, Supabase Postgres, optional Mongo/Qdrant, Capgemini-compatible LLM) fits together.</p>
       <div class="kpis">
-        <div class="kpi"><b>2</b><span>Industry packs (auto / insurance)</span></div>
-        <div class="kpi"><b>3</b><span>Logical databases (app + analytics)</span></div>
+        <div class="kpi"><b>14</b><span>Visible phases per chat question</span></div>
+        <div class="kpi"><b>5</b><span>Ways a word is matched to data (exact → glossary)</span></div>
+        <div class="kpi"><b>4</b><span>Knowledge Graph views incl. Ontology Map</span></div>
+        <div class="kpi"><b>2</b><span>Industry packs (automotive / insurance)</span></div>
         <div class="kpi"><b>SQL</b><span>Only source of numerical truth</span></div>
         <div class="kpi"><b>YAML</b><span>Only source of semantic truth</span></div>
       </div>
     </section>
 
+    <h2 id="whats-new">What's new in this release</h2>
+    <div class="card" data-search="whats new release changes entity resolution clarification follow up history ontology map multi series">
+      <div class="grid3">
+        <div class="tile"><h4>Understands business words first</h4><p>Brands, cities, models and body types are matched to real data values before any SQL is written ("suzuki" → Maruti Suzuki, "Bangalore" → Bengaluru, "Hundai" → Hyundai).</p></div>
+        <div class="tile"><h4>Structured plan</h4><p>Every question becomes a plan of intent, brand, metric, dimension, filters, analysis and chart. The answer card shows it as "Understood as".</p></div>
+        <div class="tile"><h4>Smarter SQL</h4><p>Multi-brand <code>IN</code> filters, market share with window functions, year and month grains, and a 24-month default window for open-ended trends.</p></div>
+        <div class="tile"><h4>Clarify, don't fail</h4><p>Vague, unknown or unsupported questions get a friendly clarification with clickable suggestions instead of a "SQL execution failed" error.</p></div>
+        <div class="tile"><h4>Follow-ups</h4><p>"What about Hyundai?" or "Only in Mumbai" reuse the last answer's metric, grain and filters from question history.</p></div>
+        <div class="tile"><h4>Question history</h4><p>Every question is stored with status, SQL, trust score, latency and plan state, and is visible on the Query History page.</p></div>
+        <div class="tile"><h4>Multi-series charts</h4><p>Grouped bars and multi-line charts with a legend when a result has several numeric columns (revenue and units).</p></div>
+        <div class="tile"><h4>Ontology Map</h4><p>A fourth Knowledge Graph view with business domains, community boundaries, centrality, hierarchy, search and cross-domain links.</p></div>
+        <div class="tile"><h4>Chat vocabulary kept separate</h4><p>Chat-only rules live in <code>chat_vocabulary.yaml</code>, so tuning chat never changes the Knowledge Graph.</p></div>
+      </div>
+    </div>
+
     <h2 id="solution">Overall solution architecture</h2>
-    <div class="card" data-search="architecture vercel render supabase">
-      <p>The browser never holds an LLM key and never executes SQL. Vercel serves Next.js. FastAPI on Render owns auth, NLQ, KPIs, and guardrails. Postgres (hosted as one Supabase project with schemas, or three local DBs) stores app state and analytics facts.</p>
-      <pre class="mermaid">
-flowchart LR
-  U[Browser] --> W[Next.js on Vercel]
-  W -->|HTTPS cookies /api rewrite| A[FastAPI on Render]
-  A --> APP[(askdb_app / public schema)]
-  A --> AUTO[(automotive analytics)]
-  A --> INS[(insurance analytics)]
-  A --> LLM[LLM provider]
-  A -.-> M[(MongoDB optional)]
-  A -.-> Q[(Qdrant optional)]
-  A --> Y[YAML industry packs]
-      </pre>
+    <div class="card" data-search="architecture vercel render supabase llm qdrant mongo">
+      <p>The browser never holds an LLM key and never executes SQL. Vercel serves Next.js. FastAPI on Render owns auth, AI Chat, KPIs and guardrails. Postgres (one Supabase project with schemas when hosted, three local databases in development) stores app state, question history and analytics facts.</p>
+      <div class="diagram">
+        <div class="flow center">
+          <div class="node ui"><b>Browser</b><span>Chat, Builder, Dashboards</span></div>
+          <div class="arrow"></div>
+          <div class="node ui"><b>Next.js on Vercel</b><span>UI + /api rewrite</span></div>
+          <div class="arrow">HTTPS + cookies</div>
+          <div class="node api wide"><b>FastAPI on Render</b><span>auth, AI Chat, KPIs, guardrails</span></div>
+        </div>
+        <div class="flow v"><div class="arrow down">FastAPI connects to</div></div>
+        <div class="split">
+          <div class="group">
+            <div class="gt">PostgreSQL</div>
+            <div class="fan">
+              <div class="node db"><b>askdb_app</b><span>users, conversations, query_history</span></div>
+              <div class="node db"><b>automotive</b><span>facts + dimensions · read-only pool</span></div>
+              <div class="node db"><b>insurance</b><span>facts + dimensions · read-only pool</span></div>
+            </div>
+          </div>
+          <div class="group">
+            <div class="gt">Config, AI and optional stores</div>
+            <div class="fan">
+              <div class="node cfg"><b>YAML industry packs</b><span>semantic model, glossary, chat vocabulary</span></div>
+              <div class="node ai"><b>LLM provider</b><span>fallback SQL + narration</span></div>
+              <div class="node opt"><b>MongoDB</b><span>optional</span></div>
+              <div class="node opt"><b>Qdrant</b><span>optional vectors</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="key">
+        <div class="node ui">User interface</div>
+        <div class="node api">API logic</div>
+        <div class="node db">Database</div>
+        <div class="node cfg">YAML config</div>
+        <div class="node ai">LLM</div>
+        <div class="node gate"><b style="font-size:inherit;display:inline">Decision</b></div>
+        <div class="node clar">Clarification</div>
+        <div class="node store">History</div>
+        <div class="node opt">Optional</div>
+      </div>
     </div>
 
     <h2 id="e2e">End-to-end data flow</h2>
-    <div class="card">
-      <pre class="mermaid">
-flowchart TD
-  S[Seed / warehouse load] --> P[(Postgres facts + dims)]
-  Y[pack.yaml + semantic_model.yaml + glossary] --> SEM[SemanticService]
-  P --> RO[Read-only analytics pool]
-  SEM --> NLQ[NLQ / Analytics Builder]
-  RO --> NLQ
-  NLQ --> G[SQL guardrails LIMIT + timeout + SELECT-only]
-  G --> P
-  P --> UI[Charts / KPIs / Chat cards]
-  DOC[Knowledge uploads] -.-> RAG[Chunk + embed]
-  RAG -.-> UI
-      </pre>
+    <div class="card" data-search="end to end data flow seed warehouse guardrails">
+      <div class="diagram">
+        <div class="lanes">
+          <div class="lane"><div class="lt">Data</div>
+            <div class="flow">
+              <div class="node data"><b>Seed / warehouse load</b></div><div class="arrow"></div>
+              <div class="node db"><b>Postgres facts + dims</b></div><div class="arrow"></div>
+              <div class="node api"><b>Value dictionary</b><span>distinct brands, cities, models</span></div><div class="arrow"></div>
+              <div class="node api"><b>AI Chat resolver</b></div>
+            </div>
+          </div>
+          <div class="lane"><div class="lt">Semantics</div>
+            <div class="flow">
+              <div class="node cfg"><b>pack.yaml</b><span>semantic_model.yaml, business_glossary.yaml</span></div><div class="arrow"></div>
+              <div class="node api"><b>SemanticService</b></div><div class="arrow"></div>
+              <div class="node api"><b>AI Chat planner</b></div>
+              <div class="node api"><b>Analytics Builder</b></div>
+              <div class="node api"><b>Knowledge Graph snapshot</b></div>
+            </div>
+          </div>
+          <div class="lane"><div class="lt">Chat rules</div>
+            <div class="flow">
+              <div class="node cfg"><b>chat_vocabulary.yaml</b><span>unsupported terms, generic words</span></div><div class="arrow"></div>
+              <div class="node api"><b>AI Chat only</b><span>never used by the graph</span></div>
+            </div>
+          </div>
+          <div class="lane"><div class="lt">Execution</div>
+            <div class="flow">
+              <div class="node api"><b>Chat or Builder SQL</b></div><div class="arrow"></div>
+              <div class="node warn"><b>SQL guardrails</b><span>SELECT only, allowlist, LIMIT, timeout</span></div><div class="arrow"></div>
+              <div class="node db"><b>Read-only analytics pool</b></div><div class="arrow"></div>
+              <div class="node ui"><b>Charts, KPIs, chat cards</b></div><div class="arrow"></div>
+              <div class="node store"><b>query_history</b></div>
+            </div>
+          </div>
+          <div class="lane"><div class="lt">Documents</div>
+            <div class="flow">
+              <div class="node opt"><b>Knowledge uploads</b></div><div class="arrow dashed"></div>
+              <div class="node opt"><b>Chunk + embed</b></div><div class="arrow dashed"></div>
+              <div class="node ui"><b>Chat citations</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <h2 id="query">Query processing flow</h2>
-    <div class="card">
-      <pre class="mermaid">
-sequenceDiagram
-  participant U as User
-  participant W as Next.js
-  participant A as FastAPI
-  participant L as LLM
-  participant D as Postgres
-  U->>W: Question or Builder spec
-  W->>A: POST /analytics/run or /chat/ask-sync
-  A->>A: Auth JWT + RBAC + industry header
-  A->>A: Understand intent vs YAML pack
-  alt NLQ path
-    A->>L: Schema-constrained SQL prompt
-    L-->>A: SELECT statement
-  end
-  A->>A: Validate + repair SQL
-  A->>D: Read-only execute
-  D-->>A: Rows
-  A-->>W: JSON / folded SSE events
-  W-->>U: Table, chart, narrative
-      </pre>
+    <!-- ============================ AI CHAT ============================ -->
+
+    <h2 id="chat-arch">AI Chat architecture</h2>
+    <p class="lead">Which component does what when someone asks a question.</p>
+    <div class="card" data-search="chat architecture components chatservice planner resolver response card sse ask-sync">
+      <div class="diagram">
+        <div class="group">
+          <div class="gt">Next.js · AI Chat workspace</div>
+          <div class="flow center">
+            <div class="node ui"><b>ChatWorkspace</b><span>input, conversation</span></div><div class="arrow"></div>
+            <div class="node ui"><b>sse.ts</b><span>folds events into one message</span></div><div class="arrow"></div>
+            <div class="node ui"><b>ResponseCard</b><span>answer, clarification chips</span></div><div class="arrow"></div>
+            <div class="node ui"><b>QueryPlanNote</b><span>"Understood as", mapped words</span></div>
+            <div class="node ui"><b>ResultChart</b><span>single and multi-series</span></div>
+          </div>
+        </div>
+        <div class="flow center" style="gap:2.5rem">
+          <div class="arrow down">question + conversationId → POST /chat/ask-sync</div>
+          <div class="arrow up">events: stage, plan, sql, rows, chart, tokens, done</div>
+        </div>
+        <div class="group">
+          <div class="gt">FastAPI · ChatService (in order)</div>
+          <div class="flow center">
+            <div class="node api"><b>Endpoint</b><span>/chat/ask (stream) · /chat/ask-sync (JSON)</span></div><div class="arrow"></div>
+            <div class="node warn"><b>Scope guard</b></div><div class="arrow"></div>
+            <div class="node api"><b>Entity resolver</b><span>value dictionary</span></div><div class="arrow"></div>
+            <div class="node api"><b>Rewrite + intent</b></div><div class="arrow"></div>
+            <div class="node warn"><b>Clarification checks</b></div><div class="arrow"></div>
+            <div class="node gate"><b>Router</b><span>sql / knowledge / hybrid</span></div><div class="arrow"></div>
+            <div class="node api"><b>Semantic query planner</b><span>joins, formulas, SQL</span></div><div class="arrow"></div>
+            <div class="node warn"><b>Validate + EXPLAIN repair</b></div><div class="arrow"></div>
+            <div class="node data"><b>Execute read-only</b></div><div class="arrow"></div>
+            <div class="node api"><b>Chart, narration, trust</b></div>
+          </div>
+          <div class="flow center" style="margin-top:0.5rem">
+            <div class="node api"><b>Planner cannot compile</b></div><div class="arrow dashed">fallback</div>
+            <div class="node ai"><b>LLM writes SELECT</b></div><div class="arrow dashed">then</div>
+            <div class="node warn"><b>Same validation</b></div>
+          </div>
+        </div>
+        <div class="flow v"><div class="arrow down">reads from and writes to</div></div>
+        <div class="fan">
+          <div class="node cfg"><b>Semantic pack YAML + chat_vocabulary.yaml</b><span>feeds the resolver and planner</span></div>
+          <div class="node db"><b>Analytics DB</b><span>value dictionary + query execution</span></div>
+          <div class="node store"><b>query_history</b><span>row opened as running · completed / failed with queryState · prior queryState feeds follow-ups</span></div>
+        </div>
+      </div>
+      <p class="caption">Hosted on Vercel the UI calls <code>/chat/ask-sync</code> (one JSON response) because Vercel buffers streams; locally the streaming <code>/chat/ask</code> endpoint is used. Both run the same pipeline.</p>
     </div>
+
+    <h2 id="lifecycle">Question lifecycle: the 14 phases</h2>
+    <p class="lead">The answer card shows these same 14 stages. Orange diamonds are the checks that can stop a question early with a clarification instead of an error.</p>
+    <div class="card" data-search="lifecycle pipeline stages phases rewrite intent ambiguity context semantic joins formula sql validation repair execution chart narration">
+      <div class="diagram">
+        <div class="ladder">
+          <div class="m"><div class="node api"><b>1 · User Question</b><span>history row opened as running</span></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node gate"><b>In scope for this industry?</b></div></div>
+          <div class="s"><div class="arrow">no</div><div class="node stop"><b>Out of scope message</b></div></div>
+          <div class="m"><div class="arrow down">yes</div><div class="node api"><b>Match words to data values</b><span>brands, cities, models</span></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node api"><b>2 · Query Rewrite</b><span>drop filler: "Show", "please"</span></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node api"><b>3 · Intent Detection</b><span>trend, comparison, ranking, share</span></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node gate"><b>4 · Ambiguity Check</b><span>enough scope?</span></div></div>
+          <div class="s"><div class="arrow">too vague</div><div class="node clar"><b>Did you mean… chips</b></div></div>
+          <div class="m"><div class="arrow down">clear</div><div class="node gate"><b>Every word understood and supported?</b></div></div>
+          <div class="s"><div class="arrow">unknown name</div><div class="node clar"><b>Not in the data</b></div><div class="arrow">no data for it</div><div class="node clar"><b>Not available + alternatives</b></div></div>
+          <div class="m"><div class="arrow down">yes</div><div class="node gate"><b>Route</b></div></div>
+          <div class="s"><div class="arrow">knowledge</div><div class="node alt"><b>Answer from documents</b></div></div>
+          <div class="m"><div class="arrow down">sql or hybrid</div><div class="node gate"><b>Seen recently?</b></div></div>
+          <div class="s"><div class="arrow">cache hit</div><div class="node alt"><b>Replay cached answer</b></div></div>
+          <div class="m"><div class="arrow down">miss</div><div class="node api"><b>5 · Conversation Context</b><span>reuse last queryState</span></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node api"><b>6 · Semantic Resolver</b><span>metric, dimension, filters</span></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node api"><b>7 · Join Path Discovery</b></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node api"><b>8 · Business Formula Engine</b></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node api"><b>9 · SQL Generation</b><span>compiler, template or LLM</span></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node gate"><b>10 · SQL Validation</b><span>safe and matches the plan?</span></div></div>
+          <div class="s"><div class="arrow">problem</div><div class="node api"><b>11 · Auto Repair</b><span>EXPLAIN + fix, then validate again</span></div></div>
+          <div class="m"><div class="arrow down">ok</div><div class="node data"><b>12 · Execution</b><span>read-only, timeout, LIMIT</span></div></div>
+          <div class="s"><div class="arrow">error after repair</div><div class="node clar"><b>Recovery card</b><span>"I couldn't answer that yet"</span></div></div>
+          <div class="m"><div class="arrow down">rows</div><div class="node api"><b>13 · Chart Recommendation</b></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node api"><b>14 · Narration + trust score</b></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node store"><b>Saved to query_history</b><span>every outcome, including clarifications and recovery</span></div></div><div class="s"></div>
+        </div>
+      </div>
+      <table style="margin-top:0.8rem">
+        <tr><th style="width:24%">Phase</th><th>What it does</th><th style="width:30%">Code</th></tr>
+        <tr><td>1 · User Question</td><td>Opens a history row with status <em>running</em>, then checks the question belongs to the active industry.</td><td><code>ChatService.ask</code>, <code>is_out_of_bounds</code></td></tr>
+        <tr><td>Word matching</td><td>Finds brands, cities, models, body and fuel types in the question and maps them to exact database values.</td><td><code>entity_resolver.py</code>, value dictionary</td></tr>
+        <tr><td>2 · Query Rewrite</td><td>Removes filler words so intent rules see the core question.</td><td><code>rewrite_question</code></td></tr>
+        <tr><td>3 · Intent Detection</td><td>Decides trend, comparison, ranking, aggregation or market share, plus metric and grain.</td><td><code>understand_question</code></td></tr>
+        <tr><td>4 · Ambiguity Check</td><td>Stops too-vague questions ("Sales trend") and offers options.</td><td><code>plan.is_ambiguous</code>, <code>assess_resolution</code></td></tr>
+        <tr><td>5 · Conversation Context</td><td>For follow-ups, merges the previous answer's plan state.</td><td><code>_prior_state</code>, <code>plan_state</code></td></tr>
+        <tr><td>6 · Semantic Resolver</td><td>Binds the metric, dimensions and filters to semantic-model columns.</td><td><code>semantic_query_planner.py</code></td></tr>
+        <tr><td>7 · Join Path Discovery</td><td>Adds only the joins the filters and dimensions need.</td><td>pack relationships</td></tr>
+        <tr><td>8 · Business Formula Engine</td><td>Applies governed formulas: revenue <code>SUM(total_sales)</code>, units <code>SUM(order_qty)</code>, market share.</td><td><code>_FORMULAS</code></td></tr>
+        <tr><td>9 · SQL Generation</td><td>Semantic compiler first, then templates, and the LLM only as a fallback.</td><td>compiler / templates / LLM</td></tr>
+        <tr><td>10 · SQL Validation</td><td>SELECT-only, schema allowlist, filters and grain match the plan, LIMIT enforced.</td><td><code>sql_is_safe</code>, <code>validate_sql_against_plan</code></td></tr>
+        <tr><td>11 · Auto Repair</td><td>Runs <code>EXPLAIN</code>; on error, repairs unknown columns or GROUP BY from the pack.</td><td><code>propose_sql_repair</code></td></tr>
+        <tr><td>12 · Execution</td><td>Read-only transaction with a statement timeout and row cap.</td><td>analytics pool</td></tr>
+        <tr><td>13 · Chart Recommendation</td><td>Line for time grains, bar for comparisons and rankings, multi-series when several measures return.</td><td><code>chart_type</code>, <code>ResultChart</code></td></tr>
+        <tr><td>14 · Narration</td><td>Plain-English summary, follow-up suggestions and a trust score; the history row is completed.</td><td>narration + trust</td></tr>
+      </table>
+    </div>
+
+    <h2 id="walkthrough">Phase-by-phase example</h2>
+    <p class="lead">A real run of <strong>"Compare MG sales by year in Mumbai"</strong> through the automotive pack. Every output below is what the planner actually produced.</p>
+    <div class="card" data-search="walkthrough example phase compare mg sales by year mumbai output">
+      <div class="legend-row">
+        <span style="--c:#2563eb">Understanding</span>
+        <span style="--c:#d97706">Checks</span>
+        <span style="--c:#059669">Data access</span>
+        <span style="--c:#7c3aed">Stored</span>
+      </div>
+      <ol class="phases">
+        <li class="phase store"><span class="num">1</span>
+          <h4>User Question <small>history row opened</small></h4>
+          <p>A <code>query_history</code> row is created with status <em>running</em>, so the question can be cancelled and audited.</p>
+          <div class="out">question = "Compare MG sales by year in Mumbai" · status = running</div>
+        </li>
+        <li class="phase gate"><span class="num">✓</span>
+          <h4>Scope guard</h4>
+          <p>Automotive sales question for the automotive pack, so it continues.</p>
+          <div class="out">in scope</div>
+        </li>
+        <li class="phase"><span class="num">⌕</span>
+          <h4>Word matching <small>entity resolver</small></h4>
+          <p>Words are matched to real column values from the value dictionary.</p>
+          <div class="out">"mg" → <b>MG</b> (make, exact) · "mumbai" → <b>Mumbai</b> (city, exact)</div>
+        </li>
+        <li class="phase"><span class="num">2</span>
+          <h4>Query Rewrite</h4>
+          <p>Nothing to remove here. For comparison, "Show MG revenue" is rewritten to "MG revenue".</p>
+          <div class="out">"Compare MG sales by year in Mumbai" (unchanged)</div>
+        </li>
+        <li class="phase"><span class="num">3</span>
+          <h4>Intent Detection</h4>
+          <p>"Compare" plus "by year" means a comparison across years.</p>
+          <div class="out">intent = comparison · dimension = year · metric = revenue · analysis = breakdown</div>
+        </li>
+        <li class="phase gate"><span class="num">4</span>
+          <h4>Ambiguity Check</h4>
+          <p>Brand, place, metric and grain are all present, and every word was understood.</p>
+          <div class="out">not ambiguous · nothing unresolved · nothing unsupported · route = sql</div>
+        </li>
+        <li class="phase"><span class="num">5</span>
+          <h4>Conversation Context</h4>
+          <p>First question in the conversation, so no previous state is merged.</p>
+          <div class="out">prior queryState = none</div>
+        </li>
+        <li class="phase"><span class="num">6</span>
+          <h4>Semantic Resolver <small>structured plan</small></h4>
+          <p>The plan the UI shows as "Understood as".</p>
+          <div class="out">brand = MG · metric = revenue · dimension = year · filters: city = Mumbai, make = MG · chart = line</div>
+        </li>
+        <li class="phase"><span class="num">7</span>
+          <h4>Join Path Discovery</h4>
+          <p>City lives in the region dimension and make in the carline dimension, so both joins are added.</p>
+          <div class="out">fact_sales → dim_region · fact_sales → dim_carline</div>
+        </li>
+        <li class="phase"><span class="num">8</span>
+          <h4>Business Formula Engine</h4>
+          <p>"Sales" means revenue in the glossary; units are returned alongside for the second series.</p>
+          <div class="out">revenue = SUM(total_sales) · units_sold = SUM(order_qty)</div>
+        </li>
+        <li class="phase"><span class="num">9</span>
+          <h4>SQL Generation <small>semantic compiler, no LLM needed</small></h4>
+          <pre class="sql">SELECT EXTRACT(YEAR FROM f.sales_date)::int AS year,
+       SUM(f.total_sales) AS revenue,
+       SUM(f.order_qty)   AS units_sold
+FROM automotive.fact_sales f
+JOIN automotive.dim_region  r ON r.region_id  = f.region_id
+JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
+WHERE r.city = 'Mumbai' AND c.make = 'MG'
+GROUP BY 1 ORDER BY 1 LIMIT 100</pre>
+        </li>
+        <li class="phase gate"><span class="num">10</span>
+          <h4>SQL Validation</h4>
+          <p>SELECT-only, tables in the automotive allowlist, both filters and the year grain present, LIMIT set.</p>
+          <div class="out">valid</div>
+        </li>
+        <li class="phase gate"><span class="num">11</span>
+          <h4>Auto Repair</h4>
+          <p><code>EXPLAIN</code> succeeds, so no repair is needed. If a column were wrong, the pack would supply the correct one and validation would run again.</p>
+          <div class="out">skipped (EXPLAIN ok)</div>
+        </li>
+        <li class="phase data"><span class="num">12</span>
+          <h4>Execution</h4>
+          <p>Runs in a read-only transaction with a statement timeout.</p>
+          <div class="out">one row per year: year, revenue, units_sold</div>
+        </li>
+        <li class="phase"><span class="num">13</span>
+          <h4>Chart Recommendation</h4>
+          <p>A time grain gets a line chart; two numeric columns enable the multi-series option.</p>
+          <div class="out">line chart · series = revenue, units_sold</div>
+        </li>
+        <li class="phase"><span class="num">14</span>
+          <h4>Narration</h4>
+          <p>Summary text, follow-up suggestions and a trust score are streamed to the card.</p>
+          <div class="out">narrative + follow-ups + trust score</div>
+        </li>
+        <li class="phase store"><span class="num">✔</span>
+          <h4>History row completed</h4>
+          <p>SQL, row count, latency, trust and the plan state are saved, so a follow-up such as "What about Hyundai?" can reuse them.</p>
+          <div class="out">status = completed · trust_breakdown.queryState = { metric: revenue, dimensions: [year], filters: [city = Mumbai, make = MG] }</div>
+        </li>
+      </ol>
+    </div>
+
+    <h2 id="query">Request sequence</h2>
+    <div class="card" data-search="sequence diagram request events sse">
+      <div class="diagram">
+        <ol class="seq">
+          <li><span class="who"><i class="u">User</i> → <i class="w">Next.js</i></span><span>Types a question</span></li>
+          <li><span class="who"><i class="w">Next.js</i> → <i class="a">ChatService</i></span><span>POST /chat/ask-sync with question and conversationId</span></li>
+          <li><span class="who"><i class="a">ChatService</i></span><span>Checks login, analyst role and x-industry</span></li>
+          <li><span class="who"><i class="a">ChatService</i> → <i class="h">History</i></span><span>Inserts a row with status running</span></li>
+          <li><span class="who"><i class="a">ChatService</i></span><span>Scope guard, word matching, intent</span></li>
+        </ol>
+        <div class="seq-block"><div class="bt">If it needs clarification</div>
+          <ol class="seq">
+            <li class="back"><span class="who"><i class="a">ChatService</i> → <i class="w">Next.js</i></span><span>clarification event with title and suggestion chips</span></li>
+            <li><span class="who"><i class="a">ChatService</i> → <i class="h">History</i></span><span>completed, trust 0, path clarification</span></li>
+          </ol>
+        </div>
+        <div class="seq-block ok"><div class="bt">Otherwise (answerable)</div>
+          <ol class="seq">
+            <li><span class="who"><i class="a">ChatService</i> → <i class="h">History</i></span><span>Reads the last completed queryState in this conversation</span></li>
+            <li><span class="who"><i class="a">ChatService</i> → <i class="p">Planner</i></span><span>Plan with resolved filters and prior state</span></li>
+            <li class="back"><span class="who"><i class="p">Planner</i> → <i class="a">ChatService</i></span><span>Structured plan and SQL</span></li>
+          </ol>
+          <div class="seq-block opt"><div class="bt">Only if the planner produced no SQL</div>
+            <ol class="seq">
+              <li><span class="who"><i class="a">ChatService</i> → <i class="l">LLM</i></span><span>Schema-constrained prompt</span></li>
+              <li class="back"><span class="who"><i class="l">LLM</i> → <i class="a">ChatService</i></span><span>One SELECT statement</span></li>
+            </ol>
+          </div>
+          <ol class="seq">
+            <li><span class="who"><i class="a">ChatService</i> → <i class="d">Analytics DB</i></span><span>EXPLAIN, repair if needed, then execute read-only</span></li>
+            <li class="back"><span class="who"><i class="d">Analytics DB</i> → <i class="a">ChatService</i></span><span>Rows</span></li>
+            <li class="back"><span class="who"><i class="a">ChatService</i> → <i class="w">Next.js</i></span><span>stage, plan, sql, rows, chart, tokens, done</span></li>
+            <li><span class="who"><i class="a">ChatService</i> → <i class="h">History</i></span><span>completed with SQL, rows, trust, queryState</span></li>
+          </ol>
+        </div>
+        <ol class="seq">
+          <li class="back"><span class="who"><i class="w">Next.js</i> → <i class="u">User</i></span><span>Answer card, chart, "Understood as"</span></li>
+        </ol>
+      </div>
+    </div>
+
+    <h2 id="resolver">Entity resolution: how words become data values</h2>
+    <div class="card" data-search="entity resolution resolver exact synonym fuzzy alias glossary value dictionary understood as">
+      <p>Before planning, each word is tried against the value dictionary in a fixed order. The first confident match wins, and the UI shows it in "Understood as" (for example <code>“suzuki” → Maruti Suzuki (synonym)</code>).</p>
+      <div class="diagram">
+        <div class="flow center">
+          <div class="node api"><b>Words in the question</b></div><div class="arrow"></div>
+          <div class="node gate"><b>Known unsupported term?</b><span>e.g. profit</span></div><div class="arrow">yes</div>
+          <div class="node clar"><b>Mark unsupported</b></div>
+        </div>
+        <div class="flow v"><div class="arrow down">no · try in this order, first match wins</div></div>
+        <div class="flow center">
+          <div class="node api"><b>1 · Exact</b><span>MG, Mumbai, SUV</span></div><div class="arrow"></div>
+          <div class="node api"><b>2 · Synonym</b><span>Maruti → Maruti Suzuki · EV → Electric</span></div><div class="arrow"></div>
+          <div class="node api"><b>3 · Fuzzy spelling</b><span>Hundai → Hyundai</span></div><div class="arrow"></div>
+          <div class="node api"><b>4 · Alias</b><span>Vitara → model</span></div><div class="arrow"></div>
+          <div class="node api"><b>5 · Glossary value term</b></div>
+        </div>
+        <div class="flow v"><div class="arrow down"></div></div>
+        <div class="flow center" style="gap:1rem">
+          <div class="node data"><b>Resolved filters</b><span>column = value</span></div>
+          <div class="node clar"><b>Leftover name-like words</b><span>→ unresolved → clarification</span></div>
+        </div>
+      </div>
+      <table style="margin-top:0.8rem">
+        <tr><th>Question</th><th>Word</th><th>Resolved to</th><th>Method</th></tr>
+        <tr><td>Compare MG sales by year in Mumbai</td><td>mg, mumbai</td><td>make = MG, city = Mumbai</td><td><span class="pill ok">exact</span></td></tr>
+        <tr><td>What sales of Maruti?</td><td>maruti</td><td>make = Maruti Suzuki</td><td><span class="pill info">synonym</span></td></tr>
+        <tr><td>SUV sales in Bangalore</td><td>suv, bangalore</td><td>car_type = SUV, city = Bengaluru</td><td><span class="pill ok">exact</span> <span class="pill info">synonym</span></td></tr>
+        <tr><td>EV sales by year</td><td>ev</td><td>engine_type = Electric</td><td><span class="pill info">synonym</span></td></tr>
+        <tr><td>Hundai sales by year</td><td>hundai</td><td>make = Hyundai</td><td><span class="pill warn">fuzzy</span></td></tr>
+        <tr><td>Ferari sales</td><td>ferari</td><td>nothing: unresolved</td><td><span class="pill bad">clarify</span></td></tr>
+      </table>
+      <p class="caption">Model names that are everyday words (city, punch, safari, amaze…) only resolve when a brand is named or the word is followed by "model" or "car". This list lives in <code>chat_vocabulary.yaml → generic_value_words</code>.</p>
+    </div>
+
+    <h2 id="clarify">Clarification &amp; recovery</h2>
+    <p class="lead">A question never ends with "SQL Execution Failed". It ends with an answer, a clarification, or a recovery card with suggestions.</p>
+    <div class="card" data-search="clarification recovery did you mean unsupported unresolved failure profit ferrari sales trend">
+      <div class="diagram">
+        <div class="ladder">
+          <div class="m"><div class="node api"><b>Question</b></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node gate"><b>Nothing resolved and nothing to analyze?</b></div></div>
+          <div class="s"><div class="arrow">yes</div><div class="node clar"><b>"What should I analyze?"</b></div></div>
+          <div class="m"><div class="arrow down">no</div><div class="node gate"><b>Plan ambiguous?</b></div></div>
+          <div class="s"><div class="arrow">yes</div><div class="node clar"><b>"Did you mean…"</b><span>scoped options</span></div></div>
+          <div class="m"><div class="arrow down">no</div><div class="node gate"><b>Unsupported term?</b></div></div>
+          <div class="s"><div class="arrow">yes</div><div class="node clar"><b>"That isn't in the sales data yet"</b><span>+ alternatives</span></div></div>
+          <div class="m"><div class="arrow down">no</div><div class="node gate"><b>Unknown name?</b></div></div>
+          <div class="s"><div class="arrow">yes</div><div class="node clar"><b>"Did you mean…"</b><span>available brands</span></div></div>
+          <div class="m"><div class="arrow down">no</div><div class="node api"><b>Plan, validate, execute</b></div></div>
+          <div class="s"><div class="arrow">fails after repair</div><div class="node clar"><b>"I couldn't answer that yet"</b><span>+ alternate phrasings</span></div></div>
+          <div class="m"><div class="arrow down">success</div><div class="node data"><b>Answer card</b></div></div><div class="s"></div>
+        </div>
+        <div class="flow v"><div class="arrow down">what is stored in query_history</div></div>
+        <div class="fan">
+          <div class="node store"><b>Clarifications</b><span>completed · trust 0 · path clarification</span></div>
+          <div class="node store"><b>Recovery</b><span>failed · error_message saved</span></div>
+          <div class="node store"><b>Answer</b><span>completed · SQL + trust + queryState</span></div>
+        </div>
+      </div>
+      <table style="margin-top:0.8rem">
+        <tr><th>Question</th><th>Kind</th><th>What the user sees (real output)</th></tr>
+        <tr><td>Sales trend</td><td><span class="pill warn">ambiguous</span></td><td>"A sales trend needs a scope: all brands, one brand, or a metric." Chips: Total revenue trend by month · Units sold trend by month · Revenue by brand by year · Maruti Suzuki sales trend</td></tr>
+        <tr><td>Profit by brand</td><td><span class="pill bad">unsupported</span></td><td><b>That isn't in the sales data yet.</b> "Profit can't be calculated because the sales data has selling prices but no cost data." Chips: Revenue by year · Average selling price by brand · Top brand by revenue</td></tr>
+        <tr><td>Ferari sales</td><td><span class="pill bad">unresolved</span></td><td><b>Did you mean…</b> "“ferari” isn't a brand, model or city in the sales data. Available brands include MG, Maruti Suzuki, Hyundai." Chips: MG / Maruti Suzuki / Hyundai sales by year · Top brand by revenue</td></tr>
+        <tr><td>Any query that still errors after repair</td><td><span class="pill info">recovery</span></td><td><b>I couldn't answer that yet</b>, with rephrased alternatives. Clicking a chip sends it as a new question.</td></tr>
+      </table>
+    </div>
+
+    <h2 id="followups">Follow-up questions</h2>
+    <div class="card" data-search="follow up conversation context querystate prior state what about only in">
+      <p>After a successful answer the plan is saved as <code>queryState</code> in the history row. The next question in the same conversation reads the latest completed row and merges it, so short follow-ups work.</p>
+      <div class="diagram">
+        <div class="seq-block ok"><div class="bt">Turn 1 · "MG sales by year"</div>
+          <ol class="seq">
+            <li><span class="who"><i class="u">User</i> → <i class="a">ChatService</i></span><span>MG sales by year</span></li>
+            <li><span class="who"><i class="a">ChatService</i> → <i class="p">Planner</i></span><span>Plan from scratch</span></li>
+            <li class="back"><span class="who"><i class="p">Planner</i> → <i class="a">ChatService</i></span><span>revenue by year, make = MG</span></li>
+            <li><span class="who"><i class="a">ChatService</i> → <i class="h">History</i></span><span>completed, queryState saved</span></li>
+          </ol>
+        </div>
+        <div class="seq-block"><div class="bt">Turn 2 · "What about Hyundai?"</div>
+          <ol class="seq">
+            <li><span class="who"><i class="a">ChatService</i> → <i class="h">History</i></span><span>Latest completed row in this conversation</span></li>
+            <li class="back"><span class="who"><i class="h">History</i> → <i class="a">ChatService</i></span><span>queryState: revenue, year, make = MG</span></li>
+            <li><span class="who"><i class="a">ChatService</i> → <i class="p">Planner</i></span><span>New brand Hyundai + prior state</span></li>
+            <li class="back"><span class="who"><i class="p">Planner</i> → <i class="a">ChatService</i></span><span>revenue by year, make = <b>Hyundai</b></span></li>
+          </ol>
+        </div>
+        <div class="seq-block"><div class="bt">Or turn 2 · "Only in Mumbai"</div>
+          <ol class="seq">
+            <li><span class="who"><i class="a">ChatService</i> → <i class="p">Planner</i></span><span>Add city = Mumbai to prior state</span></li>
+            <li class="back"><span class="who"><i class="p">Planner</i> → <i class="a">ChatService</i></span><span>revenue by year, make = MG, <b>city = Mumbai</b></span></li>
+          </ol>
+        </div>
+      </div>
+      <table style="margin-top:0.8rem">
+        <tr><th>Turn</th><th>Question</th><th>Plan used (real output)</th></tr>
+        <tr><td>1</td><td>MG sales by year</td><td>metric revenue · dimension year · make = MG</td></tr>
+        <tr><td>2</td><td>What about Hyundai?</td><td>metric revenue · dimension year · make = <b>Hyundai</b> (brand swapped)</td></tr>
+        <tr><td>2 (alternative)</td><td>Only in Mumbai</td><td>metric revenue · dimension year · make = MG · <b>city = Mumbai</b> (filter added, extra join to dim_region)</td></tr>
+      </table>
+      <p class="caption">Changing only the metric ("Show units instead") is not carried over yet: it is planned as a new question.</p>
+    </div>
+
+    <h2 id="history">Question history</h2>
+    <p class="lead">Every question, answered or not, leaves one row in <code>query_history</code> (app database). It powers the Query History page, cancel, audits and follow-ups.</p>
+    <div class="card" data-search="question history query_history status running completed failed cancelled trust latency api">
+      <div class="grid2">
+        <div>
+          <h3 style="margin-top:0">Status lifecycle</h3>
+          <div class="diagram">
+            <div class="flow center">
+              <div class="node ui"><b>running</b><span>question received</span></div>
+              <div class="arrow"></div>
+              <div class="flow v" style="gap:0.4rem">
+                <div class="flow"><div class="arrow">answer or clarification</div><div class="node data"><b>completed</b></div></div>
+                <div class="flow"><div class="arrow">recovery card</div><div class="node stop"><b>failed</b></div></div>
+                <div class="flow"><div class="arrow">user pressed Stop</div><div class="node alt"><b>cancelled</b></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin-top:0">What each outcome stores</h3>
+          <table>
+            <tr><th>Outcome</th><th>Status</th><th>Stored</th></tr>
+            <tr><td>Answer</td><td><span class="pill ok">completed</span></td><td>SQL, row count, trust score and breakdown, <code>queryState</code>, latency</td></tr>
+            <tr><td>Clarification</td><td><span class="pill ok">completed</span></td><td>trust 0, <code>path = "clarification"</code>, no SQL</td></tr>
+            <tr><td>Recovery</td><td><span class="pill bad">failed</span></td><td><code>error_message</code>, attempted SQL</td></tr>
+            <tr><td>Stopped</td><td><span class="pill info">cancelled</span></td><td>via <code>POST /chat/cancel/{history_id}</code></td></tr>
+            <tr><td>Cache hit</td><td><span class="pill ok">completed</span></td><td>cached SQL and rows, <code>cacheHit: true</code></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <h3>Stored fields</h3>
+      <table>
+        <tr><th style="width:24%">Field</th><th>Meaning</th></tr>
+        <tr><td><code>id</code>, <code>user_id</code>, <code>conversation_id</code></td><td>Who asked and in which conversation. The id is returned as <code>historyId</code> in the <code>done</code> event.</td></tr>
+        <tr><td><code>industry</code>, <code>question</code></td><td>Active pack and the question text as typed.</td></tr>
+        <tr><td><code>status</code></td><td>running → completed / failed / cancelled.</td></tr>
+        <tr><td><code>sql_text</code>, <code>row_count</code></td><td>The exact SELECT that produced the answer and how many rows came back.</td></tr>
+        <tr><td><code>trust_score</code>, <code>trust_breakdown</code></td><td>Score plus JSON with <code>path</code>, <code>groundedOn</code>, <code>ambiguityFlag</code>, <code>validationStatus</code> and <code>queryState</code>.</td></tr>
+        <tr><td><code>error_message</code>, <code>latency_ms</code>, <code>created_at</code></td><td>Failure reason, end-to-end time and timestamp.</td></tr>
+      </table>
+
+      <h3>Example <code>queryState</code> (real output for "MG sales by year")</h3>
+      <pre class="sql">{
+  "metric": "revenue",
+  "intent": "aggregation",
+  "dimensions": ["year"],
+  "timeGrain": "year",
+  "analysis": "breakdown",
+  "yearFilter": null,
+  "filters": [
+    { "column": "automotive.dim_carline.make", "operator": "=", "value": "MG", "label": "Make = MG" }
+  ]
+}</pre>
+
+      <h3>APIs and screens</h3>
+      <table>
+        <tr><th>Endpoint / page</th><th>Purpose</th></tr>
+        <tr><td><code>GET /api/v1/history</code></td><td>Latest 50 questions for the signed-in user and active industry.</td></tr>
+        <tr><td><code>POST /api/v1/chat/cancel/{history_id}</code></td><td>Stops a running question and marks it cancelled.</td></tr>
+        <tr><td>Query History page (<code>/query-history</code>)</td><td>Table of question, status, trust, latency, date and the SQL that ran.</td></tr>
+      </table>
+    </div>
+
+    <h2 id="examples">Question catalogue</h2>
+    <p class="lead">How different kinds of question travel through the pipeline. All rows are real planner outputs for the automotive pack.</p>
+    <div class="card" data-search="examples catalogue questions market share compare trend ranking 24 month window in filter">
+      <table>
+        <tr><th style="width:24%">Question</th><th>Understood as</th><th>SQL shape</th><th>Chart</th></tr>
+        <tr><td>What sales of Maruti?</td><td>trend · Maruti Suzuki · revenue by month</td><td>Last 24 months ending at the latest sale date (no period given)</td><td>line</td></tr>
+        <tr><td>Maruti sales trend</td><td>trend · Maruti Suzuki · revenue by month</td><td>Monthly <code>date_trunc</code>, 24-month window</td><td>line</td></tr>
+        <tr><td>MG car sales by year</td><td>aggregation · MG · revenue by year</td><td><code>EXTRACT(YEAR …)</code>, all years</td><td>line</td></tr>
+        <tr><td>Compare MG and Maruti sales</td><td>comparison · MG, Maruti Suzuki · revenue by make</td><td><code>WHERE make IN ('MG', 'Maruti Suzuki')</code></td><td>bar</td></tr>
+        <tr><td>Maruti market share by year</td><td>market share · units · year × make</td><td>CTE + <code>SUM(units) OVER (PARTITION BY year)</code>, then filter to Maruti</td><td>line</td></tr>
+        <tr><td>Top brand by revenue</td><td>ranking · revenue by make</td><td><code>ORDER BY revenue DESC LIMIT 10</code></td><td>bar</td></tr>
+        <tr><td>SUV sales in Bangalore</td><td>trend · car_type SUV · city Bengaluru</td><td>Two joins, 24-month window</td><td>line</td></tr>
+        <tr><td>EV sales by year</td><td>aggregation · engine_type Electric · year</td><td><code>WHERE engine_type = 'Electric'</code></td><td>line</td></tr>
+        <tr><td>Hundai sales by year</td><td>aggregation · Hyundai (fuzzy) · year</td><td><code>WHERE make = 'Hyundai'</code></td><td>line</td></tr>
+      </table>
+      <h3>Market share SQL (real output)</h3>
+      <pre class="sql">WITH base AS (
+  SELECT EXTRACT(YEAR FROM f.sales_date)::int AS year, c.make AS make,
+         SUM(f.order_qty) AS units_sold, SUM(f.total_sales) AS revenue
+  FROM automotive.fact_sales f
+  JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
+  GROUP BY 1, 2
+), shared AS (
+  SELECT base.*, 100.0 * units_sold / NULLIF(SUM(units_sold) OVER (PARTITION BY year), 0) AS market_share_pct
+  FROM base
+)
+SELECT year, make, market_share_pct, units_sold, revenue
+FROM shared WHERE make IN ('Maruti Suzuki')
+ORDER BY year, market_share_pct DESC LIMIT 100</pre>
+      <p class="caption">Share is computed over all brands first and filtered afterwards; filtering first would always give 100%.</p>
+    </div>
+
+    <!-- ============================ PLATFORM ============================ -->
 
     <h2 id="llm">LLM interaction &amp; reasoning</h2>
-    <div class="card">
-      <p>The model proposes SQL and optional narrative. It does not compute KPIs in Python. Timeouts, retries, and a circuit breaker protect the API. Home “LLM connected” only means a key is configured.</p>
-      <pre class="mermaid">
-flowchart TD
-  Q[User question] --> U[Question understanding]
-  U --> H[YAML hints + glossary ALWAYS/NEVER]
-  H --> P[System prompt: one PostgreSQL SELECT]
-  P --> C{Circuit open?}
-  C -->|yes| F[Degraded message]
-  C -->|no| L[complete_chat]
-  L --> V[sql_is_safe + pack allowlist]
-  V -->|fail| R[Auto-repair or failure card]
-  V -->|pass| X[Execute]
-      </pre>
+    <div class="card" data-search="llm reasoning circuit breaker prompt fallback">
+      <p>Most questions are compiled from the semantic model without the LLM. The model is a fallback for SQL and writes narration; it never computes KPIs. Timeouts, retries and a circuit breaker protect the API. On Home, "LLM connected" only means a key is configured.</p>
+      <div class="diagram">
+        <div class="ladder">
+          <div class="m"><div class="node api"><b>Structured plan</b></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node gate"><b>Compiler or template can build SQL?</b></div></div>
+          <div class="s"><div class="arrow">no</div><div class="node cfg"><b>YAML hints + glossary</b><span>ALWAYS / NEVER rules</span></div><div class="arrow"></div><div class="node ai"><b>Prompt: one SELECT</b><span>allowed tables only</span></div></div>
+          <div class="m"><div class="arrow down">yes (usual case)</div><div class="node gate"><b>LLM circuit open?</b><span>only on the LLM path</span></div></div>
+          <div class="s"><div class="arrow">open</div><div class="node clar"><b>Recovery card</b></div><div class="arrow">closed</div><div class="node ai"><b>complete_chat</b></div></div>
+          <div class="m"><div class="arrow down"></div><div class="node warn"><b>Validate against plan</b></div></div>
+          <div class="s"><div class="arrow">fail</div><div class="node warn"><b>EXPLAIN repair from pack</b><span>then validate again</span></div></div>
+          <div class="m"><div class="arrow down">pass</div><div class="node data"><b>Execute</b></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node ai"><b>LLM narration of real rows</b></div></div><div class="s"></div>
+        </div>
+      </div>
     </div>
 
     <h2 id="semantic-flow">Semantic layer &amp; ontology flow</h2>
-    <div class="card">
-      <pre class="mermaid">
-flowchart LR
-  YAML[Industry pack YAML] --> LOAD[Semantic loader]
-  LOAD --> REG[Metric + entity registry]
-  REG --> ONT[Ontology snapshot compiler]
-  ONT --> RF[React Flow browser]
-  REG --> NLQ[NLQ + Builder]
-  RF -.->|clicks never query SQL| YAML
-      </pre>
+    <div class="card" data-search="semantic ontology knowledge graph ontology map domains centrality hierarchy chat vocabulary">
+      <p>One set of YAML files feeds both AI Chat and the Knowledge Graph. Chat-only rules sit in their own file, so chat tuning never alters the graph.</p>
+      <div class="diagram">
+        <div class="group">
+          <div class="gt">Industry pack YAML</div>
+          <div class="fan">
+            <div class="node cfg"><b>semantic_model.yaml</b><span>entities, measures, joins, value_domains</span></div>
+            <div class="node cfg"><b>business_glossary.yaml</b><span>definitions, synonyms</span></div>
+            <div class="node cfg"><b>chat_vocabulary.yaml</b><span>unavailable terms, generic words · chat only</span></div>
+          </div>
+        </div>
+        <div class="split" style="margin-top:0.4rem">
+          <div>
+            <div class="flow v"><div class="arrow down">model + glossary</div></div>
+            <div class="flow center">
+              <div class="node api"><b>Semantic loader</b></div><div class="arrow"></div>
+              <div class="node api"><b>Ontology snapshot compiler</b></div>
+            </div>
+            <div class="flow v"><div class="arrow down">four views</div></div>
+            <div class="fan">
+              <div class="node ui"><b>Knowledge Graph</b></div>
+              <div class="node ui"><b>Relationship Network</b></div>
+              <div class="node ui"><b>Simple Relationship View</b></div>
+              <div class="node new"><b>Ontology Map · NEW</b><span>domains, centrality, search</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="flow v"><div class="arrow down">model + glossary + chat vocabulary</div></div>
+            <div class="flow center">
+              <div class="node api"><b>AI Chat resolver + planner</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h3>Ontology Map in one minute</h3>
+      <div class="grid2">
+        <div class="tile"><h4>Business domains</h4><p>Automotive: Vehicle, Sales, Dealer, Geography. Insurance: Policy &amp; Customer, Premium, Claims &amp; Risk, Distribution, Geography. Each domain is drawn inside a dashed, organic boundary.</p></div>
+        <div class="tile"><h4>Three layouts</h4><p><b>Force</b> groups domains naturally; <b>Centrality</b> makes the most connected concepts bigger and central; <b>Hierarchy</b> shows each domain as a tree.</p></div>
+        <div class="tile"><h4>Search and focus</h4><p>Typing "SUV" highlights Car Type, Vehicle, Sales Transaction, Units Sold, Revenue and Dealer. Domain pills zoom to one domain and emphasise its links to others.</p></div>
+        <div class="tile"><h4>Core concepts and bridges</h4><p>Automotive cores: Sales Transaction, Vehicle, Units Sold, Revenue, Dealer. Purple lines are cross-domain relationships (12 in automotive).</p></div>
+      </div>
+      <p class="caption">Clicks in any graph view never query Postgres; the graph reads YAML only.</p>
     </div>
 
     <h2 id="dq-flow">Data quality &amp; governance flow</h2>
-    <div class="card">
-      <pre class="mermaid">
-flowchart TD
-  F[Fact tables] --> DQ[DQ engine / freshness / completeness]
-  DQ --> T[Trust snapshot]
-  T --> DTC[Data Trust Center]
-  T --> KPI[KPI cards caution flags]
-  YAML --> GOV[Lineage + glossary]
-  GOV --> ONT[Ontology overlays]
-      </pre>
+    <div class="card" data-search="data quality governance trust lineage">
+      <div class="diagram">
+        <div class="flow center">
+          <div class="node db"><b>Fact tables</b></div><div class="arrow"></div>
+          <div class="node api"><b>DQ engine</b><span>freshness, completeness</span></div><div class="arrow"></div>
+          <div class="node api"><b>Trust snapshot</b></div><div class="arrow"></div>
+          <div class="fan" style="max-width:420px">
+            <div class="node ui"><b>Data Trust Center</b></div>
+            <div class="node ui"><b>KPI caution flags</b></div>
+            <div class="node ui"><b>Chat trust score</b></div>
+          </div>
+        </div>
+        <div class="flow center" style="margin-top:0.6rem">
+          <div class="node cfg"><b>YAML pack</b></div><div class="arrow"></div>
+          <div class="node api"><b>Lineage + glossary</b></div><div class="arrow"></div>
+          <div class="node ui"><b>Knowledge Graph overlays</b></div>
+        </div>
+      </div>
     </div>
 
     <h2 id="rag-flow">Knowledge base / RAG flow</h2>
-    <div class="card">
-      <p>Documents narrate; they never supply a number shown as a calculated result. Web retrieval is opt-in and allowlisted.</p>
-      <pre class="mermaid">
-flowchart LR
-  UP[Upload PDF/DOCX] --> CH[Chunk]
-  CH --> FS[Filesystem store]
-  CH -.-> QD[Qdrant vectors]
-  Q[Chat question] --> RT[Retrieve top-k]
-  RT --> CIT[Citations]
-  CIT --> CARD[Chat card: document context]
-      </pre>
+    <div class="card" data-search="knowledge rag documents upload citations">
+      <p>Documents narrate; they never supply a number shown as a calculated result. Web retrieval is opt-in and allowlisted. The chat router sends document questions down the knowledge path and mixed questions down the hybrid path.</p>
+      <div class="diagram">
+        <div class="flow center">
+          <div class="node ui"><b>Upload PDF / DOCX</b></div><div class="arrow"></div>
+          <div class="node api"><b>Chunk</b></div><div class="arrow"></div>
+          <div class="node db"><b>Filesystem store</b></div>
+          <div class="arrow dashed">optional</div>
+          <div class="node opt"><b>Qdrant vectors</b></div>
+        </div>
+        <div class="flow center" style="margin-top:0.6rem">
+          <div class="node ui"><b>Chat question</b></div><div class="arrow"></div>
+          <div class="node gate"><b>Router</b></div><div class="arrow">knowledge or hybrid</div>
+          <div class="node api"><b>Retrieve top-k</b></div><div class="arrow"></div>
+          <div class="node api"><b>Citations</b></div><div class="arrow"></div>
+          <div class="node ui"><b>Chat card: document context</b></div>
+        </div>
+      </div>
     </div>
 
     <h2 id="insight">User request to insight</h2>
-    <div class="card">
-      <pre class="mermaid">
-flowchart TD
-  R[Request] --> AUTH[Cookie session]
-  AUTH --> IND[x-industry automotive|insurance]
-  IND --> ROUTE{Surface}
-  ROUTE -->|Chat| NLQ
-  ROUTE -->|Builder| SPEC[AnalyticsSpec]
-  ROUTE -->|Executive| KPI[KPI SQL]
-  NLQ --> SQL
-  SPEC --> SQL
-  KPI --> SQL
-  SQL --> INS[Insights + anomaly hints]
-  INS --> UI[Insight depth: executive / analyst]
-      </pre>
+    <div class="card" data-search="request insight surface routing">
+      <div class="diagram">
+        <div class="flow center">
+          <div class="node ui"><b>Request</b></div><div class="arrow"></div>
+          <div class="node api"><b>Cookie session</b></div><div class="arrow"></div>
+          <div class="node api"><b>x-industry</b><span>automotive or insurance</span></div><div class="arrow"></div>
+          <div class="node gate"><b>Surface</b></div>
+        </div>
+        <div class="flow v"><div class="arrow down"></div></div>
+        <div class="fan">
+          <div class="node api"><b>Chat</b><span>14-phase pipeline · saved to query_history</span></div>
+          <div class="node api"><b>Builder</b><span>AnalyticsSpec</span></div>
+          <div class="node api"><b>Executive</b><span>KPI SQL</span></div>
+        </div>
+        <div class="flow v"><div class="arrow down"></div></div>
+        <div class="flow center">
+          <div class="node data"><b>Guarded SQL</b></div><div class="arrow"></div>
+          <div class="node api"><b>Insights + anomaly hints</b></div><div class="arrow"></div>
+          <div class="node ui"><b>Executive or analyst view</b></div>
+        </div>
+      </div>
     </div>
 
     <h2 id="render-flow">Dashboard &amp; analytics rendering</h2>
-    <div class="card">
-      <pre class="mermaid">
-flowchart LR
-  API[JSON rows + chart spec] --> RQ[TanStack Query cache]
-  RQ --> RC[ResultChart / heatmap / KPI]
-  RQ --> TB[Tables]
-  RQ --> EX[Executive cards + explorer]
-  TH[Theme store] --> RC
-      </pre>
+    <div class="card" data-search="rendering chart result chart multi series query plan note">
+      <div class="diagram">
+        <div class="flow center">
+          <div class="node api"><b>Rows + chart spec + query plan</b></div><div class="arrow"></div>
+          <div class="node ui"><b>TanStack Query / SSE fold</b></div><div class="arrow"></div>
+          <div class="fan" style="max-width:560px">
+            <div class="node ui"><b>ResultChart</b><span>bar, line, area, pie, multi-series</span></div>
+            <div class="node ui"><b>QueryPlanNote</b><span>"Understood as"</span></div>
+            <div class="node ui"><b>Tables + SQL</b></div>
+            <div class="node ui"><b>Executive cards + explorer</b></div>
+          </div>
+        </div>
+        <div class="flow center" style="margin-top:0.5rem">
+          <div class="node cfg"><b>Theme store</b></div><div class="arrow"></div><div class="node ui"><b>ResultChart colours</b></div>
+        </div>
+      </div>
+      <p class="caption"><b>QueryPlanNote</b> explains how the question was understood. <b>chartKind</b> turns the server's chart hint into the starting chart type. <b>ResultChart</b> draws it, and users can switch type or pick "All series".</p>
     </div>
 
     <h2 id="security">Security &amp; access control</h2>
-    <div class="card">
+    <div class="card" data-search="security access rbac cookies csrf read only">
       <ul>
         <li>HttpOnly cookies <code>nql_access</code> / <code>nql_refresh</code> + CSRF double-submit.</li>
-        <li>Roles: viewer, analyst, admin. Chat and Builder require analyst+.</li>
+        <li>Roles: viewer, analyst, admin. Chat and Builder require analyst or above.</li>
         <li>Analytics pools: <code>SET TRANSACTION READ ONLY</code>, statement timeout, max rows.</li>
+        <li>Question history is scoped to the signed-in user and active industry.</li>
         <li>Production: <code>AUTH_BYPASS=false</code>, <code>COOKIE_SECURE=true</code>.</li>
       </ul>
-      <pre class="mermaid">
-flowchart TD
-  L[Login] --> C[Set cookies]
-  C --> M[Next proxy: nql_access]
-  M --> API[FastAPI deps]
-  API --> RBAC[RequireViewer / Analyst / Admin]
-  RBAC --> RO[Read-only SQL]
-      </pre>
+      <div class="diagram">
+        <div class="flow center">
+          <div class="node ui"><b>Login</b></div><div class="arrow"></div>
+          <div class="node api"><b>Set cookies</b></div><div class="arrow"></div>
+          <div class="node ui"><b>Next proxy</b><span>forwards nql_access</span></div><div class="arrow"></div>
+          <div class="node api"><b>FastAPI deps</b></div><div class="arrow"></div>
+          <div class="node warn"><b>RequireViewer / Analyst / Admin</b></div><div class="arrow"></div>
+          <div class="node data"><b>Read-only SQL</b></div>
+        </div>
+      </div>
     </div>
 
     <h2 id="deploy">Deployment architecture</h2>
-    <div class="card">
+    <div class="card" data-search="deployment vercel render supabase">
       <table>
         <tr><th>Layer</th><th>Host</th><th>Notes</th></tr>
         <tr><td>Frontend</td><td>Vercel</td><td><code>askdb</code> root, Next.js, <code>API_REWRITE_TARGET</code></td></tr>
@@ -364,26 +1191,20 @@ flowchart TD
         <tr><td>Vector / docs</td><td>Optional Mongo + Qdrant</td><td>Filesystem fallback for knowledge</td></tr>
         <tr><td>LLM</td><td>External OpenAI-compatible API</td><td>Key only on Render</td></tr>
       </table>
-      <pre class="mermaid">
-flowchart TB
-  subgraph Edge
-    V[Vercel Next.js]
-  end
-  subgraph Compute
-    R[Render FastAPI]
-  end
-  subgraph Data
-    S[Supabase pooler]
-    F[Pack YAML in image]
-  end
-  subgraph AI
-    L[LLM HTTPS]
-  end
-  V --> R --> S
-  R --> F
-  R --> L
-      </pre>
+      <div class="diagram">
+        <div class="flow center" style="align-items:stretch">
+          <div class="group"><div class="gt">Edge</div><div class="node ui"><b>Vercel Next.js</b></div></div>
+          <div class="arrow"></div>
+          <div class="group"><div class="gt">Compute</div><div class="node api"><b>Render FastAPI</b></div></div>
+          <div class="arrow"></div>
+          <div class="group"><div class="gt">Data</div><div class="flow v" style="gap:0.4rem"><div class="node db"><b>Supabase pooler</b></div><div class="node cfg"><b>Pack YAML in image</b></div></div></div>
+          <div class="arrow"></div>
+          <div class="group"><div class="gt">AI</div><div class="node ai"><b>LLM over HTTPS</b></div></div>
+        </div>
+      </div>
     </div>
+
+    <!-- ============================ MODULES ============================ -->
 
     <h2>Module playbooks</h2>
     <p style="color:var(--mute)">Each module below expands. Search above filters these cards.</p>
@@ -434,33 +1255,45 @@ flowchart TB
       </div>
     </details>
 
-    <details class="mod" id="m-ask" data-search="ask db nlq chat natural language">
-      <summary>ASK DB / Natural Language Query</summary>
+    <details class="mod" id="m-ask" data-search="ask db nlq chat natural language understood as clarification follow up">
+      <summary>ASK DB / AI Chat</summary>
       <div class="body">
-        <p><strong>Purpose.</strong> Ask governed questions in English; get SQL-backed answers plus narrative.</p>
-        <p><strong>Key features.</strong> Question understanding, template hits, LLM SQL, citations, follow-ups, cancel, saved prompts.</p>
-        <p><strong>User workflow.</strong> AI Chat → type question → review table/SQL/trust → follow-up.</p>
-        <p><strong>Technical workflow.</strong> Hosted UI uses <code>POST /api/v1/chat/ask-sync</code> (JSON) because Vercel buffers SSE. Locally SSE <code>/chat/ask</code> still exists.</p>
-        <p><strong>I/O.</strong> Question + industry in; events (sql, rows, meta, tokens, failure) out.</p>
-        <p><strong>Depends on.</strong> LLM key on API, YAML pack, analytics DB, optional knowledge store.</p>
+        <p><strong>Purpose.</strong> Ask governed questions in plain English and get SQL-backed answers, charts and a narrative.</p>
+        <p><strong>Key features.</strong> Entity resolution (exact, synonym, fuzzy, alias, glossary), structured plan shown as "Understood as", multi-brand comparisons, market share, 24-month default trend window, clarification and recovery cards with clickable suggestions, follow-ups, multi-series charts, cancel, saved prompts, citations.</p>
+        <p><strong>User workflow.</strong> AI Chat → type a question → check "Understood as" → review chart, table, SQL and trust → click a suggestion or ask a follow-up.</p>
+        <p><strong>Technical workflow.</strong> Hosted UI uses <code>POST /api/v1/chat/ask-sync</code> (JSON) because Vercel buffers SSE; locally the SSE <code>/chat/ask</code> endpoint is used. See <a href="#lifecycle">the 14 phases</a>.</p>
+        <p><strong>I/O.</strong> Question, industry and conversationId in; events (stage, plan, sql, columns, rows, chart, clarification, tokens, followups, done) out.</p>
+        <p><strong>Depends on.</strong> YAML pack and chat vocabulary, value dictionary, analytics DB, query history, LLM key on the API (fallback and narration), optional knowledge store.</p>
       </div>
     </details>
 
-    <details class="mod" id="m-semantic" data-search="semantic layer yaml metrics">
+    <details class="mod" id="m-history" data-search="query history page audit status trust latency sql cancel">
+      <summary>Query History <span class="tag">New</span></summary>
+      <div class="body">
+        <p><strong>Purpose.</strong> An audit trail of every chat question, and the memory used for follow-ups.</p>
+        <p><strong>Key features.</strong> Question, status (running, completed, failed, cancelled), trust score, latency, date and the SQL that ran.</p>
+        <p><strong>User workflow.</strong> Open Query History → scan recent questions → expand a row to see its SQL.</p>
+        <p><strong>Technical workflow.</strong> <code>GET /api/v1/history</code> returns the last 50 rows for the user and industry from <code>query_history</code>. See <a href="#history">Question history</a>.</p>
+        <p><strong>Depends on.</strong> App database (<code>askdb_app</code>), chat service writing each row.</p>
+      </div>
+    </details>
+
+    <details class="mod" id="m-semantic" data-search="semantic layer yaml metrics chat vocabulary">
       <summary>Semantic Layer</summary>
       <div class="body">
-        <p><strong>Purpose.</strong> Single source of entities, measures, joins, and rules.</p>
-        <p><strong>Technical workflow.</strong> Load <code>apps/api/semantic/packs/{industry}/*.yaml</code> at runtime. Docker image must copy the <code>semantic/</code> folder.</p>
-        <p><strong>Output.</strong> Pack API, ontology snapshot, NLQ hints. <strong>Never</strong> inferred from scanning tables ad hoc.</p>
+        <p><strong>Purpose.</strong> Single source of entities, measures, joins, value domains and rules.</p>
+        <p><strong>Files.</strong> <code>pack.yaml</code>, <code>semantic_model.yaml</code>, <code>business_glossary.yaml</code> and the chat-only <code>chat_vocabulary.yaml</code> under <code>apps/api/semantic/packs/{industry}/</code>. The Docker image must copy the <code>semantic/</code> folder.</p>
+        <p><strong>Output.</strong> Pack API, ontology snapshot, chat resolver vocabulary and planner formulas. <strong>Never</strong> inferred from scanning tables ad hoc.</p>
       </div>
     </details>
 
-    <details class="mod" id="m-ontology" data-search="ontology browser react flow constellation">
-      <summary>Ontology Explorer</summary>
+    <details class="mod" id="m-ontology" data-search="ontology browser knowledge graph react flow ontology map domains centrality hierarchy">
+      <summary>Knowledge Graph / Ontology Explorer</summary>
       <div class="body">
-        <p><strong>Purpose.</strong> Visual knowledge graph: network, centrality, hierarchy, lineage, constellation.</p>
-        <p><strong>User workflow.</strong> Ontology Browser → choose layout → inspect node → business vs technical overlay.</p>
-        <p><strong>Technical workflow.</strong> Snapshot compiled from YAML only; node clicks do not query Postgres.</p>
+        <p><strong>Purpose.</strong> A visual map of business concepts and how they relate.</p>
+        <p><strong>Views.</strong> Knowledge Graph (recommended), Relationship Network, Simple Relationship View, and the new <b>Ontology Map</b> with domain clusters, Force / Centrality / Hierarchy layouts, domain pills, search and cross-domain links.</p>
+        <p><strong>User workflow.</strong> Semantic Atlas → pick a view → click a concept → switch between business and technical names.</p>
+        <p><strong>Technical workflow.</strong> Snapshot compiled from YAML (plus glossary terms for the Ontology Map); node clicks never query Postgres.</p>
       </div>
     </details>
 
@@ -481,11 +1314,11 @@ flowchart TB
       </div>
     </details>
 
-    <details class="mod" id="m-glossary" data-search="business glossary always never">
+    <details class="mod" id="m-glossary" data-search="business glossary always never synonyms">
       <summary>Business Glossary</summary>
       <div class="body">
-        <p><strong>Purpose.</strong> Human definitions and ALWAYS/NEVER disambiguation (e.g. dealer vs salesman).</p>
-        <p><strong>Lives in.</strong> <code>business_glossary.yaml</code> inside each industry pack. Consumed by NLQ and Semantic Atlas.</p>
+        <p><strong>Purpose.</strong> Human definitions, synonyms and ALWAYS/NEVER disambiguation (e.g. dealer vs salesman, "sales" means revenue).</p>
+        <p><strong>Lives in.</strong> <code>business_glossary.yaml</code> inside each industry pack. Used by the chat resolver (glossary matches), the planner, Semantic Atlas and the Ontology Map.</p>
       </div>
     </details>
 
@@ -494,31 +1327,31 @@ flowchart TB
       <div class="body">
         <p><strong>Purpose.</strong> Swap the entire semantic + KPI surface with one industry flag.</p>
         <p><strong>Packs.</strong> Automotive (sales, dealers, models) and Insurance (claims, policies, loss ratio).</p>
-        <p><strong>Switch.</strong> Session default + per-tab override via <code>x-industry</code>.</p>
+        <p><strong>Switch.</strong> Session default + per-tab override via <code>x-industry</code>. Question history is filtered by industry too.</p>
       </div>
     </details>
 
     <details class="mod" id="m-saved" data-search="saved questions">
       <summary>Saved Questions</summary>
       <div class="body">
-        <p><strong>Purpose.</strong> Pin NLQ or Builder questions for reuse.</p>
-        <p><strong>Store.</strong> <code>askdb_app</code> tables. Open from Chat deep link <code>?q=</code>.</p>
+        <p><strong>Purpose.</strong> Pin chat or Builder questions for reuse.</p>
+        <p><strong>Store.</strong> <code>askdb_app</code> tables (<code>GET/POST /api/v1/questions</code>). Open from Chat deep link <code>?q=</code>.</p>
       </div>
     </details>
 
     <details class="mod" id="m-sql" data-search="sql explorer viewer">
       <summary>SQL Explorer</summary>
       <div class="body">
-        <p><strong>Purpose.</strong> Show the exact SELECT that produced an answer (Chat / Builder / history).</p>
+        <p><strong>Purpose.</strong> Show the exact SELECT that produced an answer (Chat / Builder / Query History).</p>
         <p><strong>Governance.</strong> Display only; users cannot submit arbitrary SQL from the UI.</p>
       </div>
     </details>
 
-    <details class="mod" id="m-viz" data-search="chart visualization heatmap treemap">
+    <details class="mod" id="m-viz" data-search="chart visualization heatmap treemap multi series">
       <summary>Chart &amp; Visualization Engine</summary>
       <div class="body">
-        <p><strong>Purpose.</strong> Turn row sets into bar/line/area/pie/scatter/KPI/heatmap/treemap.</p>
-        <p><strong>Component.</strong> <code>ResultChart</code> plus Builder previews. Labels come from semantic titles, not raw column ids where possible.</p>
+        <p><strong>Purpose.</strong> Turn row sets into bar / line / area / pie / scatter / KPI / heatmap / treemap.</p>
+        <p><strong>Component.</strong> <code>ResultChart</code> plus Builder previews. When a result has several numeric columns, "All series" draws grouped bars or multiple lines with a legend. Labels come from semantic titles, not raw column ids where possible.</p>
       </div>
     </details>
 
@@ -533,7 +1366,7 @@ flowchart TB
       <summary>Governance &amp; Lineage</summary>
       <div class="body">
         <p><strong>Purpose.</strong> Show how a measure traces to physical tables/columns via YAML lineage, not inferred FK scans.</p>
-        <p><strong>UI.</strong> Ontology lineage layout + technical overlay (physical names).</p>
+        <p><strong>UI.</strong> Knowledge Graph lineage + technical overlay (physical names). Chat answers link back to their SQL in Query History.</p>
       </div>
     </details>
 
@@ -548,26 +1381,24 @@ flowchart TB
 
     <div class="card" style="margin-top:2rem">
       <strong>How to open this hub</strong>
-      <p>After a Vercel deploy: <code>/knowledge-hub/</code> on the same site. Locally: <code>askdb/apps/web/public/knowledge-hub/index.html</code>.</p>
+      <p>After a Vercel deploy: <code>/knowledge-hub/AskDB_Guide.html</code> on the same site. Locally: <code>askdb/apps/web/public/knowledge-hub/AskDB_Guide.html</code>, or <code>http://localhost:3000/knowledge-hub/AskDB_Guide.html</code> with the dev server running.</p>
     </div>
   </main>
 </div>
 <script>
-  mermaid.initialize({ startOnLoad: true, theme: document.documentElement.dataset.theme === "dark" ? "dark" : "neutral", securityLevel: "loose" });
   const root = document.documentElement;
-  const stored = localStorage.getItem("askdb-docs-theme");
-  if (stored) root.dataset.theme = stored;
-  else if (matchMedia("(prefers-color-scheme: dark)").matches) root.dataset.theme = "dark";
+
   document.getElementById("themeBtn").onclick = () => {
     root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
     localStorage.setItem("askdb-docs-theme", root.dataset.theme);
-    location.reload();
   };
+
+
   const q = document.getElementById("q");
   q.addEventListener("input", () => {
     const term = q.value.trim().toLowerCase();
     document.querySelectorAll("[data-search], details.mod, .card, .hero").forEach((el) => {
-      const blob = (el.getAttribute("data-search") || el.innerText).toLowerCase();
+      const blob = ((el.getAttribute("data-search") || "") + " " + el.innerText).toLowerCase();
       el.classList.toggle("hidden", Boolean(term) && !blob.includes(term));
     });
   });
