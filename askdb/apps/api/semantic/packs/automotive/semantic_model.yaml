@@ -239,7 +239,38 @@ value_domains:
       Petrol: [gasoline, petrol cars, petrol vehicles]
       Diesel: [diesel cars, diesel vehicles]
       Hybrid: [hybrids, HEV, strong hybrid, hybrid cars]
-  colour: {table: dim_color, column: colour_name, label: Colour, max_values: 100, aliases: [color, paint]}
+  # A colour family word ("red", "grey") resolves to every shade that lists it.
+  colour:
+    table: dim_color
+    column: colour_name
+    label: Colour
+    max_values: 100
+    aliases: [color, paint]
+    value_aliases:
+      Midnight Black: [black]
+      Pearl White: [white, pearl]
+      Ivory: [off white, cream]
+      Arctic Silver: [silver]
+      Titanium: [titanium grey, titanium gray]
+      Graphite Grey: [grey, gray, graphite gray]
+      Nardo Grey: [grey, gray, nardo gray]
+      Storm Grey: [grey, gray, storm gray]
+      Fire Red: [red]
+      Crimson Metallic: [red, crimson, maroon]
+      Cosmic Blue: [blue]
+      Ocean Blue: [blue]
+      Ice Blue: [blue, light blue]
+      Sky Cyan: [cyan, sky blue, turquoise]
+      Aurora Green: [green]
+      Forest Green: [green, dark green]
+      Emerald Pearl: [green, emerald]
+      Lava Orange: [orange]
+      Sunburst Orange: [orange]
+      Champagne Gold: [gold, golden, champagne]
+      Desert Beige: [beige, sand]
+      Coral Pink: [pink, coral]
+      Royal Purple: [purple, violet]
+      Matte Bronze: [bronze, brown]
   city:
     table: dim_region
     column: city
@@ -291,7 +322,36 @@ value_domains:
       Raipur: []
       Jodhpur: []
   region: {table: dim_region, column: region_name, label: Region, max_values: 100, aliases: [territory, geography]}
-  state: {table: dim_region, column: state_code, label: State, max_values: 100}
+  # Users type state names; the warehouse stores two-letter codes.
+  state:
+    table: dim_region
+    column: state_code
+    label: State
+    max_values: 100
+    value_aliases:
+      AP: [Andhra Pradesh]
+      AS: [Assam]
+      BR: [Bihar]
+      CG: [Chhattisgarh, Chattisgarh]
+      CH: [Chandigarh UT]
+      DL: [Delhi NCT, NCT of Delhi, Delhi state]
+      GA: [Goa state]
+      GJ: [Gujarat]
+      HP: [Himachal Pradesh, Himachal]
+      HR: [Haryana]
+      JH: [Jharkhand]
+      KA: [Karnataka]
+      KL: [Kerala]
+      MH: [Maharashtra]
+      MP: [Madhya Pradesh]
+      OD: [Odisha, Orissa]
+      PB: [Punjab]
+      RJ: [Rajasthan]
+      TN: [Tamil Nadu]
+      TS: [Telangana]
+      UK: [Uttarakhand]
+      UP: [Uttar Pradesh]
+      WB: [West Bengal, Bengal]
   dealer_grade: {table: dim_dealer, column: dealer_grade, label: Dealer Grade, max_values: 10}
 
 business_entities:

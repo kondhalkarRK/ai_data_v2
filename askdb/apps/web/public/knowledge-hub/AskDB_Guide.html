@@ -493,7 +493,7 @@
             <div class="gt">Config, AI and optional stores</div>
             <div class="fan">
               <div class="node cfg"><b>YAML industry packs</b><span>semantic model, glossary, chat vocabulary</span></div>
-              <div class="node ai"><b>LLM provider</b><span>fallback SQL + narration</span></div>
+              <div class="node ai"><b>LLM provider</b><span>fallback SQL only</span></div>
               <div class="node opt"><b>MongoDB</b><span>optional</span></div>
               <div class="node opt"><b>Qdrant</b><span>optional vectors</span></div>
             </div>
@@ -1013,7 +1013,7 @@ ORDER BY year, market_share_pct DESC LIMIT 100</pre>
 
     <h2 id="llm">LLM interaction &amp; reasoning</h2>
     <div class="card" data-search="llm reasoning circuit breaker prompt fallback">
-      <p>Most questions are compiled from the semantic model without the LLM. The model is a fallback for SQL and writes narration; it never computes KPIs. Timeouts, retries and a circuit breaker protect the API. On Home, "LLM connected" only means a key is configured.</p>
+      <p>Most questions are compiled from the semantic model without the LLM. The model is only a fallback that writes SQL when the planner cannot; narration is built from the plan and results in Python, and the model never computes KPIs. Timeouts, retries and a circuit breaker protect the API. On Home, "LLM connected" only means a key is configured.</p>
       <div class="diagram">
         <div class="ladder">
           <div class="m"><div class="node api"><b>Structured plan</b></div></div><div class="s"></div>
@@ -1024,7 +1024,7 @@ ORDER BY year, market_share_pct DESC LIMIT 100</pre>
           <div class="m"><div class="arrow down"></div><div class="node warn"><b>Validate against plan</b></div></div>
           <div class="s"><div class="arrow">fail</div><div class="node warn"><b>EXPLAIN repair from pack</b><span>then validate again</span></div></div>
           <div class="m"><div class="arrow down">pass</div><div class="node data"><b>Execute</b></div></div><div class="s"></div>
-          <div class="m"><div class="arrow down"></div><div class="node ai"><b>LLM narration of real rows</b></div></div><div class="s"></div>
+          <div class="m"><div class="arrow down"></div><div class="node api"><b>Narration from plan + rows</b><span>built in Python, no LLM</span></div></div><div class="s"></div>
         </div>
       </div>
     </div>
@@ -1263,7 +1263,7 @@ ORDER BY year, market_share_pct DESC LIMIT 100</pre>
         <p><strong>User workflow.</strong> AI Chat → type a question → check "Understood as" → review chart, table, SQL and trust → click a suggestion or ask a follow-up.</p>
         <p><strong>Technical workflow.</strong> Hosted UI uses <code>POST /api/v1/chat/ask-sync</code> (JSON) because Vercel buffers SSE; locally the SSE <code>/chat/ask</code> endpoint is used. See <a href="#lifecycle">the 14 phases</a>.</p>
         <p><strong>I/O.</strong> Question, industry and conversationId in; events (stage, plan, sql, columns, rows, chart, clarification, tokens, followups, done) out.</p>
-        <p><strong>Depends on.</strong> YAML pack and chat vocabulary, value dictionary, analytics DB, query history, LLM key on the API (fallback and narration), optional knowledge store.</p>
+        <p><strong>Depends on.</strong> YAML pack and chat vocabulary, value dictionary, analytics DB, query history, LLM key on the API (SQL fallback only), optional knowledge store.</p>
       </div>
     </details>
 

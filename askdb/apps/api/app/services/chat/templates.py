@@ -14,7 +14,9 @@ from app.services.chat.question_understanding import (
 from app.services.chat.semantic_analytics import (
     SemanticCompileError,
     compile_analytical_query,
+    time_scope_clauses,
 )
+from app.services.chat.time_periods import anchor_sql, period_predicate
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +66,10 @@ def resolve_template(
         special = _automotive_business_shape(plan)
         if special is not None:
             return special
+    elif pack is not None:
+        governed = _insurance_governed(plan, pack)
+        if governed is not None:
+            return governed
 
     # Rich plans must be compiled before narrow legacy templates get a chance to
     # collapse the grain (for example month + car type + colour -> month only).
@@ -152,7 +158,11 @@ def _automotive_filter_parts(
             joins.append(join)
             aliases.add(alias)
         clauses.append(filter_predicate(f"{alias}.{column}", filt))
-    if plan.year_filter:
+    if plan.period is not None:
+        clauses.append(
+            period_predicate(plan.period, "f.sales_date", anchor_sql("automotive.fact_sales", "sales_date"))
+        )
+    elif plan.year_filter:
         clauses.append(f"EXTRACT(YEAR FROM f.sales_date)::int = {int(plan.year_filter)}")
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     return joins, where
@@ -166,7 +176,7 @@ def _governed_automotive(plan: QuestionPlan) -> TemplateHit | None:
         return _year_window_sql(plan)
     if plan.analysis == "period_growth":
         return _growth_sql(plan)
-    if plan.year_filter or "year" in plan.dimensions:
+    if plan.has_time_scope or "year" in plan.dimensions:
         if plan.metric in {"revenue", "orders", "units", "average_selling_price"}:
             return _dimension_breakdown_sql(plan if plan.dimensions else _with_month(plan))
     if plan.entity != "metric_only":
@@ -358,7 +368,7 @@ def _dimension_breakdown_sql(plan: QuestionPlan) -> TemplateHit | None:
             joins.append(join)
     metrics, order_alias = _order_metric(plan.metric if plan.metric != "unknown" else "revenue")
     chronological = any(key in dims for key in _TIME_KEYS)
-    if "month" in dims and not plan.year_filter:
+    if "month" in dims and not plan.has_time_scope:
         where = _where_with(where, _RECENT_MONTHS)
     order = (
         ", ".join(str(i) for i in range(1, len(selects) + 1))
@@ -410,7 +420,7 @@ def _market_share_sql(plan: QuestionPlan) -> TemplateHit | None:
     for join in extra_joins:
         if join not in joins:
             joins.append(join)
-    if "month" in time_keys and not plan.year_filter:
+    if "month" in time_keys and not plan.has_time_scope:
         where = _where_with(where, _RECENT_MONTHS)
     metric = "revenue" if plan.metric == "revenue" else "units_sold"
     dim_aliases = [_DIM_EXPR[key][1] for key in dims]
@@ -494,7 +504,7 @@ def _comparison_pivot_sql(plan: QuestionPlan) -> TemplateHit | None:
     for extra in extra_joins:
         if extra not in joins:
             joins.append(extra)
-    if "month" in time_keys and not plan.year_filter:
+    if "month" in time_keys and not plan.has_time_scope:
         where = _where_with(where, _RECENT_MONTHS)
     template, suffix = _PIVOT_METRIC[plan.metric]
     series: list[str] = []
@@ -744,8 +754,211 @@ def _insurance_filter_parts(
             if " dim_policy po " in f" {join} ":
                 aliases.add("po")
         clauses.append(filter_predicate(f"{alias}.{column}", filt))
+    clauses.extend(
+        time_scope_clauses(
+            plan,
+            alias=fact_alias,
+            physical_table=f"insurance.{fact_table}",
+            date_column="reported_date" if fact_alias == "c" else "accounting_month",
+            default_window=False,
+        )
+    )
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     return joins, where
+
+
+_INSURANCE_COMPILED = frozenset(
+    {
+        "premium",
+        "earned_premium",
+        "renewal_rate",
+        "claims_incurred",
+        "claims_paid",
+        "claim_count",
+        "severity",
+        "approval_rate",
+    }
+)
+# Cross-fact ratios: (claims numerator, premium denominator, ratio alias).
+_INSURANCE_RATIOS: dict[str, tuple[tuple[str, str], tuple[str, str], str]] = {
+    "loss_ratio": (
+        ("SUM(c.incurred_amount)", "claims_incurred"),
+        ("SUM(pm.earned_premium)", "earned_premium"),
+        "loss_ratio",
+    ),
+    "frequency": (
+        ("COUNT(DISTINCT c.claim_id)", "claim_count"),
+        ("SUM(pm.exposure_units)", "exposure_units"),
+        "claim_frequency",
+    ),
+}
+_INSURANCE_DIMENSION_COLUMNS: dict[str, tuple[str, str]] = {
+    "product": ("insurance.dim_product", "product_name"),
+    "line_of_business": ("insurance.dim_product", "line_of_business"),
+    "product_family": ("insurance.dim_product", "product_family"),
+    "coverage_type": ("insurance.dim_product", "coverage_type"),
+    "region": ("insurance.dim_region", "region_name"),
+    "state": ("insurance.dim_region", "state_name"),
+    "agent": ("insurance.dim_agent", "agent_name"),
+    "channel": ("insurance.dim_agent", "channel_name"),
+    "branch": ("insurance.dim_agent", "branch_name"),
+    "coverage_tier": ("insurance.dim_policy", "coverage_tier"),
+    "policy_status": ("insurance.dim_policy", "policy_status"),
+}
+_INSURANCE_TABLE_KEYS: dict[str, tuple[str, str]] = {
+    "insurance.dim_product": ("p", "product_id"),
+    "insurance.dim_region": ("r", "region_id"),
+    "insurance.dim_agent": ("a", "agent_id"),
+    "insurance.dim_policy": ("po", "policy_id"),
+}
+
+
+def _insurance_governed(plan: QuestionPlan, pack: object) -> TemplateHit | None:
+    """Semantic-compiled insurance answers that keep every filter and period."""
+    if plan.metric in _INSURANCE_RATIOS:
+        return _insurance_ratio_sql(plan)
+    if plan.metric not in _INSURANCE_COMPILED:
+        return None
+    if not plan.dimensions:
+        plan.dimensions = ["month"]
+        plan.time_grain = "month"
+        if plan.intent in {"aggregation", "unknown"}:
+            plan.intent = "trend"
+    try:
+        compiled = compile_analytical_query(plan, pack, force=True)
+    except SemanticCompileError:
+        return None
+    if compiled is None:
+        return None
+    return TemplateHit(
+        sql=compiled.sql,
+        title=compiled.title,
+        glossary_matches=max(2, len(plan.dimensions) + 1),
+        path="semantic_compiler",
+    )
+
+
+def _insurance_side(
+    plan: QuestionPlan,
+    *,
+    fact_table: str,
+    fact_alias: str,
+    date_column: str,
+    measure: tuple[str, str],
+) -> tuple[str, list[str]]:
+    """One aggregated CTE body of a cross-fact ratio; returns (sql, output aliases)."""
+    joins: list[str] = []
+
+    def need(table: str) -> str:
+        alias, key = _INSURANCE_TABLE_KEYS[table]
+        if table == "insurance.dim_agent" and fact_alias == "c":
+            # Claims reach the selling agent through the policy.
+            wanted = [
+                "JOIN insurance.dim_policy po ON po.policy_id = c.policy_id",
+                "JOIN insurance.dim_agent a ON a.agent_id = po.agent_id",
+            ]
+        else:
+            wanted = [f"JOIN {table} {alias} ON {alias}.{key} = {fact_alias}.{key}"]
+        joins.extend(join for join in wanted if join not in joins)
+        return alias
+
+    selects: list[str] = []
+    aliases: list[str] = []
+    for key in plan.dimensions:
+        column = f"{fact_alias}.{date_column}"
+        if key == "year":
+            expression, name = f"EXTRACT(YEAR FROM {column})::int", "year"
+        elif key in {"month", "quarter"}:
+            expression, name = f"date_trunc('{key}', {column})::date", key
+        else:
+            table, name = _INSURANCE_DIMENSION_COLUMNS[key]
+            expression = f"{need(table)}.{name}"
+        selects.append(f"{expression} AS {name}")
+        aliases.append(name)
+    clauses: list[str] = []
+    for filt in plan.filters:
+        table, _, column = filt.column.rpartition(".")
+        if table.startswith("insurance.fact_"):
+            if table == fact_table:
+                clauses.append(filter_predicate(f"{fact_alias}.{column}", filt))
+            continue
+        if table in _INSURANCE_TABLE_KEYS:
+            clauses.append(filter_predicate(f"{need(table)}.{column}", filt))
+    clauses.extend(
+        time_scope_clauses(
+            plan,
+            alias=fact_alias,
+            physical_table=fact_table,
+            date_column=date_column,
+            default_window=True,
+        )
+    )
+    expression, name = measure
+    body = (
+        f"SELECT {', '.join([*selects, f'{expression} AS {name}'])}\n"
+        f"  FROM {fact_table} {fact_alias}\n"
+        + "".join(f"  {join}\n" for join in joins)
+        + (f"  WHERE {' AND '.join(clauses)}\n" if clauses else "")
+        + (f"  GROUP BY {', '.join(str(i) for i in range(1, len(selects) + 1))}" if selects else "")
+    )
+    return body.rstrip(), aliases
+
+
+def _insurance_ratio_sql(plan: QuestionPlan) -> TemplateHit | None:
+    """Loss ratio / claim frequency: aggregate each fact at the same grain, then divide."""
+    if any(
+        key not in _INSURANCE_DIMENSION_COLUMNS and key not in _TIME_KEYS for key in plan.dimensions
+    ):
+        return None  # claim-only groupings (status, type) have no premium side
+    numerator, denominator, ratio = _INSURANCE_RATIOS[plan.metric]
+    claims_sql, keys = _insurance_side(
+        plan,
+        fact_table="insurance.fact_claims",
+        fact_alias="c",
+        date_column="reported_date",
+        measure=numerator,
+    )
+    premium_sql, _ = _insurance_side(
+        plan,
+        fact_table="insurance.fact_policy_monthly",
+        fact_alias="pm",
+        date_column="accounting_month",
+        measure=denominator,
+    )
+    num, den = numerator[1], denominator[1]
+    outputs = [f"COALESCE(cl.{key}, pr.{key}) AS {key}" for key in keys]
+    joined = (
+        "FROM claims cl\nFULL OUTER JOIN premium pr ON "
+        + " AND ".join(f"pr.{key} = cl.{key}" for key in keys)
+        if keys
+        else "FROM claims cl\nCROSS JOIN premium pr"
+    )
+    chronological = any(key in _TIME_KEYS for key in keys)
+    order = (
+        ", ".join(str(i) for i in range(1, len(keys) + 1))
+        if chronological
+        else f"{ratio} {plan.order_direction.upper()} NULLS LAST"
+    )
+    limit = 100 if chronological else max(1, min(plan.limit or 20, 100))
+    grain = ", ".join(keys) or "total"
+    return TemplateHit(
+        title=f"{ratio.replace('_', ' ').title()} by {grain}",
+        glossary_matches=3,
+        path="semantic_compiler",
+        sql=f"""
+WITH claims AS (
+  {claims_sql}
+),
+premium AS (
+  {premium_sql}
+)
+SELECT {', '.join([*outputs, f'COALESCE(cl.{num}, 0) AS {num}', f'COALESCE(pr.{den}, 0) AS {den}'])},
+       COALESCE(cl.{num}, 0)::numeric / NULLIF(pr.{den}, 0) AS {ratio}
+{joined}
+ORDER BY {order}
+LIMIT {limit}
+""".strip(),
+    )
 
 
 def _insurance_from_plan(plan: QuestionPlan) -> TemplateHit | None:

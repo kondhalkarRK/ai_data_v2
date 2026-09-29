@@ -68,8 +68,15 @@ _STOPWORDS = frozenset(  # noqa: SIM905
     dealership dealerships salesperson salespeople rep reps average avg mean median
     rate ratio percent percentage pct contribution running cumulative moving rolling
     trend chart graph table plot line bar view data report numbers figures kpi kpis
-    rank ranking ranked leading popular much india indian wise
+    rank ranking ranked leading popular much india indian wise business line lines
+    target targets fiscal financial half first second third fourth past trailing recent
+    latest
     """.split()
+)
+# Period words: quarters, halves, fiscal years and month names are time, never names.
+_TIME_TOKEN = re.compile(
+    r"(?:q[1-4]|h[12]|fy\d{0,4}|20\d\d|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|"
+    r"june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
 )
 _MAKE_CUE = frozenset({"model", "models", "car", "cars", "suv", "sedan", "hatchback"})
 
@@ -344,6 +351,7 @@ class EntityResolver:
             or token in self.vocabulary.known_words
             or token.isdigit()
             or len(token) < 2
+            or bool(_TIME_TOKEN.fullmatch(token))
         )
 
     def resolve(self, question: str) -> Resolution:
@@ -419,16 +427,24 @@ class EntityResolver:
                         -form.entry.frequency,
                     ),
                 )
-                out.matches.append(
-                    EntityMatch(
-                        entry=best.entry,
-                        text=" ".join(key),
-                        method=best.method,
-                        confidence=_METHOD_CONFIDENCE.get(best.method, 0.9),
-                        start=start,
-                        end=start + length,
+                # A curated family synonym ("red") names every value that lists it.
+                family = [
+                    form
+                    for form in candidates
+                    if form.method == "synonym" == best.method
+                    and form.entry.column == best.entry.column
+                ] or [best]
+                for form in family:
+                    out.matches.append(
+                        EntityMatch(
+                            entry=form.entry,
+                            text=" ".join(key),
+                            method=form.method,
+                            confidence=_METHOD_CONFIDENCE.get(form.method, 0.9),
+                            start=start,
+                            end=start + length,
+                        )
                     )
-                )
                 for index in range(start, start + length):
                     claimed[index] = True
 

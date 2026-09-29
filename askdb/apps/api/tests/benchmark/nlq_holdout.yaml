@@ -1,0 +1,46 @@
+# Hold-out NLQ questions — same grading keys as nlq_benchmark.yaml.
+#
+# Written after the planner fixes and never used to tune them, so the score here
+# estimates accuracy on unseen phrasing rather than on the tuning set.
+
+cases:
+  - {id: HO-01, industry: automotive, category: aggregation, question: "What was the total revenue in 2023?", metric: revenue, year: 2023}
+  - {id: HO-02, industry: automotive, category: aggregation, question: "How many units did Toyota sell?", metric: units, filters: {make: [Toyota]}}
+  - {id: HO-03, industry: automotive, category: aggregation, question: "Orders for Kia in Pune", metric: orders, filters: {make: [Kia], city: [Pune]}}
+  - {id: HO-04, industry: automotive, category: aggregation, question: "Average selling price for SUVs", metric: asp, filters: {car_type: [SUV]}}
+  - {id: HO-05, industry: automotive, category: trend, question: "Monthly units sold for Tata Motors", metric: units, filters: {make: [Tata]}, group: [month]}
+  - {id: HO-06, industry: automotive, category: trend, question: "Quarterly sales of Mahindra", metric: revenue, filters: {make: [Mahindra]}, group: [quarter]}
+  - {id: HO-07, industry: automotive, category: trend, question: "Show the yearly units trend for electric cars", metric: units, filters: {engine_type: [Electric]}, group: [year]}
+  - {id: HO-08, industry: automotive, category: ranking, question: "Bottom 5 models by revenue", metric: revenue, group: [model], order: asc, limit: 5}
+  - {id: HO-09, industry: automotive, category: ranking, question: "Top 3 dealers in Mumbai by units", metric: units, filters: {city: [Mumbai]}, group: [dealer], order: desc, limit: 3}
+  - {id: HO-10, industry: automotive, category: ranking, question: "Which state sells the most cars?", metric: units, group: [state], order: desc}
+  - {id: HO-11, industry: automotive, category: ranking, question: "Top 2 colours per brand by units sold", metric: units, group: [make, colour], must: ["partition by @make\\b", "<= 2"]}
+  - {id: HO-12, industry: automotive, category: ranking, question: "Top 5 cities for Hyundai", group: [city], filters: {make: [Hyundai]}, order: desc, limit: 5}
+  - {id: HO-13, industry: automotive, category: comparison, question: "Toyota vs Honda revenue", metric: revenue, filters: {make: [Toyota, Honda]}, group: [make]}
+  - {id: HO-14, industry: automotive, category: comparison, question: "Compare Nexon and Brezza sales by year", metric: revenue, filters: {model: [Nexon, Brezza]}, group: [year]}
+  - {id: HO-15, industry: automotive, category: comparison, question: "Compare hatchback and sedan units in 2025", metric: units, filters: {car_type: [Hatchback, Sedan]}, group: [car_type], year: 2025}
+  - {id: HO-16, industry: automotive, category: time_intelligence, question: "Revenue in Q4 2024", metric: revenue, period: ["2024-10-01", "2025-01-01"]}
+  - {id: HO-17, industry: automotive, category: time_intelligence, question: "Kia units in FY24", metric: units, filters: {make: [Kia]}, period: ["2023-04-01", "2024-04-01"]}
+  - {id: HO-18, industry: automotive, category: time_intelligence, question: "Sales in the second half of 2024", metric: revenue, period: ["2024-07-01", "2025-01-01"]}
+  - {id: HO-19, industry: automotive, category: time_intelligence, question: "Revenue from Jan to Mar 2026", metric: revenue, period: ["2026-01-01", "2026-04-01"]}
+  - {id: HO-20, industry: automotive, category: time_intelligence, question: "Units sold in the past 12 months", metric: units, must: ["(max\\(|current_date)", "interval '11 months'"]}
+  - {id: HO-21, industry: automotive, category: time_intelligence, question: "Year over year revenue growth by brand", metric: revenue, group: [make, year], must: ["lag\\(", "partition by @make\\b"]}
+  - {id: HO-22, industry: automotive, category: time_intelligence, question: "Cumulative revenue by month in 2025", metric: revenue, group: [month], year: 2025, must: ["sum\\(.*\\) over"]}
+  - {id: HO-23, industry: automotive, category: time_intelligence, question: "Revenue from 2022 to 2024 by year", metric: revenue, group: [year], must: ["2022", "2023", "2024"]}
+  - {id: HO-24, industry: automotive, category: geography, question: "Revenue in Karnataka", metric: revenue, filters: {state_code: [KA]}}
+  - {id: HO-25, industry: automotive, category: geography, question: "Units sold by city in Tamil Nadu", metric: units, filters: {state_code: [TN]}, group: [city]}
+  - {id: HO-26, industry: automotive, category: geography, question: "Best performing region by revenue", metric: revenue, group: [region], order: desc}
+  - {id: HO-27, industry: automotive, category: vehicle_attributes, question: "Red car sales", metric: revenue, filters: {colour_name: [Fire Red, Crimson Metallic]}}
+  - {id: HO-28, industry: automotive, category: vehicle_attributes, question: "Grey cars sold in 2025", metric: units, filters: {colour_name: [Graphite Grey, Nardo Grey, Storm Grey]}, year: 2025}
+  - {id: HO-29, industry: automotive, category: vehicle_attributes, question: "Petrol vs diesel units by year", metric: units, filters: {engine_type: [Petrol, Diesel]}, group: [year]}
+  - {id: HO-30, industry: automotive, category: vehicle_attributes, question: "Revenue by segment for Maruti", metric: revenue, filters: {make: [Maruti Suzuki]}, group: [car_type]}
+  - {id: HO-31, industry: insurance, category: insurance_metrics, question: "Loss ratio by line of business", metric: loss_ratio, group: [lob]}
+  - {id: HO-32, industry: insurance, category: insurance_metrics, question: "Claims paid for Health products in 2024", metric: paid, filters: {line_of_business: [Health]}, year: 2024}
+  - {id: HO-33, industry: insurance, category: insurance_metrics, question: "Average claim severity by region", metric: severity, group: [region]}
+  - {id: HO-34, industry: insurance, category: insurance_metrics, question: "Written premium by channel in FY2025", metric: gwp, group: [channel], period: ["2024-04-01", "2025-04-01"]}
+  - {id: HO-35, industry: insurance, category: insurance_metrics, question: "Claim count by claim type", metric: claim_count, group: [claim_type]}
+  - {id: HO-36, industry: insurance, category: insurance_metrics, question: "Loss ratio for Maharashtra by month", metric: loss_ratio, filters: {state_name: [Maharashtra]}, group: [month]}
+  - {id: HO-37, industry: insurance, category: insurance_metrics, question: "Top 5 products by earned premium", metric: earned, group: [product], order: desc, limit: 5}
+  - {id: HO-38, industry: automotive, category: followup, prior: "Revenue by brand", question: "Only for SUVs", metric: revenue, filters: {car_type: [SUV]}, group: [make]}
+  - {id: HO-39, industry: automotive, category: followup, prior: "Toyota sales by month", question: "Show it by quarter instead", metric: revenue, filters: {make: [Toyota]}, group: [quarter]}
+  - {id: HO-40, industry: insurance, category: followup, prior: "Written premium by product", question: "What about in Q1 2025?", metric: gwp, group: [product], period: ["2025-01-01", "2025-04-01"]}

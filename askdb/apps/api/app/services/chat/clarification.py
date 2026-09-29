@@ -25,6 +25,7 @@ _METRIC_LABEL = {
     "premium": "written premium",
     "earned_premium": "earned premium",
     "claims_incurred": "claims incurred",
+    "claims_paid": "claims paid",
     "claim_count": "claim count",
     "loss_ratio": "loss ratio",
     "severity": "claim severity",
@@ -95,7 +96,9 @@ def interpretation(plan: QuestionPlan | None) -> str:
     places = _values(plan, "city") or _values(plan, "region_name")
     if places:
         text += f" in {' and '.join(places)}"
-    if plan.year_filter:
+    if plan.period is not None:
+        text += f" for {plan.period.label}"
+    elif plan.year_filter:
         text += f" for {plan.year_filter}"
     return text[:1].upper() + text[1:] if text else "your question"
 

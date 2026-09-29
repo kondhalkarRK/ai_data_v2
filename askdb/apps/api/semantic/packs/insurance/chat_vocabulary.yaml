@@ -1,0 +1,66 @@
+# AI Chat-only vocabulary for insurance. Business values and synonyms live in
+# semantic_model.yaml (value_domains); this file only holds conversational rules.
+version: "1.0"
+
+unavailable:
+  - terms: [profit, profits, underwriting profit, combined ratio, expense ratio]
+    kind: metric
+    message: >
+      Expenses aren't recorded in the insurance data, so profit and combined ratio can't
+      be calculated. Loss ratio, claims incurred and earned premium are available.
+    alternatives:
+      - Loss ratio by line of business
+      - Claims incurred by product
+      - Earned premium by month
+
+generic_value_words: []
+
+# Words that may look like names but are business vocabulary, never entities.
+known_words:
+  - premium
+  - premiums
+  - gwp
+  - claim
+  - claims
+  - incurred
+  - paid
+  - payout
+  - payouts
+  - severity
+  - frequency
+  - exposure
+  - loss
+  - losses
+  - approval
+  - approved
+  - renewal
+  - renewals
+  - retention
+  - persistency
+  - product
+  - products
+  - policy
+  - policies
+  - policyholder
+  - policyholders
+  - customer
+  - customers
+  - agent
+  - agents
+  - broker
+  - brokers
+  - channel
+  - channels
+  - branch
+  - branches
+  - coverage
+  - tier
+  - tiers
+  - lob
+  - reported
+  - written
+  - earned
+  - fraud
+  - suspected
+  - insurance
+  - insured

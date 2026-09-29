@@ -34,12 +34,25 @@ def _normalized(question: str) -> str:
     return re.sub(r"\s+", " ", (question or "").strip().lower()).strip(" ?!.")
 
 
+_FOLLOWUP_FILLER = re.compile(r"^(?:ok(?:ay)?|now|then|so|show(?:\s+me)?|please)\s+")
+_FOLLOWUP_ANYWHERE = re.compile(r"\binstead\b|\bsame\s+(?:for|but|thing)\b|\bas\s+well\b")
+_FOLLOWUP_EXTRA = frozenset({"just", "now", "then", "switch to", "change to", "make it"})
+
+
 def is_followup(question: str) -> bool:
     """Return whether a short question appears to modify a prior request."""
     q = _normalized(question)
     if not q or len(q.split()) > MAX_FOLLOWUP_QUESTION_WORDS:
         return False
-    return any(q == token or q.startswith(f"{token} ") for token in FOLLOWUP_TRIGGER_TOKENS)
+    if _FOLLOWUP_ANYWHERE.search(q):
+        return True
+    stripped = q
+    for _ in range(3):
+        stripped = _FOLLOWUP_FILLER.sub("", stripped)
+    tokens = FOLLOWUP_TRIGGER_TOKENS | _FOLLOWUP_EXTRA
+    return any(
+        text == token or text.startswith(f"{token} ") for text in {q, stripped} for token in tokens
+    )
 
 
 def needs_clarification(question: str) -> str | None:

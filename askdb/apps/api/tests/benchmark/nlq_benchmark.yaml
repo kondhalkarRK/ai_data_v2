@@ -1,0 +1,163 @@
+# NLQ accuracy benchmark.
+#
+# Each case states what a *correct business answer* must contain, independent of
+# how the current planner happens to write SQL. Checks run on normalised SQL
+# (lower case, single spaces). In regexes, "@" means an optional table alias
+# ("@make" matches "make", "c.make", "v.make").
+#
+# Keys
+#   outcome    sql (default) | clarify
+#   metric     revenue | units | orders | asp | gwp | earned | incurred | paid |
+#              claim_count | loss_ratio | severity | frequency | approval_rate | renewal_rate
+#   filters    {column: [values]}   value must be filtered on that column (= or IN)
+#   group      [dimension]          dimension must appear in the result
+#   year       2024                 whole-year filter
+#   period     [from, to)           half-open date range; 'to' or 'to - 1 day' accepted
+#   order      desc | asc
+#   limit      N
+#   must       [regex]              extra required patterns
+#   must_not   [regex]              patterns that make the answer wrong
+#   prior      question asked first (follow-up cases)
+#
+# Fiscal year convention: Indian FY, April–March, named by the ending year
+# (FY2025 = FY 2024-25 = 2024-04-01 .. 2025-03-31). Relative periods ("last
+# month", "YTD") are anchored to the latest date in the data.
+
+cases:
+  # ───────────────────────────── Aggregation ─────────────────────────────
+  - {id: AGG-01, industry: automotive, category: aggregation, question: "Total revenue", metric: revenue}
+  - {id: AGG-02, industry: automotive, category: aggregation, question: "How many cars were sold in 2024?", metric: units, year: 2024}
+  - {id: AGG-03, industry: automotive, category: aggregation, question: "Total units sold for Maruti", metric: units, filters: {make: [Maruti Suzuki]}}
+  - {id: AGG-04, industry: automotive, category: aggregation, question: "What is the average selling price of Hyundai cars?", metric: asp, filters: {make: [Hyundai]}}
+  - {id: AGG-05, industry: automotive, category: aggregation, question: "Number of orders in 2025", metric: orders, year: 2025}
+  - {id: AGG-06, industry: automotive, category: aggregation, question: "Revenue from electric vehicles", metric: revenue, filters: {engine_type: [Electric]}}
+  - {id: AGG-07, industry: automotive, category: aggregation, question: "Total sales of Suzuki", metric: revenue, filters: {make: [Maruti Suzuki]}}
+  - {id: AGG-08, industry: automotive, category: aggregation, question: "How much revenue did MG Motor make?", metric: revenue, filters: {make: [MG]}}
+  - {id: AGG-09, industry: automotive, category: aggregation, question: "Profit by brand", outcome: clarify}
+  - {id: AGG-10, industry: insurance, category: aggregation, question: "Total gross written premium", metric: gwp}
+  - {id: AGG-11, industry: insurance, category: aggregation, question: "How many claims were reported in 2024?", metric: claim_count, year: 2024}
+  - {id: AGG-12, industry: insurance, category: aggregation, question: "Total claims paid", metric: paid}
+  - {id: AGG-13, industry: insurance, category: aggregation, question: "Total earned premium for Motor line of business", metric: earned, filters: {line_of_business: [Motor]}}
+
+  # ─────────────────────────────── Trend ────────────────────────────────
+  - {id: TRD-01, industry: automotive, category: trend, question: "Maruti sales trend", metric: revenue, filters: {make: [Maruti Suzuki]}, group: [month], must: ["interval '23 months'"]}
+  - {id: TRD-02, industry: automotive, category: trend, question: "Monthly revenue trend", metric: revenue, group: [month]}
+  - {id: TRD-03, industry: automotive, category: trend, question: "Show MG revenue by month", metric: revenue, filters: {make: [MG]}, group: [month]}
+  - {id: TRD-04, industry: automotive, category: trend, question: "Units sold trend for SUVs", metric: units, filters: {car_type: [SUV]}, group: [month]}
+  - {id: TRD-05, industry: automotive, category: trend, question: "Yearly revenue", metric: revenue, group: [year]}
+  - {id: TRD-06, industry: automotive, category: trend, question: "Hyundai sales over time", metric: revenue, filters: {make: [Hyundai]}, group: [month]}
+  - {id: TRD-07, industry: automotive, category: trend, question: "Quarterly revenue trend for 2025", metric: revenue, group: [quarter], year: 2025}
+  - {id: TRD-08, industry: automotive, category: trend, question: "EV sales trend by year", metric: revenue, filters: {engine_type: [Electric]}, group: [year]}
+  - {id: TRD-09, industry: automotive, category: trend, question: "Sales trend", outcome: clarify}
+  - {id: TRD-10, industry: insurance, category: trend, question: "Written premium trend by month", metric: gwp, group: [month]}
+  - {id: TRD-11, industry: insurance, category: trend, question: "Claims count trend by year", metric: claim_count, group: [year]}
+  - {id: TRD-12, industry: insurance, category: trend, question: "Loss ratio trend", metric: loss_ratio, group: [month]}
+
+  # ────────────────────────────── Ranking ───────────────────────────────
+  - {id: RNK-01, industry: automotive, category: ranking, question: "Top 5 brands by revenue", metric: revenue, group: [make], order: desc, limit: 5}
+  - {id: RNK-02, industry: automotive, category: ranking, question: "Which color is top selling", metric: units, group: [colour], order: desc, must_not: ["@model\\b"]}
+  - {id: RNK-03, industry: automotive, category: ranking, question: "Top 10 models by units sold", metric: units, group: [model], order: desc, limit: 10}
+  - {id: RNK-04, industry: automotive, category: ranking, question: "Rank models within each make by units sold and keep top 3 per make", metric: units, group: [make, model], must: ["partition by @make\\b", "<= 3"], must_not: ["partition by @model\\b"]}
+  - {id: RNK-05, industry: automotive, category: ranking, question: "Which dealer has the highest revenue?", metric: revenue, group: [dealer], order: desc}
+  - {id: RNK-06, industry: automotive, category: ranking, question: "Top 5 salespeople by units sold", metric: units, group: [salesperson], order: desc, limit: 5}
+  - {id: RNK-07, industry: automotive, category: ranking, question: "Lowest selling model", metric: units, group: [model], order: asc}
+  - {id: RNK-08, industry: automotive, category: ranking, question: "Top 3 cities by revenue", metric: revenue, group: [city], order: desc, limit: 3}
+  - {id: RNK-09, industry: automotive, category: ranking, question: "Best selling SUV model", metric: units, filters: {car_type: [SUV]}, group: [model], order: desc}
+  - {id: RNK-10, industry: automotive, category: ranking, question: "Top selling model in 2024", metric: units, group: [model], order: desc, year: 2024}
+  - {id: RNK-11, industry: automotive, category: ranking, question: "Top 3 models per brand by revenue", metric: revenue, group: [make, model], must: ["partition by @make\\b", "<= 3"], must_not: ["partition by @model\\b"]}
+  - {id: RNK-12, industry: automotive, category: ranking, question: "Which fuel type sells the most?", metric: units, group: [engine_type], order: desc}
+  - {id: RNK-13, industry: insurance, category: ranking, question: "Top 5 agents by written premium", metric: gwp, group: [agent], order: desc, limit: 5}
+  - {id: RNK-14, industry: insurance, category: ranking, question: "Which product has the highest claims incurred?", metric: incurred, group: [product], order: desc}
+  - {id: RNK-15, industry: insurance, category: ranking, question: "Top 3 regions by claim count", metric: claim_count, group: [region], order: desc, limit: 3}
+
+  # ───────────────────────────── Comparison ─────────────────────────────
+  - {id: CMP-01, industry: automotive, category: comparison, question: "Compare MG and Maruti sales", metric: revenue, filters: {make: [MG, Maruti Suzuki]}, group: [make]}
+  - {id: CMP-02, industry: automotive, category: comparison, question: "Compare SUV vs Sedan growth", filters: {car_type: [SUV, Sedan]}, group: [car_type, year], must: ["lag\\(", "partition by @car_type\\b"]}
+  - {id: CMP-03, industry: automotive, category: comparison, question: "Hyundai vs Tata units by month", metric: units, filters: {make: [Hyundai, Tata]}, group: [month]}
+  - {id: CMP-04, industry: automotive, category: comparison, question: "Compare petrol and diesel sales", metric: revenue, filters: {engine_type: [Petrol, Diesel]}, group: [engine_type]}
+  - {id: CMP-05, industry: automotive, category: comparison, question: "MG vs Kia revenue by year", metric: revenue, filters: {make: [MG, Kia]}, group: [year]}
+  - {id: CMP-06, industry: automotive, category: comparison, question: "Compare Mumbai and Pune revenue", metric: revenue, filters: {city: [Mumbai, Pune]}, group: [city]}
+  - {id: CMP-07, industry: automotive, category: comparison, question: "Compare sales in 2024 and 2025", metric: revenue, group: [year], must: ["2024", "2025"]}
+  - {id: CMP-08, industry: automotive, category: comparison, question: "Compare Creta and Seltos units sold", metric: units, filters: {model: [Creta, Seltos]}, group: [model]}
+  - {id: CMP-09, industry: automotive, category: comparison, question: "Hatchback vs SUV revenue share", metric: revenue, group: [car_type], must: ["over\\s*\\("]}
+  - {id: CMP-10, industry: insurance, category: comparison, question: "Compare Motor and Health claims incurred", metric: incurred, filters: {line_of_business: [Motor, Health]}, group: [lob]}
+  - {id: CMP-11, industry: insurance, category: comparison, question: "Compare written premium of Agency vs Broker channel", metric: gwp, filters: {channel_name: [Agency, Broker]}, group: [channel]}
+  - {id: CMP-12, industry: insurance, category: comparison, question: "Loss ratio Motor vs Health", metric: loss_ratio, filters: {line_of_business: [Motor, Health]}, group: [lob]}
+
+  # ────────────────────────── Time intelligence ──────────────────────────
+  - {id: TIM-01, industry: automotive, category: time_intelligence, question: "Sales in Q1 2025", metric: revenue, period: ["2025-01-01", "2025-04-01"]}
+  - {id: TIM-02, industry: automotive, category: time_intelligence, question: "Maruti revenue in Q3 2024", metric: revenue, filters: {make: [Maruti Suzuki]}, period: ["2024-07-01", "2024-10-01"]}
+  - {id: TIM-03, industry: automotive, category: time_intelligence, question: "Revenue for FY2025", metric: revenue, period: ["2024-04-01", "2025-04-01"]}
+  - {id: TIM-04, industry: automotive, category: time_intelligence, question: "Units sold in FY 2024-25", metric: units, period: ["2024-04-01", "2025-04-01"]}
+  - {id: TIM-05, industry: automotive, category: time_intelligence, question: "YTD revenue", metric: revenue, must: ["(date_trunc\\('year'|extract\\(year from @sales_date\\)(::int)? = 20\\d\\d)"]}
+  - {id: TIM-06, industry: automotive, category: time_intelligence, question: "MG sales last month", metric: revenue, filters: {make: [MG]}, must: ["date_trunc\\('month'", "(max\\(|current_date)", "interval '1 month'"]}
+  - {id: TIM-07, industry: automotive, category: time_intelligence, question: "Revenue in the last 6 months", metric: revenue, must: ["(max\\(|current_date)", "interval '(5|6) months'"]}
+  - {id: TIM-08, industry: automotive, category: time_intelligence, question: "Sales in March 2025", metric: revenue, period: ["2025-03-01", "2025-04-01"]}
+  - {id: TIM-09, industry: automotive, category: time_intelligence, question: "Month over month revenue growth", metric: revenue, group: [month], must: ["lag\\("]}
+  - {id: TIM-10, industry: automotive, category: time_intelligence, question: "Year over year sales growth for Hyundai", metric: revenue, filters: {make: [Hyundai]}, group: [year], must: ["lag\\("]}
+  - {id: TIM-11, industry: automotive, category: time_intelligence, question: "Running total of units sold in 2025", metric: units, year: 2025, must: ["sum\\(.*\\) over"]}
+  - {id: TIM-12, industry: automotive, category: time_intelligence, question: "3 month moving average of revenue", metric: revenue, group: [month], must: ["avg\\(.*\\) over", "2 preceding"]}
+  - {id: TIM-13, industry: automotive, category: time_intelligence, question: "Revenue last quarter", metric: revenue, must: ["date_trunc\\('quarter'", "(max\\(|current_date)", "interval '3 months'"]}
+  - {id: TIM-14, industry: automotive, category: time_intelligence, question: "Revenue in H1 2025", metric: revenue, period: ["2025-01-01", "2025-07-01"]}
+  - {id: TIM-15, industry: insurance, category: time_intelligence, question: "Written premium in Q2 2025", metric: gwp, period: ["2025-04-01", "2025-07-01"]}
+  - {id: TIM-16, industry: insurance, category: time_intelligence, question: "Claims reported in FY2024", metric: claim_count, period: ["2023-04-01", "2024-04-01"]}
+
+  # ────────────────────────────── Geography ─────────────────────────────
+  - {id: GEO-01, industry: automotive, category: geography, question: "Revenue by region", metric: revenue, group: [region]}
+  - {id: GEO-02, industry: automotive, category: geography, question: "Sales in Bangalore", metric: revenue, filters: {city: [Bengaluru]}}
+  - {id: GEO-03, industry: automotive, category: geography, question: "Which city has lowest sales?", metric: revenue, group: [city], order: asc}
+  - {id: GEO-04, industry: automotive, category: geography, question: "Revenue by state", metric: revenue, group: [state]}
+  - {id: GEO-05, industry: automotive, category: geography, question: "Units sold in Maharashtra", metric: units, filters: {state_code: [MH]}}
+  - {id: GEO-06, industry: automotive, category: geography, question: "Revenue in Mumbai West region", metric: revenue, filters: {region_name: [Mumbai West]}}
+  - {id: GEO-07, industry: automotive, category: geography, question: "MG sales in Delhi", metric: revenue, filters: {make: [MG], city: [New Delhi]}}
+  - {id: GEO-08, industry: automotive, category: geography, question: "Revenue by city for SUVs", metric: revenue, filters: {car_type: [SUV]}, group: [city]}
+  - {id: GEO-09, industry: insurance, category: geography, question: "Claims by region", metric: claim_count, group: [region]}
+  - {id: GEO-10, industry: insurance, category: geography, question: "Written premium in Karnataka", metric: gwp, filters: {state_name: [Karnataka]}}
+  - {id: GEO-11, industry: insurance, category: geography, question: "Loss ratio by state", metric: loss_ratio, group: [state]}
+
+  # ────────────────────────── Vehicle attributes ─────────────────────────
+  - {id: VEH-01, industry: automotive, category: vehicle_attributes, question: "Sales by color", metric: revenue, group: [colour], must_not: ["@model\\b"]}
+  - {id: VEH-02, industry: automotive, category: vehicle_attributes, question: "Revenue from Pearl White cars", metric: revenue, filters: {colour_name: [Pearl White]}}
+  - {id: VEH-03, industry: automotive, category: vehicle_attributes, question: "How many black cars were sold?", metric: units, filters: {colour_name: [Midnight Black]}}
+  - {id: VEH-04, industry: automotive, category: vehicle_attributes, question: "Units sold by fuel type", metric: units, group: [engine_type]}
+  - {id: VEH-05, industry: automotive, category: vehicle_attributes, question: "Diesel car sales by year", metric: revenue, filters: {engine_type: [Diesel]}, group: [year]}
+  - {id: VEH-06, industry: automotive, category: vehicle_attributes, question: "Sales of hybrid cars", metric: revenue, filters: {engine_type: [Hybrid]}}
+  - {id: VEH-07, industry: automotive, category: vehicle_attributes, question: "Revenue by body type", metric: revenue, group: [car_type]}
+  - {id: VEH-08, industry: automotive, category: vehicle_attributes, question: "Hatchback sales in 2025", metric: revenue, filters: {car_type: [Hatchback]}, year: 2025}
+  - {id: VEH-09, industry: automotive, category: vehicle_attributes, question: "Average selling price by car type", metric: asp, group: [car_type]}
+  - {id: VEH-10, industry: automotive, category: vehicle_attributes, question: "Electric SUV sales", metric: revenue, filters: {engine_type: [Electric], car_type: [SUV]}}
+  - {id: VEH-11, industry: automotive, category: vehicle_attributes, question: "Nexon sales trend", metric: revenue, filters: {model: [Nexon]}, group: [month]}
+  - {id: VEH-12, industry: automotive, category: vehicle_attributes, question: "Units sold by colour for MG", metric: units, filters: {make: [MG]}, group: [colour]}
+  - {id: VEH-13, industry: automotive, category: vehicle_attributes, question: "Grade A dealer revenue", metric: revenue, filters: {dealer_grade: [A]}}
+  - {id: VEH-14, industry: automotive, category: vehicle_attributes, question: "Ferari sales", outcome: clarify}
+  - {id: VEH-15, industry: automotive, category: vehicle_attributes, question: "CNG car sales", outcome: clarify}
+
+  # ────────────────────────── Insurance metrics ──────────────────────────
+  - {id: INS-01, industry: insurance, category: insurance_metrics, question: "Loss ratio by product", metric: loss_ratio, group: [product]}
+  - {id: INS-02, industry: insurance, category: insurance_metrics, question: "Average claim severity by product", metric: severity, group: [product]}
+  - {id: INS-03, industry: insurance, category: insurance_metrics, question: "Claim frequency by line of business", metric: frequency, group: [lob]}
+  - {id: INS-04, industry: insurance, category: insurance_metrics, question: "Claim approval rate", metric: approval_rate}
+  - {id: INS-05, industry: insurance, category: insurance_metrics, question: "Renewal rate by channel", metric: renewal_rate, group: [channel]}
+  - {id: INS-06, industry: insurance, category: insurance_metrics, question: "Earned premium by product", metric: earned, group: [product]}
+  - {id: INS-07, industry: insurance, category: insurance_metrics, question: "How many claims are open?", metric: claim_count, filters: {claim_status: [Open]}}
+  - {id: INS-08, industry: insurance, category: insurance_metrics, question: "Repudiated claims by product", metric: claim_count, group: [product], must: ["(@claim_status\\s*(=|in\\s*\\()\\s*'repudiated'|repudiated_flag)"]}
+  - {id: INS-09, industry: insurance, category: insurance_metrics, question: "Theft claims incurred", metric: incurred, filters: {claim_type: [Theft]}}
+  - {id: INS-10, industry: insurance, category: insurance_metrics, question: "Written premium by coverage tier", metric: gwp, group: [tier]}
+  - {id: INS-11, industry: insurance, category: insurance_metrics, question: "Claims paid by region in 2025", metric: paid, group: [region], year: 2025}
+  - {id: INS-12, industry: insurance, category: insurance_metrics, question: "Loss ratio for Motor Comprehensive", metric: loss_ratio, filters: {product_name: [Motor Comprehensive]}}
+  - {id: INS-13, industry: insurance, category: insurance_metrics, question: "Fraud suspected claims count", metric: claim_count, must: ["fraud_suspected_flag"]}
+
+  # ───────────────────────────── Follow-ups ─────────────────────────────
+  - {id: FUP-01, industry: automotive, category: followup, prior: "MG sales by year", question: "What about Hyundai?", metric: revenue, filters: {make: [Hyundai]}, group: [year], must_not: ["'mg'"]}
+  - {id: FUP-02, industry: automotive, category: followup, prior: "MG sales by year", question: "Only in Mumbai", metric: revenue, filters: {make: [MG], city: [Mumbai]}, group: [year]}
+  - {id: FUP-03, industry: automotive, category: followup, prior: "Maruti sales trend", question: "Show units instead", metric: units, filters: {make: [Maruti Suzuki]}, group: [month]}
+  - {id: FUP-04, industry: automotive, category: followup, prior: "Top 5 brands by revenue", question: "Now by units", metric: units, group: [make], order: desc, limit: 5}
+  - {id: FUP-05, industry: automotive, category: followup, prior: "Revenue by region", question: "Just for SUVs", metric: revenue, filters: {car_type: [SUV]}, group: [region]}
+  - {id: FUP-06, industry: automotive, category: followup, prior: "Hyundai sales by year", question: "Break it down by month", metric: revenue, filters: {make: [Hyundai]}, group: [month]}
+  - {id: FUP-07, industry: automotive, category: followup, prior: "Compare MG and Maruti sales", question: "Add Tata", metric: revenue, filters: {make: [MG, Maruti Suzuki, Tata]}, group: [make]}
+  - {id: FUP-08, industry: automotive, category: followup, prior: "Revenue by city", question: "Only for 2025", metric: revenue, group: [city], year: 2025}
+  - {id: FUP-09, industry: automotive, category: followup, prior: "Maruti sales trend", question: "What about in Q1 2025?", metric: revenue, filters: {make: [Maruti Suzuki]}, period: ["2025-01-01", "2025-04-01"]}
+  - {id: FUP-10, industry: insurance, category: followup, prior: "Loss ratio by product", question: "Only for 2024", metric: loss_ratio, group: [product], year: 2024}
+  # A standalone question after an unrelated turn must not inherit the old scope.
+  - {id: FUP-11, industry: automotive, category: followup, prior: "Maruti sales trend", question: "Top 5 brands by revenue", metric: revenue, group: [make], order: desc, limit: 5, must_not: ["'maruti suzuki'"]}
+  - {id: FUP-12, industry: automotive, category: followup, prior: "MG sales by year", question: "Which color is top selling", metric: units, group: [colour], must_not: ["'mg'"]}

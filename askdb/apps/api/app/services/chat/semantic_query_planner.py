@@ -22,7 +22,6 @@ from app.services.chat.conversation_context import (
     state_to_plan,
 )
 from app.services.chat.glossary_resolve import apply_glossary
-from app.services.chat.intents import is_followup
 from app.services.chat.question_understanding import QuestionPlan, understand_question
 from app.services.chat.templates import resolve_template
 
@@ -50,8 +49,10 @@ _FORMULAS: dict[str, str] = {
     "premium": "SUM(written_premium)",
     "earned_premium": "SUM(earned_premium)",
     "claims_incurred": "SUM(incurred_amount)",
+    "claims_paid": "SUM(paid_amount)",
     "claim_count": "COUNT(DISTINCT claim_id)",
     "loss_ratio": "claims_incurred / earned_premium",
+    "frequency": "COUNT(DISTINCT claim_id) / SUM(exposure_units)",
     "severity": "SUM(incurred_amount) / COUNT(DISTINCT claim_id)",
 }
 
@@ -116,6 +117,7 @@ class SemanticQuery:
                 for item in plan.filters
             ],
             "year": plan.year_filter,
+            "period": plan.period.label if plan.period else None,
             "analysis": plan.analysis,
             "chart": self.chart_type,
         }
@@ -172,7 +174,7 @@ def business_formula(plan: QuestionPlan) -> str:
 def join_path(plan: QuestionPlan) -> list[str]:
     path: list[str] = []
     fact = "fact_sales" if plan.industry is Industry.AUTOMOTIVE else "fact_policy_monthly"
-    if plan.metric in {"claims_incurred", "claim_count", "severity", "approval_rate"}:
+    if plan.metric in {"claims_incurred", "claims_paid", "claim_count", "severity", "approval_rate"}:
         fact = "fact_claims"
     path.append(fact)
     for dimension in plan.dimensions:
@@ -214,11 +216,8 @@ def plan_semantic_query(
 ) -> SemanticQuery:
     """Run rewrite through SQL generation. Stops SQL when the question is ambiguous."""
     rewritten = rewrite_question(question)
-    contextual = (
-        bool(prior_state)
-        and is_contextual_followup(question)
-        and not is_self_contained(rewritten, value_filters or [])
-    )
+    self_contained = is_self_contained(rewritten, value_filters or [])
+    contextual = bool(prior_state) and is_contextual_followup(question) and not self_contained
     if contextual and prior_state is not None:
         plan = apply_followup(
             state_to_plan(industry, prior_state), rewritten, value_filters=value_filters or []
@@ -242,7 +241,7 @@ def plan_semantic_query(
         query.chart_type = "table"
         query.path = "clarification"
         return query
-    if prior_sql and not contextual:
+    if prior_sql and not contextual and not self_contained:
         # No stored plan to recompile. The chat service may still ask the model.
         query.path = "followup"
         return query
@@ -273,8 +272,22 @@ _METRIC_WORDS = re.compile(
 )
 
 
+_CONTEXT_MARKERS = re.compile(
+    r"\b(instead|what\s+about|how\s+about|only|just|now|add|also|include|exclude|remove|same|"
+    r"it|that|those|these|them|break|split|drill)\b",
+    re.I,
+)
+_GROUPING_WORDS = re.compile(
+    r"\b(brands?|makes?|models?|regions?|cit(?:y|ies)|states?|dealers?|salespe\w+|colou?rs?|"
+    r"fuel|segments?|types?|products?|agents?|channels?|branch(?:es)?|lob|tiers?|"
+    r"monthly|yearly|quarterly|by\s+(?:month|quarter|year))\b",
+    re.I,
+)
+
+
 def is_self_contained(question: str, value_filters: list[Any]) -> bool:
     """A question naming its own metric and scope starts fresh even if it says "last year"."""
-    if is_followup(question):
+    text = question or ""
+    if _CONTEXT_MARKERS.search(text) or not _METRIC_WORDS.search(text):
         return False
-    return bool(_METRIC_WORDS.search(question or "")) and bool(value_filters)
+    return bool(value_filters) or bool(_GROUPING_WORDS.search(text))

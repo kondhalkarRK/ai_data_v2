@@ -8,10 +8,25 @@ from typing import Any
 
 from app.core.config import Industry
 from app.services.chat.intents import is_followup
-from app.services.chat.question_understanding import ExtractedFilter, QuestionPlan
+from app.services.chat.question_understanding import (
+    FILTER_DIMENSION,
+    ExtractedFilter,
+    QuestionPlan,
+    understand_question,
+)
+from app.services.chat.time_periods import Period, parse_period
 
 _LAST_YEAR = re.compile(r"\b(last|previous|prior)\s+year\b", re.I)
 _COMPARE_YEAR = re.compile(r"\bcompare\b[\s\S]{0,40}\b(previous|last|prior)\s+year\b", re.I)
+_YEAR = re.compile(r"\b(20[12]\d)\b")
+# "Add Tata" / "also Kia" widens the named values instead of replacing them.
+_ADD_VALUES = re.compile(r"^\s*(?:and\s+)?(?:add|also|include|plus|along\s+with)\b|\balso\b", re.I)
+_METRIC_WORDS = re.compile(
+    r"\b(units?|volume|quantity|revenue|value|turnover|orders?|asp|average\s+selling\s+price|"
+    r"premium|gwp|claims?|loss\s+ratio|severity|frequency|approval|renewal|incurred|paid)\b",
+    re.I,
+)
+_TIME_DIMS = ("month", "quarter", "year")
 
 
 def is_contextual_followup(question: str) -> bool:
@@ -31,6 +46,11 @@ def plan_state(plan: QuestionPlan) -> dict[str, Any]:
         "timeGrain": plan.time_grain,
         "analysis": plan.analysis,
         "yearFilter": plan.year_filter,
+        "period": plan.period.to_state() if plan.period else None,
+        "limit": plan.limit,
+        "orderDirection": plan.order_direction,
+        "partitionBy": list(plan.partition_by),
+        "aggregation": plan.aggregation,
         "filters": [
             {
                 "column": item.column,
@@ -66,7 +86,28 @@ def state_to_plan(industry: Industry, state: dict[str, Any]) -> QuestionPlan:
         time_grain=state.get("timeGrain"),
         analysis=state.get("analysis") or "breakdown",
         year_filter=state.get("yearFilter"),
+        period=Period.from_state(state.get("period")),
+        limit=int(state.get("limit") or 10),
+        order_direction=state.get("orderDirection") or "desc",
+        partition_by=list(state.get("partitionBy") or []),
+        aggregation=state.get("aggregation") or "sum",
         glossary_hits=["prior turn"],
+    )
+
+
+def _widen(existing: ExtractedFilter, extra: ExtractedFilter) -> ExtractedFilter:
+    values = tuple(dict.fromkeys((*existing.all_values, *extra.all_values)))
+    domain = existing.label.split(" = ", 1)[0].split(" in (", 1)[0]
+    return ExtractedFilter(
+        column=existing.column,
+        operator="IN",
+        value=values[0],
+        label=f"{domain} in ({', '.join(values)})",
+        source=extra.source,
+        values=values,
+        match_type=extra.match_type,
+        matched_text=extra.matched_text,
+        confidence=min(existing.confidence, extra.confidence),
     )
 
 
@@ -76,10 +117,12 @@ def apply_followup(
     *,
     value_filters: list[ExtractedFilter] | None = None,
 ) -> QuestionPlan:
-    """Keep the previous metric and grain, then apply the new constraint."""
+    """Keep the previous metric, scope and grain, then apply the new constraint."""
     text = (question or "").lower()
     plan = state_to_plan(prior.industry, plan_state(prior))
     plan.notes.append("Continued from the previous question.")
+    # Read the follow-up on its own for the parts it names (metric, grain, period).
+    reading = understand_question(prior.industry, question, value_filters=value_filters)
 
     extra = list(value_filters or [])
     if not extra and "mumbai" in text:
@@ -91,24 +134,52 @@ def apply_followup(
                 label="City = Mumbai",
             )
         )
-    # A newly named value replaces the previous value of the same column
-    # ("what about Pune?" after a Mumbai question).
+    widen = bool(_ADD_VALUES.search(text))
     for filt in extra:
+        existing = next((item for item in plan.filters if item.column == filt.column), None)
         plan.filters = [item for item in plan.filters if item.column != filt.column]
-        plan.filters.append(filt)
+        # A newly named value replaces the previous value of the same column
+        # ("what about Pune?" after a Mumbai question) unless the user adds it.
+        plan.filters.append(_widen(existing, filt) if widen and existing else filt)
+    for filt in plan.filters:
+        key = FILTER_DIMENSION.get(filt.column.rsplit(".", 1)[-1])
+        if len(filt.all_values) > 1 and key and key not in plan.dimensions:
+            plan.dimensions.append(key)
+
+    if _METRIC_WORDS.search(text) and reading.metric not in {"unknown", plan.metric}:
+        plan.metric = reading.metric
+        plan.aggregation = reading.aggregation
+
+    asked = [d for d in reading.dimensions if d != reading.default_dimension]
+    new_time = [d for d in asked if d in _TIME_DIMS]
+    if new_time:
+        plan.dimensions = [d for d in plan.dimensions if d not in _TIME_DIMS]
+        plan.dimensions = [*plan.dimensions, new_time[0]] if plan.dimensions else [new_time[0]]
+    for dimension in asked:
+        if dimension not in _TIME_DIMS and dimension not in plan.dimensions:
+            plan.dimensions.append(dimension)
+    if plan.analysis == "basic" and plan.dimensions:
+        plan.analysis = "breakdown"
 
     if _COMPARE_YEAR.search(text):
         plan.analysis = "period_growth"
         plan.intent = "comparison"
         plan.time_grain = "year"
         plan.year_filter = None
+        plan.period = None
         if "year" not in plan.dimensions:
             plan.dimensions = ["year", *plan.dimensions]
         return plan
 
-    if _LAST_YEAR.search(text):
-        plan.year_filter = datetime.now().year - 1
-        plan.time_grain = plan.time_grain or "year"
+    period = parse_period(question)
+    years = sorted({int(year) for year in _YEAR.findall(text)})
+    if period is not None:
+        plan.period, plan.year_filter = period, None
+    elif len(years) == 1:
+        plan.year_filter, plan.period = years[0], None
+    elif _LAST_YEAR.search(text):
+        plan.year_filter, plan.period = datetime.now().year - 1, None
         if "year" not in plan.dimensions:
             plan.dimensions = ["year", *plan.dimensions]
+    plan.time_grain = next((g for g in _TIME_DIMS if g in plan.dimensions), None)
     return plan

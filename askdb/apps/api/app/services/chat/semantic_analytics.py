@@ -13,6 +13,15 @@ from typing import Any
 
 from app.core.config import Industry
 from app.services.chat.question_understanding import QuestionPlan, filter_predicate
+from app.services.chat.time_periods import anchor_sql, period_predicate
+
+# Monthly series without a stated period show the latest two years.
+TREND_MONTHS = 24
+_DATE_COLUMNS = {
+    "fact_sales": "sales_date",
+    "fact_policy_monthly": "accounting_month",
+    "fact_claims": "reported_date",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +133,10 @@ _INSURANCE_DIMENSIONS = {
     "claim_status": DimensionSpec(
         "claim_status", "fact_claims", "claim_status", "claim_status"
     ),
+    "claim_type": DimensionSpec("claim_type", "fact_claims", "claim_type", "claim_type"),
+    "coverage_type": DimensionSpec("coverage_type", "dim_product", "coverage_type", "coverage_type"),
+    "coverage_tier": DimensionSpec("coverage_tier", "dim_policy", "coverage_tier", "coverage_tier"),
+    "policy_status": DimensionSpec("policy_status", "dim_policy", "policy_status", "policy_status"),
 }
 
 
@@ -171,6 +184,12 @@ def _metric_spec(plan: QuestionPlan) -> MetricSpec:
                 "fact_claims",
                 "SUM({alias}.incurred_amount)",
                 "claims_incurred",
+            ),
+            "claims_paid": MetricSpec(
+                "claims_paid",
+                "fact_claims",
+                "SUM({alias}.paid_amount)",
+                "claims_paid",
             ),
             "claim_count": MetricSpec(
                 "claim_count",
@@ -321,7 +340,29 @@ def _logical_table_for_physical(pack: Any, physical: str) -> str | None:
     return None
 
 
-def _where_clauses(plan: QuestionPlan, pack: Any, required_tables: set[str]) -> list[str]:
+def time_scope_clauses(
+    plan: QuestionPlan,
+    *,
+    alias: str,
+    physical_table: str,
+    date_column: str,
+    default_window: bool,
+) -> list[str]:
+    """Year / period predicates, or the latest-24-months window for bare monthly trends."""
+    column = f"{alias}.{date_column}"
+    anchor = anchor_sql(physical_table, date_column)
+    if plan.period is not None:
+        return [period_predicate(plan.period, column, anchor)]
+    if plan.year_filter:
+        return [f"EXTRACT(YEAR FROM {column})::int = {int(plan.year_filter)}"]
+    if default_window and "month" in plan.dimensions:
+        return [f"{column} >= date_trunc('month', {anchor}) - INTERVAL '{TREND_MONTHS - 1} months'"]
+    return []
+
+
+def _where_clauses(
+    plan: QuestionPlan, pack: Any, required_tables: set[str], base_table: str
+) -> list[str]:
     clauses: list[str] = []
     for filt in plan.filters:
         physical_table, _, column = filt.column.rpartition(".")
@@ -336,8 +377,17 @@ def _where_clauses(plan: QuestionPlan, pack: Any, required_tables: set[str]) -> 
             clauses.append(filter_predicate(f"{_ALIASES[logical]}.{column}", filt))
         except ValueError as exc:
             raise SemanticCompileError(str(exc)) from exc
-    if plan.year_filter and plan.industry is Industry.AUTOMOTIVE:
-        clauses.append(f"f.sales_date IS NOT NULL AND EXTRACT(YEAR FROM f.sales_date)::int = {int(plan.year_filter)}")
+    date_column = _DATE_COLUMNS.get(base_table)
+    if date_column and plan.analysis != "year_window_compare":
+        clauses.extend(
+            time_scope_clauses(
+                plan,
+                alias=_ALIASES[base_table],
+                physical_table=getattr(_model_tables(pack)[base_table], "physical_name", base_table),
+                date_column=date_column,
+                default_window=plan.analysis not in {"running_total", "moving_average"},
+            )
+        )
     return clauses
 
 
@@ -468,12 +518,13 @@ ORDER BY {', '.join([*partition, order_alias])}
 LIMIT 100""".strip()
 
     if plan.analysis == "moving_average":
+        preceding = max(1, (plan.window_months or 3) - 1)
         return f"""WITH aggregated AS (
   {aggregate.replace(chr(10), chr(10) + '  ')}
 )
 SELECT aggregated.*,
        AVG({metric.alias}) OVER ({partition_sql}ORDER BY {order_alias}
-         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS moving_average_{metric.alias}
+         ROWS BETWEEN {preceding} PRECEDING AND CURRENT ROW) AS moving_average_{metric.alias}
 FROM aggregated
 ORDER BY {', '.join([*partition, order_alias])}
 LIMIT 100""".strip()
@@ -493,11 +544,10 @@ FROM aggregated
 ORDER BY {metric.alias}_contribution_pct DESC
 LIMIT {limit}""".strip()
 
-    order = (
-        ", ".join(dimension_aliases)
-        if plan.intent == "trend" or plan.time_grain
-        else f"{metric.alias} {direction}"
-    )
+    chronological = plan.intent == "trend" or bool(plan.time_grain)
+    order = ", ".join(dimension_aliases) if chronological else f"{metric.alias} {direction}"
+    if chronological and plan.intent != "ranking":
+        limit = 100
     return f"{aggregate}\nORDER BY {order}\nLIMIT {limit}".strip()
 
 
@@ -521,7 +571,7 @@ def compile_analytical_query(
     _validate_specs(pack, metric, dimensions)
 
     required_tables = {spec.table for spec in dimensions if spec.table != metric.table}
-    where = _where_clauses(plan, pack, required_tables)
+    where = _where_clauses(plan, pack, required_tables, metric.table)
     joins = _join_clauses(pack, metric.table, required_tables)
     physical_base = getattr(_model_tables(pack)[metric.table], "physical_name", metric.table)
     sql = _render_advanced_sql(

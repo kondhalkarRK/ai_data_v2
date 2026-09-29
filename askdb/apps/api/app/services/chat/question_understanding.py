@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Literal
 
 from app.core.config import Industry
+from app.services.chat.time_periods import Period, parse_period
 
 IntentKind = Literal[
     "ranking",
@@ -58,6 +59,7 @@ MetricKind = Literal[
     "premium",
     "earned_premium",
     "claims_incurred",
+    "claims_paid",
     "claim_count",
     "severity",
     "frequency",
@@ -126,6 +128,16 @@ class QuestionPlan:
     window_months: int | None = None
     window_years: int | None = None
     year_filter: int | None = None
+    # Quarter, fiscal year, month, relative range or several years. Takes
+    # precedence over ``year_filter`` and suppresses default trend windows.
+    period: Period | None = None
+    # Dimension implied by the entity (not asked for); dropped when the question
+    # names a more specific grouping.
+    default_dimension: str | None = None
+
+    @property
+    def has_time_scope(self) -> bool:
+        return bool(self.year_filter or self.period)
 
     @property
     def is_ambiguous(self) -> bool:
@@ -160,17 +172,21 @@ class QuestionPlan:
                 "line_of_business",
                 "channel",
                 "branch",
+                "coverage_tier",
+                "coverage_type",
+                "claim_type",
+                "policy_status",
             }
             for dimension in self.dimensions
         )
 
 
-_TOP = re.compile(r"\b(top|best|highest|leading|most|lowest|worst)\b", re.I)
+_TOP = re.compile(r"\b(top|best|highest|leading|most|lowest|worst|bottom)\b", re.I)
 _LOWEST = re.compile(r"\b(lowest|worst|least|bottom|minimum|smallest)\b", re.I)
 _TREND = re.compile(r"\b(trend|by\s+month|monthly|over\s+time|time\s+series)\b", re.I)
 _REVENUE = re.compile(r"\b(revenue|sales\s+value|dollar|amount|turnover)\b", re.I)
 _UNITS = re.compile(r"\b(unit|units|volume|qty|quantity)\b", re.I)
-_SELLING = re.compile(r"\b(selling|sold|popular)\b", re.I)
+_SELLING = re.compile(r"\b(selling|sold|popular|sells?)\b", re.I)
 _RUNNING = re.compile(r"\b(running|cumulative)\s+(?:total\s+)?", re.I)
 _MOVING_AVG = re.compile(r"\b(moving|rolling)\s+average\b", re.I)
 _PERIOD_GROWTH = re.compile(
@@ -216,6 +232,7 @@ _MARKET_SHARE = re.compile(
 )
 _COMPARE = re.compile(r"\b(compare|comparison|compared|versus|vs\.?|against)\b", re.I)
 _YEAR_LITERAL = re.compile(r"\b(20[12]\d)\b")
+_YEAR_RANGE = re.compile(r"\b(20[12]\d)\s*(?:-|\u2013|to|through|till|until)\s*(20[12]\d)\b", re.I)
 _THIS_YEAR = re.compile(r"\b(this|current)\s+year\b|\bytd\b|\byear\s+to\s+date\b", re.I)
 _LAST_YEAR_PHRASE = re.compile(r"\b(last|previous|prior)\s+year\b", re.I)
 _SALES_TREND_ONLY = re.compile(
@@ -234,7 +251,45 @@ FILTER_DIMENSION: dict[str, str] = {
     "region_name": "region",
     "colour_name": "colour",
     "state_code": "state",
+    "dealer_grade": "dealer_grade",
+    "state_name": "state",
+    "product_name": "product",
+    "line_of_business": "line_of_business",
+    "product_family": "product_family",
+    "coverage_type": "coverage_type",
+    "channel_name": "channel",
+    "branch_name": "branch",
+    "claim_status": "claim_status",
+    "claim_type": "claim_type",
+    "coverage_tier": "coverage_tier",
+    "policy_status": "policy_status",
 }
+# Dimensions answering the same business question as an entity default: a named
+# colour or fuel grouping replaces the default model list.
+_DIMENSION_FAMILY: dict[str, frozenset[str]] = {
+    "model": frozenset({"make", "model", "car_type", "engine_type", "colour"}),
+    "region": frozenset({"region", "city", "state"}),
+    "product": frozenset({"product", "product_family", "line_of_business", "coverage_type"}),
+    "agent": frozenset({"agent", "channel", "branch"}),
+    "policy": frozenset({"policy", "coverage_tier", "policy_status"}),
+}
+# Words after "per / within each / for each" that name the ranking partition.
+_SCOPE_WORDS: dict[str, str] = {
+    "make": "make", "makes": "make", "brand": "make", "brands": "make",
+    "manufacturer": "make", "oem": "make", "model": "model", "models": "model",
+    "segment": "car_type", "type": "car_type", "body": "car_type", "fuel": "engine_type",
+    "colour": "colour", "color": "colour", "region": "region", "city": "city",
+    "state": "state", "dealer": "dealer", "year": "year", "quarter": "quarter",
+    "month": "month", "product": "product", "category": "product_family",
+    "lob": "line_of_business", "line": "line_of_business", "channel": "channel",
+    "branch": "branch", "agent": "agent",
+}  # fmt: skip
+_SCOPE = re.compile(r"\b(?:within\s+each|for\s+each|in\s+each|within|per|each)\s+(\w+)", re.I)
+_MOVING_WINDOW = re.compile(r"\b(\d{1,2})[-\s]*(?:month|period|point)s?\s+(?:moving|rolling)\b", re.I)
+# Case-sensitive so the article in "a grade" is never read as grade A.
+_DEALER_GRADE = re.compile(r"\b[Gg]rade[-\s]+([ABCabc])\b|\b([ABC])[-\s]+[Gg]rade\b")
+_BY_WORD = re.compile(r"\b(by|per|each|across|every|wise|breakdown|split)\b", re.I)
+_FRAUD = re.compile(r"\bfraud(?:ulent)?\b|\bsuspicious\b", re.I)
 
 # Seeded car_type values (automotive.dim_carline.car_type).
 _BODY_STYLES: list[tuple[re.Pattern[str], str]] = [
@@ -312,10 +367,10 @@ def _extract_body_filters(q: str) -> list[ExtractedFilter]:
 
 
 def _limit_from_question(q: str) -> int:
-    match = re.search(r"\btop\s+(\d{1,3})\b", q, re.I)
+    match = re.search(r"\b(?:top|bottom)\s+(\d{1,3})\b", q, re.I)
     if match:
         return max(1, min(int(match.group(1)), 50))
-    if re.search(r"\b(the\s+)?top\b|\bbest\b|\bhighest\b|\blowest\b|\bworst\b", q, re.I):
+    if re.search(r"\b(the\s+)?top\b|\bbest\b|\bhighest\b|\blowest\b|\bworst\b|\bbottom\b", q, re.I):
         return 10
     return 20
 
@@ -343,14 +398,59 @@ def understand_question(
     plan.filters = _merge_filters(plan.filters, value_filters or [])
     _apply_value_inference(plan, q)
     _enrich_analytical_plan(plan, q)
-    if industry is Industry.AUTOMOTIVE and not plan.is_ambiguous:
+    if not plan.is_ambiguous:
         _apply_business_shape(plan, q)
     return plan
+
+
+def _apply_time_scope(plan: QuestionPlan, question: str) -> None:
+    """Quarter / FY / month / relative period, a single year, or several years."""
+    if plan.analysis == "year_window_compare":
+        return
+    period = parse_period(question)
+    if period is not None:
+        plan.period = period
+        plan.year_filter = None
+        return
+    if plan.year_filter is not None:
+        return
+    span = _YEAR_RANGE.search(question)
+    if span and int(span.group(1)) < int(span.group(2)):
+        years = list(range(int(span.group(1)), int(span.group(2)) + 1))
+    else:
+        years = sorted({int(year) for year in _YEAR_LITERAL.findall(question)})
+    if len(years) == 1:
+        plan.year_filter = years[0]
+    elif len(years) >= 2:
+        if not any(d in plan.dimensions for d in _TIME_DIMS):
+            plan.dimensions.insert(0, "year")
+        plan.period = Period(", ".join(str(y) for y in years), years=tuple(years))
+    elif _THIS_YEAR.search(question):
+        plan.year_filter = datetime.now().year
+    elif _LAST_YEAR_PHRASE.search(question):
+        plan.year_filter = datetime.now().year - 1
+
+
+def _ensure_time_axis(plan: QuestionPlan, question: str) -> None:
+    """Growth, running totals and moving averages are computed along time."""
+    if plan.analysis not in {"period_growth", "running_total", "moving_average"}:
+        return
+    dims = plan.dimensions
+    if not any(d in dims for d in _TIME_DIMS):
+        grain = "year" if plan.analysis == "period_growth" and not re.search(
+            r"\bmonth", question, re.I
+        ) else "month"
+        dims.append(grain)
+    plan.time_grain = next((g for g in _TIME_DIMS if g in dims), None)
+    plan.partition_by = [d for d in dims if d not in _TIME_DIMS]
+    # Output reads category -> period so each series is contiguous.
+    plan.dimensions = [*plan.partition_by, *(d for d in dims if d in _TIME_DIMS)]
 
 
 def _apply_business_shape(plan: QuestionPlan, question: str) -> None:
     """Complete the plan from every part of the question: brand, comparison, period, share."""
     dims = plan.dimensions
+    _apply_time_scope(plan, question)
 
     # Several named values of one column (MG and Maruti) are compared side by side.
     compared = [f for f in plan.filters if len(f.all_values) > 1]
@@ -358,12 +458,21 @@ def _apply_business_shape(plan: QuestionPlan, question: str) -> None:
         key = FILTER_DIMENSION.get(filt.column.rsplit(".", 1)[-1])
         if key and key not in dims:
             dims.append(key)
+            if plan.default_dimension in dims and plan.default_dimension != key:
+                dims.remove(plan.default_dimension)
     if compared or _COMPARE.search(question):
         if plan.intent not in {"ranking"} or compared:
             plan.intent = "comparison"
         if not dims:
             # "Compare MG sales" without a grain reads naturally as year over year.
             dims.append("year")
+
+    if plan.industry is Industry.INSURANCE:
+        _ensure_time_axis(plan, question)
+        plan.time_grain = next((g for g in _TIME_DIMS if g in plan.dimensions), None)
+        if plan.analysis == "basic" and plan.dimensions:
+            plan.analysis = "breakdown"
+        return
 
     if _MARKET_SHARE.search(question):
         explicit = _explicit_dimensions(plan.industry, question)
@@ -385,17 +494,8 @@ def _apply_business_shape(plan: QuestionPlan, question: str) -> None:
             plan.metric = "units"
         plan.notes.append(f"Market share = share of total {plan.metric} across all {share_dim} values")
 
-    years = sorted({int(year) for year in _YEAR_LITERAL.findall(question)})
-    if plan.year_filter is None:
-        if len(years) == 1:
-            plan.year_filter = years[0]
-        elif len(years) >= 2 and "year" not in dims:
-            dims.insert(0, "year")
-        elif _THIS_YEAR.search(question):
-            plan.year_filter = datetime.now().year
-        elif _LAST_YEAR_PHRASE.search(question):
-            plan.year_filter = datetime.now().year - 1
-
+    _ensure_time_axis(plan, question)
+    dims = plan.dimensions
     plan.time_grain = next((g for g in ("month", "quarter", "year") if g in dims), None)
     if plan.analysis == "basic" and dims:
         plan.analysis = "breakdown"
@@ -427,18 +527,29 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
     if industry is Industry.AUTOMOTIVE:
         patterns.extend(
             [
-                ("car_type", r"\bcar\s+type\b|\bvehicle\s+type\b|\bbody\s+style\b"),
-                ("colour", r"\bpaint\s+colou?r\b|\bcolou?r\b|\bpaint\b"),
-                ("engine_type", r"\b(?:by|per|across)\s+(?:fuel(?:\s+type)?|engine\s+type|powertrain)s?\b"),
+                (
+                    "car_type",
+                    r"\bcar\s+types?\b|\bvehicle\s+types?\b|\bbody\s+(?:style|type)s?\b|\bsegments?\b",
+                ),
+                ("colour", r"\bpaint\s+colou?r\b|\bcolou?rs?\b|\bpaint\b"),
+                ("engine_type", r"\bfuel(?:\s+types?)?\b|\bengine\s+types?\b|\bpowertrains?\b"),
                 (
                     "make",
                     r"\bbrands?\b|\bmakes?\b|\bmanufacturers?\b|\boems?\b|\bcarmakers?\b|\bautomakers?\b",
                 ),
-                ("model", r"\bby\s+model\b|\bmodels?\s+(?:per|within\s+each)\b"),
+                ("model", r"\bby\s+model\b|\bmodels?\s+(?:per|within\s+each|in\s+each|for\s+each)\b|\beach\s+model\b"),
                 ("dealer", r"\bdealers?\b"),
                 ("salesperson", r"\bsalespersons?\b|\bsalespeople\b|\bsales\s*rep\b"),
-                ("region", r"\b(?:by|per|across)\s+regions?\b|\bwithin\s+each\s+region\b|\bregional\s+average\b"),
-                ("city", r"\b(?:by|per)\s+cit(?:y|ies)\b|\bwithin\s+each\s+city\b|\beach\s+city\b"),
+                (
+                    "region",
+                    r"\b(?:by|per|across|which|each)\s+regions?\b|\bregions\b|\bregion[-\s]?wise\b|"
+                    r"\bregional\s+average\b",
+                ),
+                (
+                    "city",
+                    r"\b(?:by|per|across|which|each|every)\s+cit(?:y|ies)\b|\bcities\b|\bcity[-\s]?wise\b",
+                ),
+                ("state", r"\bstates?\b|\bstate[-\s]?wise\b"),
             ]
         )
     else:
@@ -446,15 +557,19 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
             [
                 ("product", r"\bproducts?\b"),
                 ("product_family", r"\b(?:product\s+)?categor(?:y|ies)\b|\bproduct\s+famil(?:y|ies)\b"),
-                ("line_of_business", r"\bline\s+of\s+business\b|\blob\b"),
+                ("line_of_business", r"\blines?\s+of\s+business\b|\blobs?\b"),
+                ("coverage_type", r"\bcoverage\s+types?\b"),
+                ("coverage_tier", r"\b(?:coverage\s+)?tiers?\b"),
                 ("customer", r"\bcustomers?\b|\bpolicyholders?\b"),
-                ("policy", r"\bpolic(?:y|ies)\b"),
-                ("agent", r"\bagents?\b|\bbrokers?\b"),
-                ("channel", r"\bby\s+channel\b|\bper\s+channel\b"),
-                ("branch", r"\bby\s+branch\b|\bper\s+branch\b"),
-                ("region", r"\b(?:by|per|across)\s+regions?\b|\bwithin\s+each\s+region\b|\bregional\s+average\b"),
-                ("state", r"\b(?:by|per)\s+state\b|\bwithin\s+each\s+state\b"),
-                ("claim_status", r"\bby\s+(?:claim\s+)?status\b"),
+                ("policy_status", r"\bpolicy\s+status(?:es)?\b"),
+                ("policy", r"\bpolic(?:y|ies)\b(?!\s+status)"),
+                ("agent", r"\bagents?\b|\bbrokers\b|\bintermediar(?:y|ies)\b"),
+                ("channel", r"\bchannels?\b"),
+                ("branch", r"\bbranch(?:es)?\b"),
+                ("region", r"\b(?:by|per|across|which|each)\s+regions?\b|\bregions\b|\bregional\s+average\b"),
+                ("state", r"\bstates?\b|\bstate[-\s]?wise\b"),
+                ("claim_status", r"\bby\s+(?:claim\s+)?status\b|\bclaim\s+status(?:es)?\b"),
+                ("claim_type", r"\bclaim\s+types?\b|\btype\s+of\s+claim\b"),
             ]
         )
 
@@ -469,6 +584,13 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
 
 
 def _default_dimension(plan: QuestionPlan) -> str | None:
+    if plan.entity == "claim" and plan.metric in {
+        "approval_rate",
+        "severity",
+        "frequency",
+        "loss_ratio",
+    }:
+        return None  # a claim-status split of a rate answers nothing
     return {
         "salesperson": "salesperson",
         "dealer": "dealer",
@@ -505,9 +627,31 @@ def _enrich_analytical_plan(plan: QuestionPlan, question: str) -> None:
         return
 
     dimensions = _explicit_dimensions(plan.industry, question)
+    # "Motor line of business" or "Karnataka state" names a value, not a grouping.
+    if not _BY_WORD.search(question):
+        named = {
+            FILTER_DIMENSION.get(f.column.rsplit(".", 1)[-1])
+            for f in plan.filters
+            if len(f.all_values) == 1
+        }
+        dimensions = [d for d in dimensions if d not in named]
     default = _default_dimension(plan)
-    if default and default not in dimensions and plan.entity != "metric_only":
+    family = _DIMENSION_FAMILY.get(default or "", frozenset({default}))
+    if plan.entity == "claim":
+        # Claim status is only a fallback grouping for a bare claims question.
+        family = frozenset(d for d in dimensions if d not in _TIME_DIMS) or family
+    if (
+        default
+        and plan.entity != "metric_only"
+        and not any(d in family for d in dimensions)
+    ):
         dimensions.append(default)
+        plan.default_dimension = default
+    elif plan.entity == "vehicle" and not any(
+        d in {"make", "model", "car_type", "engine_type"} for d in dimensions
+    ) and not any("dim_carline" in f.column for f in plan.filters):
+        # "Which colour sells most" is a colour ranking, not a vehicle list.
+        plan.entity = "metric_only"
 
     if _TREND.search(question) and not any(d in dimensions for d in ("month", "quarter", "year")):
         dimensions.insert(0, "month")
@@ -534,7 +678,15 @@ def _enrich_analytical_plan(plan: QuestionPlan, question: str) -> None:
     elif dimensions:
         plan.analysis = "breakdown"
 
+    if plan.analysis == "moving_average" and (size := _MOVING_WINDOW.search(question)):
+        plan.window_months = max(2, min(int(size.group(1)), 24))
+
     if plan.analysis in {"top_n_per_group", "above_average"} and len(dimensions) >= 2:
+        scoped = [
+            _SCOPE_WORDS[word.lower()]
+            for word in _SCOPE.findall(question)
+            if word.lower() in _SCOPE_WORDS and _SCOPE_WORDS[word.lower()] in dimensions
+        ]
         scope_patterns = {
             "region": r"\bwithin\s+each\s+region\b|\bper\s+region\b|\bregional\s+average\b",
             "city": r"\bwithin\s+each\s+city\b|\bper\s+city\b|\beach\s+city\b",
@@ -544,11 +696,13 @@ def _enrich_analytical_plan(plan: QuestionPlan, question: str) -> None:
                 r"\bper\s+(?:product\s+)?category\b|\bcategory\s+average\b"
             ),
         }
-        plan.partition_by = [
+        plan.partition_by = list(dict.fromkeys(scoped)) or [
             dimension
             for dimension, pattern in scope_patterns.items()
             if dimension in dimensions and re.search(pattern, question, re.I)
         ]
+        if len(plan.partition_by) >= len(dimensions):
+            plan.partition_by = plan.partition_by[:1]
         if not plan.partition_by:
             plan.partition_by = dimensions[:-1]
         # Stable output reads scope -> leaf, regardless of phrase word order.
@@ -711,6 +865,16 @@ def _understand_automotive(
 
     metric = _metric_from_question(q)
     filters = _extract_body_filters(q)
+    if grade := _DEALER_GRADE.search(q):
+        value = (grade.group(1) or grade.group(2)).upper()
+        filters.append(
+            ExtractedFilter(
+                column="automotive.dim_dealer.dealer_grade",
+                operator="=",
+                value=value,
+                label=f"Dealer grade = {value}",
+            )
+        )
     if re.search(r"\bmumbai\b", q, re.I):
         filters.append(
             ExtractedFilter(
@@ -806,7 +970,13 @@ def _understand_automotive(
                 re.I,
             )
         )
-        explicit_metric = bool(_UNITS.search(q) or _REVENUE.search(q) or _REGION.search(q))
+        explicit_metric = bool(
+            _UNITS.search(q)
+            or _REVENUE.search(q)
+            or _REGION.search(q)
+            or _YEAR_LITERAL.search(q)
+            or parse_period(q)
+        )
         if bare and not filters and not explicit_metric:
             return QuestionPlan(
                 industry=Industry.AUTOMOTIVE,
@@ -889,10 +1059,27 @@ def _understand_automotive(
 
 
 def _understand_insurance(q: str) -> QuestionPlan:
+    plan = _understand_insurance_metric(q)
+    if _FRAUD.search(q):
+        plan.filters.append(
+            ExtractedFilter(
+                column="insurance.fact_claims.fraud_suspected_flag",
+                operator="=",
+                value="true",
+                label="Fraud suspected",
+            )
+        )
+        if plan.metric in {"unknown", "premium"}:
+            plan.metric = "claim_count"
+    return plan
+
+
+def _understand_insurance_metric(q: str) -> QuestionPlan:
     limit = _limit_from_question(q)
     intent: IntentKind = "ranking" if _TOP.search(q) else "aggregation"
     entity: EntityKind = "metric_only"
-    if re.search(r"\b(agent|agents|broker|brokers|intermediar(?:y|ies)|advisor)\b", q, re.I):
+    # "Broker" alone is usually the Broker channel; only "brokers" lists people.
+    if re.search(r"\b(agent|agents|brokers|intermediar(?:y|ies)|advisors?)\b", q, re.I):
         entity = "agent"
     elif re.search(r"\b(customer|customers|policyholder|policyholders)\b", q, re.I):
         entity = "customer"
@@ -967,6 +1154,19 @@ def _understand_insurance(q: str) -> QuestionPlan:
             metric="premium",
             limit=limit,
             glossary_hits=["Gross Written Premium"],
+        )
+    if re.search(
+        r"\b(claims?\s+paid|paid\s+(?:claims?|amount)|payouts?|claim\s+payments?|amount\s+paid)\b",
+        q,
+        re.I,
+    ):
+        return QuestionPlan(
+            industry=Industry.INSURANCE,
+            intent=intent,
+            entity=entity,
+            metric="claims_paid",
+            limit=limit,
+            glossary_hits=["Claims Paid"],
         )
     if re.search(r"\b(incurred|claims?\s+cost|loss(?:es)?)\b", q, re.I):
         return QuestionPlan(

@@ -17,6 +17,7 @@ _MEASURE_KIND = {
     "written_premium": "premium",
     "earned_premium": "earned_premium",
     "claims_incurred": "claims_incurred",
+    "claims_paid": "claims_paid",
     "claim_count": "claim_count",
     "loss_ratio": "loss_ratio",
     "severity": "severity",

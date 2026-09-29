@@ -1,0 +1,772 @@
+[
+  {
+    "id": "HO-01",
+    "category": "aggregation",
+    "industry": "automotive",
+    "question": "What was the total revenue in 2023?",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\n\nWHERE EXTRACT(YEAR FROM f.sales_date)::int = 2023\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-02",
+    "category": "aggregation",
+    "industry": "automotive",
+    "question": "How many units did Toyota sell?",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       SUM(f.order_qty) AS units_sold, SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline c ON c.carline_id = f.carline_id\nWHERE c.make = 'Toyota' AND f.sales_date >= (SELECT date_trunc('month', MAX(latest.sales_date)) FROM automotive.fact_sales latest) - INTERVAL '23 months'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "toyota->Toyota (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-03",
+    "category": "aggregation",
+    "industry": "automotive",
+    "question": "Orders for Kia in Pune",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       COUNT(DISTINCT f.order_id) AS orders, SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline c ON c.carline_id = f.carline_id\nJOIN automotive.dim_region r ON r.region_id = f.region_id\nWHERE c.make = 'Kia' AND r.city = 'Pune' AND f.sales_date >= (SELECT date_trunc('month', MAX(latest.sales_date)) FROM automotive.fact_sales latest) - INTERVAL '23 months'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "kia->Kia (exact)",
+        "pune->Pune (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-04",
+    "category": "aggregation",
+    "industry": "automotive",
+    "question": "Average selling price for SUVs",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT c.model, c.make, c.car_type,\n       SUM(f.total_sales) / NULLIF(SUM(f.order_qty), 0) AS average_selling_price\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline c ON c.carline_id = f.carline_id\n\nWHERE c.car_type = 'SUV'\nGROUP BY 1, 2, 3\nORDER BY average_selling_price DESC\nLIMIT 20",
+      "path": "template",
+      "resolved": [
+        "suvs->SUV (synonym)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-05",
+    "category": "trend",
+    "industry": "automotive",
+    "question": "Monthly units sold for Tata Motors",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       SUM(f.order_qty) AS units_sold, SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline c ON c.carline_id = f.carline_id\nWHERE c.make = 'Tata' AND f.sales_date >= (SELECT date_trunc('month', MAX(latest.sales_date)) FROM automotive.fact_sales latest) - INTERVAL '23 months'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "tata motors->Tata (synonym)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-06",
+    "category": "trend",
+    "industry": "automotive",
+    "question": "Quarterly sales of Mahindra",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('quarter', f.sales_date)::date AS quarter,\n       SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline c ON c.carline_id = f.carline_id\nWHERE c.make = 'Mahindra'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "mahindra->Mahindra (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-07",
+    "category": "trend",
+    "industry": "automotive",
+    "question": "Show the yearly units trend for electric cars",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT EXTRACT(YEAR FROM f.sales_date)::int AS year,\n       v.model AS model,\n       SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline v ON v.carline_id = f.carline_id\nWHERE v.engine_type = 'Electric'\nGROUP BY EXTRACT(YEAR FROM f.sales_date)::int, v.model\nORDER BY year, model\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "electric cars->Electric (synonym)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-08",
+    "category": "ranking",
+    "industry": "automotive",
+    "question": "Bottom 5 models by revenue",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT v.model AS model,\n       SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline v ON v.carline_id = f.carline_id\nGROUP BY v.model\nORDER BY revenue ASC\nLIMIT 5",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-09",
+    "category": "ranking",
+    "industry": "automotive",
+    "question": "Top 3 dealers in Mumbai by units",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT d.dealer_name AS dealer_name,\n       SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_dealer d ON d.dealer_id = f.dealer_id\nJOIN automotive.dim_region r ON r.region_id = f.region_id\nWHERE r.city = 'Mumbai'\nGROUP BY d.dealer_name\nORDER BY units_sold DESC\nLIMIT 3",
+      "path": "semantic_compiler",
+      "resolved": [
+        "mumbai->Mumbai (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-10",
+    "category": "ranking",
+    "industry": "automotive",
+    "question": "Which state sells the most cars?",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT r.state_code AS state_code,\n       v.model AS model,\n       SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline v ON v.carline_id = f.carline_id\nJOIN automotive.dim_region r ON r.region_id = f.region_id\nGROUP BY r.state_code, v.model\nORDER BY units_sold DESC\nLIMIT 20",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-11",
+    "category": "ranking",
+    "industry": "automotive",
+    "question": "Top 2 colours per brand by units sold",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "WITH aggregated AS (\n  SELECT v.make AS make,\n         co.colour_name AS colour_name,\n         SUM(f.order_qty) AS units_sold\n  FROM automotive.fact_sales f\n  JOIN automotive.dim_carline v ON v.carline_id = f.carline_id\n  JOIN automotive.dim_color co ON co.colour_id = f.colour_id\n  GROUP BY v.make, co.colour_name\n), ranked AS (\n  SELECT aggregated.*,\n         ROW_NUMBER() OVER (PARTITION BY make ORDER BY units_sold DESC) AS row_number\n  FROM aggregated\n)\nSELECT *\nFROM ranked\nWHERE row_number <= 2\nORDER BY make, row_number\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-12",
+    "category": "ranking",
+    "industry": "automotive",
+    "question": "Top 5 cities for Hyundai",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT r.city AS city,\n       SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline v ON v.carline_id = f.carline_id\nJOIN automotive.dim_region r ON r.region_id = f.region_id\nWHERE v.make = 'Hyundai'\nGROUP BY r.city\nORDER BY units_sold DESC\nLIMIT 5",
+      "path": "semantic_compiler",
+      "resolved": [
+        "hyundai->Hyundai (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-13",
+    "category": "comparison",
+    "industry": "automotive",
+    "question": "Toyota vs Honda revenue",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT v.make AS make,\n       SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline v ON v.carline_id = f.carline_id\nWHERE v.make IN ('Toyota', 'Honda')\nGROUP BY v.make\nORDER BY revenue DESC\nLIMIT 36",
+      "path": "semantic_compiler",
+      "resolved": [
+        "toyota->Toyota (exact)",
+        "honda->Honda (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-14",
+    "category": "comparison",
+    "industry": "automotive",
+    "question": "Compare Nexon and Brezza sales by year",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT EXTRACT(YEAR FROM f.sales_date)::int AS year,\n       SUM(f.total_sales) FILTER (WHERE c.model = 'Nexon') AS nexon_revenue,\n       SUM(f.total_sales) FILTER (WHERE c.model = 'Brezza') AS brezza_revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline c ON c.carline_id = f.carline_id\nWHERE c.model IN ('Nexon', 'Brezza')\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "nexon->Nexon (exact)",
+        "brezza->Brezza (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-15",
+    "category": "comparison",
+    "industry": "automotive",
+    "question": "Compare hatchback and sedan units in 2025",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT v.car_type AS car_type,\n       SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline v ON v.carline_id = f.carline_id\nWHERE v.car_type IN ('Sedan', 'Hatchback') AND EXTRACT(YEAR FROM f.sales_date)::int = 2025\nGROUP BY v.car_type\nORDER BY units_sold DESC\nLIMIT 36",
+      "path": "semantic_compiler",
+      "resolved": [
+        "hatchback->Hatchback (exact)",
+        "sedan->Sedan (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-16",
+    "category": "time_intelligence",
+    "industry": "automotive",
+    "question": "Revenue in Q4 2024",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\n\nWHERE f.sales_date >= DATE '2024-10-01' AND f.sales_date < DATE '2025-01-01'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-17",
+    "category": "time_intelligence",
+    "industry": "automotive",
+    "question": "Kia units in FY24",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       SUM(f.order_qty) AS units_sold, SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline c ON c.carline_id = f.carline_id\nWHERE c.make = 'Kia' AND f.sales_date >= DATE '2023-04-01' AND f.sales_date < DATE '2024-04-01'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "kia->Kia (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-18",
+    "category": "time_intelligence",
+    "industry": "automotive",
+    "question": "Sales in the second half of 2024",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\n\nWHERE f.sales_date >= DATE '2024-07-01' AND f.sales_date < DATE '2025-01-01'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-19",
+    "category": "time_intelligence",
+    "industry": "automotive",
+    "question": "Revenue from Jan to Mar 2026",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\n\nWHERE f.sales_date >= DATE '2026-01-01' AND f.sales_date < DATE '2026-04-01'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-20",
+    "category": "time_intelligence",
+    "industry": "automotive",
+    "question": "Units sold in the past 12 months",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       SUM(f.order_qty) AS units_sold, SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\n\nWHERE f.sales_date >= date_trunc('month', (SELECT MAX(fact_sales_latest.sales_date) FROM automotive.fact_sales fact_sales_latest)) - INTERVAL '11 months'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-21",
+    "category": "time_intelligence",
+    "industry": "automotive",
+    "question": "Year over year revenue growth by brand",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "WITH aggregated AS (\n  SELECT v.make AS make,\n         EXTRACT(YEAR FROM f.sales_date)::int AS year,\n         SUM(f.total_sales) AS revenue\n  FROM automotive.fact_sales f\n  JOIN automotive.dim_carline v ON v.carline_id = f.carline_id\n  GROUP BY v.make, EXTRACT(YEAR FROM f.sales_date)::int\n)\nSELECT aggregated.*,\n       LAG(revenue) OVER (PARTITION BY make ORDER BY year) AS previous_revenue,\n       100.0 * (revenue - LAG(revenue) OVER (PARTITION BY make ORDER BY year)) / NULLIF(LAG(revenue) OVER (PARTITION BY make ORDER BY year), 0) AS yoy_growth_pct\nFROM aggregated\nORDER BY make, year\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-22",
+    "category": "time_intelligence",
+    "industry": "automotive",
+    "question": "Cumulative revenue by month in 2025",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "WITH aggregated AS (\n  SELECT date_trunc('month', f.sales_date)::date AS month,\n         SUM(f.total_sales) AS revenue\n  FROM automotive.fact_sales f\n  WHERE EXTRACT(YEAR FROM f.sales_date)::int = 2025\n  GROUP BY date_trunc('month', f.sales_date)::date\n)\nSELECT aggregated.*,\n       SUM(revenue) OVER (ORDER BY month\n         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_revenue\nFROM aggregated\nORDER BY month\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-23",
+    "category": "time_intelligence",
+    "industry": "automotive",
+    "question": "Revenue from 2022 to 2024 by year",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT EXTRACT(YEAR FROM f.sales_date)::int AS year,\n       SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\n\nWHERE EXTRACT(YEAR FROM f.sales_date)::int IN (2022, 2023, 2024)\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-24",
+    "category": "geography",
+    "industry": "automotive",
+    "question": "Revenue in Karnataka",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('month', f.sales_date)::date AS month,\n       SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_region r ON r.region_id = f.region_id\nWHERE r.state_code = 'KA' AND f.sales_date >= (SELECT date_trunc('month', MAX(latest.sales_date)) FROM automotive.fact_sales latest) - INTERVAL '23 months'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "karnataka->KA (synonym)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-25",
+    "category": "geography",
+    "industry": "automotive",
+    "question": "Units sold by city in Tamil Nadu",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT r.city AS city,\n       SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_region r ON r.region_id = f.region_id\nWHERE r.state_code = 'TN'\nGROUP BY r.city\nORDER BY units_sold DESC\nLIMIT 36",
+      "path": "semantic_compiler",
+      "resolved": [
+        "tamil nadu->TN (synonym)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-26",
+    "category": "geography",
+    "industry": "automotive",
+    "question": "Best performing region by revenue",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT r.region_name AS region_name,\n       SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_region r ON r.region_id = f.region_id\nGROUP BY r.region_name\nORDER BY revenue DESC\nLIMIT 10",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-27",
+    "category": "vehicle_attributes",
+    "industry": "automotive",
+    "question": "Red car sales",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT co.colour_name AS colour_name,\n       SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_color co ON co.colour_id = f.colour_id\nWHERE co.colour_name IN ('Fire Red', 'Crimson Metallic')\nGROUP BY co.colour_name\nORDER BY revenue DESC\nLIMIT 36",
+      "path": "semantic_compiler",
+      "resolved": [
+        "red->Fire Red (synonym)",
+        "red->Crimson Metallic (synonym)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-28",
+    "category": "vehicle_attributes",
+    "industry": "automotive",
+    "question": "Grey cars sold in 2025",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT co.colour_name AS colour_name,\n       SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_color co ON co.colour_id = f.colour_id\nWHERE co.colour_name IN ('Graphite Grey', 'Nardo Grey', 'Storm Grey') AND EXTRACT(YEAR FROM f.sales_date)::int = 2025\nGROUP BY co.colour_name\nORDER BY units_sold DESC\nLIMIT 36",
+      "path": "semantic_compiler",
+      "resolved": [
+        "grey->Graphite Grey (synonym)",
+        "grey->Nardo Grey (synonym)",
+        "grey->Storm Grey (synonym)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-29",
+    "category": "vehicle_attributes",
+    "industry": "automotive",
+    "question": "Petrol vs diesel units by year",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT EXTRACT(YEAR FROM f.sales_date)::int AS year,\n       SUM(f.order_qty) FILTER (WHERE c.engine_type = 'Petrol') AS petrol_units_sold,\n       SUM(f.order_qty) FILTER (WHERE c.engine_type = 'Diesel') AS diesel_units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline c ON c.carline_id = f.carline_id\nWHERE c.engine_type IN ('Petrol', 'Diesel')\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "petrol->Petrol (exact)",
+        "diesel->Diesel (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-30",
+    "category": "vehicle_attributes",
+    "industry": "automotive",
+    "question": "Revenue by segment for Maruti",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT v.car_type AS car_type,\n       SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline v ON v.carline_id = f.carline_id\nWHERE v.make = 'Maruti Suzuki'\nGROUP BY v.car_type\nORDER BY revenue DESC\nLIMIT 36",
+      "path": "semantic_compiler",
+      "resolved": [
+        "maruti->Maruti Suzuki (synonym)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-31",
+    "category": "insurance_metrics",
+    "industry": "insurance",
+    "question": "Loss ratio by line of business",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "WITH claims AS (\n  SELECT p.line_of_business AS line_of_business, SUM(c.incurred_amount) AS claims_incurred\n  FROM insurance.fact_claims c\n  JOIN insurance.dim_product p ON p.product_id = c.product_id\n  GROUP BY 1\n),\npremium AS (\n  SELECT p.line_of_business AS line_of_business, SUM(pm.earned_premium) AS earned_premium\n  FROM insurance.fact_policy_monthly pm\n  JOIN insurance.dim_product p ON p.product_id = pm.product_id\n  GROUP BY 1\n)\nSELECT COALESCE(cl.line_of_business, pr.line_of_business) AS line_of_business, COALESCE(cl.claims_incurred, 0) AS claims_incurred, COALESCE(pr.earned_premium, 0) AS earned_premium,\n       COALESCE(cl.claims_incurred, 0)::numeric / NULLIF(pr.earned_premium, 0) AS loss_ratio\nFROM claims cl\nFULL OUTER JOIN premium pr ON pr.line_of_business = cl.line_of_business\nORDER BY loss_ratio DESC NULLS LAST\nLIMIT 20",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-32",
+    "category": "insurance_metrics",
+    "industry": "insurance",
+    "question": "Claims paid for Health products in 2024",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT p.product_name AS product_name,\n       SUM(cl.paid_amount) AS claims_paid\nFROM insurance.fact_claims cl\nJOIN insurance.dim_product p ON p.product_id = cl.product_id\nWHERE p.line_of_business = 'Health' AND EXTRACT(YEAR FROM cl.reported_date)::int = 2024\nGROUP BY p.product_name\nORDER BY claims_paid DESC\nLIMIT 20",
+      "path": "semantic_compiler",
+      "resolved": [
+        "health->Health (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-33",
+    "category": "insurance_metrics",
+    "industry": "insurance",
+    "question": "Average claim severity by region",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT r.region_name AS region_name,\n       SUM(cl.incurred_amount) / NULLIF(COUNT(DISTINCT cl.claim_id), 0) AS average_claim_severity\nFROM insurance.fact_claims cl\nJOIN insurance.dim_region r ON r.region_id = cl.region_id\nGROUP BY r.region_name\nORDER BY average_claim_severity DESC\nLIMIT 20",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-34",
+    "category": "insurance_metrics",
+    "industry": "insurance",
+    "question": "Written premium by channel in FY2025",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT a.channel_name AS channel_name,\n       SUM(pm.written_premium) AS written_premium\nFROM insurance.fact_policy_monthly pm\nJOIN insurance.dim_agent a ON a.agent_id = pm.agent_id\nWHERE pm.accounting_month >= DATE '2024-04-01' AND pm.accounting_month < DATE '2025-04-01'\nGROUP BY a.channel_name\nORDER BY written_premium DESC\nLIMIT 20",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-35",
+    "category": "insurance_metrics",
+    "industry": "insurance",
+    "question": "Claim count by claim type",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT cl.claim_type AS claim_type,\n       COUNT(DISTINCT cl.claim_id) AS claim_count\nFROM insurance.fact_claims cl\nGROUP BY cl.claim_type\nORDER BY claim_count DESC\nLIMIT 20",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-36",
+    "category": "insurance_metrics",
+    "industry": "insurance",
+    "question": "Loss ratio for Maharashtra by month",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "WITH claims AS (\n  SELECT date_trunc('month', c.reported_date)::date AS month, SUM(c.incurred_amount) AS claims_incurred\n  FROM insurance.fact_claims c\n  JOIN insurance.dim_region r ON r.region_id = c.region_id\n  WHERE r.state_name = 'Maharashtra' AND c.reported_date >= date_trunc('month', (SELECT MAX(fact_claims_latest.reported_date) FROM insurance.fact_claims fact_claims_latest)) - INTERVAL '23 months'\n  GROUP BY 1\n),\npremium AS (\n  SELECT date_trunc('month', pm.accounting_month)::date AS month, SUM(pm.earned_premium) AS earned_premium\n  FROM insurance.fact_policy_monthly pm\n  JOIN insurance.dim_region r ON r.region_id = pm.region_id\n  WHERE r.state_name = 'Maharashtra' AND pm.accounting_month >= date_trunc('month', (SELECT MAX(fact_policy_monthly_latest.accounting_month) FROM insurance.fact_policy_monthly fact_policy_monthly_latest)) - INTERVAL '23 months'\n  GROUP BY 1\n)\nSELECT COALESCE(cl.month, pr.month) AS month, COALESCE(cl.claims_incurred, 0) AS claims_incurred, COALESCE(pr.earned_premium, 0) AS earned_premium,\n       COALESCE(cl.claims_incurred, 0)::numeric / NULLIF(pr.earned_premium, 0) AS loss_ratio\nFROM claims cl\nFULL OUTER JOIN premium pr ON pr.month = cl.month\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [
+        "maharashtra->Maharashtra (exact)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-37",
+    "category": "insurance_metrics",
+    "industry": "insurance",
+    "question": "Top 5 products by earned premium",
+    "prior": null,
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT p.product_name AS product_name,\n       SUM(pm.earned_premium) AS earned_premium\nFROM insurance.fact_policy_monthly pm\nJOIN insurance.dim_product p ON p.product_id = pm.product_id\nGROUP BY p.product_name\nORDER BY earned_premium DESC\nLIMIT 5",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-38",
+    "category": "followup",
+    "industry": "automotive",
+    "question": "Only for SUVs",
+    "prior": "Revenue by brand",
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT v.make AS make,\n       SUM(f.total_sales) AS revenue\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline v ON v.carline_id = f.carline_id\nWHERE v.car_type = 'SUV'\nGROUP BY v.make\nORDER BY revenue DESC\nLIMIT 20",
+      "path": "semantic_compiler",
+      "resolved": [
+        "suvs->SUV (synonym)"
+      ],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-39",
+    "category": "followup",
+    "industry": "automotive",
+    "question": "Show it by quarter instead",
+    "prior": "Toyota sales by month",
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT date_trunc('quarter', f.sales_date)::date AS quarter,\n       SUM(f.total_sales) AS revenue, SUM(f.order_qty) AS units_sold\nFROM automotive.fact_sales f\nJOIN automotive.dim_carline c ON c.carline_id = f.carline_id\nWHERE c.make = 'Toyota'\nGROUP BY 1\nORDER BY 1\nLIMIT 100",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  },
+  {
+    "id": "HO-40",
+    "category": "followup",
+    "industry": "insurance",
+    "question": "What about in Q1 2025?",
+    "prior": "Written premium by product",
+    "verdict": "correct",
+    "checks_failed": [],
+    "pattern": null,
+    "turn": {
+      "outcome": "sql",
+      "detail": "",
+      "sql": "SELECT p.product_name AS product_name,\n       SUM(pm.written_premium) AS written_premium\nFROM insurance.fact_policy_monthly pm\nJOIN insurance.dim_product p ON p.product_id = pm.product_id\nWHERE pm.accounting_month >= DATE '2025-01-01' AND pm.accounting_month < DATE '2025-04-01'\nGROUP BY p.product_name\nORDER BY written_premium DESC\nLIMIT 20",
+      "path": "semantic_compiler",
+      "resolved": [],
+      "unresolved": []
+    }
+  }
+]
