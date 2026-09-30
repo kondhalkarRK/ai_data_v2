@@ -88,7 +88,7 @@ def resolver_for(snapshot: ValueDictionarySnapshot, pack: Any | None = None) -> 
 AUTOMOTIVE_DOMAINS: tuple[ValueDomain, ...] = (
     ValueDomain("Car Type", "automotive.dim_carline", "car_type", "Car type", 30),
     ValueDomain("Make", "automotive.dim_carline", "make", "Make", 100),
-    ValueDomain("Model", "automotive.dim_carline", "model", "Model", 150),
+    ValueDomain("Model", "automotive.dim_carline", "model", "Model", 200),
     ValueDomain("Engine Type", "automotive.dim_carline", "engine_type", "Engine type", 30),
     ValueDomain("Colour", "automotive.dim_color", "colour_name", "Colour", 100),
     ValueDomain("City", "automotive.dim_region", "city", "City", 100),

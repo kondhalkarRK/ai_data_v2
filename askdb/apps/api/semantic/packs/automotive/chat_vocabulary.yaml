@@ -46,7 +46,9 @@ unavailable:
 
 # Model names that are also everyday words. They only resolve to the model when
 # the brand is named alongside them or the word is followed by model/car.
-generic_value_words: [city, venue, punch, safari, elevate, comet, amaze]
+generic_value_words: [city, venue, punch, safari, elevate, comet, amaze, rapid, superb, seal,
+  compass, aura, bolt, jazz, sunny, kicks, duster, carnival, meridian, sierra, civic, polo,
+  basalt, zest, eon, wrangler, nano]
 
 # Words that may look like names but are business vocabulary, never entities.
 known_words:

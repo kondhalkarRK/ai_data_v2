@@ -51,7 +51,8 @@ def _resolve(snapshot: ValueDictionarySnapshot, pack: Any, question: str) -> dic
         ("Mahindra & Mahindra sales", "Mahindra", "synonym"),
         ("Hundai sales by year", "Hyundai", "fuzzy"),
         ("Marutti revenue", "Maruti Suzuki", "fuzzy"),
-        ("Vitara sales", "Grand Vitara", "alias"),
+        ("Vitara sales", "Grand Vitara", "synonym"),
+        ("Altis sales", "Corolla Altis", "alias"),
         ("Sales in Bombay", "Mumbai", "synonym"),
         ("Revenue in Bangalore", "Bengaluru", "synonym"),
         ("EV sales by year", "Electric", "synonym"),
@@ -158,7 +159,9 @@ def test_success_criteria_questions_plan_and_compile(
     for value in values:
         assert f"'{value}'" in planned.sql
     assert "GROUP BY" in planned.sql
-    ok, reason = validate_sql_against_plan(planned.sql, plan, allowed_schema=build_allowed_schema(pack))
+    ok, reason = validate_sql_against_plan(
+        planned.sql, plan, allowed_schema=build_allowed_schema(pack)
+    )
     assert ok, reason
     structured = planned.structured_plan()
     assert structured["metric"] in {"revenue", "units"}
@@ -256,7 +259,11 @@ def test_failures_become_recovery_suggestions_in_the_users_scope(
     recovery = recovery_for_failure("database", plan, industry=AUTO, question="MG sales by year")
     assert recovery.kind == "recovery"
     assert "SQL" not in recovery.title and "Error" not in recovery.title
-    assert recovery.options[:3] == ["MG sales by month", "MG revenue by year", "MG units sold by year"]
+    assert recovery.options[:3] == [
+        "MG sales by month",
+        "MG revenue by year",
+        "MG units sold by year",
+    ]
     assert plan_suggestions(None, industry=AUTO)
 
 
@@ -278,3 +285,35 @@ def test_builder_multi_value_filter_is_in_not_and() -> None:
     plan = spec_to_plan(spec, AUTO, None)
     assert len(plan.filters) == 1
     assert plan.filters[0].all_values == ("MG", "Kia")
+
+
+def _filter_values(
+    snapshot: ValueDictionarySnapshot, pack: Any, question: str
+) -> dict[str, set[str]]:
+    return {
+        f.column.rsplit(".", 1)[-1]: set(f.values or (f.value,))
+        for f in snapshot.resolve(question, pack=pack).filters()
+    }
+
+
+@pytest.mark.parametrize(
+    ("question", "column", "expected"),
+    [
+        ("SUV sales in 2025", "car_type", {"SUV", "Compact SUV", "Mid SUV", "Premium SUV"}),
+        ("compact SUV sales in 2025", "car_type", {"Compact SUV"}),
+        ("sedan revenue by year", "car_type", {"Sedan", "Compact Sedan", "Premium Sedan"}),
+        ("Innova sales by year", "model", {"Innova", "Innova Crysta", "Innova Hycross"}),
+        ("sales in NCR", "city", {"New Delhi", "Gurugram", "Noida", "Faridabad", "Ghaziabad"}),
+    ],
+)
+def test_umbrella_terms_expand_to_their_family(
+    snapshot: ValueDictionarySnapshot, pack: Any, question: str, column: str, expected: set[str]
+) -> None:
+    assert _filter_values(snapshot, pack, question).get(column) == expected
+
+
+def test_generic_words_do_not_become_model_filters(
+    snapshot: ValueDictionarySnapshot, pack: Any
+) -> None:
+    assert "model" not in _filter_values(snapshot, pack, "which dealers show rapid growth")
+    assert _filter_values(snapshot, pack, "Skoda Rapid sales").get("model") == {"Rapid"}

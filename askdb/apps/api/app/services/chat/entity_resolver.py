@@ -210,7 +210,9 @@ def load_chat_vocabulary(industry: Industry, packs_dir: str | None = None) -> Ch
     )
     return ChatVocabulary(
         unavailable=unavailable,
-        generic_value_words=frozenset(normalize(str(w)) for w in raw.get("generic_value_words") or []),
+        generic_value_words=frozenset(
+            normalize(str(w)) for w in raw.get("generic_value_words") or []
+        ),
         known_words=frozenset(normalize(str(w)) for w in raw.get("known_words") or []),
     )
 
@@ -341,12 +343,14 @@ class EntityResolver:
         self._fuzzy_targets: list[_Form] = [
             form
             for form in (*self._forms["exact"], *self._forms["synonym"])
-            if len(" ".join(form.tokens)) >= _FUZZY_MIN_LENGTH
-            and not self._is_generic(form.entry)
+            if len(" ".join(form.tokens)) >= _FUZZY_MIN_LENGTH and not self._is_generic(form.entry)
         ]
 
     def _is_generic(self, entry: CatalogEntry) -> bool:
-        return entry.key == "model" and normalize(entry.canonical) in self.vocabulary.generic_value_words
+        return (
+            entry.key == "model"
+            and normalize(entry.canonical) in self.vocabulary.generic_value_words
+        )
 
     def _is_vocabulary(self, token: str) -> bool:
         return (
@@ -430,13 +434,16 @@ class EntityResolver:
                         -form.entry.frequency,
                     ),
                 )
-                # A curated family synonym ("red") names every value that lists it.
-                family = [
+                # A curated family synonym ("red") names every value that lists it;
+                # an exact umbrella value ("SUV") also brings its listed family.
+                family = [best] + [
                     form
                     for form in candidates
-                    if form.method == "synonym" == best.method
+                    if form is not best
+                    and form.method == "synonym"
+                    and best.method in {"exact", "synonym"}
                     and form.entry.column == best.entry.column
-                ] or [best]
+                ]
                 for form in family:
                     out.matches.append(
                         EntityMatch(
@@ -498,7 +505,9 @@ class EntityResolver:
                 # One slip ("hyundia", "mumabi") is closer than the ratio suggests.
                 ratio = max(ratio, 0.9)
             if ratio > best_ratio or (
-                ratio == best_ratio and best is not None and form.entry.priority < best.entry.priority
+                ratio == best_ratio
+                and best is not None
+                and form.entry.priority < best.entry.priority
             ):
                 best, best_ratio = form, ratio
         return best, best_ratio

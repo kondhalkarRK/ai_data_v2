@@ -259,7 +259,7 @@ async def test_refresh_detects_new_brand_and_feeds_ai_chat(
     unchanged = await service.refresh(load_id="load-2")
     assert unchanged.version == 1  # nothing changed, version holds
 
-    warehouse.values["make"].append(("BYD", 40))
+    warehouse.values["make"].append(("VinFast", 40))
     warehouse.columns[("automotive.dim_carline", "launch_year")] = ColumnInfo(
         "automotive.dim_carline", "launch_year", "integer", 99
     )
@@ -270,15 +270,15 @@ async def test_refresh_detects_new_brand_and_feeds_ai_chat(
     assert {"new_values", "distinct_growth", "new_column"} <= kinds
 
     make = (await service.entity_views(domain_key="make"))[0]
-    byd = next(v for v in make.values if v.value == "BYD")
+    byd = next(v for v in make.values if v.value == "VinFast")
     assert byd.is_new and byd.first_seen_load == "load-3"
     assert byd.readiness.status == "needs_review"
     assert "No synonyms configured" in byd.readiness.notes
 
     snapshot = cached_value_dictionary(Industry.AUTOMOTIVE)
     assert snapshot is not None
-    assert any(v.value == "BYD" for v in snapshot.values)
-    assert snapshot.resolve("BYD sales last year").filters()
+    assert any(v.value == "VinFast" for v in snapshot.values)
+    assert snapshot.resolve("VinFast sales last year").filters()
 
     summary = await service.summary()
     assert summary["catalogVersion"] == 2
@@ -295,13 +295,13 @@ async def test_new_badge_expires_after_seven_days(
     now = datetime(2026, 9, 1, tzinfo=UTC)
     service = await _service(catalog_session, settings, warehouse, clock=lambda: now)
     await service.refresh()
-    warehouse.values["make"].append(("BYD", 40))
+    warehouse.values["make"].append(("VinFast", 40))
     await service.refresh()
     later = await _service(
         catalog_session, settings, warehouse, clock=lambda: now + timedelta(days=8)
     )
     make = (await later.entity_views(domain_key="make"))[0]
-    assert not next(v for v in make.values if v.value == "BYD").is_new
+    assert not next(v for v in make.values if v.value == "VinFast").is_new
 
 
 async def test_failed_refresh_keeps_previous_figures(

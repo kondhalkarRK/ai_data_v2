@@ -48,44 +48,49 @@ terms:
     related_terms: [Car Type, Electric Vehicle, Sedan, SUV, Hatchback]
 
   Car Type:
-    definition: Body style / segment such as Sedan, SUV, Hatchback, MUV, Coupe.
+    definition: >
+      Indian market segment of the vehicle: SUV (rugged body-on-frame), Compact SUV
+      (sub-4 m), Mid SUV, Premium SUV, Sedan, Compact Sedan, Premium Sedan, Hatchback,
+      Premium Hatchback, MUV and MPV.
     synonyms: [body type, vehicle type, body style, segment, class]
     category: Product
     maps_to_attribute: dim_carline.car_type
     sql_expression: "automotive.dim_carline.car_type"
     calculation_rules:
-      - Filter with exact car_type values Sedan, SUV, Hatchback, MUV, Coupe.
+      - A family word covers every segment in the family (SUV, sedan, hatchback).
+      - A specific segment ("compact SUV", "premium sedan") filters that segment only.
     example_questions:
       - Top selling sedan
       - Units sold by car type
+      - Compact SUV sales by brand
 
   Sedan:
-    definition: Passenger cars with a three-box body style (Sedan).
+    definition: Three-box passenger cars — Compact Sedan, Sedan and Premium Sedan segments.
     synonyms: [sedans, saloon, saloons]
     category: Product Filter
     maps_to_attribute: dim_carline.car_type
-    sql_expression: "automotive.dim_carline.car_type = 'Sedan'"
+    sql_expression: "automotive.dim_carline.car_type IN ('Sedan', 'Compact Sedan', 'Premium Sedan')"
     calculation_rules:
-      - Always apply WHERE car_type = 'Sedan' when the user says sedan.
+      - When the user says sedan, include Compact Sedan, Sedan and Premium Sedan.
     related_terms: [Vehicle, Car Type, Units Sold]
 
   SUV:
-    definition: Sport utility vehicles (SUV).
+    definition: Sport utility vehicles — SUV, Compact SUV, Mid SUV and Premium SUV segments.
     synonyms: [suvs, sport utility, crossover]
     category: Product Filter
     maps_to_attribute: dim_carline.car_type
-    sql_expression: "automotive.dim_carline.car_type = 'SUV'"
+    sql_expression: "automotive.dim_carline.car_type IN ('SUV', 'Compact SUV', 'Mid SUV', 'Premium SUV')"
     calculation_rules:
-      - Always apply WHERE car_type = 'SUV' when the user says SUV.
+      - When the user says SUV, include SUV, Compact SUV, Mid SUV and Premium SUV.
 
   Hatchback:
-    definition: Hatchback body style vehicles.
+    definition: Hatchback body style vehicles — Hatchback and Premium Hatchback segments.
     synonyms: [hatchbacks, hatch]
     category: Product Filter
     maps_to_attribute: dim_carline.car_type
-    sql_expression: "automotive.dim_carline.car_type = 'Hatchback'"
+    sql_expression: "automotive.dim_carline.car_type IN ('Hatchback', 'Premium Hatchback')"
     calculation_rules:
-      - Always apply WHERE car_type = 'Hatchback' when the user says hatchback.
+      - When the user says hatchback, include Hatchback and Premium Hatchback.
 
   Electric Vehicle:
     definition: A battery-electric passenger vehicle.
@@ -194,18 +199,18 @@ terms:
       - Compare MG and Maruti sales
 
   MUV:
-    definition: Multi-utility vehicles / MPVs (MUV).
-    synonyms: [muvs, mpv, mpvs, people carrier]
+    definition: Multi-utility vehicles (Innova Crysta, Eeco, Bolero-style people movers).
+    synonyms: [muvs, multi utility vehicle]
     category: Product Filter
     maps_to_attribute: dim_carline.car_type
     sql_expression: "automotive.dim_carline.car_type = 'MUV'"
 
-  Coupe:
-    definition: Two-door coupe body style.
-    synonyms: [coupes]
+  MPV:
+    definition: Multi-purpose vehicles / 7-seaters (Ertiga, Carens, Innova Hycross, Triber).
+    synonyms: [mpvs, people carrier, multi purpose vehicle]
     category: Product Filter
     maps_to_attribute: dim_carline.car_type
-    sql_expression: "automotive.dim_carline.car_type = 'Coupe'"
+    sql_expression: "automotive.dim_carline.car_type = 'MPV'"
 
   Fuel Type:
     definition: Powertrain of the vehicle — Petrol, Diesel, Hybrid or Electric (dim_carline.engine_type).
@@ -289,7 +294,7 @@ domain_rules:
     - SQL is the source of truth for numerical results.
     - Top selling defaults to SUM(order_qty) unless revenue is explicit.
     - Electric vehicle means engine_type = 'Electric'.
-    - Sedan / SUV / Hatchback / MUV / Coupe must filter dim_carline.car_type exactly.
+    - Sedan / SUV / Hatchback / MUV / MPV must filter dim_carline.car_type; family words include every segment of the family.
     - Top salesperson uses dim_salesman (person name), never dim_dealer.
     - Top dealer uses dim_dealer (outlet name), never dim_salesman.
     - Concatenate first_name and last_name as salesperson_name.
@@ -310,4 +315,4 @@ sql_patterns:
     trigger_words: [top, best, highest, most, leading]
   body_style_filter:
     description: Mandatory car_type filter when body style is named
-    trigger_words: [sedan, suv, hatchback, muv, coupe]
+    trigger_words: [sedan, suv, hatchback, muv, mpv]
