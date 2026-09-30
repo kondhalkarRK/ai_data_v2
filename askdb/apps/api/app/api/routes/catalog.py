@@ -7,6 +7,7 @@ from contextlib import AsyncExitStack
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import DBAPIError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
@@ -17,6 +18,8 @@ from app.api.deps import (
     get_registry,
     get_semantic_service,
 )
+from app.core.config import Industry
+from app.core.exceptions import DependencyUnavailableError
 from app.db.session import DatabaseRegistry
 from app.models.catalog import CatalogChange
 from app.schemas.catalog import (
@@ -28,9 +31,11 @@ from app.schemas.catalog import (
     EntityDetail,
     EntityRow,
     EntityValue,
+    SchemaDriftStatus,
 )
 from app.semantic.service import SemanticService
 from app.services.catalog import CatalogBusyError, EntityCatalogService
+from app.services.catalog.config import build_catalog_config
 from app.services.catalog.service import EntityView, refresh_dict
 
 logger = logging.getLogger(__name__)
@@ -83,6 +88,44 @@ def _change(item: CatalogChange) -> CatalogChangeItem:
     )
 
 
+def _store_problem(exc: BaseException) -> str | None:
+    """Why the catalog store cannot be used, or None for an unrelated error."""
+    text = str(exc).lower()
+    if isinstance(exc, ProgrammingError) or "does not exist" in text or "no such table" in text:
+        return "migration_pending"
+    if isinstance(exc, DBAPIError | DependencyUnavailableError | OSError):
+        return "database_unreachable"
+    return None
+
+
+async def _reset(session: AsyncSession) -> None:
+    try:
+        await session.rollback()
+    except Exception:
+        logger.debug("catalog: rollback after store failure failed", exc_info=True)
+
+
+async def _pack_only_rows(semantic: SemanticService, industry: Industry) -> list[EntityRow]:
+    """Entities straight from the semantic pack, used while the catalog store is down."""
+    config = build_catalog_config(industry, await semantic.get_pack(industry))
+    return [
+        EntityRow(
+            key=domain.key,
+            label=domain.label,
+            group=domain.group,
+            table=domain.table,
+            column=domain.column,
+            ai_known=domain.ai_known,
+            readiness="not_refreshed",
+            aliases=list(dict.fromkeys(a for _, aliases in domain.value_aliases for a in aliases))[
+                :40
+            ],
+            sample_values=[value for value, _ in domain.value_aliases][:25],
+        )
+        for domain in config.domains
+    ]
+
+
 @router.get("/summary", response_model=CatalogSummary)
 async def catalog_summary(
     user: RequireViewer,
@@ -92,7 +135,22 @@ async def catalog_summary(
 ) -> CatalogSummary:
     del user
     service = EntityCatalogService(session, semantic, industry)
-    return CatalogSummary.model_validate(await service.summary())
+    try:
+        return CatalogSummary.model_validate(await service.summary())
+    except Exception as exc:
+        reason = _store_problem(exc)
+        if reason is None:
+            raise
+        logger.warning("catalog summary unavailable (%s)", reason, exc_info=True)
+        await _reset(session)
+        rows = await _pack_only_rows(semantic, industry)
+        return CatalogSummary(
+            industry=industry.value,
+            total_entities=len(rows),
+            schema_drift=SchemaDriftStatus(status="not_checked", label="Not checked yet"),
+            available=False,
+            unavailable_reason=reason,
+        )
 
 
 @router.get("/entities", response_model=list[EntityRow])
@@ -104,7 +162,13 @@ async def catalog_entities(
 ) -> list[EntityRow]:
     del user
     service = EntityCatalogService(session, semantic, industry)
-    return [EntityRow.model_validate(_row(view)) for view in await service.entity_views()]
+    try:
+        return [EntityRow.model_validate(_row(view)) for view in await service.entity_views()]
+    except Exception as exc:
+        if _store_problem(exc) is None:
+            raise
+        await _reset(session)
+        return await _pack_only_rows(semantic, industry)
 
 
 @router.get("/entities/{key}", response_model=EntityDetail)
@@ -117,7 +181,17 @@ async def catalog_entity(
 ) -> EntityDetail:
     del user
     service = EntityCatalogService(session, semantic, industry)
-    views = await service.entity_views(domain_key=key)
+    try:
+        views = await service.entity_views(domain_key=key)
+    except Exception as exc:
+        if _store_problem(exc) is None:
+            raise
+        await _reset(session)
+        row = next((r for r in await _pack_only_rows(semantic, industry) if r.key == key), None)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown catalog entity.") from exc
+        domain = build_catalog_config(industry, await semantic.get_pack(industry)).domain(key)
+        return EntityDetail(**row.model_dump(), max_values=domain.max_values if domain else 0)
     if not views:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown catalog entity.")
     view = views[0]
@@ -157,7 +231,13 @@ async def catalog_changes(
 ) -> list[CatalogChangeItem]:
     del user
     service = EntityCatalogService(session, semantic, industry)
-    return [_change(item) for item in await service.changes(limit=limit)]
+    try:
+        return [_change(item) for item in await service.changes(limit=limit)]
+    except Exception as exc:
+        if _store_problem(exc) is None:
+            raise
+        await _reset(session)
+        return []
 
 
 @router.post("/refresh", response_model=CatalogRefreshResult)
@@ -188,6 +268,17 @@ async def catalog_refresh(
         except CatalogBusyError as exc:
             raise HTTPException(
                 status.HTTP_409_CONFLICT, "A catalog refresh is already running."
+            ) from exc
+        except Exception as exc:
+            reason = _store_problem(exc)
+            if reason is None:
+                raise
+            await _reset(session)
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "The catalog store is not set up yet (run the database migration)."
+                if reason == "migration_pending"
+                else "The application database is not reachable.",
             ) from exc
         info = refresh_dict(run)
         assert info is not None

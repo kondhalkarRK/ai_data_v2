@@ -8,7 +8,9 @@ from pydantic import Field
 
 from app.schemas.common import ApiModel
 
-ReadinessStatus = Literal["ai_ready", "needs_review", "missing_synonyms", "low_confidence"]
+ReadinessStatus = Literal[
+    "ai_ready", "needs_review", "missing_synonyms", "low_confidence", "not_refreshed"
+]
 
 
 class CatalogRefreshInfo(ApiModel):
@@ -45,6 +47,9 @@ class CatalogSummary(ApiModel):
     schema_drift: SchemaDriftStatus
     ai_coverage: float | None = None
     entity_readiness: dict[str, int] = Field(default_factory=dict)
+    available: bool = True
+    # "migration_pending" | "database_unreachable" when the catalog store cannot be used
+    unavailable_reason: str | None = None
 
 
 class EntityRow(ApiModel):

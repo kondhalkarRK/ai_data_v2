@@ -30,6 +30,7 @@ export const READINESS_LABEL: Record<Readiness, string> = {
   needs_review: "Needs Review",
   missing_synonyms: "Missing Synonyms",
   low_confidence: "Low Confidence",
+  not_refreshed: "Not refreshed",
 };
 
 export const SCHEMA_KINDS = new Set([
@@ -96,7 +97,9 @@ export function filterEntities(
       return false;
     }
     if (filters.has("new_values") && row.newValues === 0) return false;
-    if (filters.has("needs_review") && row.readiness === "ai_ready") return false;
+    if (filters.has("needs_review") && ["ai_ready", "not_refreshed"].includes(row.readiness)) {
+      return false;
+    }
     if (filters.has("schema_changes") && !schemaTables.has(row.table)) return false;
     return query.trim() ? matchReason(row, query) !== null : true;
   });

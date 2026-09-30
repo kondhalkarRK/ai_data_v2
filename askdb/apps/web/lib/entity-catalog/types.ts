@@ -1,4 +1,9 @@
-export type Readiness = "ai_ready" | "needs_review" | "missing_synonyms" | "low_confidence";
+export type Readiness =
+  | "ai_ready"
+  | "needs_review"
+  | "missing_synonyms"
+  | "low_confidence"
+  | "not_refreshed";
 
 export type RefreshScope = "catalog" | "values" | "semantic_cache";
 
@@ -34,6 +39,8 @@ export interface CatalogSummary {
   };
   aiCoverage: number | null;
   entityReadiness: Partial<Record<Readiness, number>>;
+  available: boolean;
+  unavailableReason: "migration_pending" | "database_unreachable" | null;
 }
 
 export interface EntityRow {

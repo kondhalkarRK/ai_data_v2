@@ -57,6 +57,14 @@ const READINESS_TONE: Record<Readiness, StatusTone> = {
   needs_review: "warn",
   missing_synonyms: "info",
   low_confidence: "fail",
+  not_refreshed: "neutral",
+};
+
+const UNAVAILABLE_MESSAGE: Record<string, string> = {
+  migration_pending:
+    "The catalog store has not been set up in the application database yet. An administrator needs to run the database migration (alembic upgrade head). Entities below come from the semantic pack.",
+  database_unreachable:
+    "The application database is not reachable, so refresh history and live values cannot be shown. Entities below come from the semantic pack; AI Chat keeps working with the pack vocabulary.",
 };
 
 const SEVERITY_TONE: Record<string, StatusTone> = { high: "fail", medium: "warn", low: "neutral" };
@@ -104,6 +112,9 @@ function refreshError(error: unknown): string {
   if (error instanceof ApiError && error.status === 409) {
     return "A refresh is already running. It will appear here when it finishes.";
   }
+  if (error instanceof ApiError && error.status === 503) {
+    return error.message;
+  }
   return "The refresh could not start. The current catalog is still in use.";
 }
 
@@ -136,16 +147,48 @@ export function EntityCatalog() {
     return <LoadingState title="Loading Entity Catalog" size="sm" />;
   }
   if (summary.isError || entities.isError || !summary.data) {
+    const missing =
+      (summary.error instanceof ApiError && summary.error.status === 404) ||
+      (entities.error instanceof ApiError && entities.error.status === 404);
     return (
       <EmptyState
         title="The Entity Catalog is not available right now"
-        detail="AI Chat keeps working with the semantic pack vocabulary. Try again in a moment."
+        detail={
+          missing
+            ? "The API does not have the catalog service yet. Restart the API so it loads the latest version."
+            : "AI Chat keeps working with the semantic pack vocabulary."
+        }
+        action={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              void summary.refetch();
+              void entities.refetch();
+              void changes.refetch();
+            }}
+          >
+            <RefreshCw />
+            Try again
+          </Button>
+        }
       />
     );
   }
 
   return (
     <div className="space-y-4">
+      {!summary.data.available ? (
+        <Card className="border-warning/40">
+          <CardContent className="pt-5 text-sm">
+            <p className="font-semibold text-foreground">Catalog store unavailable</p>
+            <p className="mt-1 text-muted-foreground">
+              {UNAVAILABLE_MESSAGE[summary.data.unavailableReason ?? ""] ??
+                UNAVAILABLE_MESSAGE.database_unreachable}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
       <RefreshBar
         summary={summary.data}
         pendingScope={refresh.isPending ? (refresh.variables ?? null) : null}
@@ -379,7 +422,9 @@ function SummaryCards({ summary }: { summary: CatalogSummary }) {
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">AI readiness by entity:</span>
-        {(Object.keys(READINESS_LABEL) as Readiness[]).map((key) => (
+        {(Object.keys(READINESS_LABEL) as Readiness[])
+          .filter((key) => key !== "not_refreshed")
+          .map((key) => (
           <StatusPill
             key={key}
             tone={READINESS_TONE[key]}
@@ -543,7 +588,9 @@ function EntityDetailPanel({ entityKey }: { entityKey: string | null }) {
       </div>
       <ul className="mt-2 max-h-[28rem] space-y-1.5 overflow-y-auto pr-1">
         {values.length === 0 ? (
-          <li className="py-4 text-center text-xs text-muted-foreground">No values match.</li>
+          <li className="py-4 text-center text-xs text-muted-foreground">
+            {entity.valuesTotal ? "No values match." : "Values appear after the first catalog refresh."}
+          </li>
         ) : null}
         {values.map((value) => (
           <li
