@@ -12,3 +12,16 @@ Runs on startup, after data loads, on demand, and when a question names an unkno
 
 Service Unavailable
 
+env) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> $env:PGPASSWORD = "RAko@#3333"         
+>> & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h 127.0.0.1 -f "database\app\00_bootstrap.sql"
+DO
+DO
+DO
+You are now connected to database "askdb_automotive" as user "postgres".
+REVOKE
+GRANT
+You are now connected to database "askdb_insurance" as user "postgres".
+REVOKE
+GRANT
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> 
+
