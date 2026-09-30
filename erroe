@@ -1,3 +1,151 @@
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> cd "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api"
+>> .\.venv\Scripts\python.exe -m alembic upgrade head
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_app_schema, Application schema: users, refresh tokens, auth audit.
+Traceback (most recent call last):
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\psycopg.py", line 642, in execute
+    result = self.await_(self._cursor.execute(query, params, **kw))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\psycopg\cursor_async.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.DuplicateTable: relation "users" already exists
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\__main__.py", line 4, in <module>
+    main(prog="alembic")
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\config.py", line 1039, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\config.py", line 1029, in main
+    self.run_cmd(cfg, options)
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\config.py", line 963, in run_cmd
+    fn(
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\command.py", line 487, in upgrade
+    script.run_env()
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\script\base.py", line 550, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\util\pyfiles.py", line 114, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\util\pyfiles.py", line 132, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\migrations\env.py", line 126, in <module>
+    run_migrations_online()
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\migrations\env.py", line 115, in run_migrations_online
+    asyncio.run(
+  File "C:\Program Files\Python312\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python312\Lib\asyncio\base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\migrations\env.py", line 107, in run_async_migrations
+    await connection.run_sync(do_run_migrations)
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\engine.py", line 888, in run_sync
+    return await greenlet_spawn(
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 203, in greenlet_spawn
+    result = context.switch(value)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\migrations\env.py", line 98, in do_run_migrations
+    context.run_migrations()
+  File "<string>", line 8, in run_migrations
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\runtime\environment.py", line 970, in run_migrations
+    self.get_context().run_migrations(**kw)
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\runtime\migration.py", line 621, in run_migrations
+    step.migration_fn(**kw)
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\migrations\versions\0001_app_schema.py", line 39, in upgrade
+    op.create_table(
+  File "<string>", line 8, in create_table
+  File "<string>", line 3, in create_table
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\operations\ops.py", line 1323, in create_table
+    return operations.invoke(op)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\operations\base.py", line 448, in invoke
+    return fn(self, operation)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\operations\toimpl.py", line 140, in create_table
+    operations.impl.create_table(table, **kw)
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\ddl\impl.py", line 434, in create_table
+    self._exec(schema.CreateTable(table, **kw))
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\alembic\ddl\impl.py", line 252, in _exec
+    return conn.execute(construct, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\sql\ddl.py", line 188, in _execute_on_connection
+    return connection._execute_ddl(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1532, in _execute_ddl
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\psycopg.py", line 642, in execute
+    result = self.await_(self._cursor.execute(query, params, **kw))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\psycopg\cursor_async.py", line 117, in execute
+    raise ex.with_traceback(None)
+sqlalchemy.exc.ProgrammingError: (psycopg.errors.DuplicateTable) relation "users" already exists
+[SQL: 
+CREATE TABLE users (
+        id UUID NOT NULL, 
+        email VARCHAR(320) NOT NULL, 
+        email_normalized VARCHAR(320) NOT NULL, 
+        full_name VARCHAR(200) NOT NULL, 
+        password_hash VARCHAR(255) NOT NULL, 
+        password_changed_at TIMESTAMP WITH TIME ZONE, 
+        must_change_password BOOLEAN DEFAULT false NOT NULL, 
+        role VARCHAR(20) DEFAULT 'viewer' NOT NULL, 
+        default_industry VARCHAR(20) DEFAULT 'insurance' NOT NULL, 
+        is_active BOOLEAN DEFAULT true NOT NULL, 
+        last_login_at TIMESTAMP WITH TIME ZONE, 
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+        CONSTRAINT pk_users PRIMARY KEY (id), 
+        CONSTRAINT uq_users_email_normalized UNIQUE (email_normalized)
+)
+
+]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> 
+
 cd "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api"
 .\.venv\Scripts\python.exe -m alembic upgrade head
 
