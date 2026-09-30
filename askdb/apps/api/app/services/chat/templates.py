@@ -941,23 +941,44 @@ def _insurance_ratio_sql(plan: QuestionPlan) -> TemplateHit | None:
     )
     limit = 100 if chronological else max(1, min(plan.limit or 20, 100))
     grain = ", ".join(keys) or "total"
-    return TemplateHit(
-        title=f"{ratio.replace('_', ' ').title()} by {grain}",
-        glossary_matches=3,
-        path="semantic_compiler",
-        sql=f"""
+    ctes = f"""
 WITH claims AS (
   {claims_sql}
 ),
 premium AS (
   {premium_sql}
+)""".strip()
+    select = (
+        f"SELECT {', '.join([*outputs, f'COALESCE(cl.{num}, 0) AS {num}', f'COALESCE(pr.{den}, 0) AS {den}'])},\n"
+        f"       COALESCE(cl.{num}, 0)::numeric / NULLIF(pr.{den}, 0) AS {ratio}\n"
+        f"{joined}"
+    )
+    time_keys = [key for key in keys if key in _TIME_KEYS]
+    if plan.analysis == "period_growth" and time_keys:
+        groups = [key for key in keys if key not in _TIME_KEYS]
+        window = (f"PARTITION BY {', '.join(groups)} " if groups else "") + (
+            f"ORDER BY {', '.join(time_keys)}"
+        )
+        previous = f"LAG({ratio}) OVER ({window})"
+        sql = f"""
+{ctes},
+ratios AS (
+{select}
 )
-SELECT {', '.join([*outputs, f'COALESCE(cl.{num}, 0) AS {num}', f'COALESCE(pr.{den}, 0) AS {den}'])},
-       COALESCE(cl.{num}, 0)::numeric / NULLIF(pr.{den}, 0) AS {ratio}
-{joined}
+SELECT ratios.*,
+       {ratio} - {previous} AS {ratio}_change,
+       ({ratio} - {previous}) / NULLIF({previous}, 0) AS {ratio}_change_pct
+FROM ratios
 ORDER BY {order}
 LIMIT {limit}
-""".strip(),
+""".strip()
+    else:
+        sql = f"{ctes}\n{select}\nORDER BY {order}\nLIMIT {limit}"
+    return TemplateHit(
+        title=f"{ratio.replace('_', ' ').title()} by {grain}",
+        glossary_matches=3,
+        path="semantic_compiler",
+        sql=sql,
     )
 
 

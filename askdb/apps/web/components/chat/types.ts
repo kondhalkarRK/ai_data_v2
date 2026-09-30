@@ -140,6 +140,27 @@ export interface ResponseMeta {
   cacheHit?: boolean;
   route?: "sql" | "knowledge" | "hybrid";
   routeReason?: string;
+  confidence?: AnswerConfidence;
+  decision?: RouteDecision;
+  corrections?: Array<{ from: string; to: string }>;
+  reinterpretedAs?: string | null;
+}
+
+export interface AnswerConfidence {
+  level: "high" | "medium" | "needs_clarification";
+  label: string;
+  score: number;
+  reasons: string[];
+}
+
+export interface RouteDecision {
+  path: "semantic" | "llm_reasoning" | "clarify";
+  label: string;
+  complexity: "simple" | "complex";
+  reason: string;
+  llmAvailable: boolean;
+  governedFallback: boolean;
+  answeredBy?: "semantic" | "llm";
 }
 
 export interface ChatMessage {

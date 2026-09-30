@@ -24,6 +24,7 @@ class LlmResult:
     error: str | None = None
     timed_out: bool = False
     circuit_open: bool = False
+    content: str = ""
 
 
 class _CircuitBreaker:
@@ -61,6 +62,7 @@ def _slim_system_prompt(
     industry: Industry,
     schema_hints: str | None,
     prior_sql: str | None = None,
+    feedback: str | None = None,
 ) -> str:
     hints = (schema_hints or "").strip()
     hint_block = f"\nDomain context (use only this):\n{hints}\n" if hints else "\n"
@@ -69,6 +71,11 @@ def _slim_system_prompt(
         prior_block = (
             "\nPRIOR SUCCESSFUL SQL (preserve its intent, joins, and filters unless "
             f"the user explicitly changes them):\n{prior_sql[:1800]}\n"
+        )
+    if feedback:
+        prior_block += (
+            "\nYOUR PREVIOUS SQL WAS REJECTED BY THE VALIDATOR. Fix exactly this and "
+            f"return the corrected SELECT only:\n{feedback[:2400]}\n"
         )
     return (
         f"You are Ask DB for {industry.value} analytics. "
@@ -102,12 +109,13 @@ async def _one_completion(
     temperature: float | None = None,
     top_p: float | None = None,
     top_k: int | None = None,
+    max_tokens: int = 400,
 ) -> LlmResult:
     api_key = settings.llm_api_key.get_secret_value()
     payload: dict[str, object] = {
         "model": model,
         "temperature": settings.llm_temperature if temperature is None else temperature,
-        "max_tokens": min(settings.llm_max_completion_tokens, 400),
+        "max_tokens": min(settings.llm_max_completion_tokens, max_tokens),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": question},
@@ -155,6 +163,7 @@ async def _one_completion(
         prompt_tokens=int(usage.get("prompt_tokens") or 0),
         completion_tokens=int(usage.get("completion_tokens") or 0),
         error=None if sql else "Invalid model response (empty SQL)",
+        content=content,
     )
 
 
@@ -195,6 +204,7 @@ async def complete_chat(
     temperature: float | None = None,
     top_p: float | None = None,
     top_k: int | None = None,
+    feedback: str | None = None,
 ) -> LlmResult:
     api_key = settings.llm_api_key.get_secret_value()
     if not api_key:
@@ -215,7 +225,7 @@ async def complete_chat(
         )
 
     timeout = float(settings.nlq_llm_timeout_seconds)
-    system = _slim_system_prompt(industry, schema_hints, prior_sql)
+    system = _slim_system_prompt(industry, schema_hints, prior_sql, feedback)
     primary = (model_override or "").strip() or settings.llm_default_model
     fallback = (settings.llm_fallback_model or "").strip() or None
 
@@ -268,6 +278,43 @@ async def complete_chat(
         error=last.error or "Unavailable",
         timed_out=last.timed_out,
     )
+
+
+async def complete_text(
+    *,
+    settings: Settings,
+    system: str,
+    user: str,
+    max_tokens: int = 200,
+    model_override: str | None = None,
+) -> LlmResult:
+    """One short non-SQL completion (question interpretation). Never retried."""
+    model = (model_override or "").strip() or settings.llm_default_model
+    if not settings.llm_api_key.get_secret_value():
+        return LlmResult(sql=None, narrative="", model=model, error="No LLM API key configured")
+    if not _CIRCUIT.allow():
+        return LlmResult(
+            sql=None, narrative="", model=model, error="AI service is currently degraded",
+            circuit_open=True,
+        )
+    result = await _one_completion(
+        settings=settings,
+        model=model,
+        system=system,
+        question=user,
+        timeout=float(settings.nlq_llm_timeout_seconds),
+        temperature=0.0,
+        max_tokens=max_tokens,
+    )
+    if result.content:
+        _CIRCUIT.record_success()
+    elif result.timed_out or result.error:
+        _CIRCUIT.record_failure()
+    return result
+
+
+def llm_configured(settings: Settings) -> bool:
+    return bool(settings.llm_api_key.get_secret_value())
 
 
 def circuit_stats() -> dict[str, object]:

@@ -165,7 +165,7 @@ value_domains:
     label: Region
     max_values: 100
     value_aliases:
-      National Capital Region: [Delhi, NCR]
+      National Capital Region: [NCR]
       Mumbai Metro: [Mumbai]
       Bengaluru Metro: [Bengaluru, Bangalore]
       Hyderabad Metro: [Hyderabad]

@@ -12,6 +12,16 @@ unavailable:
       - Loss ratio by line of business
       - Claims incurred by product
       - Earned premium by month
+  - terms: [satisfaction, customer satisfaction, csat, nps, net promoter score, complaints,
+            customer complaints, turnaround time, tat]
+    kind: metric
+    message: >
+      Customer satisfaction, NPS and complaints aren't recorded in the insurance data.
+      Premium, claims, loss ratio, renewal rate and claim approval rate are available.
+    alternatives:
+      - Renewal rate by channel
+      - Claim approval rate by product
+      - Loss ratio by line of business
 
 generic_value_words: []
 

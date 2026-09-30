@@ -30,6 +30,24 @@ def test_nlq_accuracy_floor(suite: str) -> None:
     assert summary["accuracy"] >= ACCURACY_FLOOR, "\n".join(misses)
 
 
+RELEASE_MIN_QUESTIONS = 200
+
+
+def test_release_gate_per_industry() -> None:
+    """Release suite: 200+ questions per industry, each industry at 95% or better."""
+    results = runner.run(_RUNNER.with_name("nlq_release.yaml"))
+    summary = runner.summarise(results)
+    for industry in ("automotive", "insurance"):
+        stats = summary["by_industry"][industry]
+        misses = [
+            f"{r['id']} [{r['verdict']}] {r['question']}: {'; '.join(r['checks_failed'])[:120]}"
+            for r in results
+            if r["industry"] == industry and r["verdict"] != "correct"
+        ]
+        assert stats["total"] >= RELEASE_MIN_QUESTIONS, industry
+        assert stats["accuracy"] >= ACCURACY_FLOOR, "\n".join(misses)
+
+
 def test_no_benchmark_question_needs_the_llm() -> None:
     results = runner.run(_RUNNER.with_name("nlq_benchmark.yaml"))
     needs_llm = [r["id"] for r in results if "no_compiled_sql" in " ".join(r["checks_failed"])]

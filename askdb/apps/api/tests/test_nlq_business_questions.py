@@ -79,6 +79,15 @@ def test_clarification_choices_compile() -> None:
         assert "fact_sales" in hit.sql.lower()
 
 
+def test_show_sales_options_are_all_answerable() -> None:
+    from tests.benchmark.run_benchmark import ask
+
+    options = understand_question(Industry.AUTOMOTIVE, "Show sales").ambiguity_options
+    assert len(options) == 5
+    for option in options:
+        assert ask(Industry.AUTOMOTIVE, option).outcome == "sql", option
+
+
 def test_sql_repair_rewrites_unknown_order_date() -> None:
     sql = "SELECT order_date FROM automotive.fact_sales"
     repaired = propose_sql_repair(sql, 'column "order_date" does not exist')

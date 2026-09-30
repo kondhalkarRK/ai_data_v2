@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
@@ -28,9 +29,10 @@ from app.schemas.common import ApiModel
 from app.semantic.service import SemanticService
 from app.services.chat.profiler import PROFILER
 from app.services.chat.query_cache import QUERY_CACHE
-from app.services.chat.service import ChatService
+from app.services.chat.service import ChatService, recovery_frames
 from app.services.llm import circuit_stats, model_catalog
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
 _cancel_requested: set[uuid.UUID] = set()
 
@@ -97,6 +99,10 @@ async def chat_ask(
                 f'{{"code":"{exc.code}","message":{json_quote(exc.message)}}}\n\n'
             )
             yield payload.encode("utf-8")
+        except Exception:
+            logger.exception("chat_ask failed unexpectedly")
+            for frame in recovery_frames(industry):
+                yield frame.encode("utf-8")
 
     return StreamingResponse(
         event_stream(),
@@ -167,6 +173,9 @@ async def chat_ask_sync(
                 {"event": "done", "data": {"failed": True}},
             ]
         }
+    except Exception:
+        logger.exception("chat_ask_sync failed unexpectedly")
+        return {"events": _sse_events_from_frames([*frames, *recovery_frames(industry)])}
     return {"events": _sse_events_from_frames(frames)}
 
 

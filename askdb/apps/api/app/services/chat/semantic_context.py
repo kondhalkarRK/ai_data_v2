@@ -171,6 +171,69 @@ _SCHEMA_TABLE = re.compile(
 )
 
 
+_PARTITION = re.compile(r"partition\s+by\s+([\s\S]*?)(?:\border\s+by\b|\)|\brows\b)")
+_TIME_KEYS = frozenset({"month", "quarter", "year"})
+
+
+def _dimension_tokens(plan: QuestionPlan, key: str) -> tuple[str, ...]:
+    from app.services.chat.semantic_analytics import expected_dimension_tokens
+
+    column, alias = expected_dimension_tokens(plan).get(key, (key, key))
+    return tuple(dict.fromkeys(token.lower() for token in (column, alias, key)))
+
+
+def validate_analytical_shape(lowered: str, plan: QuestionPlan) -> tuple[bool, str | None]:
+    """Window, partition and time-intelligence logic must match the plan's analysis."""
+    partitions = " ".join(found.group(1) for found in _PARTITION.finditer(lowered))
+    analysis = plan.analysis
+
+    if analysis == "top_n_per_group":
+        if not re.search(r"\b(row_number|rank|dense_rank)\s*\(", lowered):
+            return False, "Top-N per group needs ROW_NUMBER/RANK over each group"
+        for key in plan.partition_by:
+            if not any(re.search(rf"\b{re.escape(t)}\b", partitions) for t in _dimension_tokens(plan, key)):
+                return False, f"Ranking must PARTITION BY {key}"
+        leaves = [d for d in plan.dimensions if d not in plan.partition_by]
+        for key in leaves:
+            if any(re.search(rf"\b{re.escape(t)}\b", partitions) for t in _dimension_tokens(plan, key)):
+                return False, f"Ranking must not PARTITION BY the ranked {key}"
+        if not re.search(rf"<=\s*{int(plan.limit)}\b|\blimit\b", lowered):
+            return False, "Top-N per group must keep only the top rows of each group"
+
+    if analysis == "period_growth":
+        if not re.search(r"\blag\s*\(", lowered):
+            return False, "Period growth needs LAG over time"
+        for key in plan.partition_by:
+            if not any(re.search(rf"\b{re.escape(t)}\b", partitions) for t in _dimension_tokens(plan, key)):
+                return False, f"Growth must be computed within each {key} (PARTITION BY {key})"
+
+    if analysis == "running_total" and not re.search(r"\bsum\s*\([^)]*\)\s*over\s*\(", lowered):
+        return False, "Running total needs SUM(...) OVER (ORDER BY period)"
+    if analysis == "moving_average" and (
+        not re.search(r"\bavg\s*\([^)]*\)\s*over\s*\(", lowered) or "preceding" not in lowered
+    ):
+        return False, "Moving average needs AVG(...) OVER a PRECEDING window"
+    if analysis in {"contribution", "market_share"} and not re.search(r"\bover\s*\(", lowered):
+        return False, "Share needs a window total (SUM(...) OVER ())"
+
+    if analysis == "year_window_compare":
+        return True, None
+    period = plan.period
+    if period is not None:
+        if period.years:
+            missing = [str(y) for y in period.years if str(y) not in lowered]
+            if missing:
+                return False, f"SQL is missing the requested years ({', '.join(missing)})"
+        elif period.start is not None:
+            if period.start.isoformat() not in lowered:
+                return False, f"SQL does not apply the requested period ({period.label})"
+        elif not re.search(r"\bmax\s*\(|current_date|\binterval\b|date_trunc", lowered):
+            return False, f"SQL does not apply the requested period ({period.label})"
+    elif plan.year_filter and str(plan.year_filter) not in lowered:
+        return False, f"SQL does not filter the requested year {plan.year_filter}"
+    return True, None
+
+
 def validate_sql_against_plan(
     sql: str,
     plan: QuestionPlan,
@@ -218,6 +281,10 @@ def validate_sql_against_plan(
             token = dimension.replace("_", "")
             if dimension not in lowered and token not in lowered.replace("_", ""):
                 return False, f"SQL is missing dimension '{dimension}'"
+
+    ok, reason = validate_analytical_shape(lowered, plan)
+    if not ok:
+        return ok, reason
 
     if allowed_schema:
         alias_map: dict[str, str] = {}

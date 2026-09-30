@@ -38,22 +38,13 @@ from app.analytics import automotive_seed, insurance_seed  # noqa: E402
 from app.analytics.sql_guardrails import sql_is_safe  # noqa: E402
 from app.core.config import Industry, get_settings  # noqa: E402
 from app.semantic.service import SemanticService  # noqa: E402
-from app.services.chat.clarification import assess_resolution  # noqa: E402
-from app.services.chat.conversation_context import is_contextual_followup, plan_state  # noqa: E402
-from app.services.chat.intents import is_out_of_bounds, needs_clarification  # noqa: E402
-from app.services.chat.question_understanding import understand_question  # noqa: E402
-from app.services.chat.semantic_context import (  # noqa: E402
-    build_allowed_schema,
-    validate_sql_against_plan,
-)
-from app.services.chat.semantic_query_planner import (  # noqa: E402
-    plan_semantic_query,
-    rewrite_question,
-)
+from app.services.chat.conversation_context import plan_state  # noqa: E402
+from app.services.chat.intents import is_out_of_bounds  # noqa: E402
+from app.services.chat.pipeline import plan_turn  # noqa: E402
+from app.services.chat.semantic_context import build_allowed_schema  # noqa: E402
 from app.services.chat.value_dictionary import (  # noqa: E402
     BusinessValue,
     ValueDictionarySnapshot,
-    resolver_for,
 )
 
 BENCHMARK = Path(__file__).with_name("nlq_benchmark.yaml")
@@ -209,55 +200,43 @@ def ask(industry: Industry, question: str, prior: Turn | None = None) -> Turn:
     snapshot, pack, allowed = _context(industry)
     if is_out_of_bounds(question, industry):
         return Turn("failure", "out_of_scope")
-    resolution = snapshot.resolve(question, pack=pack)
+    prior_sql = prior_state = None
+    if prior is not None and prior.plan is not None and prior.outcome == "sql":
+        prior_sql, prior_state = prior.sql, plan_state(prior.plan)
+    planned = plan_turn(
+        industry,
+        question,
+        snapshot=snapshot,
+        pack=pack,
+        allowed_schema=allowed,
+        prior_sql=prior_sql,
+        prior_state=prior_state,
+    )
+    resolution = planned.resolution
     turn = Turn(
         "failure",
         resolved=[f"{m.text}->{m.entry.canonical} ({m.method})" for m in resolution.matches],
         unresolved=[u.text for u in resolution.unresolved],
+        plan=planned.plan,
+        path=planned.planned.path if planned.planned else "",
     )
-    value_filters = resolution.filters()
-    if not resolution.matches and (message := needs_clarification(question)):
-        turn.outcome, turn.detail = "clarify", f"needs_clarification: {message[:90]}"
+    if planned.clarification is not None:
+        reason = planned.clarify_reason or "clarify"
+        detail = planned.clarification.message[:90]
+        turn.outcome = "clarify"
+        turn.detail = (
+            "planner_ambiguous" if reason == "planner_ambiguous" else f"{reason}: {detail}"
+        )
         return turn
-    plan = understand_question(industry, rewrite_question(question), value_filters=value_filters)
-    turn.plan = plan
-    if plan.is_ambiguous and plan.ambiguity_options:
-        turn.outcome, turn.detail = "clarify", f"ambiguous: {(plan.notes or [''])[0][:90]}"
+    if planned.validation_error:
+        turn.sql = planned.planned.sql if planned.planned else ""
+        turn.detail = f"validation_rejected: {planned.validation_error}"
         return turn
-    followup = is_contextual_followup(question)
-    gate = assess_resolution(
-        question,
-        plan,
-        resolution,
-        industry=industry,
-        brands=resolver_for(snapshot, pack).canonical_values("make"),
-    )
-    if gate is not None and not followup:
-        turn.outcome, turn.detail = "clarify", f"{gate.kind}: {gate.message[:90]}"
-        return turn
-    prior_sql = prior_state = None
-    if followup and prior is not None and prior.plan is not None:
-        prior_sql, prior_state = prior.sql, plan_state(prior.plan)
-    planned = plan_semantic_query(
-        industry,
-        question,
-        value_filters=value_filters,
-        prior_sql=prior_sql,
-        pack=pack,
-        prior_state=prior_state,
-        resolved=resolution.trace(),
-    )
-    turn.plan, turn.path = planned.plan, planned.path
-    if planned.path == "clarification":
-        turn.outcome, turn.detail = "clarify", "planner_ambiguous"
-        return turn
-    if not planned.sql:
+    if not planned.governed_sql:
         turn.detail = "no_compiled_sql (would need the LLM)"
         return turn
-    ok, reason = sql_is_safe(planned.sql)
-    if ok:
-        ok, reason = validate_sql_against_plan(planned.sql, planned.plan, allowed_schema=allowed)
-    turn.sql = planned.sql
+    turn.sql = planned.governed_sql
+    ok, reason = sql_is_safe(turn.sql)
     if not ok:
         turn.detail = f"validation_rejected: {reason}"
         return turn
@@ -395,13 +374,25 @@ def pattern_of(
 # ─────────────────────────────── runner ───────────────────────────────
 
 
+def _chain(prior: str | list[str] | None) -> list[str]:
+    if not prior:
+        return []
+    return [prior] if isinstance(prior, str) else list(prior)
+
+
+def _question_text(result: dict[str, Any]) -> str:
+    return " → ".join([*_chain(result.get("prior")), result["question"]])
+
+
 def run(suite: Path = BENCHMARK) -> list[dict[str, Any]]:
     cases = yaml.safe_load(suite.read_text(encoding="utf-8"))["cases"]
     results: list[dict[str, Any]] = []
     for case in cases:
         industry = Industry(case["industry"])
-        prior_turn = ask(industry, case["prior"]) if case.get("prior") else None
         try:
+            prior_turn: Turn | None = None
+            for step in _chain(case.get("prior")):
+                prior_turn = ask(industry, step, prior_turn)
             turn = ask(industry, case["question"], prior_turn)
         except Exception as exc:  # a crash is a failure, not a harness error
             turn = Turn("failure", f"exception: {type(exc).__name__}: {exc}"[:160])
@@ -438,11 +429,21 @@ def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
     for r in results:
         by_category[r["category"]][r["verdict"]] += 1
     patterns = Counter(r["pattern"] for r in results if r["pattern"])
+    by_industry: dict[str, dict[str, Any]] = {}
+    for industry in sorted({r["industry"] for r in results}):
+        subset = [r for r in results if r["industry"] == industry]
+        correct = sum(r["verdict"] == "correct" for r in subset)
+        by_industry[industry] = {
+            "total": len(subset),
+            "correct": correct,
+            "accuracy": round(100 * correct / len(subset), 1),
+        }
     return {
         "total": len(results),
         "verdicts": dict(verdicts),
         "accuracy": round(100 * verdicts["correct"] / max(len(results), 1), 1),
         "by_category": {k: dict(v) for k, v in by_category.items()},
+        "by_industry": by_industry,
         "patterns": patterns.most_common(),
     }
 
@@ -456,7 +457,10 @@ CATEGORY_ORDER = [
     "geography",
     "vehicle_attributes",
     "insurance_metrics",
+    "complex_analytics",
+    "spelling",
     "followup",
+    "clarification",
 ]
 
 
@@ -542,7 +546,7 @@ def render_report(
     for r in results:
         if r["verdict"] != "correct":
             why = "; ".join(r["checks_failed"])[:140].replace("|", "\\|")
-            q = r["question"] if not r["prior"] else f"{r['prior']} → {r['question']}"
+            q = _question_text(r)
             lines.append(f"| {r['id']} | {q} | {r['verdict']} | {why} |")
     if baseline:
         before = {r["id"]: r["verdict"] for r in baseline}
@@ -561,7 +565,7 @@ def render_report(
         ]
         for r in baseline:
             if r["verdict"] != "correct":
-                q = r["question"] if not r["prior"] else f"{r['prior']} → {r['question']}"
+                q = _question_text(r)
                 lines.append(
                     f"| {r['id']} | {q} | {r['pattern']} | {r['verdict']} | "
                     f"{now.get(r['id'], 'removed')} |"
@@ -599,6 +603,60 @@ def render_holdout(before: list[dict[str, Any]], after: list[dict[str, Any]]) ->
     return "\n".join(lines) + "\n"
 
 
+def render_release(first: list[dict[str, Any]], after: list[dict[str, Any]]) -> str:
+    """Release suite: 200+ questions per industry with a 95% gate per industry."""
+    f, a = summarise(first), summarise(after)
+    lines = [
+        "",
+        "## Release suite (`tests/benchmark/nlq_release.yaml`)",
+        "",
+        f"{a['total']} questions generated by `tests/benchmark/build_release_suite.py`: "
+        "parameterised coverage of the seed vocabulary plus hand-written complex analytics, "
+        "spelling/alias and multi-turn follow-up chains. Release gate: 200+ questions and "
+        "95% or better per industry (`tests/test_nlq_benchmark.py`). The first run is the "
+        "unseen score; its misses were then fixed generically, and ambiguous test "
+        "questions were rewritten (see below), so the second number is no longer unseen.",
+        "",
+        "| Industry | First run (unseen) | After fixes |",
+        "|---|---|---|",
+    ]
+    for industry, stats in a["by_industry"].items():
+        before = f["by_industry"].get(industry, {})
+        lines.append(
+            f"| {industry} | {before.get('correct', 0)}/{before.get('total', 0)} "
+            f"({before.get('accuracy', 0)}%) | {stats['correct']}/{stats['total']} "
+            f"({stats['accuracy']}%) |"
+        )
+    lines.append(f"| **all** | {f['accuracy']}% | **{a['accuracy']}%** |")
+    lines += [
+        "",
+        "| Category | Questions | First run correct | After fixes correct |",
+        "|---|---|---|---|",
+    ]
+    for cat in CATEGORY_ORDER:
+        c, b = a["by_category"].get(cat, {}), f["by_category"].get(cat, {})
+        if c:
+            lines.append(
+                f"| {cat} | {sum(c.values())} | {b.get('correct', 0)} | {c.get('correct', 0)} |"
+            )
+    lines += ["", "First-run misses:", "", "| Question | Verdict | Pattern |", "|---|---|---|"]
+    for r in first:
+        if r["verdict"] != "correct":
+            lines.append(f"| {_question_text(r)} | {r['verdict']} | {r['pattern']} |")
+    lines += [
+        "",
+        "Test questions changed after the first run (the question itself was ambiguous):",
+        "",
+        "- \u201cCity units sold by month\u201d \u2192 \u201cHonda City units sold by month\u201d "
+        "(\u201ccity\u201d is also a dimension).",
+        "- \u201cLiability claims incurred\u201d removed (Liability is both a claim type and a "
+        "line of business).",
+        "- \u201cShow claims data trend\u201d moved from clarification to trend "
+        "(claim count by month is a fair reading).",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--label", default="latest")
@@ -607,6 +665,9 @@ def main() -> None:
     parser.add_argument("--report", help="write a markdown report to this path")
     parser.add_argument(
         "--holdout", help="BEFORE,AFTER labels of saved hold-out runs to add to the report"
+    )
+    parser.add_argument(
+        "--release", help="FIRST,AFTER labels of saved release-suite runs to add to the report"
     )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
@@ -618,6 +679,8 @@ def main() -> None:
 
     s = summarise(results)
     print(f"{s['total']} questions · accuracy {s['accuracy']}% · {s['verdicts']}")
+    for industry, stats in s["by_industry"].items():
+        print(f"  {industry:20} {stats['correct']}/{stats['total']} ({stats['accuracy']}%)")
     for cat in CATEGORY_ORDER:
         print(f"  {cat:20} {s['by_category'].get(cat, {})}")
     print("Failure patterns:")
@@ -635,6 +698,9 @@ def main() -> None:
         if args.holdout:
             first, second = (load_run(label) for label in args.holdout.split(",", 1))
             report += render_holdout(first, second)
+        if args.release:
+            first, second = (load_run(label) for label in args.release.split(",", 1))
+            report += render_release(first, second)
         Path(args.report).write_text(report, encoding="utf-8")
         print(f"Report written to {args.report}")
 

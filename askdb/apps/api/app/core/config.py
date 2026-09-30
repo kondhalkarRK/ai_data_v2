@@ -122,6 +122,12 @@ class Settings(BaseSettings):
     nlq_llm_timeout_seconds: int = Field(default=8, ge=1, le=60)
     nlq_default_result_limit: int = Field(default=20, ge=1, le=200)
     nlq_llm_max_retries: int = Field(default=1, ge=0, le=3)
+    # Complex analytics (top-N per group, growth, running totals) when an LLM key is set:
+    # llm_first = planner spec -> LLM SQL -> validate -> repair, governed SQL as fallback;
+    # governed_first = governed SQL whenever the semantic compiler has it.
+    nlq_llm_reasoning_mode: Literal["llm_first", "governed_first"] = "llm_first"
+    # Let the LLM rephrase a question into governed vocabulary before asking the user.
+    nlq_llm_interpretation: bool = True
     llm_fallback_model: str = ""
     query_cache_ttl_seconds: int = Field(default=300, ge=30, le=3600)
 

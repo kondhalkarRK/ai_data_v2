@@ -14,13 +14,37 @@ import { ResultChart, type ChartKind } from "@/components/chat/result-chart";
 import { SQLViewer } from "@/components/chat/sql-viewer";
 import { SuggestedQuestions } from "@/components/chat/suggested-questions";
 import { TrustIndicators } from "@/components/chat/trust-indicators";
-import type { ChatMessage, InsightDepth, QueryPlanTrace, ResponseTab } from "@/components/chat/types";
+import type {
+  AnswerConfidence,
+  ChatMessage,
+  InsightDepth,
+  QueryPlanTrace,
+  ResponseMeta,
+  ResponseTab,
+} from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 
 const ROUTE_LABEL: Record<string, string> = {
   sql: "Answered from data",
   knowledge: "Documents",
   hybrid: "Data + reports",
+};
+
+const FRIENDLY_RECOVERY =
+  "I want to be sure I give you the right numbers. Pick one of these, or rephrase with a metric (revenue, units sold), a brand or region, and a period.";
+
+const RECOVERY_SUGGESTIONS = [
+  "Revenue by month",
+  "Top brands by revenue",
+  "Units sold by state",
+];
+
+const CONFIDENCE_STYLE: Record<AnswerConfidence["level"], string> = {
+  high: "border-emerald-300/70 bg-emerald-50 text-emerald-900 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-100",
+  medium:
+    "border-amber-300/70 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100",
+  needs_clarification:
+    "border-border/70 bg-muted/40 text-muted-foreground",
 };
 
 export function ResponseCard({
@@ -67,14 +91,10 @@ export function ResponseCard({
     return (
       <ResponseErrorState
         kind={kind}
-        title="I couldn't answer that yet"
-        detail={
-          failure?.reason ||
-          failure?.message ||
-          message.error ||
-          "Try rephrasing with a brand, a metric such as revenue or units sold, and a period."
-        }
-        sql={failure?.sql || message.sql}
+        title="Let's try that another way"
+        detail={FRIENDLY_RECOVERY}
+        suggestions={message.options?.length ? message.options : RECOVERY_SUGGESTIONS}
+        onAsk={onAsk}
         onRetry={failure?.retryable !== false ? onRetry : undefined}
         className={className}
       />
@@ -152,14 +172,13 @@ export function ResponseCard({
         {execFailed ? (
           <ResponseErrorState
             kind="execution"
-            title="This version of the question didn't finish"
-            detail={
-              meta?.executionError ||
-              message.error ||
-              "Try a narrower period or a single brand, or pick one of the suggestions below."
+            title="Let's try that another way"
+            detail={FRIENDLY_RECOVERY}
+            suggestions={
+              meta?.alternateInterpretations?.length
+                ? meta.alternateInterpretations.slice(0, 4)
+                : RECOVERY_SUGGESTIONS
             }
-            sql={message.sql}
-            suggestions={meta?.alternateInterpretations?.slice(0, 3)}
             onAsk={onAsk}
             onRetry={onRetry}
           />
@@ -179,6 +198,8 @@ export function ResponseCard({
         {route && ROUTE_LABEL[route] ? (
           <p className="text-[11px] font-medium text-muted-foreground">{ROUTE_LABEL[route]}</p>
         ) : null}
+
+        {meta && !execFailed ? <AnswerProvenance meta={meta} /> : null}
 
         {meta ? (
           <TrustIndicators
@@ -434,6 +455,47 @@ function QueryPlanNote({ plan }: { plan: QueryPlanTrace }) {
       ) : null}
       {plan.joins?.length ? <p>Joins: {plan.joins.join(" · ")}</p> : null}
       {plan.filters?.length ? <p>Filters: {plan.filters.join(", ")}</p> : null}
+    </div>
+  );
+}
+
+function AnswerProvenance({ meta }: { meta: ResponseMeta }) {
+  const confidence = meta.confidence;
+  const decision = meta.decision;
+  const corrections = meta.corrections ?? [];
+  if (!confidence && !decision && !corrections.length && !meta.reinterpretedAs) return null;
+  const answeredBy =
+    decision?.answeredBy === "llm"
+      ? "Planner + AI reasoning"
+      : decision
+        ? "Semantic layer"
+        : null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+      {confidence ? (
+        <span
+          className={cn(
+            "rounded-full border px-2 py-0.5 font-medium",
+            CONFIDENCE_STYLE[confidence.level] ?? CONFIDENCE_STYLE.needs_clarification,
+          )}
+          title={confidence.reasons.join(" · ") || undefined}
+        >
+          {confidence.label}
+          {answeredBy ? ` · ${answeredBy}` : ""}
+        </span>
+      ) : answeredBy ? (
+        <span className="rounded-full border border-border/70 px-2 py-0.5 font-medium text-muted-foreground">
+          {answeredBy}
+        </span>
+      ) : null}
+      {corrections.length ? (
+        <span className="text-muted-foreground">
+          Spelling: {corrections.map((item) => `“${item.from}” → ${item.to}`).join(", ")}
+        </span>
+      ) : null}
+      {meta.reinterpretedAs ? (
+        <span className="text-muted-foreground">Interpreted as “{meta.reinterpretedAs}”</span>
+      ) : null}
     </div>
   );
 }

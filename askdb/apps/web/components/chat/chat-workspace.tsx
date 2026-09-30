@@ -115,7 +115,14 @@ export function ChatWorkspace() {
         setMessages((prev) =>
           prev.map((message) =>
             message.id === assistantId
-              ? { ...message, error: error instanceof Error ? error.message : "Chat failed" }
+              ? {
+                  ...message,
+                  error: "The answer service did not respond in time.",
+                  options:
+                    industry === "insurance"
+                      ? ["Premium by month", "Top products by premium", "Claims by region"]
+                      : ["Revenue by month", "Top brands by revenue", "Units sold by state"],
+                }
               : message,
           ),
         );

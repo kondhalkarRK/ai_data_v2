@@ -25,6 +25,7 @@ import yaml
 
 from app.core.config import APP_ROOT, Industry
 from app.services.chat.question_understanding import ExtractedFilter
+from app.services.chat.spell import edit_distance
 
 MatchMethod = Literal["exact", "synonym", "fuzzy", "alias", "glossary"]
 
@@ -48,7 +49,7 @@ _DOMAIN_PRIORITY: dict[str, int] = {
 }
 _FUZZY_MIN_LENGTH = 4
 _SUGGESTION_RATIO = 0.72
-_STOPWORDS = frozenset(  # noqa: SIM905
+_STOPWORDS = frozenset(
     """
     a an the of for in on at by to from with and or vs versus v what whats what's which who
     how much many show me give tell list get find display please can could would you i we
@@ -71,7 +72,7 @@ _STOPWORDS = frozenset(  # noqa: SIM905
     rank ranking ranked leading popular much india indian wise business line lines
     target targets fiscal financial half first second third fourth past trailing recent
     latest
-    """.split()
+    """.split()  # noqa: SIM905
 )
 # Period words: quarters, halves, fiscal years and month names are time, never names.
 _TIME_TOKEN = re.compile(
@@ -325,6 +326,7 @@ class EntityResolver:
     ) -> None:
         self.catalog = tuple(catalog)
         self.vocabulary = vocabulary or ChatVocabulary()
+        self._protected: frozenset[str] | None = None
         self._forms = _index_forms(self.catalog, _glossary_entries(pack, self.catalog))
         self._max_len = max(
             (len(form.tokens) for forms in self._forms.values() for form in forms), default=1
@@ -486,6 +488,14 @@ class EntityResolver:
             if abs(len(target) - len(phrase)) > 3:
                 continue
             ratio = difflib.SequenceMatcher(None, phrase, target).ratio()
+            if (
+                length == 1
+                and len(phrase) >= 5
+                and phrase[0] == target[0]
+                and edit_distance(phrase, target) == 1
+            ):
+                # One slip ("hyundia", "mumabi") is closer than the ratio suggests.
+                ratio = max(ratio, 0.9)
             if ratio > best_ratio or (
                 ratio == best_ratio and best is not None and form.entry.priority < best.entry.priority
             ):
@@ -553,6 +563,16 @@ class EntityResolver:
                 scored[name] = max(scored.get(name, 0.0), ratio)
         ranked = sorted(scored.items(), key=lambda item: item[1], reverse=True)
         return tuple(name for name, _ in ranked[:limit])
+
+    def protected_words(self) -> frozenset[str]:
+        """Words spell correction must leave alone: vocabulary and every catalog name."""
+        if self._protected is None:
+            words = set(_STOPWORDS) | set(self.vocabulary.known_words)
+            for forms in self._forms.values():
+                for form in forms:
+                    words.update(form.tokens)
+            self._protected = frozenset(words)
+        return self._protected
 
     def canonical_values(self, key: str) -> list[str]:
         return list(

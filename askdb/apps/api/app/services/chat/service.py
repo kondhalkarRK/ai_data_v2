@@ -23,12 +23,18 @@ from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuest
 from app.models.user import User
 from app.semantic.service import SemanticService
 from app.services.chat.clarification import (
-    assess_resolution,
+    interpretation,
     plan_suggestions,
     recovery_for_failure,
     resolution_notes,
 )
-from app.services.chat.conversation_context import is_contextual_followup, plan_state
+from app.services.chat.conversation_context import plan_state
+from app.services.chat.decision_engine import (
+    Confidence,
+    assess_confidence,
+    decide_route,
+    interpretation_options,
+)
 from app.services.chat.failures import (
     FailureInfo,
     classify_database,
@@ -40,14 +46,19 @@ from app.services.chat.intents import (
     is_out_of_bounds,
     is_surprise_me,
     is_whatif,
-    needs_clarification,
     parse_whatif,
     suggested_followups,
 )
+from app.services.chat.llm_assist import (
+    generate_validated_sql,
+    interpret_question,
+    interpretation_vocabulary,
+)
+from app.services.chat.pipeline import TurnPlan, plan_turn
 from app.services.chat.profiler import PROFILER, QueryProfile
 from app.services.chat.query_cache import QUERY_CACHE, CachedAnswer
 from app.services.chat.query_router import knowledge_narrative, plan_entities, route_question
-from app.services.chat.question_understanding import QuestionPlan, understand_question
+from app.services.chat.question_understanding import QuestionPlan
 from app.services.chat.response_meta import (
     QueryTimings,
     build_insights,
@@ -64,12 +75,7 @@ from app.services.chat.semantic_context import (
     build_domain_sql_hints,
     validate_sql_against_plan,
 )
-from app.services.chat.semantic_query_planner import (
-    PIPELINE_STAGES,
-    plan_semantic_query,
-    recommend_chart,
-    rewrite_question,
-)
+from app.services.chat.semantic_query_planner import PIPELINE_STAGES, recommend_chart
 from app.services.chat.sql_limits import ensure_result_limit
 from app.services.chat.templates import list_templates
 from app.services.chat.trust import compute_trust_score
@@ -79,10 +85,56 @@ from app.services.chat.value_dictionary import (
     resolver_for,
 )
 from app.services.knowledge import KnowledgeService
-from app.services.llm import complete_chat
+from app.services.llm import llm_configured
 from app.services.web_retrieval import WebRetrievalService
 
 logger = logging.getLogger(__name__)
+
+
+def _worth_reinterpreting(turn: TurnPlan) -> bool:
+    """The AI may restate names/phrasing we could not read; curated clarifications stay."""
+    if turn.clarify_reason in {"needs_clarification", "unresolved"}:
+        return True
+    return turn.clarification is None and not turn.governed_sql
+
+
+def _needs_clarification() -> Confidence:
+    return Confidence("needs_clarification", 0, ["Asked for clarification instead of guessing"])
+
+
+RECOVERY_OPTIONS: dict[Industry, list[str]] = {
+    Industry.AUTOMOTIVE: [
+        "Revenue by month",
+        "Top brand by revenue",
+        "Maruti Suzuki sales by year",
+        "SUV sales by state",
+    ],
+    Industry.INSURANCE: [
+        "Written premium by month",
+        "Loss ratio by month",
+        "Claim count by status",
+        "Top agents by premium",
+    ],
+}
+
+
+def recovery_frames(industry: Industry) -> list[str]:
+    """Last-resort answer when anything unexpected breaks: suggestions, never a stack trace."""
+    options = RECOVERY_OPTIONS.get(industry, RECOVERY_OPTIONS[Industry.AUTOMOTIVE])
+    message = "I couldn't finish that one. These questions answer instantly:"
+    return [
+        _sse(
+            "clarification",
+            {
+                "kind": "recovery",
+                "title": "Here's what I can answer",
+                "question": message,
+                "options": options,
+            },
+        ),
+        _sse("followups", {"items": []}),
+        _sse("done", {"recovered": True, "confidence": _needs_clarification().to_dict()}),
+    ]
 
 PROGRESS_STEPS = PIPELINE_STAGES
 _DIMENSION_COLUMNS = frozenset(
@@ -256,6 +308,9 @@ class ChatService:
                 industry=self._industry,
                 question=question,
             )
+            recovery.options = interpretation_options(
+                current_plan, industry=self._industry, question=question
+            )
             async for frame in finish_without_sql(
                 path="recovery",
                 narrative=recovery.message,
@@ -264,7 +319,11 @@ class ChatService:
                 alternates=recovery.options,
                 history_status="failed",
                 extra_breakdown={"failure": info.to_dict()},
-                done_extra={"recovered": True, "failureCategory": info.category},
+                done_extra={
+                    "recovered": True,
+                    "failureCategory": info.category,
+                    "confidence": _needs_clarification().to_dict(),
+                },
             ):
                 yield frame
 
@@ -377,98 +436,110 @@ class ChatService:
                 "Value dictionary unavailable; continuing with pack vocabulary", exc_info=True
             )
             value_dictionary = ValueDictionarySnapshot(self._industry, ())
-        # Canonical names + synonyms from the pack still resolve when the live
-        # dictionary is down: exact -> synonym -> fuzzy -> alias -> glossary.
-        resolution = value_dictionary.resolve(question, pack=semantic_pack)
-        value_filters = resolution.filters()
-
-        clarification = None if resolution.matches else needs_clarification(question)
-        if clarification is not None:
-            options = plan_suggestions(None, industry=self._industry, question=question)
-            async for frame in finish_without_sql(
-                path="clarification",
-                narrative=clarification,
-                event="clarification",
-                payload={
-                    "kind": "clarify",
-                    "title": "What should I analyze?",
-                    "question": clarification,
-                    "options": options,
-                },
-                ambiguity=True,
-                alternates=options,
-            ):
-                yield frame
-            return
-
         allowed_schema = build_allowed_schema(semantic_pack)
-        rewritten = rewrite_question(question)
-        completed_steps.append("rewrite")
-        yield _progress("intent", completed_steps, slow=maybe_slow())
-        plan = understand_question(
-            self._industry,
-            rewritten,
-            value_filters=value_filters,
-        )
-        current_plan = plan
-        logger.info(
-            "nlq_plan question=%r rewritten=%r intent=%s entity=%s metric=%s analysis=%s "
-            "dimensions=%s filters=%s ambiguous=%s",
-            question[:180],
-            rewritten[:180],
-            plan.intent,
-            plan.entity,
-            plan.metric,
-            plan.analysis,
-            plan.dimensions,
-            [f"{item.column}={item.value}" for item in plan.filters],
-            plan.is_ambiguous,
-        )
-        completed_steps.append("intent")
-        yield _progress("ambiguity", completed_steps, slow=maybe_slow())
-        if plan.is_ambiguous and plan.ambiguity_options:
-            msg = (
-                plan.notes[0]
-                if plan.notes
-                else "This question can be read several ways."
-            ) + " Did you mean one of these?"
-            async for frame in finish_without_sql(
-                path="clarification",
-                narrative=msg,
-                event="clarification",
-                payload={
-                    "kind": "clarify",
-                    "title": "Did you mean…",
-                    "question": msg,
-                    "options": plan.ambiguity_options,
-                },
-                ambiguity=True,
-                alternates=plan.ambiguity_options,
-            ):
-                yield frame
-            return
+        resolver = resolver_for(value_dictionary, semantic_pack)
+        llm_ready = llm_configured(self._settings)
 
-        needs_answer = assess_resolution(
+        prior_sql: str | None = None
+        prior_state: dict[str, Any] | None = None
+        if conversation_id is not None:
+            prior_sql = await self._prior_sql(conversation.id, history_id)
+            prior_state = await self._prior_state(conversation.id, history_id)
+
+        surprise_sql = None
+        if is_surprise_me(question):
+            templates = list_templates(self._industry)
+            surprise = secrets.choice(templates) if templates else None
+            if surprise is not None:
+                surprise_sql = (surprise.sql, surprise.title, surprise.glossary_matches)
+            yield _sse("stage", {"stage": "surprise"})
+
+        # Spell correction -> rewrite -> resolver (exact, synonym, fuzzy, alias,
+        # glossary) -> intent -> planner -> governed SQL -> plan validation.
+        semantic_t0 = time.perf_counter()
+        turn = plan_turn(
+            self._industry,
             question,
-            plan,
-            resolution,
-            industry=self._industry,
-            brands=resolver_for(value_dictionary, semantic_pack).canonical_values("make"),
+            snapshot=value_dictionary,
+            pack=semantic_pack,
+            allowed_schema=allowed_schema,
+            prior_sql=prior_sql,
+            prior_state=prior_state,
+            surprise_sql=surprise_sql,
         )
-        if needs_answer is not None and not is_contextual_followup(question):
+        reinterpreted: str | None = None
+        if llm_ready and self._settings.nlq_llm_interpretation and _worth_reinterpreting(turn):
+            # Last step before asking the user: let the AI restate the question in
+            # governed vocabulary, then plan the restatement deterministically.
+            yield _sse("stage", {"stage": "llm_interpret"})
+            llm_t0 = time.perf_counter()
+            restated, tokens_in, tokens_out = await interpret_question(
+                settings=self._settings,
+                industry=self._industry,
+                question=turn.question,
+                vocabulary=interpretation_vocabulary(self._industry, resolver),
+                model_override=model_override,
+            )
+            timings.llm_generation_ms += int((time.perf_counter() - llm_t0) * 1000)
+            profile.llm_calls += 1
+            profile.prompt_tokens += tokens_in
+            profile.completion_tokens += tokens_out
+            if tokens_in or tokens_out:
+                await self._record_usage(
+                    model_override or self._settings.llm_default_model, tokens_in, tokens_out
+                )
+            if restated:
+                second = plan_turn(
+                    self._industry,
+                    restated,
+                    snapshot=value_dictionary,
+                    pack=semantic_pack,
+                    allowed_schema=allowed_schema,
+                )
+                if second.clarification is None and second.governed_sql:
+                    logger.info("nlq_reinterpreted question=%r as=%r", question[:180], restated)
+                    turn, reinterpreted = second, restated
+        timings.semantic_lookup_ms = int((time.perf_counter() - semantic_t0) * 1000)
+
+        plan = turn.plan
+        current_plan = plan
+        completed_steps.extend(["rewrite", "intent"])
+        yield _progress("ambiguity", completed_steps, slow=maybe_slow())
+        if plan is not None:
             logger.info(
-                "nlq_clarify kind=%s unresolved=%s unsupported=%s",
-                needs_answer.kind,
-                [item.text for item in resolution.unresolved],
-                [item.term for item in resolution.unsupported],
+                "nlq_plan question=%r corrected=%r intent=%s entity=%s metric=%s analysis=%s "
+                "dimensions=%s filters=%s contextual=%s",
+                question[:180],
+                turn.question[:180],
+                plan.intent,
+                plan.entity,
+                plan.metric,
+                plan.analysis,
+                plan.dimensions,
+                [f"{item.column}={item.value}" for item in plan.filters],
+                turn.contextual,
+            )
+
+        if turn.clarification is not None or plan is None:
+            clar = turn.clarification
+            assert clar is not None
+            options = clar.options or interpretation_options(
+                plan, industry=self._industry, question=question
+            )
+            logger.info(
+                "nlq_clarify reason=%s unresolved=%s unsupported=%s",
+                turn.clarify_reason,
+                [item.text for item in turn.resolution.unresolved],
+                [item.term for item in turn.resolution.unsupported],
             )
             async for frame in finish_without_sql(
                 path="clarification",
-                narrative=needs_answer.message,
+                narrative=clar.message,
                 event="clarification",
-                payload=needs_answer.payload(),
+                payload={**clar.payload(), "options": options},
                 ambiguity=True,
-                alternates=needs_answer.options,
+                alternates=options,
+                done_extra={"confidence": _needs_clarification().to_dict()},
             ):
                 yield frame
             return
@@ -658,156 +729,169 @@ class ChatService:
             },
         )
 
-        prior_sql: str | None = None
         followup_note = ""
-        prior_state: dict[str, Any] | None = None
-        if is_contextual_followup(question):
-            prior_sql = await self._prior_sql(conversation.id, history_id)
-            prior_state = await self._prior_state(conversation.id, history_id)
-            if prior_sql or prior_state:
-                yield _sse("stage", {"stage": "followup"})
-                followup_note = "Using the previous question's metric, filters, and grain. "
+        if turn.contextual:
+            yield _sse("stage", {"stage": "followup"})
+            followup_note = "Using the previous question's metric, filters, and grain. "
+        else:
+            prior_sql = None
 
-        semantic_t0 = time.perf_counter()
-        surprise_sql = None
-        if is_surprise_me(question):
-            templates = list_templates(self._industry)
-            surprise = secrets.choice(templates) if templates else None
-            if surprise is not None:
-                surprise_sql = (surprise.sql, surprise.title, surprise.glossary_matches)
-            yield _sse("stage", {"stage": "surprise"})
-        planned = plan_semantic_query(
-            self._industry,
-            question,
-            value_filters=value_filters,
-            prior_sql=prior_sql,
-            pack=semantic_pack,
-            surprise_sql=surprise_sql,
-            prior_state=prior_state,
-            resolved=resolution.trace(),
-        )
-        plan = planned.plan
-        current_plan = plan
+        planned = turn.planned
+        assert planned is not None
         logger.info("nlq_structured_plan %s", json.dumps(planned.structured_plan(), default=str))
         yield _sse("stage", {"stage": "semantic_plan", **planned.trace()})
-        timings.semantic_lookup_ms = int((time.perf_counter() - semantic_t0) * 1000)
         for step in ("context", "semantic", "joins", "formula"):
             if step not in completed_steps:
                 completed_steps.append(step)
         yield _progress("sql", completed_steps, slow=maybe_slow())
 
-        sql_text: str | None = planned.sql
+        governed_sql = turn.governed_sql
+        sql_text: str | None = governed_sql
         path = planned.path
         glossary_matches = planned.glossary_matches
         narrative = followup_note
         scenario = parse_whatif(question) if is_whatif(question) else None
         ambiguity_flag = False
         alternate_interpretations: list[str] = []
+        ai_generated = False
+        notes = [*turn.spelling_notes, *resolution_notes(turn.resolution)]
+        if reinterpreted:
+            notes.insert(0, f"I read this as \u201c{reinterpreted}\u201d.")
+        if turn.validation_error:
+            logger.warning("Governed SQL failed plan validation: %s", turn.validation_error)
 
-        if planned.sql is not None:
-            if not is_surprise_me(question):
-                ok, reason = validate_sql_against_plan(
-                    planned.sql,
-                    plan,
-                    allowed_schema=allowed_schema,
+        route_decision = decide_route(
+            plan,
+            has_governed_sql=bool(governed_sql),
+            llm_available=llm_ready,
+            mode=self._settings.nlq_llm_reasoning_mode,
+        )
+        yield _sse("stage", {"stage": "decision", **route_decision.to_dict()})
+
+        if route_decision.path == "clarify":
+            async for frame in emit_failure(
+                FailureInfo(
+                    "semantic" if plan.metric == "unknown" else "sql_generation",
+                    "No governed query",
+                    turn.validation_error
+                    or "No governed template matched and no language model is configured.",
                 )
-                if not ok:
-                    logger.warning("Template SQL failed plan validation: %s", reason)
-                    async for frame in emit_failure(
-                        classify_sql_validation(
-                            reason or "Template SQL did not match the question plan"
-                        )
-                    ):
-                        yield frame
-                    return
-            path = planned.path
-            glossary_matches = planned.glossary_matches
-            notes = resolution_notes(resolution)
-            if planned.defaulted_grain:
-                notes.append(
-                    "No period was given, so this is the monthly trend for the latest 24 months."
-                )
-                alternate_interpretations = plan_suggestions(
-                    plan, industry=self._industry, question=question
-                )
-            narrative += " ".join([*notes, f"Answered with governed template: {planned.title}."])
-            yield _sse("stage", {"stage": "template", "title": planned.title})
-        elif planned.path == "followup" or planned.sql is None:
-            if plan.entity:
-                logger.info(
-                    "Question plan entity=%s metric=%s dimensions=%s analysis=%s "
-                    "filters=%s; trying LLM",
-                    plan.entity,
-                    plan.metric,
-                    plan.dimensions,
-                    plan.analysis,
-                    [f.value for f in plan.filters],
-                )
-            yield _sse("stage", {"stage": "llm"})
+            ):
+                yield frame
+            return
+
+        if route_decision.path == "llm_reasoning":
+            yield _sse("stage", {"stage": "llm", "reason": route_decision.reason})
             llm_t0 = time.perf_counter()
-            llm = await complete_chat(
+
+            def _validate(candidate: str) -> tuple[bool, str | None]:
+                safe, why = sql_is_safe(candidate)
+                if not safe:
+                    return safe, why
+                return validate_sql_against_plan(candidate, plan, allowed_schema=allowed_schema)
+
+            outcome = await generate_validated_sql(
                 settings=self._settings,
                 industry=self._industry,
-                question=question,
-                schema_hints=await self._domain_sql_hints(question, plan),
+                question=turn.question,
+                plan=plan,
+                schema_hints=await self._domain_sql_hints(turn.question, plan),
+                validate=_validate,
                 prior_sql=prior_sql,
                 model_override=model_override,
                 temperature=temperature,
                 top_p=top_p,
                 top_k=top_k,
             )
-            timings.llm_generation_ms = int((time.perf_counter() - llm_t0) * 1000)
-            profile.llm_calls = 1
-            profile.prompt_tokens = llm.prompt_tokens
-            profile.completion_tokens = llm.completion_tokens
-
-            if llm.circuit_open:
-                async for frame in emit_failure(classify_llm_failure(llm.error or "degraded")):
-                    yield frame
-                return
-            if llm.sql:
-                ok, reason = validate_sql_against_plan(
-                    llm.sql,
-                    plan,
-                    allowed_schema=allowed_schema,
+            timings.llm_generation_ms += int((time.perf_counter() - llm_t0) * 1000)
+            profile.llm_calls += outcome.attempts
+            profile.prompt_tokens += outcome.prompt_tokens
+            profile.completion_tokens += outcome.completion_tokens
+            if outcome.prompt_tokens or outcome.completion_tokens:
+                await self._record_usage(
+                    outcome.model, outcome.prompt_tokens, outcome.completion_tokens
                 )
-                if not ok:
-                    logger.warning("LLM SQL failed plan validation: %s", reason)
-                    async for frame in emit_failure(
-                        classify_sql_validation(reason or "SQL did not match the question plan")
-                    ):
-                        yield frame
-                    return
-                sql_text = llm.sql
+            if outcome.sql:
+                sql_text = outcome.sql
                 path = "semantic_llm"
-                glossary_matches = 1
-                narrative += llm.narrative or "Generated with the configured language model."
-                ambiguity_flag = plan.entity == "unknown" and not plan.filters
-                if ambiguity_flag:
-                    alternate_interpretations = [
-                        "Rephrase with an explicit metric name from the glossary",
-                        "Ask for a monthly trend of a known KPI",
-                    ]
-                await self._record_usage(llm.model, llm.prompt_tokens, llm.completion_tokens)
-            else:
-                if llm.error and self._settings.llm_api_key.get_secret_value():
-                    async for frame in emit_failure(classify_llm_failure(llm.error)):
-                        yield frame
-                    return
-                category = (
-                    "semantic"
-                    if plan.metric == "unknown" and plan.entity in {"unknown", "metric_only"}
-                    else "sql_generation"
+                glossary_matches = max(glossary_matches, 1)
+                ai_generated = True
+                if outcome.repaired:
+                    notes.append("The AI's first draft was corrected in the validation loop.")
+            elif governed_sql:
+                logger.info(
+                    "nlq_llm_fallback reason=%s rejected=%s", outcome.error, outcome.rejected
                 )
-                async for frame in emit_failure(
-                    FailureInfo(
-                        category,
-                        "No governed query",
-                        "No governed template matched and no language model is configured.",
-                    )
-                ):
+                route_decision.governed_fallback = True
+            else:
+                logger.info("nlq_llm_failed reason=%s rejected=%s", outcome.error, outcome.rejected)
+                info = (
+                    classify_llm_failure(outcome.error or "degraded")
+                    if outcome.circuit_open or not outcome.rejected
+                    else classify_sql_validation(outcome.error or "rejected")
+                )
+                async for frame in emit_failure(info):
                     yield frame
                 return
+
+        confidence = assess_confidence(
+            plan,
+            resolution=turn.resolution,
+            corrections=turn.corrections,
+            has_sql=bool(sql_text),
+            contextual=turn.contextual,
+            reinterpreted=bool(reinterpreted),
+            ai_generated=ai_generated,
+        )
+        if confidence.level == "needs_clarification":
+            # A safe clarification beats a confident wrong number.
+            options = list(
+                dict.fromkeys(
+                    [
+                        interpretation(plan),
+                        *interpretation_options(plan, industry=self._industry, question=question),
+                    ]
+                )
+            )[:5]
+            message = "I found more than one way to read this. Choose one:"
+            async for frame in finish_without_sql(
+                path="clarification",
+                narrative=message,
+                event="clarification",
+                payload={
+                    "kind": "clarify",
+                    "title": "I found multiple interpretations",
+                    "question": message,
+                    "options": options,
+                },
+                ambiguity=True,
+                alternates=options,
+                extra_breakdown={"confidence": confidence.to_dict()},
+                done_extra={"confidence": confidence.to_dict()},
+            ):
+                yield frame
+            return
+
+        if planned.defaulted_grain and not ai_generated:
+            notes.append(
+                "No period was given, so this is the monthly trend for the latest 24 months."
+            )
+            alternate_interpretations = plan_suggestions(
+                plan, industry=self._industry, question=question
+            )
+        if confidence.level == "medium" and not alternate_interpretations:
+            alternate_interpretations = interpretation_options(
+                plan, industry=self._industry, question=question, limit=3
+            )
+        if ai_generated:
+            notes.append(
+                "Planner + AI reasoning: SQL drafted by the AI from the query plan and "
+                "approved by the validator."
+            )
+        else:
+            notes.append(f"Answered with governed template: {planned.title}.")
+            yield _sse("stage", {"stage": "template", "title": planned.title})
+        narrative += " ".join(notes)
 
         if scenario is not None:
             direction = str(scenario["direction"])
@@ -867,6 +951,30 @@ class ChatService:
                         await self._recover_analytics()
                         last_exc = repair_exc
                         candidate = proposal
+                if not repaired_ok and llm_ready:
+                    repaired = await self._llm_repair(
+                        question=turn.question,
+                        plan=plan,
+                        failed_sql=candidate,
+                        error=str(last_exc),
+                        allowed_schema=allowed_schema,
+                        model_override=model_override,
+                    )
+                    if repaired:
+                        sql_text, validation_status, repaired_ok = repaired, "auto_repaired", True
+                        ai_generated = True
+                        path = "semantic_llm"
+                if not repaired_ok and governed_sql and sql_text != governed_sql:
+                    fallback = ensure_result_limit(
+                        governed_sql, self._settings.nlq_default_result_limit
+                    )
+                    try:
+                        await self._analytics.execute(text(f"EXPLAIN {fallback}"))
+                        sql_text, path, repaired_ok = fallback, planned.path, True
+                        ai_generated = False
+                        route_decision.governed_fallback = True
+                    except Exception:
+                        await self._recover_analytics()
                 timings.sql_auto_repair_ms = int((time.perf_counter() - repair_t0) * 1000)
                 if not repaired_ok:
                     validation_status = "failed"
@@ -1041,7 +1149,25 @@ class ChatService:
         if "narration" not in completed_steps:
             completed_steps.append("narration")
 
+        confidence = assess_confidence(
+            plan,
+            resolution=turn.resolution,
+            corrections=turn.corrections,
+            has_sql=bool(sql_text),
+            contextual=turn.contextual,
+            reinterpreted=bool(reinterpreted),
+            ai_generated=ai_generated,
+        )
         meta_payload = {
+            "confidence": confidence.to_dict(),
+            "decision": {
+                **route_decision.to_dict(),
+                "answeredBy": "llm" if ai_generated else "semantic",
+            },
+            "corrections": [
+                {"from": wrong, "to": right} for wrong, right in turn.corrections
+            ],
+            "reinterpretedAs": reinterpreted,
             "groundedOn": grounded,
             "ambiguityFlag": ambiguity_flag,
             "validationStatus": validation_status,
@@ -1079,6 +1205,8 @@ class ChatService:
             "ambiguityFlag": ambiguity_flag,
             "validationStatus": validation_status,
             "queryState": plan_state(plan),
+            "confidence": confidence.to_dict(),
+            "decision": route_decision.to_dict(),
         }
         history.latency_ms = latency_ms
         history.status = "completed"
@@ -1105,7 +1233,7 @@ class ChatService:
         )[:5]
         yield _sse("followups", {"items": followups})
 
-        if sql_text and path != "fallback" and not is_contextual_followup(question):
+        if sql_text and path != "fallback" and not turn.contextual:
             QUERY_CACHE.put(
                 industry=self._industry.value,
                 question=question,
@@ -1143,8 +1271,49 @@ class ChatService:
                 "validationStatus": validation_status,
                 "rowCount": len(rows),
                 "timings": timings.to_dict(),
+                "confidence": confidence.to_dict(),
             },
         )
+
+    async def _llm_repair(
+        self,
+        *,
+        question: str,
+        plan: QuestionPlan,
+        failed_sql: str,
+        error: str,
+        allowed_schema: dict[str, set[str]],
+        model_override: str | None,
+    ) -> str | None:
+        """One AI repair of SQL the database rejected; it must pass validation and EXPLAIN."""
+
+        def _validate(candidate: str) -> tuple[bool, str | None]:
+            safe, why = sql_is_safe(candidate)
+            if not safe:
+                return safe, why
+            return validate_sql_against_plan(candidate, plan, allowed_schema=allowed_schema)
+
+        outcome = await generate_validated_sql(
+            settings=self._settings,
+            industry=self._industry,
+            question=question,
+            plan=plan,
+            schema_hints=await self._domain_sql_hints(question, plan),
+            validate=_validate,
+            model_override=model_override,
+            initial_feedback=f"Database error: {error[:400]}\nFailed SQL:\n{failed_sql}",
+        )
+        if outcome.prompt_tokens or outcome.completion_tokens:
+            await self._record_usage(outcome.model, outcome.prompt_tokens, outcome.completion_tokens)
+        if not outcome.sql:
+            return None
+        candidate = ensure_result_limit(outcome.sql, self._settings.nlq_default_result_limit)
+        try:
+            await self._analytics.execute(text(f"EXPLAIN {candidate}"))
+        except Exception:
+            await self._recover_analytics()
+            return None
+        return candidate
 
     async def _domain_sql_hints(self, question: str, plan: QuestionPlan) -> str:
         pack = None

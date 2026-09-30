@@ -33,10 +33,20 @@ unavailable:
       - Average selling price by brand
       - Revenue by brand
       - Average selling price by year
+  - terms: [satisfaction, customer satisfaction, csat, nps, net promoter score, complaints,
+            customer complaints, service rating]
+    kind: metric
+    message: >
+      Customer satisfaction and complaints aren't recorded in the sales data. Revenue,
+      units sold, orders and average selling price are available.
+    alternatives:
+      - Revenue by brand
+      - Units sold by month
+      - Top dealers by revenue
 
 # Model names that are also everyday words. They only resolve to the model when
 # the brand is named alongside them or the word is followed by model/car.
-generic_value_words: [city, venue, punch, safari, elevate, comet, amaze, thar]
+generic_value_words: [city, venue, punch, safari, elevate, comet, amaze]
 
 # Words that may look like names but are business vocabulary, never entities.
 known_words:

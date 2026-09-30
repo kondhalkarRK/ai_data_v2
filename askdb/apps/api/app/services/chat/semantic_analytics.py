@@ -8,7 +8,7 @@ operations instead of asking an LLM to invent joins or SQL structure.
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from app.core.config import Industry
@@ -17,6 +17,7 @@ from app.services.chat.time_periods import anchor_sql, period_predicate
 
 # Monthly series without a stated period show the latest two years.
 TREND_MONTHS = 24
+_TIME_GRAINS = frozenset({"month", "quarter", "year"})
 _DATE_COLUMNS = {
     "fact_sales": "sales_date",
     "fact_policy_monthly": "accounting_month",
@@ -361,7 +362,12 @@ def time_scope_clauses(
 
 
 def _where_clauses(
-    plan: QuestionPlan, pack: Any, required_tables: set[str], base_table: str
+    plan: QuestionPlan,
+    pack: Any,
+    required_tables: set[str],
+    base_table: str,
+    *,
+    include_time: bool = True,
 ) -> list[str]:
     clauses: list[str] = []
     for filt in plan.filters:
@@ -378,7 +384,7 @@ def _where_clauses(
         except ValueError as exc:
             raise SemanticCompileError(str(exc)) from exc
     date_column = _DATE_COLUMNS.get(base_table)
-    if date_column and plan.analysis != "year_window_compare":
+    if include_time and date_column and plan.analysis != "year_window_compare":
         clauses.extend(
             time_scope_clauses(
                 plan,
@@ -566,6 +572,8 @@ def compile_analytical_query(
         return None
     if not force and not plan.requires_semantic_compiler:
         return None
+    if plan.analysis in {"growth_ranking", "divergence"}:
+        return _compile_period_change(plan, pack)
     metric = _metric_spec(plan)
     dimensions = _dimension_specs(plan, metric.table)
     _validate_specs(pack, metric, dimensions)
@@ -592,6 +600,121 @@ def compile_analytical_query(
         dimensions=tuple(spec.alias for spec in dimensions),
         metric=metric.alias,
         required_tables=tuple(sorted({metric.table, *required_tables})),
+    )
+
+
+def _change_windows(plan: QuestionPlan, column: str, anchor: str) -> tuple[str, str, str]:
+    """(bucket expression, scope predicate, label) for current vs previous period."""
+    if plan.year_filter:
+        year = int(plan.year_filter)
+        return (
+            f"CASE WHEN EXTRACT(YEAR FROM {column})::int = {year} "
+            "THEN 'current' ELSE 'previous' END",
+            f"EXTRACT(YEAR FROM {column})::int IN ({year - 1}, {year})",
+            f"{year} vs {year - 1}",
+        )
+    return (
+        f"CASE WHEN {column} > {anchor} - INTERVAL '12 months' "
+        "THEN 'current' ELSE 'previous' END",
+        f"{column} > {anchor} - INTERVAL '24 months'",
+        "latest 12 months vs the previous 12 months",
+    )
+
+
+def _compile_period_change(plan: QuestionPlan, pack: Any) -> AnalyticalQuery:
+    """Growth leaderboards and "X up but Y down" screens over two equal periods."""
+    metric_keys = [key for key, _ in plan.divergence] or [plan.metric]
+    metrics = [_metric_spec(replace(plan, metric=key)) for key in metric_keys]  # type: ignore[arg-type]
+    base_table = metrics[0].table
+    if any(spec.table != base_table for spec in metrics):
+        raise SemanticCompileError("Compared metrics must come from the same fact table")
+    entity_plan = replace(plan, dimensions=[d for d in plan.dimensions if d not in _TIME_GRAINS])
+    dimensions = _dimension_specs(entity_plan, base_table)
+    if not dimensions:
+        raise SemanticCompileError("Growth comparison needs a business dimension")
+    for spec in metrics:
+        _validate_specs(pack, spec, dimensions)
+
+    required_tables = {spec.table for spec in dimensions if spec.table != base_table}
+    where = _where_clauses(plan, pack, required_tables, base_table, include_time=False)
+    joins = _join_clauses(pack, base_table, required_tables)
+    physical_base = getattr(_model_tables(pack)[base_table], "physical_name", base_table)
+    alias = _ALIASES[base_table]
+    date_column = _DATE_COLUMNS[base_table]
+    bucket, scope, label = _change_windows(
+        plan, f"{alias}.{date_column}", anchor_sql(physical_base, date_column)
+    )
+    where = [*where, scope]
+
+    expressions = [_dimension_expression(spec) for spec in dimensions]
+    names = [spec.alias for spec in dimensions]
+    select_dims = ",\n         ".join(
+        f"{expression} AS {name}" for expression, name in zip(expressions, names, strict=True)
+    )
+    select_metrics = ",\n         ".join(
+        f"{spec.expression.format(alias=alias)} AS {spec.alias}" for spec in metrics
+    )
+    pivot = ",\n         ".join(
+        f"MAX({spec.alias}) FILTER (WHERE period_bucket = '{period}') AS {period}_{spec.alias}"
+        for spec in metrics
+        for period in ("current", "previous")
+    )
+    changes = ",\n       ".join(
+        f"100.0 * (current_{spec.alias} - previous_{spec.alias}) / "
+        f"NULLIF(previous_{spec.alias}, 0) AS {spec.alias}_change_pct"
+        for spec in metrics
+    )
+    joined = "\n  ".join(joins)
+    head = f"""WITH bucketed AS (
+  SELECT {select_dims},
+         {bucket} AS period_bucket,
+         {select_metrics}
+  FROM {physical_base} {alias}
+  {joined}
+  WHERE {' AND '.join(where)}
+  GROUP BY {', '.join(expressions)}, {bucket}
+), compared AS (
+  SELECT {', '.join(names)},
+         {pivot}
+  FROM bucketed
+  GROUP BY {', '.join(names)}
+)
+SELECT compared.*,
+       {changes}
+FROM compared"""
+    first = metrics[0].alias
+    if plan.analysis == "divergence":
+        conditions = [
+            f"current_{spec.alias} {'>' if direction == 'up' else '<'} previous_{spec.alias}"
+            for spec, (_, direction) in zip(metrics, plan.divergence, strict=True)
+        ]
+        sql = (
+            f"{head}\nWHERE {' AND '.join(conditions)}\n"
+            f"ORDER BY {first}_change_pct DESC\nLIMIT {max(1, min(plan.limit or 20, 100))}"
+        )
+        moves = " and ".join(
+            f"{spec.alias.replace('_', ' ')} {'up' if direction == 'up' else 'down'}"
+            for spec, (_, direction) in zip(metrics, plan.divergence, strict=True)
+        )
+        title = f"{names[0].replace('_', ' ').title()}s with {moves} ({label})"
+    else:
+        direction = plan.order_direction.upper()
+        sql = (
+            f"{head}\nWHERE previous_{first} > 0 AND current_{first} IS NOT NULL\n"
+            f"ORDER BY {first}_change_pct {direction}\n"
+            f"LIMIT {max(1, min(plan.limit or 10, 100))}"
+        )
+        pace = "fastest declining" if direction == "ASC" else "fastest growing"
+        title = (
+            f"{pace.title()} {names[0].replace('_', ' ')}s by "
+            f"{first.replace('_', ' ')} ({label})"
+        )
+    return AnalyticalQuery(
+        sql=sql.strip(),
+        title=title,
+        dimensions=tuple(names),
+        metric=first,
+        required_tables=tuple(sorted({base_table, *required_tables})),
     )
 
 

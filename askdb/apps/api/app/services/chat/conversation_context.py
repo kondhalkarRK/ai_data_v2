@@ -27,14 +27,27 @@ _METRIC_WORDS = re.compile(
     re.I,
 )
 _TIME_DIMS = ("month", "quarter", "year")
+_SCOPE_ONLY = re.compile(
+    r"^(?:for|in|during|over|within|from|since|only|just|excluding|without|by|per|"
+    r"top|bottom|lowest|highest)\b"
+)
+_RANKING = re.compile(r"\b(top|bottom|lowest|highest|best|worst|least)\b", re.I)
+_TOP_N = re.compile(r"\b(?:top|bottom|first|last)\s+(\d{1,3})\b", re.I)
 
 
 def is_contextual_followup(question: str) -> bool:
     """True when the utterance should modify the previous plan instead of starting over."""
     if is_followup(question):
         return True
-    text = (question or "").lower()
-    return bool(_LAST_YEAR.search(text) or _COMPARE_YEAR.search(text))
+    text = (question or "").lower().strip(" ?.!")
+    if _LAST_YEAR.search(text) or _COMPARE_YEAR.search(text):
+        return True
+    # A bare scope or period with no metric ("for 2024", "in Q1", "by quarter", "bottom 5").
+    if len(text.split()) <= 6 and not _METRIC_WORDS.search(text):
+        if _SCOPE_ONLY.match(text) or _YEAR.fullmatch(text):
+            return True
+        return len(text.split()) <= 4 and parse_period(text) is not None
+    return False
 
 
 def plan_state(plan: QuestionPlan) -> dict[str, Any]:
@@ -160,6 +173,12 @@ def apply_followup(
             plan.dimensions.append(dimension)
     if plan.analysis == "basic" and plan.dimensions:
         plan.analysis = "breakdown"
+    if _RANKING.search(text) and plan.dimensions:
+        plan.order_direction = reading.order_direction
+        if plan.intent != "ranking" and plan.analysis in {"basic", "breakdown", "ranking"}:
+            plan.intent, plan.analysis = "ranking", "ranking"
+        if top_n := _TOP_N.search(text):
+            plan.limit = int(top_n.group(1))
 
     if _COMPARE_YEAR.search(text):
         plan.analysis = "period_growth"
@@ -173,6 +192,9 @@ def apply_followup(
 
     period = parse_period(question)
     years = sorted({int(year) for year in _YEAR.findall(text)})
+    if period is not None and not years and not period.relative and prior.year_filter:
+        # "in Q1" after a 2024 answer means Q1 2024.
+        period = parse_period(f"{question} {prior.year_filter}") or period
     if period is not None:
         plan.period, plan.year_filter = period, None
     elif len(years) == 1:

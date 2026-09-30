@@ -35,6 +35,8 @@ AnalysisKind = Literal[
     "above_average",
     "year_window_compare",
     "market_share",
+    "growth_ranking",
+    "divergence",
 ]
 AggregationKind = Literal["sum", "count", "count_distinct", "avg", "ratio"]
 
@@ -134,6 +136,8 @@ class QuestionPlan:
     # Dimension implied by the entity (not asked for); dropped when the question
     # names a more specific grouping.
     default_dimension: str | None = None
+    # "Increasing revenue but decreasing units": [(metric, "up"), (metric, "down")].
+    divergence: list[tuple[str, str]] = field(default_factory=list)
 
     @property
     def has_time_scope(self) -> bool:
@@ -155,6 +159,8 @@ class QuestionPlan:
             "contribution",
             "above_average",
             "year_window_compare",
+            "growth_ranking",
+            "divergence",
         }
         if self.analysis in advanced or len(self.dimensions) > 1:
             return True
@@ -194,6 +200,98 @@ _PERIOD_GROWTH = re.compile(
     r"\bgrowth\b",
     re.I,
 )
+_GROWTH_RANK = re.compile(
+    r"\b(?:fastest|quickest|most\s+rapidly)[-\s]+(?:growing|improving|rising|declining|shrinking|"
+    r"falling)\b|\b(?:growing|declining|shrinking|falling)\s+(?:the\s+)?(?:fastest|most)\b|"
+    r"\b(?:highest|biggest|top|best|largest|strongest|lowest|worst|weakest)\s+growth\b|"
+    r"\b(?:biggest|largest|steepest|sharpest)\s+(?:decline|drop|fall)s?\b|"
+    r"\b(?:which|what)\s+\w+(?:\s+\w+)?\s+(?:are|is|have|has|show|shows)\s+"
+    r"(?:growing|declining|increasing|decreasing|falling|shrinking|dropping)\b|"
+    r"\b(?:with|showing)\s+(?:growing|declining|increasing|decreasing|falling|shrinking)\s+"
+    r"(?!\w+\s+(?:but|while|and|yet)\b)",
+    re.I,
+)
+_DECLINE = re.compile(
+    r"\b(declin\w*|decreas\w*|shrink\w*|falling|drop\w*|lowest\s+growth|worst\s+growth|"
+    r"weakest\s+growth)\b",
+    re.I,
+)
+_UP_WORDS = r"(?:increasing|growing|rising|higher|improving|up)"
+_DOWN_WORDS = r"(?:decreasing|declining|falling|lower|dropping|shrinking|down)"
+_METRIC_PHRASE = r"([a-z]+(?:\s+[a-z]+)?)"
+_DIVERGENCE = re.compile(
+    rf"\b(?P<d1>{_UP_WORDS}|{_DOWN_WORDS})\s+{_METRIC_PHRASE}\s+(?:but|while|and|with|yet)\s+"
+    rf"(?:a\s+|an\s+)?(?:(?P<d2>{_UP_WORDS}|{_DOWN_WORDS})\s+)?{_METRIC_PHRASE}"
+    rf"(?:\s+(?P<d3>{_UP_WORDS}|{_DOWN_WORDS}))?",
+    re.I,
+)
+# Policies as a list to rank ("top 10 policies"), not a qualifier ("motor policies premium").
+_POLICY_LIST = re.compile(
+    r"\b(?:by|per|each|which|top|bottom|every|list|largest|biggest|highest|lowest)\s+"
+    r"(?:\d+\s+)?(?:insurance\s+)?(?:polic(?:y|ies)|contracts?)\b(?!\s+status)|\bpolicy[-\s]?wise\b|"
+    r"^(?:show\s+)?(?:polic(?:y|ies)|contracts?)\b(?!\s+status)",
+    re.I,
+)
+_DIVERGENCE_POST = re.compile(
+    rf"\b{_METRIC_PHRASE}\s+(?P<d1>{_UP_WORDS}|{_DOWN_WORDS})\s+(?:but|while|yet|and|with)\s+"
+    rf"{_METRIC_PHRASE}\s+(?P<d2>{_UP_WORDS}|{_DOWN_WORDS})\b",
+    re.I,
+)
+_METRIC_PHRASES: tuple[tuple[str, str], ...] = (
+    (r"earned\s+premium", "earned_premium"),
+    (r"premium|gwp", "premium"),
+    (r"claims?\s+incurred|incurred", "claims_incurred"),
+    (r"claims?\s+paid|paid", "claims_paid"),
+    (r"claims?(?:\s+count)?", "claim_count"),
+    (r"average\s+selling\s+price|asp|price", "average_selling_price"),
+    (r"units?(?:\s+sold)?|volume|quantity|sold", "units"),
+    (r"orders?", "orders"),
+    (r"revenue|sales(?:\s+value)?|turnover", "revenue"),
+)
+
+
+def _metric_from_phrase(phrase: str) -> str | None:
+    text = phrase.strip().lower()
+    for pattern, metric in _METRIC_PHRASES:
+        if re.match(rf"(?:{pattern})\b", text):
+            return metric
+    return None
+
+
+def _parse_divergence(question: str) -> list[tuple[str, str]]:
+    """Two metrics moving in stated directions ("increasing revenue but decreasing units")."""
+
+    def direction(word: str | None) -> str | None:
+        if not word:
+            return None
+        return "up" if re.fullmatch(_UP_WORDS, word, re.I) else "down"
+
+    found = _DIVERGENCE.search(question)
+    if found:
+        groups = [g for g in found.groups() if g is not None]
+        first_dir = direction(found.group("d1"))
+        phrases = [
+            g for g in groups if not re.fullmatch(f"{_UP_WORDS}|{_DOWN_WORDS}", g, re.I)
+        ]
+        second_dir = direction(found.group("d2") or found.group("d3"))
+        if second_dir is None and first_dir is not None:
+            joined = found.group(0).lower()
+            opposite = {"up": "down", "down": "up"}[first_dir]
+            second_dir = first_dir if re.search(r"\band\b", joined) else opposite
+    else:
+        found = _DIVERGENCE_POST.search(question)
+        if not found:
+            return []
+        first_dir, second_dir = direction(found.group("d1")), direction(found.group("d2"))
+        phrases = [found.group(1), found.group(3)]
+    if len(phrases) < 2 or first_dir is None or second_dir is None:
+        return []
+    first, second = _metric_from_phrase(phrases[0]), _metric_from_phrase(phrases[1])
+    if not first or not second or first == second:
+        return []
+    return [(first, first_dir), (second, second_dir)]
+
+
 _CONTRIBUTION = re.compile(
     r"\b(contribution|share|percentage|percent|%)\b",
     re.I,
@@ -366,8 +464,36 @@ def _extract_body_filters(q: str) -> list[ExtractedFilter]:
     return out
 
 
+VAGUE_OPTIONS: dict[Industry, tuple[str, ...]] = {
+    Industry.AUTOMOTIVE: (
+        "Total Revenue",
+        "Total Units Sold",
+        "Total Orders",
+        "Revenue trend by month",
+        "Revenue by region",
+    ),
+    Industry.INSURANCE: (
+        "Total written premium",
+        "Written premium trend by month",
+        "Claims incurred by line of business",
+        "Loss ratio by product",
+        "Number of claims by region",
+    ),
+}
+
+_VAGUE_ASK = re.compile(
+    r"\b(numbers|data|figures|stats|statistics|metrics|kpis?|dashboard|overview|summary|"
+    r"performance|details|info|report)\b",
+    re.I,
+)
+
+_EXPLICIT_N = re.compile(
+    r"\b(?:top|bottom|best|worst|highest|lowest|leading)\s+(\d{1,3})\b", re.I
+)
+
+
 def _limit_from_question(q: str) -> int:
-    match = re.search(r"\b(?:top|bottom)\s+(\d{1,3})\b", q, re.I)
+    match = _EXPLICIT_N.search(q)
     if match:
         return max(1, min(int(match.group(1)), 50))
     if re.search(r"\b(the\s+)?top\b|\bbest\b|\bhighest\b|\blowest\b|\bworst\b|\bbottom\b", q, re.I):
@@ -398,8 +524,20 @@ def understand_question(
     plan.filters = _merge_filters(plan.filters, value_filters or [])
     _apply_value_inference(plan, q)
     _enrich_analytical_plan(plan, q)
+    if (
+        plan.intent == "unknown"
+        and plan.metric == "unknown"
+        and not plan.filters
+        and len(q.split()) <= 6
+        and _VAGUE_ASK.search(q)
+    ):
+        plan.intent = "ambiguous"
+        plan.ambiguity_options = list(VAGUE_OPTIONS[industry])
+        plan.notes.append("No metric was named; offering the main measures.")
     if not plan.is_ambiguous:
         _apply_business_shape(plan, q)
+        if explicit := _EXPLICIT_N.search(q):
+            plan.limit = max(1, min(int(explicit.group(1)), 50))
     return plan
 
 
@@ -562,7 +700,7 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
                 ("coverage_tier", r"\b(?:coverage\s+)?tiers?\b"),
                 ("customer", r"\bcustomers?\b|\bpolicyholders?\b"),
                 ("policy_status", r"\bpolicy\s+status(?:es)?\b"),
-                ("policy", r"\bpolic(?:y|ies)\b(?!\s+status)"),
+                ("policy", _POLICY_LIST.pattern),
                 ("agent", r"\bagents?\b|\bbrokers\b|\bintermediar(?:y|ies)\b"),
                 ("channel", r"\bchannels?\b"),
                 ("branch", r"\bbranch(?:es)?\b"),
@@ -661,6 +799,25 @@ def _enrich_analytical_plan(plan: QuestionPlan, question: str) -> None:
         None,
     )
 
+    divergence = _parse_divergence(question)
+    if divergence:
+        plan.analysis = "divergence"
+        plan.divergence = divergence
+        plan.metric = divergence[0][0]  # type: ignore[assignment]
+        plan.intent = "comparison"
+        plan.dimensions = [d for d in dimensions if d not in _TIME_DIMS]
+        plan.time_grain = None
+        plan.limit = 20
+        return
+    if _GROWTH_RANK.search(question):
+        plan.analysis = "growth_ranking"
+        plan.intent = "ranking"
+        plan.order_direction = "asc" if _DECLINE.search(question) else "desc"
+        plan.dimensions = [d for d in dimensions if d not in _TIME_DIMS]
+        plan.time_grain = None
+        if plan.metric in {"orders", "claim_count"}:
+            plan.aggregation = "count_distinct"
+        return
     if _ABOVE_AVERAGE.search(question):
         plan.analysis = "above_average"
     elif _MOVING_AVG.search(question):
@@ -828,9 +985,9 @@ def _understand_automotive(
             metric="unknown",
             ambiguity_options=[
                 "Total Revenue",
+                "Total Units Sold",
                 "Total Orders",
-                "Quantity Sold",
-                "Revenue by month",
+                "Revenue trend by month",
                 "Revenue by region",
             ],
             notes=["Sales was not specific enough to choose a metric."],
@@ -976,6 +1133,7 @@ def _understand_automotive(
             or _REGION.search(q)
             or _YEAR_LITERAL.search(q)
             or parse_period(q)
+            or re.search(r"\b(?:in|for|at|within)\s+(?!the\b|a\b)[a-z]", q, re.I)
         )
         if bare and not filters and not explicit_metric:
             return QuestionPlan(
@@ -1058,8 +1216,12 @@ def _understand_automotive(
     )
 
 
+_PRODUCT_WITH_METRIC_WORD = re.compile(r"\bhome\s+premium\b", re.I)
+
+
 def _understand_insurance(q: str) -> QuestionPlan:
-    plan = _understand_insurance_metric(q)
+    # "Home Premium" is a product name; it must not select the premium metric.
+    plan = _understand_insurance_metric(_PRODUCT_WITH_METRIC_WORD.sub("home product", q))
     if _FRAUD.search(q):
         plan.filters.append(
             ExtractedFilter(
@@ -1083,7 +1245,7 @@ def _understand_insurance_metric(q: str) -> QuestionPlan:
         entity = "agent"
     elif re.search(r"\b(customer|customers|policyholder|policyholders)\b", q, re.I):
         entity = "customer"
-    elif re.search(r"\b(policy|policies|contract|contracts)\b", q, re.I):
+    elif _POLICY_LIST.search(q):
         entity = "policy"
     elif re.search(r"\b(product|products|lob|line\s+of\s+business|business\s+line)\b", q, re.I):
         entity = "product"
