@@ -1,3 +1,7 @@
+cd "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api"
+.\.venv\Scripts\python.exe -m alembic upgrade head
+
+
 $env:PGPASSWORD = "YOUR_POSTGRES_PASSWORD"
 & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h 127.0.0.1 -f database\app\00_bootstrap.sql
 
