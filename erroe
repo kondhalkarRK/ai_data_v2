@@ -1,2 +1,14 @@
 $env:PGPASSWORD = "YOUR_POSTGRES_PASSWORD"
 & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h 127.0.0.1 -f database\app\00_bootstrap.sql
+
+Catalog store unavailable
+
+The catalog store has not been set up in the application database yet. An administrator needs to run the database migration (alembic upgrade head). Entities below come from the semantic pack.
+
+Metadata refresh
+
+Not refreshed yet
+Runs on startup, after data loads, on demand, and when a question names an unknown value.
+
+Service Unavailable
+
