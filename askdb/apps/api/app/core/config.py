@@ -128,6 +128,8 @@ class Settings(BaseSettings):
     nlq_llm_reasoning_mode: Literal["llm_first", "governed_first"] = "llm_first"
     # Let the LLM rephrase a question into governed vocabulary before asking the user.
     nlq_llm_interpretation: bool = True
+    # Entity Catalog refresh in the background at startup (best effort, per industry).
+    catalog_refresh_on_startup: bool = True
     llm_fallback_model: str = ""
     query_cache_ttl_seconds: int = Field(default=300, ge=30, le=3600)
 

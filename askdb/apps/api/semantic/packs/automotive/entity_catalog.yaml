@@ -1,0 +1,35 @@
+# Entity Catalog configuration. Every value domain in semantic_model.yaml is
+# catalogued automatically; this file adds the business group for each domain,
+# columns that are watched but not yet in the AI value dictionary, and the
+# warehouse schemas monitored for schema drift.
+version: "1.0"
+
+schemas: [automotive]
+
+groups:
+  make: Vehicle
+  model: Vehicle
+  car_type: Vehicle
+  engine_type: Vehicle
+  colour: Vehicle
+  city: Geography
+  region: Geography
+  state: Geography
+  dealer_grade: Dealer
+
+tracked_columns:
+  dealer_name:
+    table: dim_dealer
+    column: dealer_name
+    label: Dealer Name
+    group: Dealer
+  salesperson:
+    table: dim_salesman
+    column: first_name
+    label: Salesperson First Name
+    group: Sales
+  target_make:
+    table: dim_targets
+    column: make
+    label: Target Make
+    group: Sales

@@ -95,6 +95,14 @@ class SemanticService:
     async def get_summary(self, industry: Industry) -> SemanticPackSummary:
         return (await self.get_pack(industry)).summary
 
+    def invalidate(self, industry: Industry | None = None) -> None:
+        """Drop the compiled pack and graph so the next request rebuilds them."""
+        for cache in (self._pack_cache, self._snapshot_cache):
+            if industry is None:
+                cache.clear()
+            else:
+                cache.invalidate(industry.value)
+
     @property
     def cache_stats(self) -> dict[str, dict[str, int | float]]:
         return {

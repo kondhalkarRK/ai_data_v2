@@ -1,0 +1,33 @@
+# Entity Catalog configuration. Every value domain in semantic_model.yaml is
+# catalogued automatically; this file adds the business group for each domain,
+# columns that are watched but not yet in the AI value dictionary, and the
+# warehouse schemas monitored for schema drift.
+version: "1.0"
+
+schemas: [insurance]
+
+groups:
+  claim_status: Insurance
+  claim_type: Insurance
+  policy_status: Insurance
+  coverage_tier: Insurance
+  product: Insurance
+  line_of_business: Insurance
+  product_family: Insurance
+  coverage_type: Insurance
+  channel: Sales
+  branch: Geography
+  region: Geography
+  state: Geography
+
+tracked_columns:
+  agent_name:
+    table: dim_agent
+    column: agent_name
+    label: Agent Name
+    group: Sales
+  customer:
+    table: dim_policy
+    column: customer_key
+    label: Customer Key
+    group: Customer

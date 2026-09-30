@@ -327,6 +327,7 @@ class EntityResolver:
         self.catalog = tuple(catalog)
         self.vocabulary = vocabulary or ChatVocabulary()
         self._protected: frozenset[str] | None = None
+        self._phrases: dict[tuple[str, str], dict[str, list[str]]] | None = None
         self._forms = _index_forms(self.catalog, _glossary_entries(pack, self.catalog))
         self._max_len = max(
             (len(form.tokens) for forms in self._forms.values() for form in forms), default=1
@@ -573,6 +574,26 @@ class EntityResolver:
                     words.update(form.tokens)
             self._protected = frozenset(words)
         return self._protected
+
+    def phrases_by_value(self) -> dict[tuple[str, str], dict[str, list[str]]]:
+        """Every phrase that resolves to a value, by method; keyed by (column, canonical)."""
+        if self._phrases is None:
+            index: dict[tuple[str, str], dict[str, list[str]]] = {}
+            for method, forms in self._forms.items():
+                for form in forms:
+                    key = (form.entry.column.casefold(), form.entry.canonical.casefold())
+                    phrases = index.setdefault(key, {}).setdefault(method, [])
+                    phrase = " ".join(form.tokens)
+                    if phrase not in phrases:
+                        phrases.append(phrase)
+            self._phrases = index
+        return self._phrases
+
+    def is_generic_value(self, column: str, canonical: str) -> bool:
+        """Model names that are everyday words need the brand named alongside."""
+        return column.rsplit(".", 1)[-1] == "model" and (
+            normalize(canonical) in self.vocabulary.generic_value_words
+        )
 
     def canonical_values(self, key: str) -> list[str]:
         return list(

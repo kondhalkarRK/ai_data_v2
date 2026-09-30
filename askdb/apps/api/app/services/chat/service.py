@@ -22,6 +22,7 @@ from app.core.exceptions import ValidationError
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuestion
 from app.models.user import User
 from app.semantic.service import SemanticService
+from app.services.catalog import EntityCatalogService
 from app.services.chat.clarification import (
     interpretation,
     plan_suggestions,
@@ -81,6 +82,7 @@ from app.services.chat.templates import list_templates
 from app.services.chat.trust import compute_trust_score
 from app.services.chat.value_dictionary import (
     ValueDictionarySnapshot,
+    cached_value_dictionary,
     get_value_dictionary,
     resolver_for,
 )
@@ -235,6 +237,26 @@ class ChatService:
             await self._analytics.execute(text("SET TRANSACTION READ ONLY"))
         except Exception:
             logger.debug("Analytics connection recovery failed", exc_info=True)
+
+    async def _discover_unknown_values(self, terms: list[str]) -> ValueDictionarySnapshot | None:
+        """Targeted catalog lookup for names the dictionary does not know (e.g. a new brand).
+
+        Returns the refreshed dictionary when something was found; never raises.
+        """
+        service = EntityCatalogService(
+            self._app, self._semantic, self._industry, analytics=self._analytics
+        )
+        try:
+            async with self._app.begin_nested():
+                found = await service.targeted_lookup(terms)
+        except Exception:
+            await self._recover_analytics()
+            logger.warning("catalog lookup failed for %s", terms[:3], exc_info=True)
+            return None
+        if not found:
+            return None
+        logger.info("catalog_lookup found=%s", found[:5])
+        return cached_value_dictionary(self._industry)
 
     async def ask_stream(
         self,
@@ -467,6 +489,24 @@ class ChatService:
             prior_state=prior_state,
             surprise_sql=surprise_sql,
         )
+        if turn.clarify_reason == "unresolved" and turn.resolution.unresolved:
+            refreshed = await self._discover_unknown_values(
+                [item.text for item in turn.resolution.unresolved]
+            )
+            if refreshed is not None:
+                yield _sse("stage", {"stage": "catalog_lookup"})
+                value_dictionary = refreshed
+                resolver = resolver_for(value_dictionary, semantic_pack)
+                turn = plan_turn(
+                    self._industry,
+                    question,
+                    snapshot=value_dictionary,
+                    pack=semantic_pack,
+                    allowed_schema=allowed_schema,
+                    prior_sql=prior_sql,
+                    prior_state=prior_state,
+                    surprise_sql=surprise_sql,
+                )
         reinterpreted: str | None = None
         if llm_ready and self._settings.nlq_llm_interpretation and _worth_reinterpreting(turn):
             # Last step before asking the user: let the AI restate the question in

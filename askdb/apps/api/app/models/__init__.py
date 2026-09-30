@@ -7,6 +7,7 @@ autogenerate reads. New model modules must be imported here.
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedAnalysis, SavedQuestion
 from app.models.audit import AuthAuditEvent
 from app.models.base import Base
+from app.models.catalog import CatalogChange, CatalogColumn, CatalogRefresh, CatalogValue
 from app.models.enums import AuthEventType, Role
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
@@ -15,6 +16,10 @@ __all__ = [
     "AuthAuditEvent",
     "AuthEventType",
     "Base",
+    "CatalogChange",
+    "CatalogColumn",
+    "CatalogRefresh",
+    "CatalogValue",
     "Conversation",
     "LlmUsage",
     "QueryHistory",

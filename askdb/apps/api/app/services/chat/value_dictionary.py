@@ -7,6 +7,7 @@ plan or LLM prompt.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -191,3 +192,48 @@ async def get_value_dictionary(
         return ValueDictionarySnapshot(industry=industry, values=values)
 
     return await _CACHE.get_or_set(industry.value, load)
+
+
+def build_snapshot(
+    industry: Industry,
+    rows: Iterable[tuple[str, str, int]],
+    *,
+    pack: Any | None = None,
+) -> ValueDictionarySnapshot:
+    """Snapshot from (qualified_column, value, frequency) rows, e.g. the Entity Catalog."""
+    domains = {domain.qualified_column.casefold(): domain for domain in domains_for(industry, pack)}
+    aliases_by_value = {
+        (column, value.casefold()): aliases
+        for column, domain in domains.items()
+        for value, aliases in domain.value_aliases
+    }
+    values = tuple(
+        BusinessValue(
+            domain=domains[column.casefold()].name,
+            column=domains[column.casefold()].qualified_column,
+            value=value,
+            frequency=frequency,
+            aliases=aliases_by_value.get((column.casefold(), value.casefold()), ()),
+        )
+        for column, value, frequency in rows
+        if column.casefold() in domains
+    )
+    return ValueDictionarySnapshot(industry=industry, values=values)
+
+
+def cached_value_dictionary(industry: Industry) -> ValueDictionarySnapshot | None:
+    return _CACHE.get(industry.value)
+
+
+def replace_value_dictionary(snapshot: ValueDictionarySnapshot) -> None:
+    """Swap in a freshly refreshed dictionary so AI Chat sees new values immediately."""
+    _CACHE.set(snapshot.industry.value, snapshot)
+    _RESOLVERS.clear()
+
+
+def invalidate_value_dictionary(industry: Industry | None = None) -> None:
+    if industry is None:
+        _CACHE.clear()
+    else:
+        _CACHE.invalidate(industry.value)
+    _RESOLVERS.clear()

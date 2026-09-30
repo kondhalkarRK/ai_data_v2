@@ -1,11 +1,12 @@
 "use client";
 
-import { BookOpenText, Boxes, Network } from "lucide-react";
+import { BookOpenText, Boxes, DatabaseZap, Network } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { LoadingState } from "@/components/loading/loading-state";
 import { OntologyBrowser } from "@/components/ontology/ontology-browser";
+import { EntityCatalog } from "@/components/semantic/entity-catalog";
 import { GlossaryCatalog } from "@/components/semantic/glossary-catalog";
 import { SemanticModelPanel } from "@/components/semantic/semantic-model-panel";
 import { IndustrySwitcher } from "@/components/shell/industry-switcher";
@@ -18,6 +19,7 @@ const TABS = [
   { id: "glossary", label: "Business Glossary", icon: BookOpenText },
   { id: "model", label: "Semantic Model", icon: Boxes },
   { id: "graph", label: "Knowledge Graph", icon: Network },
+  { id: "catalog", label: "Entity Catalog", icon: DatabaseZap },
 ] as const;
 
 export type AtlasTab = (typeof TABS)[number]["id"];
@@ -26,6 +28,7 @@ function tabFromPath(pathname: string): AtlasTab | null {
   if (pathname.includes("/glossary")) return "glossary";
   if (pathname.includes("/models")) return "model";
   if (pathname.includes("/ontology")) return "graph";
+  if (pathname.includes("/catalog")) return "catalog";
   return null;
 }
 
@@ -123,6 +126,7 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
             <GlossaryCatalog pack={pack.data} initialQuery={glossaryQuery} />
           ) : null}
           {tab === "model" ? <SemanticModelPanel pack={pack.data} /> : null}
+          {tab === "catalog" ? <EntityCatalog /> : null}
         </>
       )}
     </div>
@@ -143,7 +147,7 @@ function AtlasTabs({
       className={cn(
         compact
           ? "ml-auto flex shrink-0 gap-1"
-          : "mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3",
+          : "mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4",
       )}
       role="tablist"
       aria-label="Semantic Atlas"

@@ -5,9 +5,10 @@ from __future__ import annotations
 # Windows: must run before uvicorn creates the event loop / psycopg connects.
 import app.compat  # noqa: F401
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -19,7 +20,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.api.router import api_v1_router
 from app.api.routes import system
 from app.auth.rate_limit import FixedWindowRateLimiter
-from app.core.config import Settings, database_host_label, get_settings
+from app.core.config import Industry, Settings, database_host_label, get_settings
 from app.core.context import current_request_id
 from app.core.exceptions import NqlError, RateLimitedError
 from app.db.session import DatabaseRegistry
@@ -27,6 +28,7 @@ from app.observability.logging import configure_logging
 from app.observability.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.schemas.common import ErrorBody, ErrorResponse
 from app.semantic.service import SemanticService
+from app.services.catalog import EntityCatalogService
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +63,40 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "insurance_db": database_host_label(settings.insurance_database_url),
         },
     )
+    warmup = (
+        asyncio.create_task(_warm_entity_catalog(registry, app.state.semantic_service))
+        if settings.catalog_refresh_on_startup
+        else None
+    )
     try:
         yield
     finally:
+        if warmup is not None and not warmup.done():
+            warmup.cancel()
+            with suppress(asyncio.CancelledError):
+                await warmup
         await registry.stop()
         logger.info("api stopped")
+
+
+async def _warm_entity_catalog(registry: DatabaseRegistry, semantic: SemanticService) -> None:
+    """Startup refresh so AI Chat starts with current values; never blocks or fails startup."""
+    for industry in Industry:
+        try:
+            async with (
+                registry.app_session() as session,
+                registry.analytics_connection(industry) as analytics,
+            ):
+                service = EntityCatalogService(session, semantic, industry, analytics=analytics)
+                run = await service.refresh(scope="catalog", trigger="startup")
+                logger.info(
+                    "entity catalog startup refresh",
+                    extra={"industry": industry.value, "status": run.status},
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.warning("entity catalog startup refresh skipped for %s", industry.value)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

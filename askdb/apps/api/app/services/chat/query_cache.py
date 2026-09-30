@@ -71,6 +71,10 @@ class QueryResultCache:
                 self._store.pop(oldest[0], None)
             self._store[key] = answer
 
+    def clear(self) -> None:
+        with self._lock:
+            self._store.clear()
+
     def stats(self) -> dict[str, int]:
         with self._lock:
             return {"entries": len(self._store), "max": self._max}
