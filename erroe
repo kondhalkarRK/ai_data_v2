@@ -1,3 +1,5 @@
+python scripts\load_india_auto_dataset.py --replace --database-url "postgresql://askdb_owner:askdb_owner@localhost:5432/askdb_automotive"
+
 2026-09-30 18:14:20,434 INFO    [57a120db81104947] uvicorn.access: 127.0.0.1:52420 - "GET /api/v1/semantic/ontology HTTP/1.1" 200
 2026-09-30 18:14:21,699 INFO    [3041246a4aa14b85] nql.access: request completed
 2026-09-30 18:14:21,700 INFO    [3041246a4aa14b85] uvicorn.access: 127.0.0.1:52420 - "POST /api/v1/catalog/refresh HTTP/1.1" 503
