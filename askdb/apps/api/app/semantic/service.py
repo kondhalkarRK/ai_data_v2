@@ -103,6 +103,10 @@ class SemanticService:
             else:
                 cache.invalidate(industry.value)
 
+    def invalidate_graph(self, industry: Industry) -> None:
+        """Drop only the compiled knowledge graph; the semantic pack stays cached."""
+        self._snapshot_cache.invalidate(industry.value)
+
     @property
     def cache_stats(self) -> dict[str, dict[str, int | float]]:
         return {

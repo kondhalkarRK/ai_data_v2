@@ -69,7 +69,13 @@ def read_password(*, generate: bool) -> tuple[str, bool]:
 
 
 async def create_admin(
-    *, email: str, full_name: str, password: str, industry: Industry, role: Role
+    *,
+    email: str,
+    full_name: str,
+    password: str,
+    industry: Industry,
+    role: Role,
+    username: str | None = None,
 ) -> None:
     settings = get_settings()
     registry = DatabaseRegistry(settings)
@@ -87,6 +93,7 @@ async def create_admin(
 
             user = await service.create_user(
                 actor=None,
+                username=username,
                 email=email,
                 full_name=full_name,
                 password=password,
@@ -96,7 +103,7 @@ async def create_admin(
                 # shared secret to rotate on first login.
                 must_change_password=False,
             )
-            print(f"Created {user.role.value} account {user.email} ({user.id}).")
+            print(f"Created {user.role.value} account {user.username} <{user.email}> ({user.id}).")
     finally:
         await registry.stop()
 
@@ -104,6 +111,7 @@ async def create_admin(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create an Ask DB administrator.")
     parser.add_argument("--email", required=True)
+    parser.add_argument("--username", default=None, help="Login name (defaults to the email).")
     parser.add_argument("--name", required=True, dest="full_name")
     parser.add_argument(
         "--industry",
@@ -148,6 +156,7 @@ def main() -> int:
                 password=password,
                 industry=Industry(args.industry),
                 role=Role(args.role),
+                username=args.username,
             ),
             loop_factory=lambda: asyncio.SelectorEventLoop(
                 selectors.SelectSelector()

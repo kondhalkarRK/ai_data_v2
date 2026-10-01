@@ -9,13 +9,14 @@
 // --- primitives -------------------------------------------------------------
 
 export type Industry = "automotive" | "insurance";
-export type Role = "admin" | "analyst" | "viewer";
+/** Two roles only: an admin can do everything a user can, plus the Admin Center. */
+export type Role = "admin" | "user";
 
 export const INDUSTRIES: readonly Industry[] = ["automotive", "insurance"] as const;
-export const ROLES: readonly Role[] = ["admin", "analyst", "viewer"] as const;
+export const ROLES: readonly Role[] = ["admin", "user"] as const;
 
 /** Role precedence, used for client-side affordance hiding. */
-const ROLE_RANK: Record<Role, number> = { viewer: 0, analyst: 1, admin: 2 };
+const ROLE_RANK: Record<Role, number> = { user: 0, admin: 1 };
 
 export function roleAtLeast(actual: Role, required: Role): boolean {
   return ROLE_RANK[actual] >= ROLE_RANK[required];
@@ -38,14 +39,31 @@ export interface ApiErrorResponse {
 
 export interface UserProfile {
   id: string;
+  username: string;
   email: string;
   fullName: string;
   role: Role;
   defaultIndustry: Industry;
   isActive: boolean;
   mustChangePassword: boolean;
+  /** `null` means unlimited (administrators). */
+  weeklyTokenLimit: number | null;
+  weeklyCallLimit: number | null;
   lastLoginAt: string | null;
   createdAt: string;
+}
+
+/** `GET /auth/me/usage` — the caller's AI usage since Monday 00:00 UTC. */
+export interface WeeklyUsage {
+  tokenLimit: number | null;
+  tokensUsed: number;
+  tokensRemaining: number | null;
+  callLimit: number | null;
+  callsUsed: number;
+  callsRemaining: number | null;
+  unlimited: boolean;
+  weekStart: string;
+  resetsAt: string;
 }
 
 export interface SessionResponse {
@@ -55,8 +73,9 @@ export interface SessionResponse {
 }
 
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
+  rememberMe: boolean;
 }
 
 // --- system -----------------------------------------------------------------

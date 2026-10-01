@@ -86,7 +86,11 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
   return (
     <div className={presenterMode ? "flex h-dvh presenter-mode" : "flex h-dvh overflow-hidden"}>
-      {presenterMode ? null : <Sidebar user={user} />}
+      {presenterMode ? null : (
+        <React.Suspense fallback={null}>
+          <Sidebar user={user} />
+        </React.Suspense>
+      )}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar />
         <main

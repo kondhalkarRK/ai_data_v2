@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import httpx
 
 from app.core.config import Industry, Settings
+from app.services.governance.llm_config import active_llm, endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -111,11 +112,15 @@ async def _one_completion(
     top_k: int | None = None,
     max_tokens: int = 400,
 ) -> LlmResult:
-    api_key = settings.llm_api_key.get_secret_value()
+    governed = active_llm(settings)
+    target = endpoint(settings, governed.provider)
+    if target is None:
+        return LlmResult(sql=None, narrative="", model=model, error="No LLM API key configured")
+    base_url, auth_headers = target
     payload: dict[str, object] = {
         "model": model,
-        "temperature": settings.llm_temperature if temperature is None else temperature,
-        "max_tokens": min(settings.llm_max_completion_tokens, max_tokens),
+        "temperature": governed.temperature if temperature is None else temperature,
+        "max_tokens": min(governed.max_tokens, max_tokens),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": question},
@@ -126,11 +131,8 @@ async def _one_completion(
     # Top-K is provider-specific; only send when the selected model advertises support.
     if top_k is not None and _model_supports_top_k(model):
         payload["top_k"] = top_k
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    url = settings.llm_base_url.rstrip("/") + "/chat/completions"
+    headers = {**auth_headers, "Content-Type": "application/json"}
+    url = base_url.rstrip("/") + "/chat/completions"
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(url, headers=headers, json=payload)
@@ -176,7 +178,7 @@ def _model_supports_top_k(model: str) -> bool:
 
 
 def model_catalog(settings: Settings) -> list[dict[str, object]]:
-    primary = settings.llm_default_model
+    primary = active_llm(settings).model
     fallback = (settings.llm_fallback_model or "").strip()
     models = [primary]
     if fallback and fallback not in models:
@@ -206,12 +208,12 @@ async def complete_chat(
     top_k: int | None = None,
     feedback: str | None = None,
 ) -> LlmResult:
-    api_key = settings.llm_api_key.get_secret_value()
-    if not api_key:
+    governed = active_llm(settings)
+    if not llm_configured(settings):
         return LlmResult(
             sql=None,
             narrative="",
-            model=settings.llm_default_model,
+            model=governed.model,
             error="No LLM API key configured",
         )
 
@@ -219,15 +221,20 @@ async def complete_chat(
         return LlmResult(
             sql=None,
             narrative="The language model provider is temporarily unavailable.",
-            model=settings.llm_default_model,
+            model=governed.model,
             error="AI service is currently degraded",
             circuit_open=True,
         )
 
     timeout = float(settings.nlq_llm_timeout_seconds)
     system = _slim_system_prompt(industry, schema_hints, prior_sql, feedback)
-    primary = (model_override or "").strip() or settings.llm_default_model
-    fallback = (settings.llm_fallback_model or "").strip() or None
+    primary = (model_override or "").strip() or governed.model
+    # The environment fallback model only exists on the default (OpenAI) endpoint.
+    fallback = (
+        (settings.llm_fallback_model or "").strip() or None
+        if governed.provider == "openai"
+        else None
+    )
 
     attempts: list[str] = [primary]
     if fallback and fallback != primary:
@@ -289,8 +296,8 @@ async def complete_text(
     model_override: str | None = None,
 ) -> LlmResult:
     """One short non-SQL completion (question interpretation). Never retried."""
-    model = (model_override or "").strip() or settings.llm_default_model
-    if not settings.llm_api_key.get_secret_value():
+    model = (model_override or "").strip() or active_llm(settings).model
+    if not llm_configured(settings):
         return LlmResult(sql=None, narrative="", model=model, error="No LLM API key configured")
     if not _CIRCUIT.allow():
         return LlmResult(
@@ -314,7 +321,7 @@ async def complete_text(
 
 
 def llm_configured(settings: Settings) -> bool:
-    return bool(settings.llm_api_key.get_secret_value())
+    return endpoint(settings, active_llm(settings).provider) is not None
 
 
 def circuit_stats() -> dict[str, object]:

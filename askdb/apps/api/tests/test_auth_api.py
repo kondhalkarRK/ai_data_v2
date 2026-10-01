@@ -35,7 +35,7 @@ async def _seed_admin(
 
 async def _login(client: AsyncClient, password: str = ADMIN_PASSWORD):
     return await client.post(
-        "/api/v1/auth/login", json={"email": ADMIN_EMAIL, "password": password}
+        "/api/v1/auth/login", json={"username": ADMIN_EMAIL, "password": password}
     )
 
 
@@ -97,7 +97,7 @@ async def test_login_with_wrong_password_is_generic(
 async def test_unknown_email_returns_the_same_error(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/auth/login",
-        json={"email": "nobody@example.com", "password": "Definitely-Wrong-1!"},
+        json={"username": "nobody@example.com", "password": "Definitely-Wrong-1!"},
     )
 
     assert response.status_code == 401
@@ -241,14 +241,14 @@ async def test_viewer_cannot_list_users(
             email="viewer@example.com",
             full_name="Read Only",
             password_hash=hash_password(ADMIN_PASSWORD),
-            role=Role.VIEWER,
+            role=Role.USER,
             default_industry=Industry.AUTOMOTIVE,
         )
         await session.commit()
 
     await client.post(
         "/api/v1/auth/login",
-        json={"email": "viewer@example.com", "password": ADMIN_PASSWORD},
+        json={"username": "viewer@example.com", "password": ADMIN_PASSWORD},
     )
 
     response = await client.get("/api/v1/auth/users")
@@ -259,7 +259,7 @@ async def test_viewer_cannot_list_users(
 
 async def test_validation_error_does_not_echo_the_password(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/v1/auth/login", json={"email": "not-an-email", "password": "s3cret-value"}
+        "/api/v1/auth/login", json={"username": "   ", "password": "s3cret-value"}
     )
 
     assert response.status_code == 422

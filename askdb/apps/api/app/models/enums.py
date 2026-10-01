@@ -6,22 +6,29 @@ from enum import StrEnum
 
 
 class Role(StrEnum):
-    """Authorization roles (spec section 5).
+    """The two PoC roles: ``admin`` governs the platform, ``user`` consumes it.
 
-    Ordered from most to least privileged. ``at_least`` gives a simple hierarchy so a
-    route can require ``analyst`` and still admit an ``admin``.
+    ``at_least`` lets a route require ``user`` and still admit an ``admin``.
     """
 
     ADMIN = "admin"
-    ANALYST = "analyst"
-    VIEWER = "viewer"
+    USER = "user"
 
     @property
     def rank(self) -> int:
-        return {Role.VIEWER: 0, Role.ANALYST: 1, Role.ADMIN: 2}[self]
+        return {Role.USER: 0, Role.ADMIN: 1}[self]
 
     def at_least(self, required: Role) -> bool:
         return self.rank >= required.rank
+
+
+class ExecutionMode(StrEnum):
+    """How an AI Chat question was answered (Hybrid AI Governance dashboard)."""
+
+    SCHEMA = "SCHEMA"  # semantic layer alone, no LLM tokens
+    LLM = "LLM"  # the LLM wrote the SQL
+    HYBRID = "HYBRID"  # the LLM assisted, governed semantic SQL answered
+    CACHE = "CACHE"  # served from the result cache
 
 
 class AuthEventType(StrEnum):

@@ -37,20 +37,20 @@ function apiError(status: number, code: string) {
 }
 
 describe("LoginForm", () => {
-  it("submits the trimmed email and the password as typed", async () => {
+  it("submits the trimmed username, the password as typed, and Remember me", async () => {
     login.mockResolvedValueOnce({ user: { id: "1" }, csrfToken: "t", accessExpiresAt: "" });
     const user = userEvent.setup();
     renderForm();
 
-    await user.type(screen.getByLabelText("Email"), "  analyst@corp.com  ");
+    await user.type(screen.getByLabelText("Username"), "  user1  ");
     await user.type(screen.getByLabelText("Password"), " Pa55word! ");
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Login" }));
 
     await waitFor(() => expect(login).toHaveBeenCalledTimes(1));
     expect(login).toHaveBeenCalledWith(
       "/api/v1/auth/login",
-      // Whitespace around an email is a typing artefact; inside a password it is content.
-      { email: "analyst@corp.com", password: " Pa55word! " },
+      // Whitespace around a username is a typing artefact; inside a password it is content.
+      { username: "user1", password: " Pa55word! ", rememberMe: true },
       { skipRefresh: true },
     );
   });
@@ -60,14 +60,14 @@ describe("LoginForm", () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.type(screen.getByLabelText("Email"), "nobody@corp.com");
+    await user.type(screen.getByLabelText("Username"), "nobody");
     await user.type(screen.getByLabelText("Password"), "wrong-password");
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Login" }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Incorrect email or password.");
+    expect(alert).toHaveTextContent("Incorrect username or password.");
     expect(alert).not.toHaveTextContent("internal detail");
-    expect(screen.getByLabelText("Email")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Username")).toHaveAttribute("aria-invalid", "true");
   });
 
   it("distinguishes rate limiting, because the user must wait rather than retype", async () => {
@@ -75,11 +75,25 @@ describe("LoginForm", () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.type(screen.getByLabelText("Email"), "analyst@corp.com");
+    await user.type(screen.getByLabelText("Username"), "user1");
     await user.type(screen.getByLabelText("Password"), "Pa55word!");
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Login" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Too many attempts");
+  });
+
+  it("sends rememberMe false when the box is unticked", async () => {
+    login.mockResolvedValueOnce({ user: { id: "1" }, csrfToken: "t", accessExpiresAt: "" });
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(screen.getByLabelText("Username"), "admin");
+    await user.type(screen.getByLabelText("Password"), "secret");
+    await user.click(screen.getByLabelText("Remember me"));
+    await user.click(screen.getByRole("button", { name: "Login" }));
+
+    await waitFor(() => expect(login).toHaveBeenCalledTimes(1));
+    expect(login.mock.calls[0]?.[1]).toMatchObject({ username: "admin", rememberMe: false });
   });
 
   it("toggles password visibility and announces the toggle state", async () => {

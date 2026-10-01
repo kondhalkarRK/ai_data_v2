@@ -1,4 +1,4 @@
-﻿"""Entity Catalog routes: summary, entities, changes and refresh."""
+"""Entity Catalog routes: summary, entities, changes and refresh."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
     ActiveIndustry,
-    RequireAnalyst,
-    RequireViewer,
+    RequireAdmin,
+    RequireUser,
     get_app_session,
     get_registry,
     get_semantic_service,
@@ -37,6 +37,7 @@ from app.semantic.service import SemanticService
 from app.services.catalog import CatalogBusyError, EntityCatalogService
 from app.services.catalog.config import build_catalog_config
 from app.services.catalog.service import EntityView, refresh_dict
+from app.services.governance.audit import AdminAction, record_admin_action
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +129,7 @@ async def _pack_only_rows(semantic: SemanticService, industry: Industry) -> list
 
 @router.get("/summary", response_model=CatalogSummary)
 async def catalog_summary(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: SessionDep,
     semantic: SemanticDep,
@@ -155,7 +156,7 @@ async def catalog_summary(
 
 @router.get("/entities", response_model=list[EntityRow])
 async def catalog_entities(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: SessionDep,
     semantic: SemanticDep,
@@ -174,7 +175,7 @@ async def catalog_entities(
 @router.get("/entities/{key}", response_model=EntityDetail)
 async def catalog_entity(
     key: str,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: SessionDep,
     semantic: SemanticDep,
@@ -223,7 +224,7 @@ async def catalog_entity(
 
 @router.get("/changes", response_model=list[CatalogChangeItem])
 async def catalog_changes(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: SessionDep,
     semantic: SemanticDep,
@@ -243,7 +244,7 @@ async def catalog_changes(
 @router.post("/refresh", response_model=CatalogRefreshResult)
 async def catalog_refresh(
     body: CatalogRefreshRequest,
-    user: RequireAnalyst,
+    user: RequireAdmin,
     industry: ActiveIndustry,
     session: SessionDep,
     semantic: SemanticDep,
@@ -282,6 +283,15 @@ async def catalog_refresh(
             ) from exc
         info = refresh_dict(run)
         assert info is not None
+        if body.trigger == "manual":
+            await record_admin_action(
+                session,
+                user.id,
+                AdminAction.REFRESHED_SEMANTIC_CACHE
+                if body.scope == "semantic_cache"
+                else AdminAction.REFRESHED_ENTITY_CATALOG,
+                f"Scope: {body.scope} ({industry.value})",
+            )
         return CatalogRefreshResult(
             refresh=CatalogRefreshInfo.model_validate(info),
             summary=CatalogSummary.model_validate(await service.summary()),

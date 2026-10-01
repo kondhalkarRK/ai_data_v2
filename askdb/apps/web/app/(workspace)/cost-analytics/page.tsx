@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Cost Analytics moved under LLM Observability (Round 2). */
+/** Cost Analytics moved into the Admin Center LLM usage view. */
 export default function CostAnalyticsRedirectPage() {
-  redirect("/llm-observability");
+  redirect("/admin?tab=usage");
 }

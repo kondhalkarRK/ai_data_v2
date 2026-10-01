@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.api.deps import (
     ActiveIndustry,
-    RequireViewer,
+    RequireUser,
     get_registry,
 )
 from app.db.session import DatabaseRegistry
@@ -41,7 +41,7 @@ AnalyticsConnection = Annotated[AsyncConnection, Depends(get_analytics_connectio
 
 @router.get("/filters", response_model=KpiFilterOptions)
 async def kpi_filters(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
 ) -> KpiFilterOptions:
@@ -50,7 +50,7 @@ async def kpi_filters(
 
 @router.get("/summary", response_model=KpiSummaryResponse)
 async def kpi_summary(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     window: WindowId = Query(default="ytd"),
@@ -72,7 +72,7 @@ async def kpi_summary(
 
 @router.get("/export")
 async def kpi_export(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     window: WindowId = Query(default="ytd"),
@@ -95,7 +95,7 @@ async def kpi_export(
 @router.post("/scenario", response_model=ScenarioResponse)
 async def kpi_scenario(
     body: ScenarioRequest,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
 ) -> ScenarioResponse:

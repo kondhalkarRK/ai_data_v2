@@ -155,6 +155,16 @@ class Settings(BaseSettings):
     # Optional alias — some setups only export OPENAI_API_KEY.
     openai_api_key: SecretStr = SecretStr("")
 
+    # Optional extra providers an admin can switch to in the Admin Center. Each speaks the
+    # OpenAI chat-completions protocol; a provider without a key cannot be activated.
+    anthropic_api_key: SecretStr = SecretStr("")
+    anthropic_base_url: str = "https://api.anthropic.com/v1"
+    gemini_api_key: SecretStr = SecretStr("")
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    azure_openai_api_key: SecretStr = SecretStr("")
+    azure_openai_base_url: str = ""  # e.g. https://<resource>.openai.azure.com/openai/v1
+    ollama_base_url: str = "http://localhost:11434/v1"
+
     # --- rag ---------------------------------------------------------------
     upload_max_bytes: int = Field(default=26_214_400, ge=1)
     upload_allowed_extensions: CsvList

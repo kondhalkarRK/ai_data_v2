@@ -22,12 +22,12 @@ async def _sign_in(
             email=EMAIL,
             full_name="Semantic Viewer",
             password_hash=hash_password(PASSWORD),
-            role=Role.VIEWER,
+            role=Role.USER,
             default_industry=Industry.INSURANCE,
         )
         await session.commit()
     response = await client.post(
-        "/api/v1/auth/login", json={"email": EMAIL, "password": PASSWORD}
+        "/api/v1/auth/login", json={"username": EMAIL, "password": PASSWORD}
     )
     assert response.status_code == 200
 

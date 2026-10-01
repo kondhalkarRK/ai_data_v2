@@ -85,6 +85,26 @@ export function ResponseCard({
     );
   }
 
+  if (message.quotaNotice) {
+    const [headline, ...lines] = message.quotaNotice.split("\n");
+    return (
+      <div
+        role="status"
+        className={cn(
+          "space-y-2 rounded-2xl border border-warning/40 bg-warning/5 p-4 text-sm",
+          className,
+        )}
+      >
+        <p className="font-semibold text-foreground">{headline}</p>
+        {lines.map((line) => (
+          <p key={line} className="text-muted-foreground">
+            {line}
+          </p>
+        ))}
+      </div>
+    );
+  }
+
   if (message.failure || (message.error && !meta)) {
     const failure = message.failure;
     const kind = failureKindFromCategory(failure?.category);

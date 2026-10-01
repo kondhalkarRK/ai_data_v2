@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
     ActiveIndustry,
-    RequireAnalyst,
-    RequireViewer,
+    RequireAdmin,
+    RequireUser,
     get_app_session,
     get_app_settings,
     get_registry,
@@ -19,6 +19,7 @@ from app.api.deps import (
 )
 from app.core.config import Settings
 from app.db.session import DatabaseRegistry
+from app.models.enums import Role
 from app.schemas.reliability import (
     BulkMonitorRequest,
     CreateMonitorRequest,
@@ -32,6 +33,7 @@ from app.schemas.trust import (
     UpdateRuleThresholdRequest,
 )
 from app.semantic.service import SemanticService
+from app.services.governance.audit import AdminAction, record_admin_action
 from app.services.reliability import (
     DataReliabilityService,
     MonitorValidationError,
@@ -62,7 +64,7 @@ SessionDep = Annotated[AsyncSession, Depends(get_app_session)]
 
 @router.get("/center", response_model=DataTrustCenterResponse)
 async def trust_center(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     semantic: SemanticDep,
@@ -70,7 +72,7 @@ async def trust_center(
     refresh: bool = Query(default=False),
 ) -> DataTrustCenterResponse:
     """Legacy profiling view (sample-based); the Trust Center UI uses ``/trust/reliability``."""
-    del user
+    refresh = refresh and user.role is Role.ADMIN
     if refresh:
         clear_trust_cache()
     service = DataTrustService(
@@ -84,7 +86,7 @@ async def trust_center(
 
 @router.get("/reliability", response_model=DataReliabilityResponse)
 async def reliability_center(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     semantic: SemanticDep,
@@ -94,7 +96,12 @@ async def reliability_center(
     service = DataReliabilityService(
         connection=connection, semantic=semantic, industry=industry, app_session=session
     )
-    return await service.center(refresh=refresh, user=user.email)
+    if refresh and user.role is Role.ADMIN:
+        await record_admin_action(
+            session, user.id, AdminAction.REFRESHED_TRUST_SCORES, f"Industry: {industry.value}"
+        )
+        return await service.center(refresh=True, user=user.email)
+    return await service.center(refresh=False, user=user.email)
 
 
 @router.post(
@@ -104,7 +111,7 @@ async def reliability_center(
 )
 async def create_monitor(
     body: CreateMonitorRequest,
-    user: RequireAnalyst,
+    user: RequireAdmin,
     industry: ActiveIndustry,
     semantic: SemanticDep,
     session: SessionDep,
@@ -122,7 +129,7 @@ async def create_monitor(
 async def update_monitor(
     rule_id: str,
     body: UpdateMonitorRequest,
-    user: RequireAnalyst,
+    user: RequireAdmin,
     industry: ActiveIndustry,
     semantic: SemanticDep,
     session: SessionDep,
@@ -133,13 +140,20 @@ async def update_monitor(
     result = await service.update_monitor(rule_id, body, user.email)
     if not result.ok and rule_id in result.skipped:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Rule not found.")
+    if body.enabled is not None:
+        await record_admin_action(
+            session,
+            user.id,
+            AdminAction.ENABLED_DQ_RULE if body.enabled else AdminAction.DISABLED_DQ_RULE,
+            f"Rule: {rule_id} ({industry.value})",
+        )
     return result
 
 
 @router.post("/reliability/monitors/bulk", response_model=MonitorMutationResult)
 async def bulk_update_monitors(
     body: BulkMonitorRequest,
-    user: RequireAnalyst,
+    user: RequireAdmin,
     industry: ActiveIndustry,
     semantic: SemanticDep,
     session: SessionDep,
@@ -153,7 +167,7 @@ async def bulk_update_monitors(
 @router.delete("/reliability/monitors/{rule_id}", response_model=MonitorMutationResult)
 async def delete_monitor(
     rule_id: str,
-    user: RequireAnalyst,
+    user: RequireAdmin,
     industry: ActiveIndustry,
     semantic: SemanticDep,
     session: SessionDep,
@@ -170,7 +184,7 @@ async def delete_monitor(
 
 @router.get("/snapshot")
 async def trust_snapshot(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     semantic: SemanticDep,
@@ -193,7 +207,7 @@ async def trust_snapshot(
 async def update_rule(
     rule_id: str,
     body: UpdateRuleThresholdRequest,
-    user: RequireAnalyst,
+    user: RequireAdmin,
     industry: ActiveIndustry,
 ) -> dict[str, Any]:
     del user, industry
@@ -203,7 +217,7 @@ async def update_rule(
 @router.post("/steward/feedback")
 async def steward_feedback(
     body: StewardFeedbackRequest,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: SessionDep,
     connection: AnalyticsConnection,

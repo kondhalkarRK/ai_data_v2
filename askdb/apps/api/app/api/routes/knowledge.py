@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydantic import Field
 
-from app.api.deps import ActiveIndustry, RequireAnalyst, RequireViewer, get_app_settings
+from app.api.deps import ActiveIndustry, RequireUser, get_app_settings
 from app.core.config import Settings
 from app.schemas.common import ApiModel
 from app.services.knowledge import KnowledgeService
@@ -26,7 +26,7 @@ class SearchRequest(ApiModel):
 
 @router.get("")
 async def list_documents(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> list[dict[str, Any]]:
@@ -35,7 +35,7 @@ async def list_documents(
 
 @router.post("")
 async def upload_document(
-    user: RequireAnalyst,
+    user: RequireUser,
     industry: ActiveIndustry,
     settings: Annotated[Settings, Depends(get_app_settings)],
     file: UploadFile = File(...),
@@ -54,7 +54,7 @@ async def upload_document(
 
 @router.post("/reindex")
 async def reindex_documents(
-    user: RequireAnalyst,
+    user: RequireUser,
     industry: ActiveIndustry,
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> dict[str, int]:
@@ -64,7 +64,7 @@ async def reindex_documents(
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: str,
-    user: RequireAnalyst,
+    user: RequireUser,
     industry: ActiveIndustry,
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> dict[str, str]:
@@ -75,7 +75,7 @@ async def delete_document(
 @router.post("/search")
 async def search_documents(
     body: SearchRequest,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> list[dict[str, Any]]:

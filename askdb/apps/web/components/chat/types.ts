@@ -186,6 +186,8 @@ export interface ChatMessage {
   route?: string;
   cancelled?: boolean;
   error?: string;
+  /** Set when the weekly AI quota blocked the question; shown verbatim. */
+  quotaNotice?: string;
   failure?: FailurePayload;
   progress?: ProgressState | null;
   meta?: ResponseMeta;

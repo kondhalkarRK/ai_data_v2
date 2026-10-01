@@ -28,6 +28,7 @@ import {
   useCatalogRefresh,
   useCatalogSummary,
 } from "@/hooks/use-entity-catalog";
+import { useSession } from "@/hooks/use-session";
 import { ApiError } from "@/lib/api-client";
 import type { StatusTone } from "@/lib/design";
 import {
@@ -123,6 +124,7 @@ export function EntityCatalog() {
   const entities = useCatalogEntities();
   const changes = useCatalogChanges();
   const refresh = useCatalogRefresh();
+  const { data: user } = useSession();
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Set<CatalogFilter>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
@@ -194,6 +196,7 @@ export function EntityCatalog() {
         pendingScope={refresh.isPending ? (refresh.variables ?? null) : null}
         onRefresh={(scope) => refresh.mutate(scope)}
         errorMessage={refresh.isError ? refreshError(refresh.error) : null}
+        canRefresh={user?.role === "admin"}
       />
       <SummaryCards summary={summary.data} />
 
@@ -279,11 +282,13 @@ function RefreshBar({
   pendingScope,
   onRefresh,
   errorMessage,
+  canRefresh,
 }: {
   summary: CatalogSummary;
   pendingScope: RefreshScope | null;
   onRefresh: (scope: RefreshScope) => void;
   errorMessage: string | null;
+  canRefresh: boolean;
 }) {
   const last = summary.lastRefresh;
   const status: { tone: StatusTone; label: string } = pendingScope
@@ -311,7 +316,7 @@ function RefreshBar({
           </p>
           {errorMessage ? <p className="mt-1 text-xs text-danger">{errorMessage}</p> : null}
         </div>
-        {REFRESH_ACTIONS.map((action, index) => (
+        {(canRefresh ? REFRESH_ACTIONS : []).map((action, index) => (
           <Button
             key={action.scope}
             variant={index === 0 ? "primary" : "secondary"}

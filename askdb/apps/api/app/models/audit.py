@@ -31,7 +31,7 @@ class AuthAuditEvent(UUIDPrimaryKeyMixin, Base):
     # Null when the attempt referenced an address with no matching account. The email is
     # still recorded so repeated probing is visible.
     user_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL")
+        ForeignKey("auth_users.user_id", ondelete="SET NULL")
     )
     email_attempted: Mapped[str | None] = mapped_column(String(320))
 

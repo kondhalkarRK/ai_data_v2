@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
@@ -15,21 +16,29 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
     ActiveIndustry,
-    RequireAnalyst,
-    RequireViewer,
+    RequireAdmin,
+    RequireUser,
     get_app_session,
     get_app_settings,
     get_registry,
     get_semantic_service,
 )
-from app.core.config import Settings
+from app.core.config import Industry, Settings
 from app.core.exceptions import NqlError
 from app.db.session import DatabaseRegistry
+from app.models.user import User
 from app.schemas.common import ApiModel
 from app.semantic.service import SemanticService
 from app.services.chat.profiler import PROFILER
 from app.services.chat.query_cache import QUERY_CACHE
 from app.services.chat.service import ChatService, recovery_frames
+from app.services.governance import (
+    active_llm,
+    enforce_quota,
+    execution_mode,
+    record_question_usage,
+    sync_llm_config,
+)
 from app.services.llm import circuit_stats, model_catalog
 
 logger = logging.getLogger(__name__)
@@ -38,13 +47,53 @@ _cancel_requested: set[uuid.UUID] = set()
 
 
 class AskRequest(ApiModel):
+    """Model, temperature and token limits are governed by the admin, not the client."""
+
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
     web_retrieval: bool = False
-    model: str | None = None
-    temperature: float | None = Field(default=None, ge=0.0, le=1.5)
-    top_p: float | None = Field(default=None, ge=0.0, le=1.0)
-    top_k: int | None = Field(default=None, ge=1, le=200)
+
+
+async def _prepare_question(session: AsyncSession, settings: Settings, user: User) -> None:
+    await sync_llm_config(session, settings)
+    await enforce_quota(session, user)
+
+
+async def _record_question(
+    session: AsyncSession,
+    settings: Settings,
+    service: ChatService,
+    *,
+    user: User,
+    question: str,
+    industry: Industry,
+    started: float,
+) -> None:
+    """Store one ``llm_usage`` row per question; never fails the answer."""
+    profile = service.last_profile
+    if profile is None:
+        return
+    tokens = service.usage_prompt_tokens + service.usage_completion_tokens
+    llm_used = service.usage_llm_steps > 0 or profile.llm_calls > 0 or tokens > 0
+    mode = execution_mode(cache_hit=profile.cache_hit, llm_used=llm_used, path=profile.path)
+    history = service.last_history
+    try:
+        await record_question_usage(
+            session,
+            user_id=user.id,
+            question=question,
+            industry=industry.value,
+            mode=mode,
+            model_name=(service.usage_model or active_llm(settings).model) if llm_used else "none",
+            prompt_tokens=service.usage_prompt_tokens,
+            completion_tokens=service.usage_completion_tokens,
+            response_time_ms=int((time.perf_counter() - started) * 1000),
+            query_history_id=history.id if history is not None else None,
+        )
+        await session.commit()
+    except Exception:
+        logger.warning("could not record llm usage", exc_info=True)
+        await session.rollback()
 
 
 class SaveQuestionRequest(ApiModel):
@@ -64,13 +113,14 @@ async def _analytics(
 @router.post("/chat/ask")
 async def chat_ask(
     body: AskRequest,
-    user: RequireAnalyst,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
     analytics: Annotated[AsyncConnection, Depends(_analytics)],
     semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
 ) -> StreamingResponse:
+    await _prepare_question(session, settings, user)
     service = ChatService(
         app_session=session,
         analytics=analytics,
@@ -79,6 +129,7 @@ async def chat_ask(
         industry=industry,
         semantic_service=semantic_service,
     )
+    started = time.perf_counter()
 
     async def event_stream() -> AsyncIterator[bytes]:
         try:
@@ -87,10 +138,6 @@ async def chat_ask(
                 body.conversation_id,
                 cancel_requested=_cancel_requested,
                 web_retrieval=body.web_retrieval,
-                model_override=body.model,
-                temperature=body.temperature,
-                top_p=body.top_p,
-                top_k=body.top_k,
             ):
                 yield frame.encode("utf-8")
         except NqlError as exc:
@@ -103,6 +150,16 @@ async def chat_ask(
             logger.exception("chat_ask failed unexpectedly")
             for frame in recovery_frames(industry):
                 yield frame.encode("utf-8")
+        finally:
+            await _record_question(
+                session,
+                settings,
+                service,
+                user=user,
+                question=body.question,
+                industry=industry,
+                started=started,
+            )
 
     return StreamingResponse(
         event_stream(),
@@ -137,7 +194,7 @@ def _sse_events_from_frames(frames: list[str]) -> list[dict[str, Any]]:
 @router.post("/chat/ask-sync")
 async def chat_ask_sync(
     body: AskRequest,
-    user: RequireAnalyst,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
@@ -145,6 +202,7 @@ async def chat_ask_sync(
     semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
 ) -> dict[str, Any]:
     """One JSON response for hosts (Vercel) that buffer SSE and never paint tokens."""
+    await _prepare_question(session, settings, user)
     service = ChatService(
         app_session=session,
         analytics=analytics,
@@ -153,6 +211,7 @@ async def chat_ask_sync(
         industry=industry,
         semantic_service=semantic_service,
     )
+    started = time.perf_counter()
     frames: list[str] = []
     try:
         async for frame in service.ask_stream(
@@ -160,10 +219,6 @@ async def chat_ask_sync(
             body.conversation_id,
             cancel_requested=_cancel_requested,
             web_retrieval=body.web_retrieval,
-            model_override=body.model,
-            temperature=body.temperature,
-            top_p=body.top_p,
-            top_k=body.top_k,
         ):
             frames.append(frame)
     except NqlError as exc:
@@ -176,13 +231,23 @@ async def chat_ask_sync(
     except Exception:
         logger.exception("chat_ask_sync failed unexpectedly")
         return {"events": _sse_events_from_frames([*frames, *recovery_frames(industry)])}
+    finally:
+        await _record_question(
+            session,
+            settings,
+            service,
+            user=user,
+            question=body.question,
+            industry=industry,
+            started=started,
+        )
     return {"events": _sse_events_from_frames(frames)}
 
 
 @router.post("/chat/cancel/{history_id}")
 async def cancel_chat(
     history_id: uuid.UUID,
-    user: RequireAnalyst,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
@@ -208,7 +273,7 @@ def json_quote(value: str) -> str:
 
 @router.get("/history")
 async def query_history(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
@@ -239,7 +304,7 @@ async def query_history(
 
 @router.get("/questions")
 async def list_saved_questions(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
@@ -269,7 +334,7 @@ async def list_saved_questions(
 @router.post("/questions")
 async def save_question(
     body: SaveQuestionRequest,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
@@ -290,7 +355,7 @@ async def save_question(
 
 @router.get("/chat/profiler")
 async def chat_profiler(
-    user: RequireAnalyst,
+    user: RequireAdmin,
     limit: int = 50,
 ) -> dict[str, Any]:
     """Last N NLQ executions + stage percentiles (POC ring buffer)."""
@@ -310,13 +375,13 @@ async def chat_profiler(
 
 @router.get("/llm/controls")
 async def llm_controls(
-    user: RequireAnalyst,
+    user: RequireAdmin,
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> dict[str, Any]:
     del user
     catalog = model_catalog(settings)
     return {
-        "defaultModel": settings.llm_default_model,
+        "defaultModel": active_llm(settings).model,
         "fallbackModel": (settings.llm_fallback_model or "").strip() or None,
         "defaultTemperature": settings.llm_temperature,
         "monthlyBudgetUsd": settings.llm_monthly_budget_usd,
@@ -342,7 +407,7 @@ async def llm_controls(
 
 @router.get("/cost")
 async def cost_analytics(
-    user: RequireAnalyst,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],

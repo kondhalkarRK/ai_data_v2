@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
     ActiveIndustry,
-    RequireAnalyst,
+    RequireUser,
     get_app_session,
     get_app_settings,
     get_registry,
@@ -44,7 +44,7 @@ async def _analytics_conn(
 
 
 def _service(
-    user: RequireAnalyst,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],

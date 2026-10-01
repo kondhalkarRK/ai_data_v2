@@ -39,7 +39,7 @@ class InvalidCredentialsError(AuthenticationError):
     code = "invalid_credentials"
     # Deliberately identical for unknown users and wrong passwords so the endpoint
     # cannot be used to enumerate accounts.
-    message = "Incorrect email or password."
+    message = "Incorrect username or password."
 
 
 class AccountLockedError(AuthenticationError):
@@ -95,6 +95,14 @@ class RateLimitedError(NqlError):
     def __init__(self, retry_after_seconds: int, message: str | None = None) -> None:
         super().__init__(message, details={"retry_after_seconds": retry_after_seconds})
         self.retry_after_seconds = retry_after_seconds
+
+
+class QuotaExceededError(NqlError):
+    """A USER has spent their weekly AI token or call allowance."""
+
+    status_code = 429
+    code = "quota_exceeded"
+    message = "Weekly AI quota reached. Please contact your administrator."
 
 
 class DependencyUnavailableError(NqlError):

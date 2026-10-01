@@ -30,7 +30,7 @@ async def _seed(session_factory: async_sessionmaker[AsyncSession]) -> None:
             email=EMAIL,
             full_name="Audit Subject",
             password_hash=hash_password(PASSWORD),
-            role=Role.ANALYST,
+            role=Role.USER,
             default_industry=Industry.INSURANCE,
         )
         await session.commit()
@@ -50,7 +50,7 @@ async def test_failed_login_is_recorded(
     await _seed(session_factory)
 
     await client.post(
-        "/api/v1/auth/login", json={"email": EMAIL, "password": "Wrong-Password-1!"}
+        "/api/v1/auth/login", json={"username": EMAIL, "password": "Wrong-Password-1!"}
     )
 
     events = await _events(session_factory, AuthEventType.LOGIN_FAILED)
@@ -65,7 +65,7 @@ async def test_successful_login_is_recorded(
 ) -> None:
     await _seed(session_factory)
 
-    await client.post("/api/v1/auth/login", json={"email": EMAIL, "password": PASSWORD})
+    await client.post("/api/v1/auth/login", json={"username": EMAIL, "password": PASSWORD})
 
     events = await _events(session_factory, AuthEventType.LOGIN_SUCCEEDED)
     assert len(events) == 1
@@ -77,7 +77,7 @@ async def test_login_for_unknown_email_is_recorded_without_a_user(
 ) -> None:
     await client.post(
         "/api/v1/auth/login",
-        json={"email": "ghost@example.com", "password": "Wrong-Password-1!"},
+        json={"username": "ghost@example.com", "password": "Wrong-Password-1!"},
     )
 
     events = await _events(session_factory, AuthEventType.LOGIN_FAILED)
@@ -93,7 +93,7 @@ async def test_audit_never_stores_the_submitted_password(
     await _seed(session_factory)
     secret = "Nobody-Should-See-This-1!"
 
-    await client.post("/api/v1/auth/login", json={"email": EMAIL, "password": secret})
+    await client.post("/api/v1/auth/login", json={"username": EMAIL, "password": secret})
 
     async with session_factory() as session:
         rows = list((await session.execute(select(AuthAuditEvent))).scalars())
@@ -107,7 +107,7 @@ async def test_token_reuse_revocation_is_durable(
     client: AsyncClient, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
     await _seed(session_factory)
-    await client.post("/api/v1/auth/login", json={"email": EMAIL, "password": PASSWORD})
+    await client.post("/api/v1/auth/login", json={"username": EMAIL, "password": PASSWORD})
     stolen = client.cookies.get(REFRESH_COOKIE)
 
     await client.post("/api/v1/auth/refresh")

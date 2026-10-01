@@ -22,7 +22,7 @@ class RefreshToken(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "refresh_tokens"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("auth_users.user_id", ondelete="CASCADE"), nullable=False
     )
     # Identifies the chain of rotations that started at one login.
     family_id: Mapped[uuid.UUID] = mapped_column(nullable=False)

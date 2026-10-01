@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
     CurrentUser,
     RequireAdmin,
+    get_app_session,
     get_app_settings,
     get_auth_service,
     get_fingerprint,
     verify_csrf,
 )
-from app.auth.cookies import clear_session_cookies, read_refresh_token, set_session_cookies
+from app.auth.cookies import (
+    clear_session_cookies,
+    read_persistent,
+    read_refresh_token,
+    set_session_cookies,
+)
 from app.auth.service import AuthService, RequestFingerprint, SessionTokens
 from app.core.config import Settings
 from app.core.exceptions import TokenError
@@ -27,6 +34,7 @@ from app.schemas.auth import (
     UpdatePreferencesRequest,
     UserProfile,
 )
+from app.services.governance.quota import weekly_usage
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -36,7 +44,7 @@ FingerprintDep = Annotated[RequestFingerprint, Depends(get_fingerprint)]
 
 
 def _session_response(
-    response: Response, settings: Settings, tokens: SessionTokens
+    response: Response, settings: Settings, tokens: SessionTokens, *, persistent: bool = True
 ) -> SessionResponse:
     set_session_cookies(
         response,
@@ -44,6 +52,7 @@ def _session_response(
         access_token=tokens.access_token,
         refresh_token=tokens.refresh_token,
         csrf_token=tokens.csrf_token,
+        persistent=persistent,
     )
     return SessionResponse(
         user=UserProfile.model_validate(tokens.user),
@@ -55,7 +64,7 @@ def _session_response(
 @router.post(
     "/login",
     response_model=SessionResponse,
-    summary="Sign in with email and password",
+    summary="Sign in with username and password",
 )
 async def login(
     payload: LoginRequest,
@@ -65,9 +74,9 @@ async def login(
     fingerprint: FingerprintDep,
 ) -> SessionResponse:
     tokens = await service.login(
-        email=str(payload.email), password=payload.password, fingerprint=fingerprint
+        login=payload.username, password=payload.password, fingerprint=fingerprint
     )
-    return _session_response(response, settings, tokens)
+    return _session_response(response, settings, tokens, persistent=payload.remember_me)
 
 
 @router.post(
@@ -92,7 +101,7 @@ async def refresh(
         # token that will never work again.
         clear_session_cookies(response, settings)
         raise
-    return _session_response(response, settings, tokens)
+    return _session_response(response, settings, tokens, persistent=read_persistent(request))
 
 
 @router.post(
@@ -124,6 +133,13 @@ async def logout(
 @router.get("/me", response_model=UserProfile, summary="Current user profile")
 async def me(user: CurrentUser) -> UserProfile:
     return UserProfile.model_validate(user)
+
+
+@router.get("/me/usage", summary="The caller's AI usage for the current week")
+async def my_usage(
+    user: CurrentUser, session: Annotated[AsyncSession, Depends(get_app_session)]
+) -> dict[str, Any]:
+    return (await weekly_usage(session, user)).to_dict()
 
 
 @router.patch(
@@ -181,6 +197,7 @@ async def create_user(
     user = await service.create_user(
         actor=admin,
         email=str(payload.email),
+        username=payload.username,
         full_name=payload.full_name,
         password=payload.password,
         role=payload.role,

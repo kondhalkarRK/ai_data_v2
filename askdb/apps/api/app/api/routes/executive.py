@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
     ActiveIndustry,
-    RequireViewer,
+    RequireUser,
     get_app_session,
     get_registry,
 )
@@ -57,7 +57,7 @@ AnalyticsConnection = Annotated[AsyncConnection, Depends(get_analytics_connectio
 
 @router.get("/intelligence", response_model=ExecutiveIntelligenceResponse)
 async def executive_intelligence(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     window: WindowId = Query(default="ytd"),
@@ -81,7 +81,7 @@ async def executive_intelligence(
 
 @router.get("/cockpit", response_model=CockpitResponse)
 async def executive_cockpit(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     year: int | None = Query(default=None, ge=2000, le=2100),
@@ -113,7 +113,7 @@ async def executive_cockpit(
 
 @router.get("/cockpit/options", response_model=CockpitOptions)
 async def executive_cockpit_options(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     dealer_id: int | None = Query(default=None),
@@ -126,7 +126,7 @@ async def executive_cockpit_options(
 
 @router.get("/region-map", response_model=list[RegionMapPoint])
 async def region_map(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     metric: str = Query(default="units"),
@@ -138,7 +138,7 @@ async def region_map(
 @router.get("/region-map/{region_id}/dealers", response_model=list[DealerMapRow])
 async def region_dealers(
     region_id: int,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
 ) -> list[DealerMapRow]:
@@ -149,7 +149,7 @@ async def region_dealers(
 @router.get("/dealers/{dealer_id}/models", response_model=list[ModelMapRow])
 async def dealer_models(
     dealer_id: int,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
 ) -> list[ModelMapRow]:
@@ -160,7 +160,7 @@ async def dealer_models(
 @router.post("/insights/feedback", response_model=InsightFeedbackResponse)
 async def insight_feedback(
     body: InsightFeedbackRequest,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
 ) -> InsightFeedbackResponse:

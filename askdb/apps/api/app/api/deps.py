@@ -174,23 +174,21 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 def require_role(
     minimum: Role,
 ) -> Callable[[User], Coroutine[Any, Any, User]]:
-    """Dependency factory enforcing a minimum role.
-
-    ``admin`` satisfies ``analyst``, and ``analyst`` satisfies ``viewer``.
-    """
+    """Dependency factory enforcing a role: ``admin`` can do everything a ``user`` can."""
 
     async def _check(user: CurrentUser) -> User:
         if not user.role.at_least(minimum):
             raise AuthorizationError(
-                f"This action requires the '{minimum.value}' role or higher."
+                "Administrator access is required."
+                if minimum is Role.ADMIN
+                else "You do not have access to this action."
             )
         return user
 
     return _check
 
 
-RequireViewer = Annotated[User, Depends(require_role(Role.VIEWER))]
-RequireAnalyst = Annotated[User, Depends(require_role(Role.ANALYST))]
+RequireUser = Annotated[User, Depends(require_role(Role.USER))]
 RequireAdmin = Annotated[User, Depends(require_role(Role.ADMIN))]
 
 

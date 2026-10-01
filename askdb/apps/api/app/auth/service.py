@@ -38,6 +38,7 @@ from app.models.user import User
 from app.repositories.audit import AuthAuditRepository
 from app.repositories.refresh_tokens import RefreshTokenRepository
 from app.repositories.users import UserRepository, normalize_email
+from app.services.governance.audit import record_login, record_logout
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +88,10 @@ class AuthService:
     # --- login -------------------------------------------------------------
 
     async def login(
-        self, *, email: str, password: str, fingerprint: RequestFingerprint
+        self, *, login: str, password: str, fingerprint: RequestFingerprint
     ) -> SessionTokens:
-        normalized = normalize_email(email)
+        """Sign in with a username (or, for older accounts, an email address)."""
+        normalized = normalize_email(login)
 
         # Limit by account and by source address independently, so one attacker cannot
         # lock every account and a botnet cannot brute force a single one.
@@ -108,10 +110,10 @@ class AuthService:
                 await self._persist()
                 raise RateLimitedError(decision.retry_after_seconds)
 
-        user = await self.users.get_by_email(normalized)
+        user = await self.users.get_by_login(normalized)
 
         # Always run a verification, even for an unknown account, so response timing does
-        # not disclose whether the address exists.
+        # not disclose whether the account exists.
         password_ok = passwords.verify_password(
             password, user.password_hash if user else None
         )
@@ -126,6 +128,12 @@ class AuthService:
                 ip_address=fingerprint.ip_address,
                 user_agent=fingerprint.user_agent,
                 reason="bad_credentials",
+            )
+            await record_login(
+                self._session,
+                user_id=user.id if user else None,
+                username=user.username if user else normalized,
+                succeeded=False,
             )
             await self._persist()
             raise InvalidCredentialsError
@@ -162,6 +170,9 @@ class AuthService:
             request_id=fingerprint.request_id,
             ip_address=fingerprint.ip_address,
             user_agent=fingerprint.user_agent,
+        )
+        await record_login(
+            self._session, user_id=user.id, username=user.username, succeeded=True
         )
         return tokens
 
@@ -253,6 +264,10 @@ class AuthService:
             user_agent=fingerprint.user_agent,
             metadata={"all_sessions": all_sessions},
         )
+        if user_id is not None:
+            user = await self.users.get_by_id(user_id)
+            if user is not None:
+                await record_logout(self._session, user_id=user.id, username=user.username)
 
     # --- password ----------------------------------------------------------
 
@@ -311,6 +326,7 @@ class AuthService:
         default_industry: Industry,
         must_change_password: bool = True,
         fingerprint: RequestFingerprint | None = None,
+        username: str | None = None,
     ) -> User:
         if actor is not None and actor.role is not Role.ADMIN:
             raise AuthorizationError("Only an administrator can create accounts.")
@@ -323,6 +339,7 @@ class AuthService:
             )
 
         user = await self.users.create(
+            username=username,
             email=email,
             full_name=full_name,
             password_hash=passwords.hash_password(password),

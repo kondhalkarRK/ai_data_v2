@@ -44,7 +44,7 @@ type Section = "catalog" | "alerts" | "datasets" | "trend";
 export function TrustCenter({ industry }: { industry: Industry }) {
   const queryClient = useQueryClient();
   const { data: user } = useSession();
-  const canEdit = user ? roleAtLeast(user.role, "analyst") : false;
+  const canEdit = user ? roleAtLeast(user.role, "admin") : false;
   const [filters, setFilters] = React.useState<TrustFilters>({});
   const [drills, setDrills] = React.useState<Drilldown[]>([]);
   const [monitorOpen, setMonitorOpen] = React.useState(false);
@@ -188,15 +188,17 @@ export function TrustCenter({ industry }: { industry: Industry }) {
         </div>
         <div className="flex items-center gap-2">
           {center.isFetching && data ? <Loader2 className="size-4 animate-spin text-slate-400" aria-label="Updating" /> : null}
-          <HeaderButton
-            onClick={() => {
-              refreshNext.current = true;
-              void center.refetch();
-            }}
-            disabled={center.isFetching}
-          >
-            <RefreshCw className={cn("size-3.5", center.isFetching && "animate-spin")} /> Run checks
-          </HeaderButton>
+          {canEdit ? (
+            <HeaderButton
+              onClick={() => {
+                refreshNext.current = true;
+                void center.refetch();
+              }}
+              disabled={center.isFetching}
+            >
+              <RefreshCw className={cn("size-3.5", center.isFetching && "animate-spin")} /> Run checks
+            </HeaderButton>
+          ) : null}
           <HeaderButton onClick={exportSummary} disabled={!data}>
             <Download className="size-3.5" /> Export
           </HeaderButton>

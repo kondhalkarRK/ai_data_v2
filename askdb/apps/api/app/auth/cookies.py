@@ -16,6 +16,7 @@ from app.core.config import Settings
 ACCESS_COOKIE: Final = "nql_access"
 REFRESH_COOKIE: Final = "nql_refresh"
 CSRF_COOKIE: Final = "nql_csrf"
+PERSIST_COOKIE: Final = "nql_persist"
 
 # The refresh cookie is only ever sent to the endpoints that consume it, so a request to
 # any other route cannot leak it.
@@ -29,18 +30,30 @@ def set_session_cookies(
     access_token: str,
     refresh_token: str,
     csrf_token: str,
+    persistent: bool = True,
 ) -> None:
+    """``persistent=False`` (Remember me unticked) issues cookies that end with the browser."""
     # Spelled out per call rather than splatted from a dict: Starlette's ``samesite`` is
     # a Literal, and a dict of mixed value types erases that back to ``str``.
     domain = settings.cookie_domain or None
     secure = settings.cookie_secure
     samesite = settings.cookie_samesite
-    refresh_max_age = settings.jwt_refresh_ttl_days * 24 * 60 * 60
+    refresh_max_age = settings.jwt_refresh_ttl_days * 24 * 60 * 60 if persistent else None
 
+    response.set_cookie(
+        PERSIST_COOKIE,
+        "1" if persistent else "0",
+        max_age=refresh_max_age,
+        httponly=True,
+        path=REFRESH_COOKIE_PATH,
+        domain=domain,
+        secure=secure,
+        samesite=samesite,
+    )
     response.set_cookie(
         ACCESS_COOKIE,
         access_token,
-        max_age=settings.jwt_access_ttl_minutes * 60,
+        max_age=settings.jwt_access_ttl_minutes * 60 if persistent else None,
         httponly=True,
         path="/",
         domain=domain,
@@ -76,6 +89,11 @@ def clear_session_cookies(response: Response, settings: Settings) -> None:
     response.delete_cookie(ACCESS_COOKIE, path="/", domain=domain)
     response.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH, domain=domain)
     response.delete_cookie(CSRF_COOKIE, path="/", domain=domain)
+    response.delete_cookie(PERSIST_COOKIE, path=REFRESH_COOKIE_PATH, domain=domain)
+
+
+def read_persistent(request: Request) -> bool:
+    return request.cookies.get(PERSIST_COOKIE, "1") != "0"
 
 
 def read_access_token(request: Request) -> str | None:

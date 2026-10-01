@@ -21,6 +21,9 @@ os.environ.setdefault("RATE_LIMIT_LOGIN_PER_MINUTE", "5")
 # Empty means host-only cookies, which is what the ASGI test host needs: a cookie scoped
 # to "localhost" would never be stored for requests to "testserver".
 os.environ.setdefault("COOKIE_DOMAIN", "")
+# Process env beats a developer's local .env, which may enable the bypass or pin hosts.
+os.environ.setdefault("AUTH_BYPASS", "false")
+os.environ.setdefault("TRUSTED_HOSTS", "testserver,localhost")
 
 from app.api.deps import get_app_session, get_registry
 from app.auth.rate_limit import FixedWindowRateLimiter

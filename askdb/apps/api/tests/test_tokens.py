@@ -23,7 +23,7 @@ def _claims_args() -> dict[str, object]:
     return {
         "user_id": uuid.uuid4(),
         "email": "analyst@example.com",
-        "role": Role.ANALYST,
+        "role": Role.USER,
         "default_industry": Industry.INSURANCE,
         "session_id": uuid.uuid4(),
     }
@@ -36,7 +36,7 @@ def test_round_trip(settings: Settings) -> None:
     decoded = decode_access_token(settings, token)
 
     assert decoded.user_id == args["user_id"]
-    assert decoded.role is Role.ANALYST
+    assert decoded.role is Role.USER
     assert decoded.default_industry is Industry.INSURANCE
     assert decoded.jti == issued.jti
 
@@ -78,7 +78,7 @@ def test_rejects_expired_token(settings: Settings) -> None:
     payload = {
         "sub": str(uuid.uuid4()),
         "email": "x@example.com",
-        "role": "viewer",
+        "role": "user",
         "industry": "automotive",
         "sid": str(uuid.uuid4()),
         "typ": "access",
@@ -101,7 +101,7 @@ def test_rejects_wrong_audience(settings: Settings) -> None:
     payload = {
         "sub": str(uuid.uuid4()),
         "email": "x@example.com",
-        "role": "viewer",
+        "role": "user",
         "industry": "automotive",
         "sid": str(uuid.uuid4()),
         "typ": "access",

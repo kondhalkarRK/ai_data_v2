@@ -3,7 +3,7 @@
 import type { UserProfile } from "@nql/shared-types";
 import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
@@ -22,8 +22,17 @@ function initials(fullName: string): string {
     .join("");
 }
 
+function isActive(href: string, pathname: string, tab: string | null): boolean {
+  const [path, query] = href.split("?");
+  const itemTab = new URLSearchParams(query ?? "").get("tab");
+  if (pathname !== path && !pathname.startsWith(`${path}/`)) return false;
+  // "/semantic" and "/semantic?tab=graph" share a route; the tab decides which is active.
+  return itemTab ? tab === itemTab : tab !== "graph";
+}
+
 export function Sidebar({ user }: { user: UserProfile }) {
   const pathname = usePathname();
+  const tab = useSearchParams().get("tab");
   const collapsed = useUiStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
   const logout = useLogout();
@@ -73,9 +82,7 @@ export function Sidebar({ user }: { user: UserProfile }) {
             ) : null}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
-                // Exact match, or a nested route below this item.
-                const active =
-                  pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const active = isActive(item.href, pathname, tab);
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>
@@ -136,14 +143,28 @@ export function Sidebar({ user }: { user: UserProfile }) {
               >
                 {initials(user.fullName)}
               </span>
-              <div className="min-w-0 flex-1">
+              <Link
+                href="/profile"
+                className="min-w-0 flex-1 rounded-[var(--radius-control)] hover:bg-muted/60"
+                title="My AI usage"
+              >
                 <p className="truncate text-sm font-medium text-foreground">
                   {user.fullName}
                 </p>
-                <p className="truncate text-2xs capitalize text-muted-foreground">
-                  {user.role}
+                <p className="flex items-center gap-1.5 truncate text-2xs text-muted-foreground">
+                  <span
+                    className={cn(
+                      "rounded px-1 py-px font-semibold tracking-wide",
+                      user.role === "admin"
+                        ? "bg-primary/12 text-primary"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {user.role.toUpperCase()}
+                  </span>
+                  <span className="truncate">{user.username}</span>
                 </p>
-              </div>
+              </Link>
               <Button
                 variant="ghost"
                 size="icon-sm"

@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import ActiveIndustry, RequireViewer, get_semantic_service
+from app.api.deps import ActiveIndustry, RequireUser, get_semantic_service
 from app.schemas.semantic import (
     OntologySnapshot,
     SemanticPackResponse,
@@ -23,7 +23,7 @@ SemanticServiceDep = Annotated[SemanticService, Depends(get_semantic_service)]
     response_model=list[SemanticPackSummary],
     summary="Available validated semantic packs",
 )
-async def list_packs(user: RequireViewer, service: SemanticServiceDep) -> list[SemanticPackSummary]:
+async def list_packs(user: RequireUser, service: SemanticServiceDep) -> list[SemanticPackSummary]:
     return await service.list_packs()
 
 
@@ -33,7 +33,7 @@ async def list_packs(user: RequireViewer, service: SemanticServiceDep) -> list[S
     summary="Full semantic model and business glossary",
 )
 async def get_pack(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     service: SemanticServiceDep,
 ) -> SemanticPackResponse:
@@ -46,7 +46,7 @@ async def get_pack(
     summary="Compiled ontology snapshot",
 )
 async def get_ontology(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     service: SemanticServiceDep,
 ) -> OntologySnapshot:

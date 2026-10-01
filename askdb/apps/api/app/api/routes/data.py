@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.api.deps import (
     ActiveIndustry,
-    RequireViewer,
+    RequireUser,
     get_app_settings,
     get_registry,
     get_semantic_service,
@@ -47,7 +47,7 @@ SettingsDep = Annotated[Settings, Depends(get_app_settings)]
     summary="List previewable tables for the active industry",
 )
 async def list_tables(
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     semantic: SemanticDep,
@@ -69,7 +69,7 @@ async def list_tables(
 )
 async def preview_table(
     table_name: str,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     semantic: SemanticDep,
@@ -93,7 +93,7 @@ async def preview_table(
 )
 async def data_quality(
     table_name: str,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     semantic: SemanticDep,
@@ -115,7 +115,7 @@ async def data_quality(
 )
 async def export_table(
     table_name: str,
-    user: RequireViewer,
+    user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     semantic: SemanticDep,

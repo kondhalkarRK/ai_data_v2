@@ -1,17 +1,18 @@
 import type { Role } from "@nql/shared-types";
 import {
-  Activity,
   BarChart3,
   BookOpen,
   Boxes,
+  Gauge,
   History,
   Home,
   LineChart,
   type LucideIcon,
   MessageSquare,
   Network,
-  ScrollText,
+  Share2,
   ShieldCheck,
+  ShieldHalf,
   Star,
 } from "lucide-react";
 
@@ -19,7 +20,7 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  /** Minimum role required. Items above the caller's role are hidden. */
+  /** Minimum role required. Admin-only items are hidden from users entirely. */
   minRole: Role;
   description: string;
 }
@@ -30,107 +31,101 @@ export interface NavSection {
   items: NavItem[];
 }
 
-/** Left sidebar — flagship workspace order for business users. */
+/** Left sidebar. ADMIN sees everything; USER sees everything except the Admin section. */
 export const NAV_SECTIONS: NavSection[] = [
   {
     id: "workspace",
     label: null,
     items: [
       {
-        href: "/home",
-        label: "Home",
-        icon: Home,
-        minRole: "viewer",
-        description: "Ask DB hero, live demo, and connected data sources.",
-      },
-      {
         href: "/dashboard",
         label: "Executive Intelligence",
         icon: BarChart3,
-        minRole: "viewer",
+        minRole: "user",
         description: "Domain-aware KPIs, grounded AI insights, and performance analytics.",
       },
       {
         href: "/chat",
         label: "AI Chat",
         icon: MessageSquare,
-        minRole: "analyst",
+        minRole: "user",
         description: "Ask questions in natural language over governed data.",
       },
       {
-        href: "/analytics-builder",
-        label: "Analytics Builder",
-        icon: LineChart,
-        minRole: "analyst",
-        description: "No-code business analytics over the semantic layer.",
-      },
-      {
         href: "/data-quality",
-        label: "Data Trust Center",
+        label: "Data Trust",
         icon: ShieldCheck,
-        minRole: "viewer",
+        minRole: "user",
         description: "Data reliability: trust score, DQ rules, alerts, freshness and drift.",
-      },
-      {
-        href: "/semantic?tab=graph",
-        label: "Ontology Browser",
-        icon: Network,
-        minRole: "viewer",
-        description: "Explore the enterprise knowledge graph.",
-      },
-    ],
-  },
-  {
-    id: "explore",
-    label: "Explore",
-    items: [
-      {
-        href: "/data-preview",
-        label: "Data Preview",
-        icon: Boxes,
-        minRole: "viewer",
-        description: "Browse governed tables from the active industry pack.",
       },
       {
         href: "/semantic",
         label: "Semantic Atlas",
         icon: Network,
-        minRole: "viewer",
-        description: "Semantic model, knowledge graph, and entity catalog.",
+        minRole: "user",
+        description: "Semantic model and entity catalog.",
+      },
+      {
+        href: "/semantic?tab=graph",
+        label: "Knowledge Graph",
+        icon: Share2,
+        minRole: "user",
+        description: "Explore the enterprise knowledge graph.",
+      },
+    ],
+  },
+  {
+    id: "more",
+    label: "More",
+    items: [
+      {
+        href: "/home",
+        label: "Home",
+        icon: Home,
+        minRole: "user",
+        description: "Ask DB hero, live demo, and connected data sources.",
+      },
+      {
+        href: "/analytics-builder",
+        label: "Analytics Builder",
+        icon: LineChart,
+        minRole: "user",
+        description: "No-code business analytics over the semantic layer.",
+      },
+      {
+        href: "/data-preview",
+        label: "Data Preview",
+        icon: Boxes,
+        minRole: "user",
+        description: "Browse governed tables from the active industry pack.",
       },
       {
         href: "/knowledge",
         label: "Knowledge Hub",
         icon: BookOpen,
-        minRole: "viewer",
-        description: "Upload documents and retrieve cited business context for AI Chat.",
+        minRole: "user",
+        description: "Retrieve cited business context for AI Chat.",
       },
-    ],
-  },
-  {
-    id: "activity",
-    label: "Activity",
-    items: [
       {
         href: "/saved-questions",
         label: "Saved Questions",
         icon: Star,
-        minRole: "viewer",
+        minRole: "user",
         description: "Personal and shared question collections.",
       },
       {
         href: "/query-history",
         label: "Query History",
         icon: History,
-        minRole: "viewer",
-        description: "Every executed question with SQL, cost and status.",
+        minRole: "user",
+        description: "Every executed question with SQL and status.",
       },
       {
-        href: "/llm-observability",
-        label: "LLM Observability",
-        icon: Activity,
-        minRole: "analyst",
-        description: "Cost analytics and LLM sampling controls.",
+        href: "/profile",
+        label: "My AI Usage",
+        icon: Gauge,
+        minRole: "user",
+        description: "Your weekly AI token and call usage.",
       },
     ],
   },
@@ -139,11 +134,11 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Admin",
     items: [
       {
-        href: "/system-logs",
-        label: "System Logs",
-        icon: ScrollText,
+        href: "/admin",
+        label: "Admin Center",
+        icon: ShieldHalf,
         minRole: "admin",
-        description: "Operator diagnostics — not a business report. Prefer Query History for analysts.",
+        description: "AI governance, usage monitoring, data trust and semantic administration, audit.",
       },
     ],
   },
@@ -157,7 +152,7 @@ export const MAIN_TABS = [
   { href: "/analytics-builder", label: "Analytics Builder", icon: LineChart },
 ] as const;
 
-const ROLE_RANK: Record<Role, number> = { viewer: 0, analyst: 1, admin: 2 };
+const ROLE_RANK: Record<Role, number> = { user: 0, admin: 1 };
 
 export function visibleSections(role: Role): NavSection[] {
   return NAV_SECTIONS.map((section) => ({

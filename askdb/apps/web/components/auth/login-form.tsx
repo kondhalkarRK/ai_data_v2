@@ -12,7 +12,7 @@ import { ApiError } from "@/lib/api-client";
 /**
  * Turns a failure into something a user can act on without telling an attacker anything.
  *
- * A wrong password and an unknown address produce the same message by design; only rate
+ * A wrong password and an unknown username produce the same message by design; only rate
  * limiting and outages get a distinct one, because those change what the user should do.
  */
 function errorMessage(error: unknown): string {
@@ -21,7 +21,7 @@ function errorMessage(error: unknown): string {
       return "Too many attempts. Wait a minute before trying again.";
     }
     if (error.status === 401 || error.status === 403) {
-      return "Incorrect email or password.";
+      return "Incorrect username or password.";
     }
     if (error.status >= 500) {
       return "The service is unavailable. Try again shortly.";
@@ -38,8 +38,9 @@ export function LoginForm() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     login.mutate({
-      email: String(form.get("email") ?? "").trim(),
+      username: String(form.get("username") ?? "").trim(),
       password: String(form.get("password") ?? ""),
+      rememberMe: form.get("rememberMe") === "on",
     });
   }
 
@@ -50,17 +51,19 @@ export function LoginForm() {
       <CardContent className="pt-5">
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="space-y-1.5">
-            <label htmlFor="email" className="text-sm font-medium text-foreground">
-              Email
+            <label htmlFor="username" className="text-sm font-medium text-foreground">
+              Username
             </label>
             <Input
-              id="email"
-              name="email"
-              type="email"
+              id="username"
+              name="username"
+              type="text"
               autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
               required
               autoFocus
-              placeholder="you@company.com"
+              placeholder="e.g. admin"
               aria-invalid={failed || undefined}
               aria-describedby={failed ? "login-error" : undefined}
               disabled={login.isPending}
@@ -97,6 +100,17 @@ export function LoginForm() {
             </div>
           </div>
 
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              name="rememberMe"
+              defaultChecked
+              disabled={login.isPending}
+              className="size-4 rounded border-border accent-primary"
+            />
+            Remember me
+          </label>
+
           {failed ? (
             <p
               id="login-error"
@@ -114,7 +128,7 @@ export function LoginForm() {
                 Signing in
               </>
             ) : (
-              "Sign in"
+              "Login"
             )}
           </Button>
         </form>

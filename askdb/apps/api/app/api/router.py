@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.routes import (
+    admin,
     analytics,
     auth,
     catalog,
@@ -32,3 +33,4 @@ api_v1_router.include_router(chat.router)
 api_v1_router.include_router(knowledge.router)
 api_v1_router.include_router(analytics.router)
 api_v1_router.include_router(catalog.router)
+api_v1_router.include_router(admin.router)

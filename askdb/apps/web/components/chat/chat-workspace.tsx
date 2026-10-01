@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import { type ActionKey } from "@/components/chat/action-toolbar";
@@ -10,10 +11,10 @@ import { applyChatSseEvent } from "@/components/chat/sse";
 import type { ChatMessage } from "@/components/chat/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
+import { myUsageKey, quotaMessage } from "@/hooks/use-my-usage";
 import { useActiveIndustry } from "@/hooks/use-session";
-import { API_BASE_URL, apiClient } from "@/lib/api-client";
+import { API_BASE_URL, ApiError, apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { useUiStore } from "@/stores/ui-store";
 
 export function ChatWorkspace() {
   const industry = useActiveIndustry();
@@ -29,10 +30,7 @@ export function ChatWorkspace() {
   const historyIdRef = useRef<string | null>(null);
   const bootstrapped = useRef(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const llmModel = useUiStore((s) => s.llmModel);
-  const llmTemperature = useUiStore((s) => s.llmTemperature);
-  const llmTopP = useUiStore((s) => s.llmTopP);
-  const llmTopK = useUiStore((s) => s.llmTopK);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const seeded = searchParams.get("q");
@@ -74,10 +72,6 @@ export function ChatWorkspace() {
         question: userMessage.question,
         conversationId,
         webRetrieval,
-        model: llmModel || undefined,
-        temperature: llmTemperature,
-        topP: llmTopP,
-        topK: llmTopK,
       };
       // Vercel rewrites buffer SSE, so production uses one JSON round-trip.
       const sync = await apiClient.post<{
@@ -109,6 +103,14 @@ export function ChatWorkspace() {
               : message,
           ),
         );
+      } else if (error instanceof ApiError && error.code === "quota_exceeded") {
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantId
+              ? { ...message, quotaNotice: quotaMessage(error.details) }
+              : message,
+          ),
+        );
       } else {
         setMessages((prev) =>
           prev.map((message) =>
@@ -128,6 +130,7 @@ export function ChatWorkspace() {
     } finally {
       setBusy(false);
       abortRef.current = null;
+      void queryClient.invalidateQueries({ queryKey: myUsageKey });
     }
   }
 

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Industry
 from app.core.exceptions import ConflictError
 from app.models.enums import Role
-from app.models.user import User
+from app.models.user import DEFAULT_WEEKLY_CALL_LIMIT, DEFAULT_WEEKLY_TOKEN_LIMIT, User
 
 
 def normalize_email(email: str) -> str:
@@ -29,6 +29,15 @@ class UserRepository:
     async def get_by_email(self, email: str) -> User | None:
         stmt = select(User).where(User.email_normalized == normalize_email(email))
         return (await self._session.execute(stmt)).scalar_one_or_none()
+
+    async def get_by_login(self, login: str) -> User | None:
+        """Resolve the login form's identifier: a username, or an email address."""
+        normalized = normalize_email(login)
+        stmt = select(User).where(func.lower(User.username) == normalized)
+        user = (await self._session.execute(stmt)).scalar_one_or_none()
+        if user is None and "@" in normalized:
+            user = await self.get_by_email(normalized)
+        return user
 
     async def count(self) -> int:
         stmt = select(func.count()).select_from(User)
@@ -49,8 +58,13 @@ class UserRepository:
         role: Role,
         default_industry: Industry,
         must_change_password: bool = False,
+        username: str | None = None,
     ) -> User:
+        unlimited = role is Role.ADMIN
         user = User(
+            username=(username or normalize_email(email)).strip()[:80],
+            weekly_token_limit=None if unlimited else DEFAULT_WEEKLY_TOKEN_LIMIT,
+            weekly_call_limit=None if unlimited else DEFAULT_WEEKLY_CALL_LIMIT,
             email=email.strip(),
             email_normalized=normalize_email(email),
             full_name=full_name.strip(),
@@ -66,7 +80,7 @@ class UserRepository:
             await self._session.flush()
         except IntegrityError as exc:
             await self._session.rollback()
-            raise ConflictError("An account with that email already exists.") from exc
+            raise ConflictError("An account with that username or email already exists.") from exc
         return user
 
     async def record_successful_login(self, user: User) -> None:
@@ -85,6 +99,11 @@ class UserRepository:
 
     async def set_role(self, user: User, role: Role) -> None:
         user.role = role
+        if role is Role.ADMIN:
+            user.weekly_token_limit = user.weekly_call_limit = None
+        elif user.weekly_token_limit is None and user.weekly_call_limit is None:
+            user.weekly_token_limit = DEFAULT_WEEKLY_TOKEN_LIMIT
+            user.weekly_call_limit = DEFAULT_WEEKLY_CALL_LIMIT
         await self._session.flush()
 
     async def set_default_industry(self, user: User, industry: Industry) -> None:

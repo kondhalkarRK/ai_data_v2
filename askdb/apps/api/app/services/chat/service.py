@@ -224,6 +224,12 @@ class ChatService:
         self._user = user
         self._industry = industry
         self._semantic = semantic_service or SemanticService(settings)
+        self.usage_model = ""
+        self.usage_prompt_tokens = 0
+        self.usage_completion_tokens = 0
+        self.usage_llm_steps = 0
+        self.last_profile: QueryProfile | None = None
+        self.last_history: QueryHistory | None = None
 
     async def _recover_analytics(self) -> None:
         """Clear an aborted Postgres transaction so later statements can run.
@@ -285,6 +291,7 @@ class ChatService:
         )
         history_id = uuid.uuid4()
         profile.history_id = str(history_id)
+        self.last_profile = profile
         completed_steps: list[str] = ["question"]
 
         yield _sse("stage", {"stage": "accepted", "historyId": str(history_id)})
@@ -292,6 +299,7 @@ class ChatService:
 
         conversation = await self._ensure_conversation(conversation_id, question)
         history = await self._create_running_history(history_id, conversation.id, question)
+        self.last_history = history
         await self._app.flush()
         await self._app.commit()
 
@@ -1502,7 +1510,7 @@ class ChatService:
         daily: dict[str, float] = {}
         for row in rows:
             model_bucket = by_model.setdefault(
-                row.model, {"calls": 0, "tokens": 0, "costUsd": 0.0}
+                row.model_name, {"calls": 0, "tokens": 0, "costUsd": 0.0}
             )
             model_bucket["calls"] = int(model_bucket["calls"]) + 1
             model_bucket["tokens"] = int(model_bucket["tokens"]) + row.total_tokens
@@ -1562,8 +1570,9 @@ class ChatService:
             "recent": [
                 {
                     "id": str(row.id),
-                    "model": row.model,
+                    "model": row.model_name,
                     "purpose": row.purpose,
+                    "executionMode": row.execution_mode,
                     "totalTokens": row.total_tokens,
                     "estimatedCostUsd": float(row.estimated_cost_usd),
                     "createdAt": row.created_at.isoformat(),
@@ -1611,19 +1620,8 @@ class ChatService:
         return row
 
     async def _record_usage(self, model: str, prompt_tokens: int, completion_tokens: int) -> None:
-        total = prompt_tokens + completion_tokens
-        cost = total * 0.000002
-        self._app.add(
-            LlmUsage(
-                id=uuid.uuid4(),
-                user_id=self._user.id,
-                industry=self._industry.value,
-                model=model,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total,
-                estimated_cost_usd=cost,
-                purpose="chat",
-            )
-        )
-        await self._app.flush()
+        """Accumulate LLM tokens; the chat route stores one ``llm_usage`` row per question."""
+        self.usage_model = model or self.usage_model
+        self.usage_prompt_tokens += max(0, prompt_tokens)
+        self.usage_completion_tokens += max(0, completion_tokens)
+        self.usage_llm_steps += 1

@@ -14,8 +14,18 @@ from app.schemas.common import ApiModel
 
 
 class LoginRequest(ApiModel):
-    email: EmailStr
+    """``username`` also accepts the email address of accounts created before usernames."""
+
+    username: str = Field(min_length=1, max_length=320)
     password: str = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
+    remember_me: bool = True
+
+    @field_validator("username")
+    @classmethod
+    def _username_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Username must not be blank.")
+        return value.strip()
 
     @field_validator("password")
     @classmethod
@@ -27,12 +37,15 @@ class LoginRequest(ApiModel):
 
 class UserProfile(ApiModel):
     id: uuid.UUID
+    username: str
     email: str
     full_name: str
     role: Role
     default_industry: Industry
     is_active: bool
     must_change_password: bool
+    weekly_token_limit: int | None = None
+    weekly_call_limit: int | None = None
     last_login_at: datetime | None = None
     created_at: datetime
 
@@ -59,10 +72,13 @@ class LogoutRequest(ApiModel):
 
 
 class CreateUserRequest(ApiModel):
+    username: str | None = Field(
+        default=None, min_length=3, max_length=80, pattern=r"^[A-Za-z0-9._-]+$"
+    )
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
-    role: Role = Role.VIEWER
+    role: Role = Role.USER
     default_industry: Industry = Industry.INSURANCE
     must_change_password: bool = True
 
