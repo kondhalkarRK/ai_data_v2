@@ -13,6 +13,7 @@ export function ChartFrame({
   subtitle,
   controls,
   csv,
+  png = true,
   exportName,
   className,
   bodyClassName,
@@ -22,6 +23,8 @@ export function ChartFrame({
   subtitle?: React.ReactNode;
   controls?: React.ReactNode;
   csv?: () => Array<Record<string, unknown>>;
+  /** Offer PNG export; needs an `svg[data-chart]` in the body. */
+  png?: boolean;
   exportName: string;
   className?: string;
   bodyClassName?: string;
@@ -79,12 +82,14 @@ export function ChartFrame({
                 sideOffset={4}
                 className="z-[70] min-w-36 rounded-lg border border-slate-200 bg-white p-1 text-xs shadow-lg dark:border-border dark:bg-surface-raised"
               >
-                <DropdownMenu.Item
-                  className="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100 dark:data-[highlighted]:bg-muted"
-                  onSelect={() => void exportPng()}
-                >
-                  Download PNG
-                </DropdownMenu.Item>
+                {png ? (
+                  <DropdownMenu.Item
+                    className="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100 dark:data-[highlighted]:bg-muted"
+                    onSelect={() => void exportPng()}
+                  >
+                    Download PNG
+                  </DropdownMenu.Item>
+                ) : null}
                 {csv ? (
                   <DropdownMenu.Item
                     className="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100 dark:data-[highlighted]:bg-muted"

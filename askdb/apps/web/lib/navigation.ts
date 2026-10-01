@@ -69,7 +69,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Data Trust Center",
         icon: ShieldCheck,
         minRole: "viewer",
-        description: "Observability, quality, governance, and trust scoring.",
+        description: "Data reliability: trust score, DQ rules, alerts, freshness and drift.",
       },
       {
         href: "/semantic?tab=graph",

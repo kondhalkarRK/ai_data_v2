@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
@@ -19,16 +19,27 @@ from app.api.deps import (
 )
 from app.core.config import Settings
 from app.db.session import DatabaseRegistry
+from app.schemas.reliability import (
+    BulkMonitorRequest,
+    CreateMonitorRequest,
+    DataReliabilityResponse,
+    MonitorMutationResult,
+    UpdateMonitorRequest,
+)
 from app.schemas.trust import (
     DataTrustCenterResponse,
     StewardFeedbackRequest,
     UpdateRuleThresholdRequest,
 )
 from app.semantic.service import SemanticService
+from app.services.reliability import (
+    DataReliabilityService,
+    MonitorValidationError,
+    shared_snapshot,
+)
 from app.services.trust import (
     DataTrustService,
     clear_trust_cache,
-    get_shared_trust_snapshot,
     update_rule_threshold,
 )
 
@@ -46,6 +57,7 @@ async def get_analytics_connection(
 AnalyticsConnection = Annotated[AsyncConnection, Depends(get_analytics_connection)]
 SemanticDep = Annotated[SemanticService, Depends(get_semantic_service)]
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]
+SessionDep = Annotated[AsyncSession, Depends(get_app_session)]
 
 
 @router.get("/center", response_model=DataTrustCenterResponse)
@@ -57,6 +69,7 @@ async def trust_center(
     settings: SettingsDep,
     refresh: bool = Query(default=False),
 ) -> DataTrustCenterResponse:
+    """Legacy profiling view (sample-based); the Trust Center UI uses ``/trust/reliability``."""
     del user
     if refresh:
         clear_trust_cache()
@@ -69,35 +82,111 @@ async def trust_center(
     return await service.get_center(force_refresh=refresh)
 
 
+@router.get("/reliability", response_model=DataReliabilityResponse)
+async def reliability_center(
+    user: RequireViewer,
+    industry: ActiveIndustry,
+    connection: AnalyticsConnection,
+    semantic: SemanticDep,
+    session: SessionDep,
+    refresh: bool = Query(default=False),
+) -> DataReliabilityResponse:
+    service = DataReliabilityService(
+        connection=connection, semantic=semantic, industry=industry, app_session=session
+    )
+    return await service.center(refresh=refresh, user=user.email)
+
+
+@router.post(
+    "/reliability/monitors",
+    response_model=MonitorMutationResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_monitor(
+    body: CreateMonitorRequest,
+    user: RequireAnalyst,
+    industry: ActiveIndustry,
+    semantic: SemanticDep,
+    session: SessionDep,
+) -> MonitorMutationResult:
+    service = DataReliabilityService(
+        connection=None, semantic=semantic, industry=industry, app_session=session
+    )
+    try:
+        return await service.create_monitor(body, user.email)
+    except MonitorValidationError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.patch("/reliability/monitors/{rule_id}", response_model=MonitorMutationResult)
+async def update_monitor(
+    rule_id: str,
+    body: UpdateMonitorRequest,
+    user: RequireAnalyst,
+    industry: ActiveIndustry,
+    semantic: SemanticDep,
+    session: SessionDep,
+) -> MonitorMutationResult:
+    service = DataReliabilityService(
+        connection=None, semantic=semantic, industry=industry, app_session=session
+    )
+    result = await service.update_monitor(rule_id, body, user.email)
+    if not result.ok and rule_id in result.skipped:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Rule not found.")
+    return result
+
+
+@router.post("/reliability/monitors/bulk", response_model=MonitorMutationResult)
+async def bulk_update_monitors(
+    body: BulkMonitorRequest,
+    user: RequireAnalyst,
+    industry: ActiveIndustry,
+    semantic: SemanticDep,
+    session: SessionDep,
+) -> MonitorMutationResult:
+    service = DataReliabilityService(
+        connection=None, semantic=semantic, industry=industry, app_session=session
+    )
+    return await service.bulk(body, user.email)
+
+
+@router.delete("/reliability/monitors/{rule_id}", response_model=MonitorMutationResult)
+async def delete_monitor(
+    rule_id: str,
+    user: RequireAnalyst,
+    industry: ActiveIndustry,
+    semantic: SemanticDep,
+    session: SessionDep,
+) -> MonitorMutationResult:
+    del user
+    service = DataReliabilityService(
+        connection=None, semantic=semantic, industry=industry, app_session=session
+    )
+    result = await service.delete_monitor(rule_id)
+    if not result.ok:
+        raise HTTPException(status.HTTP_409_CONFLICT, result.message or "Cannot delete this rule.")
+    return result
+
+
 @router.get("/snapshot")
 async def trust_snapshot(
     user: RequireViewer,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     semantic: SemanticDep,
-    settings: SettingsDep,
+    session: SessionDep,
 ) -> dict[str, Any]:
-    """Shared trust signal for Chat + Executive Intelligence."""
-    del user
-    cached = get_shared_trust_snapshot(industry.value)
-    if cached and cached.get("score") is not None:
-        return {"available": True, **cached}
-    service = DataTrustService(
-        connection=connection,
-        semantic=semantic,
-        settings=settings,
-        industry=industry,
-    )
-    center = await service.get_center()
-    return {
-        "available": center.hero.available,
-        "score": center.hero.score,
-        "label": center.hero.label,
-        "components": [c.model_dump(by_alias=True) for c in center.hero.components],
-        "formulaNote": center.hero.formula_note,
-        "activeIncidents": center.hero.active_incidents,
-        "computedAt": center.computed_at,
-    }
+    """Shared trust signal for Chat + Executive Intelligence (same score as the Trust Center)."""
+    cached = shared_snapshot(industry.value)
+    if cached is None:
+        service = DataReliabilityService(
+            connection=connection, semantic=semantic, industry=industry, app_session=session
+        )
+        await service.center(user=user.email)
+        cached = shared_snapshot(industry.value)
+    if not cached or cached.get("score") is None:
+        return {"available": False, "score": None, "label": "Not measured", "components": []}
+    return {"available": True, **cached}
 
 
 @router.patch("/rules/{rule_id}")
@@ -116,7 +205,7 @@ async def steward_feedback(
     body: StewardFeedbackRequest,
     user: RequireViewer,
     industry: ActiveIndustry,
-    session: Annotated[AsyncSession, Depends(get_app_session)],
+    session: SessionDep,
     connection: AnalyticsConnection,
     semantic: SemanticDep,
     settings: SettingsDep,

@@ -10,6 +10,7 @@ from app.models.base import Base
 from app.models.catalog import CatalogChange, CatalogColumn, CatalogRefresh, CatalogValue
 from app.models.enums import AuthEventType, Role
 from app.models.refresh_token import RefreshToken
+from app.models.reliability import DqRuleRun, DqRuleSetting, DqScoreSnapshot
 from app.models.user import User
 
 __all__ = [
@@ -21,6 +22,9 @@ __all__ = [
     "CatalogRefresh",
     "CatalogValue",
     "Conversation",
+    "DqRuleRun",
+    "DqRuleSetting",
+    "DqScoreSnapshot",
     "LlmUsage",
     "QueryHistory",
     "RefreshToken",
