@@ -1,0 +1,197 @@
+=====================================================================
+ LOAD THE INDIA AUTOMOTIVE DATASET WITH pgAdmin (Query Tool)
+ (schema "automotive" and its tables must already exist)
+=====================================================================
+
+You need the 8 CSV files from  askdb\data\india_auto\ :
+
+    dim_region.csv        dim_carline.csv       dim_color.csv
+    dim_salesman.csv      dim_dealer.csv        dim_targets.csv
+    fact_sales.csv        fact_forecast_monthly.csv
+
+(Ignore manifest.json, reference_model_calendar.csv and the
+ "increment" folder.)
+
+
+---------------------------------------------------------------------
+STEP 1 - Put the CSV files where the PostgreSQL server can read them
+---------------------------------------------------------------------
+
+COPY ... FROM 'file' is executed by the PostgreSQL SERVICE, not by
+pgAdmin, so the files must be on the same machine as Postgres and the
+service account must be allowed to read them.
+
+1. Create the folder   C:\pgload\india_auto
+2. Copy the 8 CSV files into it.
+3. Give the Postgres service read access (PowerShell, run once):
+
+       icacls C:\pgload /grant "NETWORK SERVICE:(OI)(CI)R" /T
+       icacls C:\pgload /grant "Users:(OI)(CI)R" /T
+
+   (Do not use Desktop / Downloads / OneDrive folders - the service
+    usually cannot read those.)
+
+
+---------------------------------------------------------------------
+STEP 2 - Open the Query Tool
+---------------------------------------------------------------------
+
+pgAdmin > Servers > your server > Databases > askdb_automotive
+Right-click askdb_automotive > Query Tool
+
+Connect as the "postgres" superuser (server-side COPY from a file needs
+superuser or the pg_read_server_files role).
+
+
+---------------------------------------------------------------------
+STEP 3 - Paste this whole script and press F5 (Execute script)
+---------------------------------------------------------------------
+
+-- 1) Empty the tables (also resets forecast_id)
+TRUNCATE automotive.fact_sales,
+         automotive.fact_forecast_monthly,
+         automotive.dim_targets,
+         automotive.dim_dealer,
+         automotive.dim_salesman,
+         automotive.dim_color,
+         automotive.dim_carline,
+         automotive.dim_region
+RESTART IDENTITY CASCADE;
+
+-- 2) Skip foreign-key checks during the bulk load (much faster).
+--    The data is checked afterwards in STEP 4.
+SET session_replication_role = replica;
+
+-- 3) Dimensions
+COPY automotive.dim_region (region_id, region_name, city, state_code, country)
+FROM 'C:/pgload/india_auto/dim_region.csv' WITH (FORMAT csv, HEADER true);
+
+COPY automotive.dim_carline (carline_id, carline_name, model, make, car_type, engine_capacity, engine_type)
+FROM 'C:/pgload/india_auto/dim_carline.csv' WITH (FORMAT csv, HEADER true);
+
+COPY automotive.dim_color (colour_id, colour_name, rcg_combination, patent_number)
+FROM 'C:/pgload/india_auto/dim_color.csv' WITH (FORMAT csv, HEADER true);
+
+COPY automotive.dim_salesman (sales_person_id, first_name, last_name, email, corp_id, active)
+FROM 'C:/pgload/india_auto/dim_salesman.csv' WITH (FORMAT csv, HEADER true);
+
+COPY automotive.dim_dealer (dealer_id, dealer_code, dealer_name, region_id, city, dealer_grade, active)
+FROM 'C:/pgload/india_auto/dim_dealer.csv' WITH (FORMAT csv, HEADER true);
+
+COPY automotive.dim_targets (target_id, year_month, make, target_units, target_revenue)
+FROM 'C:/pgload/india_auto/dim_targets.csv' WITH (FORMAT csv, HEADER true);
+
+-- 4) Facts (total_sales is calculated by Postgres; forecast_id is auto)
+COPY automotive.fact_sales (order_id, carline_id, colour_id, sales_person_id, region_id, dealer_id, sales_date, order_qty, price_per_unit)
+FROM 'C:/pgload/india_auto/fact_sales.csv' WITH (FORMAT csv, HEADER true);
+
+COPY automotive.fact_forecast_monthly (sales_month, carline_id, region_id, forecast_revenue, forecast_units)
+FROM 'C:/pgload/india_auto/fact_forecast_monthly.csv' WITH (FORMAT csv, HEADER true);
+
+-- 5) Back to normal mode, update statistics, rebuild the summary view
+SET session_replication_role = DEFAULT;
+ANALYZE automotive.fact_sales;
+ANALYZE automotive.fact_forecast_monthly;
+REFRESH MATERIALIZED VIEW automotive.mv_sales_monthly;
+
+Expected time: about 1-3 minutes (fact_sales is ~2.1 million rows).
+Use forward slashes  /  in the file paths, as shown.
+
+
+---------------------------------------------------------------------
+STEP 4 - Check the load (run in the same Query Tool)
+---------------------------------------------------------------------
+
+-- Row counts
+SELECT 'dim_region' t, COUNT(*) FROM automotive.dim_region
+UNION ALL SELECT 'dim_carline', COUNT(*) FROM automotive.dim_carline
+UNION ALL SELECT 'dim_color', COUNT(*) FROM automotive.dim_color
+UNION ALL SELECT 'dim_salesman', COUNT(*) FROM automotive.dim_salesman
+UNION ALL SELECT 'dim_dealer', COUNT(*) FROM automotive.dim_dealer
+UNION ALL SELECT 'dim_targets', COUNT(*) FROM automotive.dim_targets
+UNION ALL SELECT 'fact_sales', COUNT(*) FROM automotive.fact_sales
+UNION ALL SELECT 'fact_forecast_monthly', COUNT(*) FROM automotive.fact_forecast_monthly;
+
+   Expected (default dataset, end date 2026-09-30):
+     dim_region 69, dim_carline 251, dim_color 24, dim_salesman 3766,
+     dim_dealer 433, dim_targets 1921, fact_sales 2098110,
+     fact_forecast_monthly 427341
+
+-- Orphan check (every number must be 0)
+SELECT
+  (SELECT COUNT(*) FROM automotive.fact_sales f
+     LEFT JOIN automotive.dim_carline c USING (carline_id)  WHERE c.carline_id IS NULL)      AS bad_carline,
+  (SELECT COUNT(*) FROM automotive.fact_sales f
+     LEFT JOIN automotive.dim_color  c USING (colour_id)    WHERE c.colour_id IS NULL)       AS bad_colour,
+  (SELECT COUNT(*) FROM automotive.fact_sales f
+     LEFT JOIN automotive.dim_salesman s USING (sales_person_id) WHERE s.sales_person_id IS NULL) AS bad_salesman,
+  (SELECT COUNT(*) FROM automotive.fact_sales f
+     LEFT JOIN automotive.dim_dealer d USING (dealer_id)    WHERE d.dealer_id IS NULL)       AS bad_dealer,
+  (SELECT COUNT(*) FROM automotive.fact_sales f
+     JOIN automotive.dim_dealer d USING (dealer_id)         WHERE d.region_id <> f.region_id) AS region_mismatch;
+
+-- Quick business check: brand share by year
+SELECT EXTRACT(YEAR FROM f.sales_date) AS yr, c.make, SUM(f.order_qty) AS units
+FROM automotive.fact_sales f JOIN automotive.dim_carline c USING (carline_id)
+GROUP BY 1, 2 ORDER BY 1, 3 DESC;
+
+(Optional, if Python is set up on this machine - runs all 42 checks:
+   python scripts\validate_india_auto_dataset.py --database-url postgresql://askdb_owner:askdb_owner@localhost:5432/askdb_automotive )
+
+
+---------------------------------------------------------------------
+STEP 5 - Use it in the app
+---------------------------------------------------------------------
+
+1. Start the app (scripts\dev.ps1), log in.
+2. Semantic Atlas > Entity Catalog > Refresh catalog.
+3. Try AI Chat: "SUV sales by brand in 2025", "EV share by year".
+
+
+---------------------------------------------------------------------
+COMMON ERRORS
+---------------------------------------------------------------------
+
+"could not open file ... Permission denied"
+    -> STEP 1.3 (icacls) was not done, or the files are in a user folder
+       such as Desktop/Downloads. Move them to C:\pgload\india_auto.
+
+"could not open file ... No such file or directory"
+    -> Wrong path, or the CSVs are on a different PC than the Postgres
+       server. Check the folder and use forward slashes.
+
+"must be superuser or have privileges of the pg_read_server_files role"
+    -> Connect the Query Tool as "postgres", or run once as postgres:
+         GRANT pg_read_server_files TO askdb_owner;
+
+"permission denied to set parameter session_replication_role"
+    -> Not superuser. Remove the two SET lines; the load still works,
+       just slower (about 5-10 minutes).
+
+"duplicate key value violates unique constraint"
+    -> The TRUNCATE at the top was not run. Run the whole script again
+       from the beginning.
+
+"relation automotive.xxx does not exist"
+    -> You are in the wrong database. Open the Query Tool on
+       askdb_automotive.
+
+
+---------------------------------------------------------------------
+ALTERNATIVE (no folder permissions needed): pgAdmin Import dialog
+---------------------------------------------------------------------
+
+For each table, in the order: dim_region, dim_carline, dim_color,
+dim_salesman, dim_dealer, dim_targets, fact_sales, fact_forecast_monthly
+
+  Right-click the table > Import/Export Data...
+    Import/Export : Import
+    Filename      : the matching .csv
+    Format        : csv      Header : ON      Delimiter : ,
+    Columns tab   : fact_sales -> remove "total_sales"
+                    fact_forecast_monthly -> remove "forecast_id"
+  OK
+
+Run the TRUNCATE from STEP 3 first, and after the last table run:
+  ANALYZE automotive.fact_sales;
+  REFRESH MATERIALIZED VIEW automotive.mv_sales_monthly;
