@@ -250,6 +250,15 @@ export interface GlossaryTerm {
   exampleQuestions: string[];
 }
 
+export interface SemanticValueDomain {
+  table: string;
+  column: string;
+  label: string;
+  maxValues: number;
+  aliases: string[];
+  valueAliases: Record<string, string[]>;
+}
+
 export interface SemanticPackResponse {
   summary: SemanticPackSummary;
   model: {
@@ -270,11 +279,15 @@ export interface SemanticPackResponse {
     measures: Record<string, SemanticMeasure>;
     dimensions: Record<string, SemanticDimension>;
     businessEntities: Array<{ name: string; table: string; description?: string }>;
+    hierarchies?: Record<string, string[]>;
+    domainRules?: Record<string, string[]>;
+    valueDomains?: Record<string, SemanticValueDomain>;
   };
   glossary: {
     version: string;
     domain: string;
     terms: Record<string, GlossaryTerm>;
+    domainRules?: Record<string, string[]>;
   };
 }
 
