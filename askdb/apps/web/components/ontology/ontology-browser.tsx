@@ -22,11 +22,9 @@ import {
 import {
   BookOpen,
   Network,
-  Orbit,
   Radar,
   Search,
   Shapes,
-  Share2,
   Tags,
 } from "lucide-react";
 import * as React from "react";
@@ -116,30 +114,16 @@ const MODES: ReadonlyArray<{
   icon: React.ComponentType<{ className?: string }>;
 }> = [
   {
-    id: "knowledge",
-    label: "Knowledge Graph",
-    badge: "Recommended",
-    hint: "Explore how actors, events, entities, attributes and outcomes relate. Click a concept to expand two steps out.",
-    icon: Orbit,
+    id: "ontology",
+    label: "Ontology Map",
+    hint: "Business domains as communities: what areas exist, which concepts matter most, and how the areas connect.",
+    icon: Shapes,
   },
   {
     id: "network",
     label: "Relationship Network",
     hint: "Find the hubs. The most central concept sits in the middle; each ring outwards is less central.",
     icon: Radar,
-  },
-  {
-    id: "simple",
-    label: "Simple Relationship View",
-    hint: "Every business concept once, every relationship labelled. The quickest way to read the model.",
-    icon: Share2,
-  },
-  {
-    id: "ontology",
-    label: "Ontology Map",
-    badge: "New",
-    hint: "Business domains as communities: what areas exist, which concepts matter most, and how the areas connect.",
-    icon: Shapes,
   },
 ];
 
@@ -321,7 +305,7 @@ function OntologyBrowserInner({
   glossary?: Record<string, GlossaryTerm>;
 }) {
   const { fitView, setCenter, getZoom } = useReactFlow();
-  const [mode, setMode] = React.useState<GalaxyMode>("knowledge");
+  const [mode, setMode] = React.useState<GalaxyMode>("ontology");
   const [simpleLayout, setSimpleLayout] =
     React.useState<GraphLayout>("grouped");
   const [metric, setMetric] = React.useState<CentralityMetric>("degree");

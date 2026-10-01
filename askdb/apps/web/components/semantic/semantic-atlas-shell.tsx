@@ -1,13 +1,12 @@
 "use client";
 
-import { BookOpenText, Boxes, DatabaseZap, Network } from "lucide-react";
+import { Boxes, DatabaseZap, Network } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { LoadingState } from "@/components/loading/loading-state";
 import { OntologyBrowser } from "@/components/ontology/ontology-browser";
 import { EntityCatalog } from "@/components/semantic/entity-catalog";
-import { GlossaryCatalog } from "@/components/semantic/glossary-catalog";
 import { SemanticModelPanel } from "@/components/semantic/semantic-model-panel";
 import { IndustrySwitcher } from "@/components/shell/industry-switcher";
 import { PageHeader } from "@/components/shell/page-header";
@@ -16,7 +15,6 @@ import { useOntologySnapshot, useSemanticPack } from "@/hooks/use-semantic";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { id: "glossary", label: "Business Glossary", icon: BookOpenText },
   { id: "model", label: "Semantic Model", icon: Boxes },
   { id: "graph", label: "Knowledge Graph", icon: Network },
   { id: "catalog", label: "Entity Catalog", icon: DatabaseZap },
@@ -25,8 +23,7 @@ const TABS = [
 export type AtlasTab = (typeof TABS)[number]["id"];
 
 function tabFromPath(pathname: string): AtlasTab | null {
-  if (pathname.includes("/glossary")) return "glossary";
-  if (pathname.includes("/models")) return "model";
+  if (pathname.includes("/models") || pathname.includes("/glossary")) return "model";
   if (pathname.includes("/ontology")) return "graph";
   if (pathname.includes("/catalog")) return "catalog";
   return null;
@@ -47,14 +44,14 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requested = (searchParams.get("tab") as AtlasTab | null) || initialTab || tabFromPath(pathname);
-  const tab: AtlasTab = TABS.some((item) => item.id === requested) ? (requested as AtlasTab) : "glossary";
-  const glossaryQuery = searchParams.get("q") ?? "";
+  const tab: AtlasTab = TABS.some((item) => item.id === requested) ? (requested as AtlasTab) : "model";
+  const searchQuery = searchParams.get("q") ?? "";
   const focus = searchParams.get("focus");
 
   function selectTab(next: AtlasTab) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", next);
-    if (next !== "glossary") params.delete("q");
+    if (next !== "model") params.delete("q");
     if (next !== "graph") params.delete("focus");
     router.replace(`/semantic?${params.toString()}`, { scroll: false });
   }
@@ -79,7 +76,7 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
       ) : (
         <PageHeader
           title="Semantic Atlas"
-          description="Governed catalog of business language, model contracts, and the knowledge graph."
+          description="The business meaning behind every AI answer: measures, relationships and the knowledge graph."
         />
       )}
 
@@ -116,16 +113,11 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
             <span>{pack.data.summary.tableCount} tables</span>
             <span aria-hidden="true">·</span>
             <span>{pack.data.summary.measureCount} measures</span>
-            <span aria-hidden="true">·</span>
-            <span>{pack.data.summary.glossaryTermCount} glossary terms</span>
           </div>
 
           <AtlasTabs tab={tab} onSelect={selectTab} />
 
-          {tab === "glossary" ? (
-            <GlossaryCatalog pack={pack.data} initialQuery={glossaryQuery} />
-          ) : null}
-          {tab === "model" ? <SemanticModelPanel pack={pack.data} /> : null}
+          {tab === "model" ? <SemanticModelPanel key={searchQuery} pack={pack.data} initialQuery={searchQuery} /> : null}
           {tab === "catalog" ? <EntityCatalog /> : null}
         </>
       )}
@@ -147,7 +139,7 @@ function AtlasTabs({
       className={cn(
         compact
           ? "ml-auto flex shrink-0 gap-1"
-          : "mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4",
+          : "mb-8 grid grid-cols-3 gap-3",
       )}
       role="tablist"
       aria-label="Semantic Atlas"

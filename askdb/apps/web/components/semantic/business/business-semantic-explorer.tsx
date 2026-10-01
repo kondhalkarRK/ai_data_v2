@@ -1,22 +1,18 @@
 "use client";
 
 import type { SemanticPackResponse } from "@nql/shared-types";
-import { Brain, Calculator, Gavel, Grid3x3, Layers3 } from "lucide-react";
+import { ChevronDown, ShieldCheck } from "lucide-react";
 import * as React from "react";
 
 import { useCatalogEntities } from "@/hooks/use-entity-catalog";
 
-import { AiUnderstanding, aiRowId, aiTabFor, type AiTab } from "./ai-understanding";
-import { CoverageSummary } from "./coverage-summary";
-import { DimensionsTable } from "./dimensions-section";
+import { BusinessLanguage, languageRowId } from "./business-language";
 import { GovernanceRules } from "./governance-rules";
-import { MeasuresTable } from "./measures-section";
-import { RelationshipMatrix } from "./relationship-matrix";
+import { MeasureCards } from "./measure-cards";
 import { buildSemanticLayer, type SearchHit } from "./semantic-layer";
 import { SemanticSearch } from "./semantic-search";
-import { Section } from "./ui";
-
-type SectionId = "measures" | "dimensions" | "relationships" | "ai" | "governance";
+import { SliceCards } from "./slice-cards";
+import { BlockHeader, panelClass } from "./ui";
 
 function reveal(elementId: string) {
   window.setTimeout(() => {
@@ -24,131 +20,108 @@ function reveal(elementId: string) {
   }, 60);
 }
 
-export function BusinessSemanticExplorer({ pack }: { pack: SemanticPackResponse }) {
+export function BusinessSemanticExplorer({
+  pack,
+  initialQuery = "",
+}: {
+  pack: SemanticPackResponse;
+  initialQuery?: string;
+}) {
   const catalog = useCatalogEntities();
   const layer = React.useMemo(() => buildSemanticLayer(pack, catalog.data ?? []), [pack, catalog.data]);
 
-  const [query, setQuery] = React.useState("");
-  const [sections, setSections] = React.useState<Record<SectionId, boolean>>({
-    measures: true,
-    dimensions: true,
-    relationships: true,
-    ai: true,
-    governance: false,
-  });
+  const [query, setQuery] = React.useState(initialQuery);
   const [openMeasure, setOpenMeasure] = React.useState<string | null>(null);
   const [openDimension, setOpenDimension] = React.useState<string | null>(null);
-  const [aiTab, setAiTab] = React.useState<AiTab>("concepts");
-  const [aiFocus, setAiFocus] = React.useState<string | null>(null);
+  const [showAllTerms, setShowAllTerms] = React.useState(false);
+  const [termFocus, setTermFocus] = React.useState<string | null>(null);
 
-  const toggleSection = (id: SectionId) => setSections((current) => ({ ...current, [id]: !current[id] }));
-  const openSection = (id: SectionId) => setSections((current) => ({ ...current, [id]: true }));
-
-  function showMeasure(id: string) {
-    openSection("measures");
-    setOpenMeasure(id);
-    reveal(`measure-${id}`);
-  }
-
-  function showDimension(id: string) {
-    openSection("dimensions");
-    setOpenDimension(id);
-    reveal(`dimension-${id}`);
-  }
+  const ruleCount = layer.rules.always.length + layer.rules.never.length;
+  const sliceCount = layer.dimensions.filter((dimension) => !dimension.synthetic).length;
 
   function pick(hit: SearchHit) {
-    if (hit.section === "measures") showMeasure(hit.targetId);
-    else if (hit.section === "dimensions") showDimension(hit.targetId);
-    else {
-      const row = layer.understanding.find((item) => item.key === hit.targetId);
-      if (!row) return;
-      openSection("ai");
-      setAiTab(aiTabFor(row));
-      setAiFocus(row.key);
-      reveal(aiRowId(row.key));
+    if (hit.section === "measures") {
+      if (layer.measures.some((measure) => measure.id === hit.targetId)) {
+        setOpenMeasure(hit.targetId);
+        reveal(`measure-${hit.targetId}`);
+      } else {
+        reveal("semantic-measures");
+      }
+    } else if (hit.section === "dimensions") {
+      setOpenDimension(hit.targetId);
+      reveal(`dimension-${hit.targetId}`);
+    } else {
+      setShowAllTerms(true);
+      setTermFocus(hit.targetId);
+      reveal(languageRowId(hit.targetId));
     }
   }
 
   return (
-    <div className="space-y-4">
-      <CoverageSummary coverage={layer.coverage} />
-      <SemanticSearch layer={layer} query={query} onQueryChange={setQuery} onPick={pick} />
+    <div className="space-y-10">
+      <div className="space-y-3">
+        <SemanticSearch layer={layer} query={query} onQueryChange={setQuery} onPick={pick} />
+        <p className="px-1 text-xs text-muted-foreground">
+          The AI can calculate <span className="font-semibold text-foreground">{layer.measures.length} measures</span>,
+          slice them <span className="font-semibold text-foreground">{sliceCount} ways</span>, and understands{" "}
+          <span className="font-semibold text-foreground">{layer.understanding.length} business terms</span>.
+        </p>
+      </div>
 
-      <Section
-        id="semantic-measures"
-        icon={Calculator}
-        title="Business Measures"
-        description="Every governed number the AI can calculate, how it is defined and what it can be sliced by."
-        count={layer.measures.length + layer.derived.length}
-        open={sections.measures}
-        onToggle={() => toggleSection("measures")}
-      >
-        <MeasuresTable
+      <section id="semantic-measures" className="scroll-mt-24 space-y-5">
+        <BlockHeader
+          title="What you can measure"
+          description="Each governed number, what it means, and what it can be broken down by."
+        />
+        <MeasureCards
           layer={layer}
           openId={openMeasure}
           onToggle={(id) => setOpenMeasure((current) => (current === id ? null : id))}
         />
-      </Section>
+      </section>
 
-      <Section
-        id="semantic-dimensions"
-        icon={Layers3}
-        title="Business Dimensions"
-        description="The ways business users slice and filter: their meaning, aliases and real example values."
-        count={layer.dimensions.length}
-        open={sections.dimensions}
-        onToggle={() => toggleSection("dimensions")}
-      >
-        <DimensionsTable
+      <section id="semantic-dimensions" className="scroll-mt-24 space-y-5">
+        <BlockHeader
+          title="Ways to slice the business"
+          description="The views people use to group and filter numbers, with real example values."
+        />
+        <SliceCards
           layer={layer}
           openId={openDimension}
           onToggle={(id) => setOpenDimension((current) => (current === id ? null : id))}
         />
-      </Section>
+      </section>
 
-      <Section
-        id="semantic-relationships"
-        icon={Grid3x3}
-        title="Semantic Relationships"
-        description="Which measures can be analysed by which dimensions through governed joins."
-        count={layer.coverage.relationships}
-        open={sections.relationships}
-        onToggle={() => toggleSection("relationships")}
-      >
-        <RelationshipMatrix layer={layer} onPickMeasure={showMeasure} onPickDimension={showDimension} />
-      </Section>
-
-      <Section
-        id="semantic-ai"
-        icon={Brain}
-        title="AI Understanding Layer"
-        description="How everyday business language is translated into governed concepts before any SQL is written."
-        count={layer.understanding.length}
-        open={sections.ai}
-        onToggle={() => toggleSection("ai")}
-      >
-        <AiUnderstanding
-          layer={layer}
-          tab={aiTab}
-          onTabChange={(next) => {
-            setAiTab(next);
-            setAiFocus(null);
-          }}
-          focusKey={aiFocus}
+      <section id="semantic-language" className="scroll-mt-24 space-y-5">
+        <BlockHeader
+          title="Business language the AI understands"
+          description="Everyday words and how they are translated before any query runs. Ambiguous words trigger a clarifying question."
         />
-      </Section>
+        <BusinessLanguage
+          rows={layer.understanding}
+          showAll={showAllTerms}
+          onShowAll={() => setShowAllTerms(true)}
+          focusKey={termFocus}
+        />
+      </section>
 
-      <Section
-        id="semantic-governance"
-        icon={Gavel}
-        title="Governance Rules"
-        description={`Domain rules enforced on every AI answer · ${layer.domain} pack v${layer.version}`}
-        count={layer.rules.always.length + layer.rules.never.length}
-        open={sections.governance}
-        onToggle={() => toggleSection("governance")}
-      >
-        <GovernanceRules rules={layer.rules} />
-      </Section>
+      {ruleCount ? (
+        <details className={`group ${panelClass}`}>
+          <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+            <ShieldCheck className="size-4 text-success" />
+            <span className="flex-1">
+              <span className="block text-[15px] font-semibold text-foreground">Rules the AI always follows</span>
+              <span className="block text-xs text-muted-foreground">
+                {ruleCount} governance rules applied to every answer · {layer.domain} pack v{layer.version}
+              </span>
+            </span>
+            <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-border/60 p-5">
+            <GovernanceRules rules={layer.rules} />
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }

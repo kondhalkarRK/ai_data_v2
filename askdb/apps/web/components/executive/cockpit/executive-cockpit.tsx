@@ -13,7 +13,6 @@ import { GeoIntelligence } from "@/components/executive/cockpit/geo-intelligence
 import { InsightRail } from "@/components/executive/cockpit/insight-rail";
 import { KpiStrip } from "@/components/executive/cockpit/kpi-strip";
 import { SalesMix } from "@/components/executive/cockpit/mix-treemap";
-import { PlanBullets } from "@/components/executive/cockpit/plan-bullets";
 import { RankedModels } from "@/components/executive/cockpit/ranked-models";
 import { RevenueSunburst } from "@/components/executive/cockpit/sunburst";
 import { TrendChart } from "@/components/executive/cockpit/trend-chart";
@@ -122,7 +121,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2f6fed]">Executive KPI analytics</p>
@@ -212,29 +211,37 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
           </button>
         </div>
       ) : data ? (
-        <div className={cn("space-y-4 transition-opacity", cockpit.isFetching && "opacity-80")}>
+        <div className={cn("space-y-10 transition-opacity", cockpit.isFetching && "opacity-80")}>
           {cockpit.isError ? (
             <p role="alert" className="rounded-xl border border-[#f0d9a8] bg-[#fdf3dc] px-3 py-2 text-xs text-[#7a5a14]">
               Refresh failed. Showing the figures last loaded for this selection.
             </p>
           ) : null}
           <KpiStrip data={data} onSelect={select} />
-          <div className="grid gap-4 xl:grid-cols-12">
-            <TrendChart data={data} className="xl:col-span-5" />
-            <BubbleMatrix data={data} onSelect={select} className="xl:col-span-4" />
-            <div className="relative min-h-[18rem] xl:col-span-3">
-              <InsightRail insights={data.insights} onSelect={select} className="h-full xl:absolute xl:inset-0" />
+
+          <CockpitSection title="Performance" description="How revenue is trending and what stands out.">
+            <div className="grid gap-6 xl:grid-cols-12">
+              <TrendChart data={data} className="xl:col-span-8" />
+              <div className="relative min-h-[20rem] xl:col-span-4">
+                <InsightRail insights={data.insights} onSelect={select} className="h-full xl:absolute xl:inset-0" />
+              </div>
             </div>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-12">
-            <RevenueSunburst data={data} onSelect={select} className="xl:col-span-4" />
-            <RankedModels data={data} onSelect={select} className="xl:col-span-4" />
-            <SalesMix data={data} onSelect={select} className="lg:col-span-2 xl:col-span-4" />
-          </div>
-          <div className="grid gap-4 xl:grid-cols-12">
-            <GeoIntelligence data={data} onSelect={select} className="xl:col-span-7" />
-            <PlanBullets data={data} onSelect={select} className="xl:col-span-5" />
-          </div>
+          </CockpitSection>
+
+          <CockpitSection title="Product mix" description="Which brands, models and segments drive the business.">
+            <div className="grid gap-6 xl:grid-cols-12">
+              <RevenueSunburst data={data} onSelect={select} className="xl:col-span-5" />
+              <RankedModels data={data} onSelect={select} className="xl:col-span-7" />
+            </div>
+            <SalesMix data={data} onSelect={select} />
+          </CockpitSection>
+
+          <CockpitSection title="Regional performance" description="Where growth is coming from across India.">
+            <div className="grid gap-6 xl:grid-cols-12">
+              <BubbleMatrix data={data} onSelect={select} className="xl:col-span-5" />
+              <GeoIntelligence data={data} onSelect={select} className="xl:col-span-7" />
+            </div>
+          </CockpitSection>
         </div>
       ) : null}
 
@@ -247,6 +254,26 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
         onClear={() => setFilters({})}
       />
     </div>
+  );
+}
+
+function CockpitSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-5">
+      <div className="border-b border-slate-200/70 pb-3 dark:border-border">
+        <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-foreground">{title}</h2>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-muted-foreground">{description}</p>
+      </div>
+      <div className="space-y-6">{children}</div>
+    </section>
   );
 }
 
@@ -284,16 +311,15 @@ function HeaderButton({
 
 function CockpitSkeleton() {
   return (
-    <div className="space-y-4" aria-busy="true" aria-label="Loading KPI cockpit">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+    <div className="space-y-10" aria-busy="true" aria-label="Loading KPI cockpit">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:gap-5 xl:grid-cols-5">
         {Array.from({ length: 5 }, (_, i) => (
-          <Skeleton key={i} className="h-[7.5rem] rounded-2xl" />
+          <Skeleton key={i} className="h-[8rem] rounded-2xl" />
         ))}
       </div>
-      <div className="grid gap-4 xl:grid-cols-12">
-        <Skeleton className="h-[21rem] rounded-2xl xl:col-span-5" />
-        <Skeleton className="h-[21rem] rounded-2xl xl:col-span-4" />
-        <Skeleton className="h-[21rem] rounded-2xl xl:col-span-3" />
+      <div className="grid gap-6 xl:grid-cols-12">
+        <Skeleton className="h-[22rem] rounded-2xl xl:col-span-8" />
+        <Skeleton className="h-[22rem] rounded-2xl xl:col-span-4" />
       </div>
     </div>
   );

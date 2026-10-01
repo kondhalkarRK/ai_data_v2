@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, MessageSquareText, type LucideIcon } from "lucide-react";
+import { MessageSquareText, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -10,63 +10,12 @@ import type { ExampleQuestion } from "./semantic-layer";
 
 export const panelClass = "rounded-2xl border border-border/70 bg-surface-raised/80 shadow-sm";
 
-export function Section({
-  id,
-  icon: Icon,
-  title,
-  description,
-  count,
-  open,
-  onToggle,
-  actions,
-  children,
-}: {
-  id: string;
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  count?: ReactNode;
-  open: boolean;
-  onToggle: () => void;
-  actions?: ReactNode;
-  children: ReactNode;
-}) {
+export function BlockHeader({ title, description }: { title: string; description: string }) {
   return (
-    <section id={id} className={cn(panelClass, "scroll-mt-24")}>
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5">
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
-          aria-expanded={open}
-          aria-controls={`${id}-body`}
-          onClick={onToggle}
-        >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Icon className="size-4" />
-          </span>
-          <span className="min-w-0">
-            <span className="flex items-center gap-2">
-              <span className="text-[15px] font-semibold text-foreground">{title}</span>
-              {count !== undefined ? (
-                <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
-                  {count}
-                </span>
-              ) : null}
-            </span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
-          </span>
-          <ChevronDown
-            className={cn("ml-auto size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
-          />
-        </button>
-        {open && actions ? <div className="flex items-center gap-2">{actions}</div> : null}
-      </div>
-      {open ? (
-        <div id={`${id}-body`} className="border-t border-border/60 px-4 pb-4 pt-3 sm:px-5">
-          {children}
-        </div>
-      ) : null}
-    </section>
+    <div className="border-b border-border/60 pb-3">
+      <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
+      <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+    </div>
   );
 }
 
@@ -89,31 +38,9 @@ export function Chip({ children, tone = "neutral", className }: { children: Reac
   );
 }
 
-export function ChipList({ items, empty = "None recorded", max }: { items: string[]; empty?: string; max?: number }) {
-  if (!items.length) return <span className="text-xs text-muted-foreground/80">{empty}</span>;
-  const shown = max ? items.slice(0, max) : items;
-  return (
-    <span className="flex flex-wrap gap-1">
-      {shown.map((item) => (
-        <Chip key={item}>{item}</Chip>
-      ))}
-      {max && items.length > max ? <Chip tone="primary">+{items.length - max}</Chip> : null}
-    </span>
-  );
-}
-
 export function FieldLabel({ children }: { children: ReactNode }) {
   return (
     <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{children}</p>
-  );
-}
-
-export function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="text-sm text-foreground">{children}</div>
-    </div>
   );
 }
 
@@ -177,14 +104,5 @@ export function SegmentedTabs<T extends string>({
         );
       })}
     </div>
-  );
-}
-
-export function ExpandButton({ open, label }: { open: boolean; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary" aria-hidden="true">
-      {open ? "Hide" : label}
-      <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
-    </span>
   );
 }

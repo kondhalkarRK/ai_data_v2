@@ -96,7 +96,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Semantic Atlas",
         icon: Network,
         minRole: "viewer",
-        description: "Ontology browser, semantic model, business glossary, and entity catalog.",
+        description: "Semantic model, knowledge graph, and entity catalog.",
       },
       {
         href: "/knowledge",

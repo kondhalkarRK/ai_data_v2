@@ -50,18 +50,18 @@ export function ChartFrame({
   const card = (
     <section
       className={cn(
-        "flex min-w-0 flex-col rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.08)] dark:border-border dark:bg-surface-raised",
+        "flex min-w-0 flex-col rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.08)] dark:border-border dark:bg-surface-raised",
         expanded && "h-full w-full bg-white dark:bg-surface-raised",
         !expanded && className,
       )}
     >
-      <header className="mb-2 flex items-start justify-between gap-3">
+      <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-sm font-semibold tracking-tight text-slate-800 dark:text-foreground">
+          <h3 className="truncate text-[15px] font-semibold tracking-tight text-slate-800 dark:text-foreground">
             {title}
           </h3>
           {subtitle ? (
-            <p className="mt-0.5 truncate text-2xs text-slate-500 dark:text-muted-foreground">{subtitle}</p>
+            <p className="mt-1 truncate text-xs text-slate-500 dark:text-muted-foreground">{subtitle}</p>
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">

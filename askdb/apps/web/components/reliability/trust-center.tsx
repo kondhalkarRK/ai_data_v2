@@ -2,7 +2,7 @@
 
 import { type Industry, roleAtLeast } from "@nql/shared-types";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Loader2, Plus, RefreshCw, X } from "lucide-react";
+import { ChevronDown, Download, Loader2, Plus, RefreshCw, X } from "lucide-react";
 import * as React from "react";
 
 import { exportCsv } from "@/components/executive/cockpit/chart-utils";
@@ -13,7 +13,7 @@ import { DimensionCards } from "@/components/reliability/dimension-cards";
 import { EntityChangesPanel, SchemaDriftPanel } from "@/components/reliability/drift-entities";
 import { DrilldownPanel, type RuleEdits } from "@/components/reliability/drilldown-panel";
 import { FreshnessTable } from "@/components/reliability/freshness-table";
-import { CapabilitiesPanel, InsightsPanel, MethodologyPanel } from "@/components/reliability/insights-methodology";
+import { CapabilitiesPanel, MethodologyPanel } from "@/components/reliability/insights-methodology";
 import { type CreateMonitorBody, MonitorDialog } from "@/components/reliability/monitor-dialog";
 import { type BulkRequest, RulesCatalog } from "@/components/reliability/rules-catalog";
 import { TrustHero } from "@/components/reliability/trust-hero";
@@ -173,7 +173,7 @@ export function TrustCenter({ industry }: { industry: Industry }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#14a3a1]">Executive data reliability center</p>
@@ -265,7 +265,7 @@ export function TrustCenter({ industry }: { industry: Industry }) {
           </button>
         </div>
       ) : data ? (
-        <div className={cn("space-y-4 transition-opacity", center.isFetching && "opacity-85")}>
+        <div className={cn("space-y-10 transition-opacity", center.isFetching && "opacity-85")}>
           {center.isError ? (
             <p role="alert" className="rounded-xl border border-[#f0d9a8] bg-[#fdf3dc] px-3 py-2 text-xs text-[#7a5a14]">
               The latest check failed to complete. Showing the results from the previous run.
@@ -280,25 +280,34 @@ export function TrustCenter({ industry }: { industry: Industry }) {
 
           <TrustHero data={data} onFilter={onFilter} onJump={jump} />
 
-          <DimensionCards
-            dimensions={data.dimensions}
-            selected={filters.dimension}
-            onOpen={(k) => drill({ kind: "dimension", key: k })}
-          />
-
-          <div className="grid gap-4 xl:grid-cols-12">
-            <div id="trust-trend" className="scroll-mt-4 xl:col-span-8">
-              <TrustTrendChart data={data} filters={filters} onOpenRule={openRule} className="h-full" />
+          <TrustSection title="Quality by dimension" description="Each dimension's score. Open one to see the rules behind it.">
+            <DimensionCards
+              dimensions={data.dimensions}
+              selected={filters.dimension}
+              onOpen={(k) => drill({ kind: "dimension", key: k })}
+            />
+            <div id="trust-trend" className="scroll-mt-4">
+              <TrustTrendChart data={data} filters={filters} onOpenRule={openRule} />
             </div>
-            <InsightsPanel insights={data.insights} onFilter={onFilter} onDrill={drill} className="xl:col-span-4" />
-          </div>
+          </TrustSection>
 
-          <div className="grid gap-4 xl:grid-cols-12">
-            <div id="trust-alerts" className="scroll-mt-4 xl:col-span-7">
-              <AlertCenter data={data} filters={filters} onFilter={onFilter} onOpenRule={openRule} className="h-full" />
+          <TrustSection title="Issues & impact" description="What needs attention and which business numbers it affects.">
+            <div className="grid gap-6 xl:grid-cols-12">
+              <div id="trust-alerts" className="scroll-mt-4 xl:col-span-7">
+                <AlertCenter data={data} filters={filters} onFilter={onFilter} onOpenRule={openRule} className="h-full" />
+              </div>
+              <BusinessImpactPanel data={data} filters={filters} onOpenRule={openRule} className="xl:col-span-5" />
             </div>
-            <BusinessImpactPanel data={data} filters={filters} onOpenRule={openRule} className="xl:col-span-5" />
-          </div>
+          </TrustSection>
+
+          <TrustSection title="Datasets & freshness" description="How each dataset scores and how recently it was loaded.">
+            <div className="grid gap-6 xl:grid-cols-12">
+              <div id="trust-datasets" className="scroll-mt-4 xl:col-span-7">
+                <DatasetRanking data={data} filters={filters} onFilter={onFilter} onDrill={drill} className="h-full" />
+              </div>
+              <FreshnessTable data={data} filters={filters} onFilter={onFilter} onOpenRule={openRule} className="xl:col-span-5" />
+            </div>
+          </TrustSection>
 
           <div id="trust-catalog" className="scroll-mt-4">
             <RulesCatalog
@@ -324,20 +333,27 @@ export function TrustCenter({ industry }: { industry: Industry }) {
             />
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-12">
-            <div id="trust-datasets" className="scroll-mt-4 xl:col-span-7">
-              <DatasetRanking data={data} filters={filters} onFilter={onFilter} onDrill={drill} className="h-full" />
+          <details className="group rounded-2xl border border-slate-200/70 bg-white/60 dark:border-border dark:bg-surface-raised/60">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+              <span>
+                <span className="block text-[15px] font-semibold tracking-tight text-slate-800 dark:text-foreground">
+                  Monitoring details
+                </span>
+                <span className="mt-0.5 block text-xs text-slate-500 dark:text-muted-foreground">
+                  Schema drift, new business values, scoring method and monitor coverage.
+                </span>
+              </span>
+              <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-6 border-t border-slate-200/70 p-5 dark:border-border">
+              <div className="grid gap-6 lg:grid-cols-2">
+                <SchemaDriftPanel data={data} />
+                <EntityChangesPanel data={data} />
+              </div>
+              <MethodologyPanel data={data} />
+              <CapabilitiesPanel capabilities={data.capabilities} />
             </div>
-            <FreshnessTable data={data} filters={filters} onFilter={onFilter} onOpenRule={openRule} className="xl:col-span-5" />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <SchemaDriftPanel data={data} />
-            <EntityChangesPanel data={data} />
-          </div>
-
-          <MethodologyPanel data={data} />
-          <CapabilitiesPanel capabilities={data.capabilities} />
+          </details>
         </div>
       ) : null}
 
@@ -374,6 +390,26 @@ export function TrustCenter({ industry }: { industry: Industry }) {
   );
 }
 
+function TrustSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-5">
+      <div className="border-b border-slate-200/70 pb-3 dark:border-border">
+        <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-foreground">{title}</h2>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-muted-foreground">{description}</p>
+      </div>
+      <div className="space-y-6">{children}</div>
+    </section>
+  );
+}
+
 function HeaderButton({
   children,
   onClick,
@@ -404,13 +440,13 @@ function HeaderButton({
 
 function TrustSkeleton() {
   return (
-    <div className="space-y-4" aria-busy="true" aria-label="Running data quality checks">
-      <div className="grid gap-4 xl:grid-cols-12">
+    <div className="space-y-8" aria-busy="true" aria-label="Running data quality checks">
+      <div className="grid gap-6 xl:grid-cols-12">
         <Skeleton className="h-[19rem] rounded-2xl xl:col-span-4" />
         <Skeleton className="h-[19rem] rounded-2xl xl:col-span-5" />
         <Skeleton className="h-[19rem] rounded-2xl xl:col-span-3" />
       </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-5 2xl:grid-cols-6">
         {Array.from({ length: 6 }, (_, i) => (
           <Skeleton key={i} className="h-[11rem] rounded-2xl" />
         ))}

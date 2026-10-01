@@ -1,7 +1,5 @@
-"use client";
-
-import { SemanticAtlasShell } from "@/components/semantic/semantic-atlas-shell";
+import { redirect } from "next/navigation";
 
 export default function GlossaryPage() {
-  return <SemanticAtlasShell initialTab="glossary" />;
+  redirect("/semantic?tab=model");
 }

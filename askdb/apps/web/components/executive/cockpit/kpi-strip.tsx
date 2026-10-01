@@ -14,7 +14,7 @@ export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: Sele
   const history = data.trend.filter((p) => p.revenue != null).slice(-12);
   const compare = `vs ${period.priorLabel}`;
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:gap-5 xl:grid-cols-5">
       <KpiCard
         icon={<IndianRupee className="size-4" />}
         label="Total Revenue"
@@ -114,7 +114,7 @@ function Sparkline({ values, colour }: { values: number[]; colour: string }) {
 }
 
 const cardBase =
-  "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.1)] dark:border-border dark:bg-surface-raised";
+  "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.1)] dark:border-border dark:bg-surface-raised";
 
 function KpiCard({
   icon,

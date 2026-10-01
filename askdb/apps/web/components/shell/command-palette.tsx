@@ -13,7 +13,7 @@ interface PaletteItem {
   id: string;
   label: string;
   hint: string;
-  group: "Glossary" | "Semantic Graph" | "Saved insights";
+  group: "Business terms" | "Semantic Graph" | "Saved insights";
   href?: string;
 }
 
@@ -57,8 +57,8 @@ export function CommandPalette() {
         id: `glossary-${name}`,
         label: term.displayLabel || name,
         hint: term.definition.slice(0, 80),
-        group: "Glossary",
-        href: `/semantic?tab=glossary&q=${encodeURIComponent(name)}`,
+        group: "Business terms",
+        href: `/semantic?tab=model&q=${encodeURIComponent(name)}`,
       }));
 
     const graph: PaletteItem[] = [
@@ -137,7 +137,7 @@ export function CommandPalette() {
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Jump to glossary, graph, or saved insight…"
+            placeholder="Jump to a business term, graph node, or saved insight…"
             className="h-12 flex-1 bg-transparent text-sm outline-none"
             aria-label="Command search"
           />
@@ -162,7 +162,7 @@ export function CommandPalette() {
                 <ul>
                   {groupItems.slice(0, 8).map((item) => {
                     const Icon =
-                      item.group === "Glossary"
+                      item.group === "Business terms"
                         ? BookOpen
                         : item.group === "Semantic Graph"
                           ? Network

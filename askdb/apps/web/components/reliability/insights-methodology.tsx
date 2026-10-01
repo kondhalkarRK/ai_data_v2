@@ -3,68 +3,9 @@
 import { ChevronDown, Compass, Lightbulb, Rocket, Sigma } from "lucide-react";
 import * as React from "react";
 
-import type { Capability, DataReliability, DimensionKey, Drilldown, InsightItem, TrustFilters } from "@/components/reliability/types";
-import {
-  BAND_COLOUR,
-  Card,
-  DIMENSION_COLOUR,
-  PanelTitle,
-  SEVERITIES,
-  TONE_COLOUR,
-} from "@/components/reliability/ui";
+import type { Capability, DataReliability, DimensionKey } from "@/components/reliability/types";
+import { BAND_COLOUR, Card, DIMENSION_COLOUR, PanelTitle, SEVERITIES } from "@/components/reliability/ui";
 import { cn } from "@/lib/utils";
-
-export function InsightsPanel({
-  insights,
-  onFilter,
-  onDrill,
-  className,
-}: {
-  insights: InsightItem[];
-  onFilter: (patch: TrustFilters) => void;
-  onDrill: (next: Drilldown) => void;
-  className?: string;
-}) {
-  const open = (i: InsightItem) => {
-    if (i.ruleIds.length === 1) onDrill({ kind: "rule", id: i.ruleIds[0]! });
-    else if (i.dimension) onDrill({ kind: "dimension", key: i.dimension });
-    else if (i.dataset) onFilter({ dataset: i.dataset });
-  };
-  return (
-    <Card className={className}>
-      <PanelTitle
-        title="AI insights"
-        subtitle="Patterns found across rules, history and freshness"
-        right={<Lightbulb className="size-4 text-[#d69e2e]" />}
-      />
-      {insights.length ? (
-        <ul className="space-y-2">
-          {insights.map((i) => {
-            const actionable = Boolean(i.ruleIds.length || i.dimension || i.dataset);
-            return (
-              <li key={i.id}>
-                <button
-                  type="button"
-                  disabled={!actionable}
-                  onClick={() => open(i)}
-                  className="flex w-full gap-2.5 rounded-xl border border-slate-100 px-3 py-2.5 text-left transition enabled:hover:border-[#c9dafb] enabled:hover:bg-[#f8faff] dark:border-border"
-                >
-                  <span className="mt-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: TONE_COLOUR[i.tone] }} />
-                  <span className="min-w-0">
-                    <span className="block text-xs font-semibold text-slate-800 dark:text-foreground">{i.title}</span>
-                    <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-600 dark:text-muted-foreground">{i.detail}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="text-2xs text-slate-500">No notable patterns in the latest run.</p>
-      )}
-    </Card>
-  );
-}
 
 export function MethodologyPanel({ data, className }: { data: DataReliability; className?: string }) {
   const [open, setOpen] = React.useState(false);

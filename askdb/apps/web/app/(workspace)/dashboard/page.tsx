@@ -165,7 +165,7 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
           </CardContent>
         </Card>
       ) : data ? (
-        <div className={cn("space-y-5", presenterMode && "text-base")}>
+        <div className={cn("space-y-8", presenterMode && "text-base")}>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p>
               {data.windowLabel}
@@ -190,9 +190,9 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
             presenterMode={presenterMode}
           />
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
-            <div className="min-w-0 space-y-5">
-              <section className="rounded-2xl border border-border/60 bg-surface-raised/80 p-4 shadow-sm">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 space-y-6">
+              <section className="rounded-2xl border border-border/60 bg-surface-raised/80 p-5 shadow-sm">
                 <div className="mb-3">
                   <h2 className="text-base font-semibold tracking-tight">Progressive explorer</h2>
                   <p className="text-xs text-muted-foreground">
@@ -210,8 +210,8 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
                 />
               </section>
 
-              <section className="rounded-2xl border border-border/60 bg-surface-raised/80 p-4 shadow-sm">
-                <h2 className="mb-3 text-base font-semibold tracking-tight">AI Intelligence</h2>
+              <section className="rounded-2xl border border-border/60 bg-surface-raised/80 p-5 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold tracking-tight">AI Intelligence</h2>
                 <AiIntelligenceSection
                   insights={data.insights}
                   exploreBasePath={data.exploreBasePath}
@@ -219,7 +219,7 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
               </section>
             </div>
 
-            <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+            <aside className="space-y-6 xl:sticky xl:top-4 xl:self-start">
               <div className="rounded-2xl border border-border/60 bg-surface-raised/90 p-4 shadow-sm">
                 <h2 className="text-sm font-semibold tracking-tight">Period & filters</h2>
                 <p className="mt-1 mb-3 text-[11px] text-muted-foreground">

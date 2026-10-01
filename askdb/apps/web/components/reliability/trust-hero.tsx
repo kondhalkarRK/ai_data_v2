@@ -115,7 +115,7 @@ export function TrustHero({
   const delta = hero.delta7d;
   const bandColour = BAND_COLOUR[hero.band];
   return (
-    <div className="grid gap-4 xl:grid-cols-12">
+    <div className="grid gap-6 xl:grid-cols-12">
       <Card className="relative overflow-hidden bg-gradient-to-br from-[#eef4ff] via-white to-[#eaf7f3] xl:col-span-4 dark:from-surface-raised dark:to-surface-raised">
         <div className="flex items-center justify-between">
           <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-slate-500">Enterprise trust score</p>
@@ -159,7 +159,7 @@ export function TrustHero({
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:col-span-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:col-span-5">
         <KpiTile
           icon={<ListChecks className="size-4" />}
           label="Active DQ rules"

@@ -32,6 +32,8 @@ export interface MeasureEntry {
   sourceColumns: TableRef[];
   synonyms: string[];
   dimensionIds: string[];
+  /** Descriptive columns on the measure's own table, for measures with no governed joins. */
+  localBreakdowns: string[];
   joinPaths: Record<string, string[]>;
   rules: string[];
   examples: ExampleQuestion[];
@@ -478,18 +480,23 @@ export function buildSemanticLayer(
   for (const [id, dimension] of Object.entries(model.dimensions)) {
     const attrs = [...(attributeColumns.get(id) ?? [])].map((key) => attributeOf(key, id));
     const term = glossaryFor(pack, (t) => t.mapsToDimension === id)[0];
-    const entity = model.businessEntities.find((item) => item.table === dimension.sourceTable);
+    const isDate = dimension.type === "date";
+    const entity = isDate ? undefined : model.businessEntities.find((item) => item.table === dimension.sourceTable);
     const definition =
       term?.[1].definition.trim() ??
       entity?.description ??
-      model.tables[dimension.sourceTable]?.description ??
-      `Analyse measures by ${dimension.displayName.toLowerCase()}.`;
+      (isDate ? undefined : model.tables[dimension.sourceTable]?.description) ??
+      (isDate
+        ? "Analyse any measure over time: by day, month, quarter or year."
+        : `Analyse measures by ${dimension.displayName.toLowerCase()}.`);
     dimensions.push({
       id,
       name: dimension.displayName,
       type: dimensionType(dimension, attrs, term?.[1].category ?? "Attribute"),
       definition,
-      definitionGoverned: Boolean(term || entity?.description || model.tables[dimension.sourceTable]?.description),
+      definitionGoverned: Boolean(
+        term || entity?.description || (!isDate && model.tables[dimension.sourceTable]?.description),
+      ),
       aliases: unique([
         ...dimension.synonyms,
         ...(term ? [term[0], ...term[1].synonyms] : []),
@@ -523,6 +530,20 @@ export function buildSemanticLayer(
   }
 
   // ---- measures -----------------------------------------------------------
+  const measureColumns = new Set(
+    Object.values(model.measures)
+      .filter((measure) => measure.sourceTable && measure.sourceColumn)
+      .map((measure) => `${measure.sourceTable}.${measure.sourceColumn}`),
+  );
+  const localBreakdowns = (tables: string[]) =>
+    unique(
+      tables.flatMap((table) =>
+        Object.keys(model.tables[table]?.columns ?? {})
+          .filter((column) => !/(^|_)id$/i.test(column) && !measureColumns.has(`${table}.${column}`))
+          .map((column) => (/date|month|year|period/i.test(column) ? "Time" : columnLabel(model.tables[table], column))),
+      ),
+    );
+
   const measureEntries: MeasureEntry[] = Object.entries(model.measures).map(([id, measure]) => {
     const columns = expressionColumns(pack, measure);
     const tables = unique([
@@ -567,6 +588,7 @@ export function buildSemanticLayer(
         (alias) => alias.toLowerCase() !== measure.displayName.toLowerCase(),
       ),
       dimensionIds,
+      localBreakdowns: dimensionIds.length ? [] : localBreakdowns(tables),
       joinPaths,
       rules: unique([...(term?.[1].calculationRules ?? []), ...(term?.[1].disambiguation ?? [])]),
       examples: [],

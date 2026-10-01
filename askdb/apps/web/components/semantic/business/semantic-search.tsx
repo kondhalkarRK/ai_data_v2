@@ -48,15 +48,15 @@ export function SemanticSearch({
   const active = query.trim().length >= 2;
 
   return (
-    <div className={cn(panelClass, "p-4")}>
+    <div className={cn(panelClass, "p-5")}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            className="h-10 pl-9 pr-9 text-sm"
-            placeholder="Search measures, dimensions, aliases, business terms and metric definitions"
+            className="h-11 pl-9 pr-9 text-sm"
+            placeholder="Search a metric, dimension or business term"
             aria-label="Semantic search"
           />
           {query ? (

@@ -9,35 +9,38 @@ import { COCKPIT } from "@/components/executive/cockpit/palette";
 import type { CockpitData, TrendPoint } from "@/components/executive/cockpit/types";
 import { cn } from "@/lib/utils";
 
-type SeriesKey = "revenue" | "units" | "forecast" | "prior";
+type SeriesKey = "revenue" | "units" | "prior";
 
 const SERIES: Array<{ key: SeriesKey; label: string; colour: string; dashed?: boolean }> = [
   { key: "revenue", label: "Revenue", colour: COCKPIT.blue },
   { key: "units", label: "Units", colour: COCKPIT.teal },
-  { key: "forecast", label: "Forecast", colour: "#7c9cc9", dashed: true },
   { key: "prior", label: "Last year", colour: COCKPIT.greySoft, dashed: true },
 ];
+
+/** Months after the last actual exist only to carry projections, which the cockpit does not show. */
+function actualMonths(trend: TrendPoint[]): TrendPoint[] {
+  let end = trend.length;
+  while (end > 0 && trend[end - 1]!.revenue == null) end -= 1;
+  return trend.slice(0, end);
+}
 
 export function TrendChart({ data, className }: { data: CockpitData; className?: string }) {
   const [visible, setVisible] = React.useState<Record<SeriesKey, boolean>>({
     revenue: true,
     units: true,
-    forecast: true,
     prior: false,
   });
   return (
     <ChartFrame
       title="Revenue trend"
-      subtitle={`Last 24 months${data.trend.some((p) => p.revenue == null) ? " + 6-month forecast" : ""} · Diwali and shocks highlighted`}
+      subtitle="Last 24 months · Diwali and shocks highlighted"
       exportName="revenue-trend"
       className={className}
       csv={() =>
-        data.trend.map((p) => ({
+        actualMonths(data.trend).map((p) => ({
           month: p.month,
           revenue: p.revenue,
           units: p.units,
-          forecast_revenue: p.forecastRevenue,
-          forecast_units: p.forecastUnits,
           last_year_revenue: p.priorRevenue,
         }))
       }
@@ -82,7 +85,7 @@ function TrendSvg({
 }) {
   const [ref, size] = useElementSize<HTMLDivElement>();
   const [hover, setHover] = React.useState<number | null>(null);
-  const points = data.trend;
+  const points = React.useMemo(() => actualMonths(data.trend), [data.trend]);
   const width = size.width;
   const height = expanded ? Math.max(size.height, 320) : 268;
   const margin = { top: 24, right: 46, bottom: 26, left: 56 };
@@ -95,12 +98,12 @@ function TrendSvg({
   const revMax = niceMax(
     Math.max(
       ...points.map((p) =>
-        Math.max(p.revenue ?? 0, visible.forecast ? (p.forecastRevenue ?? 0) : 0, visible.prior ? (p.priorRevenue ?? 0) : 0),
+        Math.max(p.revenue ?? 0, visible.prior ? (p.priorRevenue ?? 0) : 0),
       ),
       1,
     ),
   );
-  const unitMax = niceMax(Math.max(...points.map((p) => Math.max(p.units ?? 0, p.forecastUnits ?? 0)), 1));
+  const unitMax = niceMax(Math.max(...points.map((p) => p.units ?? 0), 1));
   const yRev = (v: number) => margin.top + innerH - (v / revMax.max) * innerH;
   const yUnits = (v: number) => margin.top + innerH - (v / unitMax.max) * innerH;
   const ticks = Array.from({ length: Math.round(revMax.max / revMax.step) + 1 }, (_, i) => i * revMax.step);
@@ -184,12 +187,6 @@ function TrendSvg({
               })
             : null}
 
-          {visible.forecast
-            ? line((p) => p.forecastRevenue, yRev).map((d, i) => (
-                <path key={`fc-${i}`} d={d} fill="none" stroke="#7c9cc9" strokeWidth={1.6} strokeDasharray="5 4" />
-              ))
-            : null}
-
           {visible.units
             ? line((p) => p.units, yUnits).map((d, i) => (
                 <path key={`units-${i}`} d={d} fill="none" stroke={COCKPIT.teal} strokeWidth={1.7} strokeLinecap="round" />
@@ -218,7 +215,7 @@ function TrendSvg({
 
           {points.map((p, i) =>
             i % labelEvery === 0 || i === n - 1 ? (
-              <text key={`lbl-${p.month}`} x={x(i)} y={height - 8} textAnchor="middle" fontSize={10} fill={p.revenue == null ? "#a5b4cf" : "#94a3b8"}>
+              <text key={`lbl-${p.month}`} x={x(i)} y={height - 8} textAnchor="middle" fontSize={10} fill="#94a3b8">
                 {formatMonth(p.month)}
               </text>
             ) : null,
@@ -232,9 +229,6 @@ function TrendSvg({
               ) : null}
               {visible.units && hovered.units != null ? (
                 <circle cx={x(hover)} cy={yUnits(hovered.units)} r={3.5} fill={COCKPIT.teal} stroke="#fff" strokeWidth={1.5} />
-              ) : null}
-              {visible.forecast && hovered.forecastRevenue != null ? (
-                <circle cx={x(hover)} cy={yRev(hovered.forecastRevenue)} r={3} fill="#7c9cc9" stroke="#fff" strokeWidth={1.5} />
               ) : null}
             </g>
           ) : null}
@@ -262,12 +256,8 @@ function TrendSvg({
           </p>
           <TooltipRow colour={COCKPIT.blue} label="Revenue" value={formatInr(hovered.revenue)} />
           <TooltipRow colour={COCKPIT.teal} label="Units" value={formatCount(hovered.units)} />
-          <TooltipRow colour="#7c9cc9" label="Forecast" value={formatInr(hovered.forecastRevenue)} />
           {hovered.revenue != null && hovered.priorRevenue ? (
             <TooltipRow colour="#94a3b8" label="YoY" value={formatPct(hovered.revenue / hovered.priorRevenue - 1, true)} />
-          ) : null}
-          {hovered.revenue != null && hovered.forecastRevenue ? (
-            <TooltipRow colour="#94a3b8" label="vs forecast" value={formatPct(hovered.revenue / hovered.forecastRevenue - 1, true)} />
           ) : null}
         </ChartTooltip>
       ) : null}

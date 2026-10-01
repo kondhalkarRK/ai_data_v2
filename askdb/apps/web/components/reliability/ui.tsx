@@ -101,7 +101,7 @@ export const cardClass =
   "rounded-2xl border border-slate-200/70 bg-white/90 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.1)] dark:border-border dark:bg-surface-raised";
 
 export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <section className={cn(cardClass, "p-4", className)}>{children}</section>;
+  return <section className={cn(cardClass, "p-5", className)}>{children}</section>;
 }
 
 export function PanelTitle({
@@ -114,10 +114,10 @@ export function PanelTitle({
   right?: React.ReactNode;
 }) {
   return (
-    <header className="mb-3 flex items-start justify-between gap-3">
+    <header className="mb-4 flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <h3 className="truncate text-sm font-semibold tracking-tight text-slate-800 dark:text-foreground">{title}</h3>
-        {subtitle ? <p className="mt-0.5 text-2xs text-slate-500 dark:text-muted-foreground">{subtitle}</p> : null}
+        <h3 className="truncate text-[15px] font-semibold tracking-tight text-slate-800 dark:text-foreground">{title}</h3>
+        {subtitle ? <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">{subtitle}</p> : null}
       </div>
       {right ? <div className="flex shrink-0 items-center gap-1">{right}</div> : null}
     </header>
