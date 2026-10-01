@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
@@ -11,11 +11,9 @@ import type { ChatMessage } from "@/components/chat/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { useActiveIndustry } from "@/hooks/use-session";
-import { apiClient } from "@/lib/api-client";
+import { API_BASE_URL, apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 
 export function ChatWorkspace() {
   const industry = useActiveIndustry();

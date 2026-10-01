@@ -7,8 +7,7 @@ import { applyChatSseEvent, consumeSseBuffer } from "@/components/chat/sse";
 import type { ChatMessage } from "@/components/chat/types";
 import { Button } from "@/components/ui/button";
 import { useActiveIndustry } from "@/hooks/use-session";
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+import { API_BASE_URL } from "@/lib/api-client";
 
 function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;

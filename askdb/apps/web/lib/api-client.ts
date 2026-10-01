@@ -1,6 +1,11 @@
 import type { ApiErrorBody, ApiErrorResponse, Industry } from "@nql/shared-types";
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+// In development the Next rewrites proxy /api to whichever port dev.ps1 picked, so a
+// stale absolute URL in .env.local must not bypass it.
+const API_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? ""
+    : (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 const CSRF_COOKIE = "nql_csrf";
 const CSRF_HEADER = "x-csrf-token";
 
