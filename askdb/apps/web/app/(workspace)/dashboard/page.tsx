@@ -1,5 +1,6 @@
 "use client";
 
+import type { Industry } from "@nql/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, RefreshCw } from "lucide-react";
 import Link from "next/link";
@@ -9,6 +10,7 @@ import { useMemo, useState } from "react";
 
 import { AiIntelligenceSection } from "@/components/executive/ai-intelligence";
 import { BusinessHealthPanel } from "@/components/executive/business-health";
+import { ExecutiveCockpit } from "@/components/executive/cockpit/executive-cockpit";
 import { KpiCardsGrid } from "@/components/executive/kpi-cards";
 import { ProgressiveExplorer } from "@/components/executive/progressive-explorer";
 import type { ExecutiveIntelligence } from "@/components/executive/types";
@@ -32,6 +34,17 @@ interface KpiFilters {
 
 export default function DashboardPage() {
   const industry = useActiveIndustry();
+  if (industry === "automotive") {
+    return (
+      <div className="w-full animate-fade-in">
+        <ExecutiveCockpit industry={industry} />
+      </div>
+    );
+  }
+  return <ClassicDashboard industry={industry} />;
+}
+
+function ClassicDashboard({ industry }: { industry: Industry }) {
   const router = useRouter();
   const presenterMode = useUiStore((state) => state.presenterMode);
   const trustSnapshot = useTrustSnapshot();
