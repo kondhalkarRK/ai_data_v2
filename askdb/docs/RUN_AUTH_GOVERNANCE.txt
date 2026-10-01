@@ -1,0 +1,169 @@
+=====================================================================
+ Ask DB - Turn on Login + Admin/User Governance (PoC)
+ Step-by-step run guide (Windows, PowerShell)
+=====================================================================
+
+Everything below runs in a normal **PowerShell** window. You do NOT need
+pgAdmin or any "Postgres workspace": `psql` is run from PowerShell.
+
+Project root used in this guide:
+    E:\ai_data_rag\ai_data_v2\askdb
+
+PostgreSQL on this machine: version 18
+    psql.exe = C:\Program Files\PostgreSQL\18\bin\psql.exe
+
+
+---------------------------------------------------------------------
+ STEP 0. Stop the running API and web app
+---------------------------------------------------------------------
+Where : the terminals where the API (uvicorn) and web app (npm run dev) run
+Do    : press Ctrl + C in each one
+
+
+---------------------------------------------------------------------
+ STEP 1. Make sure PostgreSQL is running
+---------------------------------------------------------------------
+Where : PowerShell (run it "as Administrator" to start the service)
+Folder: any
+
+    Get-Service postgresql*
+
+If Status is "Stopped":
+
+    Start-Service postgresql-x64-18
+
+(If the name differs, use the exact Name shown by Get-Service.)
+
+Optional check that psql works (add it to PATH for this window first):
+
+    $env:Path += ";C:\Program Files\PostgreSQL\18\bin"
+    psql --version
+
+
+---------------------------------------------------------------------
+ STEP 2. Run the database migration (creates the new tables)
+---------------------------------------------------------------------
+Where : PowerShell
+Folder: E:\ai_data_rag\ai_data_v2\askdb      (the project ROOT, not apps\api)
+
+    cd E:\ai_data_rag\ai_data_v2\askdb
+    .\apps\api\.venv\Scripts\Activate.ps1
+    python scripts\migrate.py app upgrade head
+
+Expected: a line like
+    Running upgrade 0006_data_reliability -> 0007_auth_governance
+
+This renames "users" to "auth_users", turns analyst/viewer accounts into
+"user", and creates login_audit, admin_audit, app_settings, and the new
+llm_usage columns. It reads the DB connection from askdb\.env.
+
+(Alternative for a DBA / brand-new database only:
+    psql -U askdb_app -h localhost -d askdb_app -f database\app\10_auth_governance.sql
+ You do NOT need this if the migration above succeeded.)
+
+
+---------------------------------------------------------------------
+ STEP 3. Seed the two PoC users (admin / user1)
+---------------------------------------------------------------------
+Where : PowerShell
+Folder: E:\ai_data_rag\ai_data_v2\askdb      (project ROOT)
+
+    cd E:\ai_data_rag\ai_data_v2\askdb
+    $env:Path += ";C:\Program Files\PostgreSQL\18\bin"
+    psql -U askdb_app -h localhost -d askdb_app -f database\app\11_seed_poc_users.sql
+
+It asks for the password of the "askdb_app" database role (the same one
+used in APP_DATABASE_URL in askdb\.env). If you prefer, use the postgres
+superuser instead:  psql -U postgres -h localhost -d askdb_app -f ...
+
+Expected output:  BEGIN / INSERT 0 2 / COMMIT
+(INSERT 0 0 means the users already exist - that is fine.)
+
+Check:
+
+    psql -U askdb_app -h localhost -d askdb_app -c "SELECT username, role, weekly_token_limit, weekly_call_limit FROM auth_users;"
+
+
+---------------------------------------------------------------------
+ STEP 4. Turn the auth bypass OFF (otherwise the login page is skipped)
+---------------------------------------------------------------------
+Edit these two files in the editor (Cursor), save them:
+
+ a) E:\ai_data_rag\ai_data_v2\askdb\.env
+        AUTH_BYPASS=false
+
+ b) E:\ai_data_rag\ai_data_v2\askdb\apps\web\.env.local
+        NEXT_PUBLIC_AUTH_BYPASS=false
+
+If a line is missing, add it. Do not change anything else in these files.
+
+
+---------------------------------------------------------------------
+ STEP 5. Start the API  (Terminal 1)
+---------------------------------------------------------------------
+Where : PowerShell
+Folder: E:\ai_data_rag\ai_data_v2\askdb\apps\api
+
+    cd E:\ai_data_rag\ai_data_v2\askdb\apps\api
+    .\.venv\Scripts\Activate.ps1
+    python -m uvicorn app.main:app --reload --port 8000
+
+Check in a browser: http://localhost:8000/ready  -> should say "ready"
+
+
+---------------------------------------------------------------------
+ STEP 6. Start the web app  (Terminal 2)
+---------------------------------------------------------------------
+Where : a second PowerShell window
+Folder: E:\ai_data_rag\ai_data_v2\askdb      (project ROOT)
+
+    cd E:\ai_data_rag\ai_data_v2\askdb
+    npm run dev
+
+(Restart is required: NEXT_PUBLIC_* values are only read at startup.)
+
+Shortcut for steps 5 + 6 together:
+    cd E:\ai_data_rag\ai_data_v2\askdb
+    .\scripts\dev.ps1
+
+
+---------------------------------------------------------------------
+ STEP 7. Sign in
+---------------------------------------------------------------------
+Open http://localhost:3000/login
+
+  ADMIN : username  admin    password  admin123
+          -> sees Admin Center (AI Governance, Hybrid AI Dashboard,
+             LLM Usage, Data Trust Admin, Semantic Admin, Audit Center)
+
+  USER  : username  user1    password  user123
+          -> no Admin Center; "My AI Usage" shows weekly tokens/calls
+             (limit 60,000 tokens and 50 AI calls per week)
+
+If you were already signed in from before, click "Sign out" (bottom of the
+sidebar) first, or use a private/incognito window.
+
+
+---------------------------------------------------------------------
+ Troubleshooting
+---------------------------------------------------------------------
+ "psql is not recognized"
+     -> run:  $env:Path += ";C:\Program Files\PostgreSQL\18\bin"
+
+ migrate.py: "connection refused" / "password authentication failed"
+     -> PostgreSQL is not running (Step 1) or the password in askdb\.env
+        does not match the askdb_app role.
+
+ Login page still skipped / lands on /home
+     -> NEXT_PUBLIC_AUTH_BYPASS is still true, or the web app was not
+        restarted after editing apps\web\.env.local.
+
+ "Incorrect username or password"
+     -> Step 3 was not run, or was run against a different database.
+
+ Claude / Gemini / Azure OpenAI show "(not configured)" in AI Governance
+     -> add ANTHROPIC_API_KEY / GEMINI_API_KEY / AZURE_OPENAI_API_KEY and
+        AZURE_OPENAI_BASE_URL to askdb\.env, then restart the API.
+
+ Security note: admin123 / user123 are demo passwords only. Change or
+ disable these accounts before any shared deployment.
