@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AskDB - Query Flow Diagrams</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #111c33;
+    --border: #23314f;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    padding: 28px 40px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0 0 4px; font-size: 24px; }
+  header p { margin: 0; color: var(--muted); }
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 40px;
+    background: rgba(15, 23, 42, 0.95);
+    border-bottom: 1px solid var(--border);
+  }
+  nav a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+  nav a:hover { border-color: var(--accent); color: var(--accent); }
+  main { padding: 24px 40px 60px; max-width: 1400px; margin: 0 auto; }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 26px;
+    margin-bottom: 28px;
+  }
+  section h2 { margin: 0 0 6px; font-size: 19px; }
+  section .desc { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+  .diagram {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 20px;
+    overflow-x: auto;
+    text-align: center;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .legend span::before {
+    content: "";
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    margin-right: 6px;
+    vertical-align: -1px;
+    background: var(--c);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--accent); font-weight: 600; }
+  code { color: #fbbf24; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding-bottom: 30px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AskDB - How a Question Flows</h1>
+  <p>Login, quota, routing, semantic layer, validation, execution, narration and usage tracking.</p>
+</header>
+
+<nav>
+  <a href="#overview">1. End-to-end flow</a>
+  <a href="#routing">2. Routing decision</a>
+  <a href="#sql">3. SQL generation and validation</a>
+  <a href="#knowledge">4. Documents (Knowledge Hub)</a>
+  <a href="#ontology">5. Semantic model vs ontology graph</a>
+  <a href="#governance">6. Quota and usage tracking</a>
+  <a href="#modes">7. Execution modes</a>
+</nav>
+
+<main>
+
+<section id="overview">
+  <h2>1. End-to-end question flow</h2>
+  <p class="desc">Every step a chat question passes through, from login to the admin dashboards.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+    A([User asks in AI Chat]):::user --> B{Logged in?}
+    B -- no --> B1[Redirect to /login]:::stop
+    B -- yes --> C[Load admin LLM settings<br/>provider, model, temperature, max tokens]:::gov
+    C --> D{"Weekly quota left?<br/>USER: 60k tokens / 50 calls<br/>ADMIN: unlimited"}:::gov
+    D -- no --> D1[Weekly AI quota reached<br/>contact administrator]:::stop
+    D -- yes --> E[Rewrite<br/>spelling fixes and business vocabulary]:::sem
+    E --> F{Same question cached?}
+    F -- yes --> F1[Return cached answer]:::cache --> U
+    F -- no --> G[Understand question<br/>metric, entity, filters, period, analysis type]:::sem
+    G --> H[Entity catalog lookup<br/>brands, models, cities, states, synonyms]:::sem
+    H --> I{Too ambiguous?}
+    I -- yes --> I1[Clarification and suggested questions]:::clar --> U
+    I -- no --> J{Route<br/>keyword rules, no LLM}
+    J -- knowledge --> K[Search uploaded documents]:::doc --> K1[Narration with citations]:::doc --> U
+    J -- sql or hybrid --> L[Load semantic pack<br/>tables, measures, joins, glossary, rules]:::sem
+    L --> M{Semantic layer can compile?}
+    M -- yes --> N[Compiled SQL<br/>no LLM]:::sem
+    M -- no --> O[LLM writes SQL<br/>schema hints + joins + plan]:::llm
+    N --> P[Validator]:::val
+    O --> P
+    P -- fails --> Q[LLM repair]:::llm
+    Q --> P
+    P -- passes --> R{Confidence OK?}
+    R -- low --> I1
+    R -- ok --> S[Run read-only on analytics DB]:::exec
+    S --> T[Chart, trust score, insights, narration]:::exec
+    T --> T1{Hybrid route?}
+    T1 -- yes --> T2[Add document citations<br/>filtered by entities]:::doc --> U
+    T1 -- no --> U
+    U([Answer card with path and confidence badges]):::user --> V[Record usage<br/>tokens, time, execution mode]:::gov
+    V --> W[Admin Center dashboards<br/>and user usage meter]:::gov
+
+    classDef user fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef gov fill:#ede9fe,stroke:#7c3aed,color:#0f172a
+    classDef sem fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef llm fill:#fef3c7,stroke:#d97706,color:#0f172a
+    classDef val fill:#fee2e2,stroke:#dc2626,color:#0f172a
+    classDef exec fill:#e0f2fe,stroke:#0284c7,color:#0f172a
+    classDef doc fill:#fce7f3,stroke:#db2777,color:#0f172a
+    classDef cache fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef clar fill:#fff7ed,stroke:#ea580c,color:#0f172a
+    classDef stop fill:#f8fafc,stroke:#475569,color:#0f172a,stroke-dasharray:4 3
+</pre>
+  </div>
+  <div class="legend">
+    <span style="--c:#ede9fe">Governance</span>
+    <span style="--c:#dcfce7">Semantic layer (no LLM)</span>
+    <span style="--c:#fef3c7">LLM step</span>
+    <span style="--c:#fee2e2">Validator</span>
+    <span style="--c:#e0f2fe">Execution / output</span>
+    <span style="--c:#fce7f3">Documents</span>
+    <span style="--c:#fff7ed">Clarification</span>
+  </div>
+</section>
+
+<section id="routing">
+  <h2>2. Routing decision (first match wins)</h2>
+  <p class="desc">Deterministic keyword rules in <code>query_router.py</code>. The default is always governed SQL, never document search.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+    Q([Question]) --> R1{"Contains document phrase?<br/>summarize, key findings, concerns,<br/>recommendations, in the document,<br/>from the report, policy document"}
+    R1 -- yes --> K[KNOWLEDGE<br/>documents only]:::doc
+    R1 -- no --> R2{"Explanation phrase?<br/>why, reason, factors, insights,<br/>drivers of, explain the increase"}
+    R2 -- yes --> H[HYBRID<br/>SQL answer + document citations]:::hyb
+    R2 -- no --> R3{"Plan found a metric, entity,<br/>dimension, filter or analysis?"}
+    R3 -- yes --> S[SQL<br/>governed analytics]:::sql
+    R3 -- no --> R4{"Documents uploaded AND question<br/>mentions document, report, policy,<br/>memo, catalog?"}
+    R4 -- yes --> K
+    R4 -- no --> S
+
+    classDef doc fill:#fce7f3,stroke:#db2777,color:#0f172a
+    classDef hyb fill:#fef3c7,stroke:#d97706,color:#0f172a
+    classDef sql fill:#dcfce7,stroke:#16a34a,color:#0f172a
+</pre>
+  </div>
+  <table>
+    <tr><th>Example question</th><th>Route</th></tr>
+    <tr><td>Summarize the dealer policy document</td><td>Knowledge</td></tr>
+    <tr><td>Why did Tata EV sales grow in 2025?</td><td>Hybrid</td></tr>
+    <tr><td>Top 5 dealers by revenue in 2025</td><td>SQL</td></tr>
+    <tr><td>What is the discount policy for EVs? (no document phrase, EV is a known value)</td><td>SQL</td></tr>
+  </table>
+</section>
+
+<section id="sql">
+  <h2>3. SQL generation, validation and repair</h2>
+  <p class="desc">Compiled SQL is preferred; the LLM is used only when the semantic layer cannot compile the plan. Both paths go through the same validator.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+    P[Question plan] --> C{Supported analysis?}
+    C -- "ranking, top-N per group, growth,<br/>moving avg, running total, share,<br/>contribution, divergence,<br/>above average, year compare" --> CS[Compiled SQL]:::sem
+    C -- "other, e.g. target vs actual,<br/>custom ratios" --> H[Domain hints<br/>tables, measures, glossary,<br/>rules, relevant joins]:::sem
+    H --> L[LLM generates SQL]:::llm
+    CS --> V
+    L --> V
+    subgraph V[Validator]
+      direction TB
+      V1[Tables and columns in semantic pack]
+      V2[Mandatory filter values present]
+      V3[Correct entity table<br/>dealer vs salesperson]
+      V4[Ranking direction]
+      V5[GROUP BY dimensions]
+      V6[Window / partition shape]
+      V7[Requested period applied]
+    end
+    V -- fail --> RP[LLM repair with reason]:::llm --> V
+    V -- pass --> CF{Confidence}
+    CF -- high --> EX[Execute read-only]:::exec
+    CF -- low --> CL[Clarify and suggest]:::clar
+
+    classDef sem fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef llm fill:#fef3c7,stroke:#d97706,color:#0f172a
+    classDef exec fill:#e0f2fe,stroke:#0284c7,color:#0f172a
+    classDef clar fill:#fff7ed,stroke:#ea580c,color:#0f172a
+</pre>
+  </div>
+</section>
+
+<section id="knowledge">
+  <h2>4. Documents: upload and retrieval</h2>
+  <p class="desc">Documents are stored per industry. The knowledge route returns the top 5 passages and narrates the first 3; the hybrid route first filters passages by the entities in the question.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+    subgraph Upload[Upload at /knowledge]
+      U1[PDF / DOCX / TXT / MD / HTML] --> U2[Extract text]
+      U2 --> U3[Deduplicate by content hash]
+      U3 --> U4[Split into chunks<br/>1400 chars, 180 overlap]
+      U4 --> U5[Tag entities<br/>brands, cities, segments]
+      U5 --> U6[(Knowledge store<br/>per industry)]
+    end
+    subgraph Ask[Chat question]
+      A1{Route} -- knowledge --> A2[Score all chunks]
+      A1 -- hybrid --> A3[Keep chunks mentioning<br/>plan entities] --> A2
+      A2 --> A4[Top passages as citations]
+      A4 --> A5[Narration + citation chips]
+    end
+    U6 -.-> A2
+</pre>
+  </div>
+</section>
+
+<section id="ontology">
+  <h2>5. Semantic model vs ontology graph</h2>
+  <p class="desc">Chat does not read the Knowledge Graph. Both are built from the same semantic pack, so editing the model changes both.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+    Y[(Semantic pack YAML<br/>tables, relationships, measures,<br/>dimensions, glossary, rules, value lists)]:::sem
+    Y --> G[Ontology snapshot<br/>SemanticService.get_snapshot]:::ont
+    G --> GV[Knowledge Graph tab<br/>for people: explore and verify]:::ont
+    Y --> C1[Entity catalog<br/>value lists and synonyms]:::chat
+    Y --> C2[Compiled SQL<br/>measures and joins]:::chat
+    Y --> C3[LLM prompt hints<br/>tables, measures, relevant joins, rules]:::chat
+    Y --> C4[Validator whitelist<br/>allowed tables and columns]:::chat
+    C1 --> CH([AI Chat answer])
+    C2 --> CH
+    C3 --> CH
+    C4 --> CH
+    CH --> JP[Join path shown on answer card]:::chat
+    JP -. trace it in .-> GV
+
+    classDef sem fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef ont fill:#ede9fe,stroke:#7c3aed,color:#0f172a
+    classDef chat fill:#e0f2fe,stroke:#0284c7,color:#0f172a
+</pre>
+  </div>
+</section>
+
+<section id="governance">
+  <h2>6. Quota and usage tracking</h2>
+  <p class="desc">Checked before the pipeline runs and recorded after it finishes.</p>
+  <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant W as Web app
+    participant API as Chat API
+    participant Q as Quota service
+    participant P as Chat pipeline
+    participant DB as App DB (llm_usage)
+    participant A as Admin Center
+
+    U->>W: Ask question
+    W->>API: POST /chat (session cookie)
+    API->>API: Load admin LLM settings
+    API->>Q: Check weekly tokens and calls
+    alt USER over limit
+        Q-->>API: quota_exceeded
+        API-->>W: 429 friendly message
+        W-->>U: Weekly AI quota reached
+    else Within limit or ADMIN
+        Q-->>API: OK
+        API->>P: Run pipeline (stream stages)
+        P-->>W: Stages, SQL, rows, insights
+        API->>DB: Save one usage row<br/>tokens, time, model, mode
+        W-->>U: Answer card
+        DB-->>A: Governance, LLM Usage, Audit dashboards
+    end
+</pre>
+  </div>
+</section>
+
+<section id="modes">
+  <h2>7. How the execution mode is decided</h2>
+  <p class="desc">Stored with every question in <code>llm_usage</code> and shown in Admin Center.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+    S([Question finished]) --> C{Cache hit?}
+    C -- yes --> M1[CACHE]:::cache
+    C -- no --> L{Any LLM call used?}
+    L -- no --> M2[SCHEMA]:::sem
+    L -- yes --> P{LLM wrote the SQL?<br/>path = semantic_llm}
+    P -- yes --> M3[LLM]:::llm
+    P -- no --> M4["HYBRID<br/>(compiled SQL + LLM interpret,<br/>repair or narration)"]:::hyb
+
+    classDef cache fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef sem fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef llm fill:#fef3c7,stroke:#d97706,color:#0f172a
+    classDef hyb fill:#fce7f3,stroke:#db2777,color:#0f172a
+</pre>
+  </div>
+</section>
+
+</main>
+
+<footer>AskDB PoC - query flow reference</footer>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "default",
+    securityLevel: "loose",
+    flowchart: { htmlLabels: true, curve: "basis" },
+  });
+</script>
+</body>
+</html>
