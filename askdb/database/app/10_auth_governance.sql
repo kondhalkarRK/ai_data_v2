@@ -87,6 +87,44 @@ CREATE TABLE IF NOT EXISTS llm_usage (
         FOREIGN KEY (user_id) REFERENCES auth_users (user_id)
 );
 
+-- A database created by the older activity schema already has llm_usage with
+-- columns id / model and a foreign key to the old users table, so CREATE TABLE
+-- above is skipped. Bring that table up to the current shape.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = current_schema() AND table_name = 'llm_usage'
+                 AND column_name = 'id') THEN
+        ALTER TABLE llm_usage RENAME COLUMN id TO usage_id;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = current_schema() AND table_name = 'llm_usage'
+                 AND column_name = 'model') THEN
+        ALTER TABLE llm_usage RENAME COLUMN model TO model_name;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_llm_usage_user') THEN
+        ALTER TABLE llm_usage DROP CONSTRAINT fk_llm_usage_user;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_llm_usage_user_id_auth_users') THEN
+        ALTER TABLE llm_usage ADD CONSTRAINT fk_llm_usage_user_id_auth_users
+            FOREIGN KEY (user_id) REFERENCES auth_users (user_id) NOT VALID;
+    END IF;
+END $$;
+
+ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS question TEXT;
+ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS execution_mode VARCHAR(10) NOT NULL DEFAULT 'LLM';
+ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS response_time_ms INTEGER;
+ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS query_history_id UUID;
+ALTER TABLE llm_usage ALTER COLUMN purpose SET DEFAULT 'chat';
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_llm_usage_execution_mode') THEN
+        ALTER TABLE llm_usage ADD CONSTRAINT ck_llm_usage_execution_mode
+            CHECK (execution_mode IN ('SCHEMA', 'LLM', 'HYBRID', 'CACHE'));
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS ix_llm_usage_user_created ON llm_usage (user_id, created_at);
 CREATE INDEX IF NOT EXISTS ix_llm_usage_mode_created ON llm_usage (execution_mode, created_at);
 

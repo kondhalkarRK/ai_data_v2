@@ -14,6 +14,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -23,6 +24,7 @@ from app.auth.rate_limit import FixedWindowRateLimiter
 from app.core.config import Industry, Settings, database_host_label, get_settings
 from app.core.context import current_request_id
 from app.core.exceptions import NqlError, RateLimitedError
+from app.db.errors import classify_database_error
 from app.db.session import DatabaseRegistry
 from app.observability.logging import configure_logging
 from app.observability.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
@@ -195,6 +197,16 @@ def _register_exception_handlers(app: FastAPI) -> None:
             )
         )
         return JSONResponse(status_code=422, content=body.model_dump(by_alias=True))
+
+    @app.exception_handler(DBAPIError)
+    async def handle_database_error(request: Request, exc: DBAPIError) -> JSONResponse:
+        code, message = classify_database_error(exc)
+        logger.exception("database error", extra={"code": code})
+        body = ErrorResponse(
+            error=ErrorBody(code=code, message=message, request_id=current_request_id())
+        )
+        status_code = 500 if code == "internal_error" else 503
+        return JSONResponse(status_code=status_code, content=body.model_dump(by_alias=True))
 
     @app.exception_handler(Exception)
     async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:

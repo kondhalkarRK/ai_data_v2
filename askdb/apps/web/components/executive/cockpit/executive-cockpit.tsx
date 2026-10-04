@@ -10,7 +10,6 @@ import { exportCsv } from "@/components/executive/cockpit/chart-utils";
 import { activeFilterCount, FilterPane } from "@/components/executive/cockpit/filter-pane";
 import { formatDate } from "@/components/executive/cockpit/format";
 import { GeoIntelligence } from "@/components/executive/cockpit/geo-intelligence";
-import { InsightRail } from "@/components/executive/cockpit/insight-rail";
 import { KpiStrip } from "@/components/executive/cockpit/kpi-strip";
 import { SalesMix } from "@/components/executive/cockpit/mix-treemap";
 import { RankedModels } from "@/components/executive/cockpit/ranked-models";
@@ -219,12 +218,10 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
           ) : null}
           <KpiStrip data={data} onSelect={select} />
 
-          <CockpitSection title="Performance" description="How revenue is trending and what stands out.">
+          <CockpitSection title="Performance" description="How revenue is trending and which regions lead or lag.">
             <div className="grid gap-6 xl:grid-cols-12">
-              <TrendChart data={data} className="xl:col-span-8" />
-              <div className="relative min-h-[20rem] xl:col-span-4">
-                <InsightRail insights={data.insights} onSelect={select} className="h-full xl:absolute xl:inset-0" />
-              </div>
+              <TrendChart data={data} className="xl:col-span-7" />
+              <BubbleMatrix data={data} onSelect={select} className="xl:col-span-5" />
             </div>
           </CockpitSection>
 
@@ -237,10 +234,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
           </CockpitSection>
 
           <CockpitSection title="Regional performance" description="Where growth is coming from across India.">
-            <div className="grid gap-6 xl:grid-cols-12">
-              <BubbleMatrix data={data} onSelect={select} className="xl:col-span-5" />
-              <GeoIntelligence data={data} onSelect={select} className="xl:col-span-7" />
-            </div>
+            <GeoIntelligence data={data} onSelect={select} />
           </CockpitSection>
         </div>
       ) : null}
