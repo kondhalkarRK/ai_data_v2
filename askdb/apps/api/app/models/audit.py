@@ -21,7 +21,13 @@ class AuthAuditEvent(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "auth_audit_events"
 
     event_type: Mapped[AuthEventType] = mapped_column(
-        Enum(AuthEventType, name="auth_event_type", native_enum=False, length=40),
+        Enum(
+            AuthEventType,
+            name="auth_event_type",
+            native_enum=False,
+            length=40,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         nullable=False,
     )
     occurred_at: Mapped[datetime] = mapped_column(
