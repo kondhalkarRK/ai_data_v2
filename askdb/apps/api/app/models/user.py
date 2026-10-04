@@ -45,12 +45,24 @@ class User(TimestampMixin, Base):
     )
 
     role: Mapped[Role] = mapped_column(
-        Enum(Role, name="user_role", native_enum=False, length=20),
+        Enum(
+            Role,
+            name="user_role",
+            native_enum=False,
+            length=20,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         nullable=False,
         server_default=Role.USER.value,
     )
     default_industry: Mapped[Industry] = mapped_column(
-        Enum(Industry, name="industry", native_enum=False, length=20),
+        Enum(
+            Industry,
+            name="industry",
+            native_enum=False,
+            length=20,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         nullable=False,
         server_default=Industry.INSURANCE.value,
     )

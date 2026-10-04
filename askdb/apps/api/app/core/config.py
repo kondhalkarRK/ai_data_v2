@@ -206,7 +206,8 @@ class Settings(BaseSettings):
         resolved = primary or fallback
         object.__setattr__(self, "llm_api_key", SecretStr(resolved))
 
-        # Local convenience: accept both localhost and 127.0.0.1 frontends.
+        # Local convenience: accept the common local and test hosts used by browsers and
+        # ASGI transport clients before the actual auth flow is reached.
         if self.environment is not Environment.PRODUCTION:
             origins = list(self.cors_allowed_origins)
             for origin in (
@@ -216,6 +217,16 @@ class Settings(BaseSettings):
                 if origin not in origins:
                     origins.append(origin)
             object.__setattr__(self, "cors_allowed_origins", origins)
+
+            hosts = list(self.trusted_hosts)
+            for host in ("localhost", "127.0.0.1", "0.0.0.0", "::1", "testserver"):
+                if host not in hosts:
+                    hosts.append(host)
+            object.__setattr__(self, "trusted_hosts", hosts)
+
+            # Browsers reject Domain=localhost, so a local session must remain host-only.
+            if self.cookie_domain in {"localhost", "127.0.0.1", "::1"}:
+                object.__setattr__(self, "cookie_domain", "")
 
         secret = self.jwt_secret_key.get_secret_value()
 

@@ -18,7 +18,9 @@ down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-ROLES = ("admin", "analyst", "viewer")
+# The PoC user model only supports two roles: ``admin`` and ``user``.
+# Older drafts used ``analyst`` / ``viewer`` and must not be recreated in new DBs.
+ROLES = ("admin", "user")
 INDUSTRIES = ("automotive", "insurance")
 AUTH_EVENTS = (
     "login_succeeded",
