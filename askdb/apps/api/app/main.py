@@ -25,7 +25,7 @@ from app.core.config import Industry, Settings, database_host_label, get_setting
 from app.core.context import current_request_id
 from app.core.exceptions import NqlError, RateLimitedError
 from app.db.errors import classify_database_error
-from app.db.schema_repair import repair_llm_usage
+from app.db.schema_repair import repair_auth_user_industry_values, repair_llm_usage
 from app.db.session import DatabaseRegistry
 from app.observability.logging import configure_logging
 from app.observability.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     registry = DatabaseRegistry(settings)
     await registry.start()
+    await repair_auth_user_industry_values(registry.app_engine)
     await repair_llm_usage(registry.app_engine)
     app.state.databases = registry
     app.state.login_limiter = FixedWindowRateLimiter(

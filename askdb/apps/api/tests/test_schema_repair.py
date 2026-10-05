@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.db.schema_repair import plan_llm_usage_repair
+from app.db.schema_repair import plan_auth_user_industry_repair, plan_llm_usage_repair
 
 CURRENT_COLUMNS = {
     "usage_id",
@@ -61,3 +61,11 @@ def test_partially_upgraded_table_only_adds_missing_parts() -> None:
     assert "ADD COLUMN execution_mode" in joined
     assert "ADD COLUMN query_history_id" in joined
     assert "ADD COLUMN question" not in joined
+
+
+def test_uppercase_industry_values_are_normalized() -> None:
+    steps = plan_auth_user_industry_repair()
+    joined = "\n".join(steps)
+    assert "UPDATE auth_users" in joined
+    assert "LOWER(default_industry)" in joined
+    assert "default_industry <> LOWER(default_industry)" in joined

@@ -14,6 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = logging.getLogger(__name__)
 
+_AUTH_USER_INDUSTRY_REPAIR = (
+    "UPDATE auth_users "
+    "SET default_industry = LOWER(default_industry) "
+    "WHERE default_industry IS NOT NULL "
+    "AND default_industry <> LOWER(default_industry)"
+)
+
 _COLUMNS = text(
     "SELECT column_name FROM information_schema.columns "
     "WHERE table_schema = current_schema() AND table_name = 'llm_usage'"
@@ -30,6 +37,11 @@ _ADD_COLUMNS = {
     "response_time_ms": "ALTER TABLE llm_usage ADD COLUMN response_time_ms INTEGER",
     "query_history_id": "ALTER TABLE llm_usage ADD COLUMN query_history_id UUID",
 }
+
+
+def plan_auth_user_industry_repair() -> list[str]:
+    """Normalize stale uppercase values before enum coercion triggers a LookupError."""
+    return [_AUTH_USER_INDUSTRY_REPAIR]
 
 
 def plan_llm_usage_repair(columns: set[str], constraints: set[str]) -> list[str]:
@@ -62,6 +74,28 @@ def plan_llm_usage_repair(columns: set[str], constraints: set[str]) -> list[str]
             "ON llm_usage (execution_mode, created_at)"
         )
     return steps
+
+
+async def repair_auth_user_industry_values(engine: AsyncEngine) -> list[str]:
+    """Lowercase stale default_industry values that were migrated from uppercase strings."""
+    if engine.dialect.name != "postgresql":
+        return []
+    try:
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM auth_users WHERE default_industry IS NOT NULL "
+                    "AND default_industry <> LOWER(default_industry)"
+                )
+            )
+            if result.scalar_one() == 0:
+                return []
+            await conn.execute(text(_AUTH_USER_INDUSTRY_REPAIR))
+    except Exception:
+        logger.warning("auth_users default_industry repair failed", exc_info=True)
+        return []
+    logger.info("auth_users default_industry repaired")
+    return plan_auth_user_industry_repair()
 
 
 async def repair_llm_usage(engine: AsyncEngine) -> list[str]:
