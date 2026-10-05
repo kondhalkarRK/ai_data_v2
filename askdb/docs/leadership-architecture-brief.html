@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask DB — Leadership &amp; Architecture Brief</title>
+<style>
+  :root {
+    --ink: #0f172a; --muted: #475569; --line: #e2e8f0; --bg: #f8fafc;
+    --brand: #0f766e; --brand-soft: #ccfbf1; --blue: #1d4ed8; --blue-soft: #dbeafe;
+    --amber: #b45309; --amber-soft: #fef3c7; --red: #b91c1c; --red-soft: #fee2e2;
+    --green: #15803d; --green-soft: #dcfce7; --violet: #6d28d9; --violet-soft: #ede9fe;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 28px 80px; }
+  header.cover { background: linear-gradient(135deg, #0f766e, #1e3a8a); color: #fff; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; }
+  header.cover h1 { margin: 0 0 8px; font-size: 30px; }
+  header.cover p { margin: 4px 0; opacity: .92; }
+  h2 { margin: 48px 0 12px; font-size: 23px; border-bottom: 2px solid var(--brand); padding-bottom: 6px; }
+  h3 { margin: 28px 0 8px; font-size: 18px; color: #1e293b; }
+  h4 { margin: 18px 0 6px; font-size: 15px; color: #334155; }
+  p, li { color: #1e293b; }
+  code { font-family: Consolas, "Cascadia Code", monospace; font-size: 13px; background: #eef2f7; padding: 1px 5px; border-radius: 4px; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
+  pre code { background: none; padding: 0; color: inherit; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  th { background: #f1f5f9; font-weight: 600; color: #334155; }
+  tr:last-child td { border-bottom: none; }
+  .toc { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 24px; }
+  .toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  .toc a { color: var(--blue); text-decoration: none; }
+  .callout { border-left: 4px solid var(--brand); background: var(--brand-soft); padding: 12px 16px; border-radius: 8px; margin: 14px 0; }
+  .callout.blue { border-color: var(--blue); background: var(--blue-soft); }
+  .callout.amber { border-color: var(--amber); background: var(--amber-soft); }
+  .callout.red { border-color: var(--red); background: var(--red-soft); }
+  .callout.violet { border-color: var(--violet); background: var(--violet-soft); }
+  .callout strong:first-child { display: block; margin-bottom: 4px; }
+  .say { border: 1px dashed var(--brand); background: #fff; border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
+  .say::before { content: "Say it like this"; display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); font-weight: 700; margin-bottom: 4px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); margin: 14px 0; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card h4 { margin-top: 0; }
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 16px 0; }
+  .step { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: start; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  .step .n { width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .step.llm .n { background: var(--violet); }
+  .step.gate .n { background: var(--amber); }
+  .step.db .n { background: var(--blue); }
+  .step b { display: block; }
+  .step small { color: var(--muted); }
+  .arrow { text-align: center; color: #94a3b8; font-size: 16px; line-height: 18px; }
+  .legend span { display: inline-block; margin-right: 14px; font-size: 13px; color: var(--muted); }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+  .tag.yes { background: var(--green-soft); color: var(--green); }
+  .tag.no { background: var(--red-soft); color: var(--red); }
+  .tag.part { background: var(--amber-soft); color: var(--amber); }
+  .qa { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 12px 0; }
+  .qa h4 { margin: 0 0 6px; color: var(--ink); font-size: 15.5px; }
+  .qa p { margin: 6px 0; }
+  .qa .ev { font-size: 13px; color: var(--muted); }
+  footer { margin-top: 56px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 14px; }
+  @media print {
+    body { background: #fff; }
+    main { padding: 0; }
+    header.cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    h2 { page-break-before: always; }
+    .qa, .step, table, .callout { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="cover">
+  <h1>Ask DB: Leadership &amp; Architecture Brief</h1>
+  <p>How AI Chat, the Semantic Layer, the Entity Catalog, the Knowledge Graph and SQL generation actually work in this PoC.</p>
+  <p>Written from the current codebase (October 2026), not from a target architecture. Where the system has a gap, this brief says so.</p>
+</header>
+
+<div class="callout">
+  <strong>The one-sentence story</strong>
+  Ask DB answers business questions from governed business definitions first, and only brings in the AI model when a question needs reasoning. Every AI-written query must pass the same validation as our own, and the AI never sees customer data rows.
+</div>
+
+<nav class="toc">
+  <ol>
+    <li><a href="#flow">AI Chat end-to-end flow</a></li>
+    <li><a href="#schema-llm">Schema-based vs LLM-based questions</a></li>
+    <li><a href="#hybrid">Why not LLM for everything?</a></li>
+    <li><a href="#correct">Is schema SQL always correct?</a></li>
+    <li><a href="#growth">Dynamic data growth</a></li>
+    <li><a href="#kg">Knowledge Graph usage today</a></li>
+    <li><a href="#vision">Future vision for the Knowledge Graph</a></li>
+    <li><a href="#risks">Risks and gaps (honest assessment)</a></li>
+    <li><a href="#qa">Leadership Q&amp;A preparation</a></li>
+    <li><a href="#appendix">Appendix: where things live in the code</a></li>
+  </ol>
+</nav>
+
+<!-- ───────────────────────── 1. FLOW ───────────────────────── -->
+<h2 id="flow">1. AI Chat end-to-end flow</h2>
+
+<p>This is the real sequence the chat service runs for every question. Steps 3–8 run in our own code, with no AI call and no database write. The benchmark replays exactly these steps offline.</p>
+
+<p class="legend">
+  <span><i class="dot" style="background:var(--brand)"></i>Deterministic (our code)</span>
+  <span><i class="dot" style="background:var(--amber)"></i>Decision gate</span>
+  <span><i class="dot" style="background:var(--violet)"></i>AI model (only if needed)</span>
+  <span><i class="dot" style="background:var(--blue)"></i>Database</span>
+</p>
+
+<div class="flow">
+  <div class="step gate"><div class="n">1</div><div><b>Sign-in, role and weekly quota check</b><small>Every question requires a signed-in user. Users get 50 AI calls / 60,000 tokens per week, admins 100 / 60,000. Over quota means the question is refused before any work.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step db"><div class="n">2</div><div><b>Load the domain's Semantic Pack and Value Dictionary</b><small>The YAML semantic pack (tables, joins, metrics, glossary, rules) plus a live dictionary of real business values from the warehouse (brands, models, cities, states, products…), cached for 30 minutes.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step"><div class="n">3</div><div><b>Spelling correction</b><small>“Mahindar revnue” is read as “Mahindra revenue”. Real brand and place names are protected from being “corrected”.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step"><div class="n">4</div><div><b>Entity resolution</b><small>Each name is matched to a real value: exact → synonym → fuzzy spelling → alias → glossary. “Maharashtra” → state MH, “SUV” → every SUV segment. Matched values become <i>mandatory filters</i>.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step"><div class="n">5</div><div><b>Question understanding (intent and plan)</b><small>Produces a structured plan: intent (ranking, trend, comparison…), metric (revenue, units, loss ratio…), dimensions, filters, period (“last 3 months”, “FY25”), analysis type (top-N per group, growth, running total…), sort direction, limit.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step gate"><div class="n">6</div><div><b>Ambiguity and scope gates</b><small>If the question is vague, ambiguous, names something not in the data, or asks for something the data can't support (“profit” with no cost data), the user gets a clarification with clickable options instead of a guess.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step"><div class="n">7</div><div><b>Semantic planner and governed SQL compiler</b><small>Applies conversation context for follow-ups, picks the business formula from the glossary, finds the join path, and compiles governed SQL for the plan.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step gate"><div class="n">8</div><div><b>Plan validation</b><small>The compiled SQL is checked against the plan: right entity tables, every mandatory filter present, sort direction, GROUP BY, window/partition logic, requested period, and only tables/columns listed in the semantic pack.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step db"><div class="n">9</div><div><b>Unknown-name lookup (only when needed)</b><small>If a name wasn't recognised (e.g. a brand added this morning), the Entity Catalog runs a targeted lookup in the warehouse and the plan is rebuilt with the new value.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step llm"><div class="n">10</div><div><b>AI restatement (only when still unclear)</b><small>The model may restate the question using only our governed vocabulary. The restatement is then re-planned by steps 3–8 and is used only if it produces governed SQL. Otherwise the user is asked to clarify.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step gate"><div class="n">11</div><div><b>Route: data, documents, or both</b><small>Document phrasing (“summarize the report”) → Knowledge Hub. “Why / explain / drivers” → data answer plus supporting document passages. Everything else → governed data answer.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step"><div class="n">12</div><div><b>Answer cache</b><small>The same question within 5 minutes reuses the answer, unless the data's “as of” date has changed.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step gate"><div class="n">13</div><div><b>Decision engine: Semantic layer or Planner + AI reasoning</b><small>Simple shapes → governed SQL. Complex shapes (top-N per group, growth, multi-year windows, running totals, 2+ business dimensions) → AI drafts SQL from the plan, with governed SQL as the safety net. No governed SQL and no AI → clarification.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step llm"><div class="n">14</div><div><b>AI SQL under governance (complex questions only)</b><small>The model receives the plan as hard requirements plus compact schema hints (no data rows). Generate → validate → one repair → validate. If it still fails, the governed SQL is used.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step gate"><div class="n">15</div><div><b>Confidence score</b><small>Starts at 100 and drops for fuzzy matches, spelling corrections, unknown metric, AI restatement, or AI-written SQL. Below 60 → clarification instead of a number.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step gate"><div class="n">16</div><div><b>Safety guardrails and dry run</b><small>SELECT-only, no data changes, no chained statements, no dangerous functions, row limit. Then an EXPLAIN dry run. On error: rule-based repair → AI repair (validated) → fall back to governed SQL.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step db"><div class="n">17</div><div><b>Execution</b><small>Read-only transaction with a statement timeout (30 seconds by default), on the analytics database.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step"><div class="n">18</div><div><b>Narration, chart and insights</b><small>Executive Summary, Key Highlights, Business Insight, Recommended Focus Area, generated by our own narration engine from the result. <b>No AI call, so no extra cost and no data sent out.</b> Plus a chart recommendation, outlier flags and suggested follow-ups.</small></div></div>
+  <div class="arrow">▼</div>
+  <div class="step db"><div class="n">19</div><div><b>Record and respond</b><small>Question, SQL, path, confidence, trust breakdown, timings and AI token usage are saved (query history and LLM usage). The answer streams to the screen stage by stage.</small></div></div>
+</div>
+
+<div class="say">When you ask a question, we first translate it into our own business language: which metric, which brand, which period. We then build the query from definitions the business has approved. The AI model only gets involved when the question needs real reasoning, and even then it must pass the same checks. If we aren't confident, we ask you rather than guess.</div>
+
+<!-- ───────────────────────── 2. SCHEMA vs LLM ───────────────────────── -->
+<h2 id="schema-llm">2. Schema-based vs LLM-based questions</h2>
+
+<h3>2.1 Where the schema/semantic rules are stored</h3>
+<p><strong>Both in YAML and in code, by design.</strong> The YAML holds <em>what the business means</em>. The code holds <em>how a question shape becomes SQL</em> and <em>how SQL is checked</em>.</p>
+
+<table>
+  <tr><th style="width:34%">File (per domain: automotive, insurance)</th><th>What it controls</th></tr>
+  <tr><td><code>semantic/packs/&lt;domain&gt;/semantic_model.yaml</code></td><td>Tables and columns (the allowed-schema whitelist), relationships/joins, measures (e.g. Revenue = <code>SUM(total_sales)</code>), dimensions, hierarchies, <b>value domains</b> (which columns hold business values and their synonyms, e.g. “saloon” → Sedan), business entities, ALWAYS/NEVER domain rules.</td></tr>
+  <tr><td><code>semantic/packs/&lt;domain&gt;/business_glossary.yaml</code></td><td>Business terms, definitions, synonyms, SQL expression, disambiguation (“Top selling means units unless revenue is named”), example questions, domain rules.</td></tr>
+  <tr><td><code>semantic/packs/&lt;domain&gt;/chat_vocabulary.yaml</code></td><td>Things the data can't answer and what to suggest instead (profit, margin, CNG, satisfaction), model names that are also everyday words (“City”, “Venue”), words that are never entity names.</td></tr>
+  <tr><td><code>semantic/packs/&lt;domain&gt;/entity_catalog.yaml</code></td><td>Business grouping of value domains, extra columns to watch, schemas monitored for drift.</td></tr>
+  <tr><td><code>services/chat/question_understanding.py</code></td><td>Intent, metric, dimension, period and analysis detection from the question text.</td></tr>
+  <tr><td><code>services/chat/templates.py</code>, <code>semantic_analytics.py</code></td><td>The governed SQL builders: breakdowns, rankings, market share, comparisons, top-N per group, growth, running totals, moving averages, year-window comparisons. Joins come from the pack relationships.</td></tr>
+  <tr><td><code>services/chat/time_periods.py</code></td><td>Business periods (“last 3 months”, “YTD”, fiscal year), anchored to the latest date in the data, not the calendar.</td></tr>
+  <tr><td><code>services/chat/semantic_context.py</code>, <code>analytics/sql_guardrails.py</code></td><td>The validator (SQL must match the plan and the semantic pack) and the safety guardrails (read-only).</td></tr>
+  <tr><td><code>services/chat/decision_engine.py</code></td><td>Confidence scoring and the semantic-vs-AI routing decision.</td></tr>
+</table>
+
+<h3>2.2 How the application decides a question needs no LLM</h3>
+<ol>
+  <li>A metric was identified (revenue, units, premium, loss ratio…).</li>
+  <li>Every named value was matched to real data (brand, state, segment…).</li>
+  <li>The question shape is one our governed compiler supports, and the compiled SQL passes plan validation.</li>
+  <li>The shape is “simple”: one business dimension and no window logic. Complex shapes go to the AI <em>by policy</em> (see 2.4).</li>
+</ol>
+
+<h3>2.3 Verified examples: answered without the LLM</h3>
+<p>Results from replaying the pipeline on the PoC data (October 2026):</p>
+<table>
+  <tr><th>Question</th><th>How it was understood</th><th>Route</th></tr>
+  <tr><td>Show total sales by year</td><td>metric = revenue (glossary: “sales” → revenue), dimension = year</td><td><span class="tag yes">Semantic layer</span></td></tr>
+  <tr><td>Top 10 models by revenue</td><td>ranking, revenue, dimension = model, limit 10, descending</td><td><span class="tag yes">Semantic layer</span></td></tr>
+  <tr><td>Revenue by state</td><td>breakdown, revenue, dimension = state</td><td><span class="tag yes">Semantic layer</span></td></tr>
+  <tr><td>Show MG sales by year</td><td>“MG” → make MG (exact match), revenue by year</td><td><span class="tag yes">Semantic layer</span></td></tr>
+  <tr><td>Compare Tata vs Mahindra revenue</td><td>both brands matched, comparison by make</td><td><span class="tag yes">Semantic layer</span></td></tr>
+</table>
+<p><strong>Why no LLM is needed:</strong> each of these is one approved metric, sliced by one known dimension, with known filters. The meaning is fully defined in the glossary. Asking a model to “figure it out” would only add cost, delay and a chance of inconsistency.</p>
+
+<h3>2.4 LLM layer: when a question goes to the AI</h3>
+<table>
+  <tr><th>Situation</th><th>What happens</th></tr>
+  <tr><td>Complex analytical shape (top-N within each group, period growth, multi-year window, running total, moving average, divergence, 2+ business dimensions)</td><td>With the default <code>llm_first</code> setting, the AI drafts SQL from our plan, and the validator enforces the partition, window and period logic. Governed SQL is the fallback.</td></tr>
+  <tr><td>No governed SQL for the shape</td><td>The AI drafts SQL; it must pass validation or the user gets a clarification.</td></tr>
+  <tr><td>Wording we couldn't parse</td><td>The AI restates the question in governed vocabulary, then our planner re-plans it.</td></tr>
+  <tr><td>Database rejected a query</td><td>Rule-based repair first, then one validated AI repair, then governed fallback.</td></tr>
+</table>
+
+<table>
+  <tr><th>Your example</th><th>What the system does today</th></tr>
+  <tr><td>Compare last 3 months sales for the last 3 years</td><td>Understood as a <em>year-window comparison</em> (same 3 months in each of 3 years). Our compiler <b>can</b> build this; because it is complex, the default policy sends it to the AI with our SQL as the safety net. The reasoning: anchoring to the latest data month, aligning the same months across years, pivoting by year.</td></tr>
+  <tr><td>Rank models within each make and show top 3</td><td>Understood as <em>top-N per group</em>. The validator insists on <code>ROW_NUMBER() OVER (PARTITION BY make …)</code>, never partitioning by model, keeping 3 per make. Our compiler can build it; by policy it goes to the AI with fallback.</td></tr>
+  <tr><td>Show unusual sales patterns</td><td><b>Not supported as an analysis today.</b> No metric or dimension is named, so the system asks for clarification (with AI restatement first, if available). Results do flag simple statistical outliers, but there is no anomaly-detection analysis.</td></tr>
+</table>
+
+<div class="callout amber">
+  <strong>Useful nuance for leadership</strong>
+  The first two “complex” examples can be answered with <em>zero</em> AI calls: our governed compiler handles them. We send them to the AI by default to show reasoning. Switching <code>NLQ_LLM_REASONING_MODE</code> to <code>governed_first</code> answers them deterministically. That's a cost and consistency lever we control.
+</div>
+
+<h3>2.5 What happens if the LLM is unavailable</h3>
+<ul>
+  <li><b>Simple questions are unaffected.</b> The semantic layer, narration, charts and insights need no AI.</li>
+  <li><b>Complex questions fall back to governed SQL</b> where it exists.</li>
+  <li><b>Circuit breaker:</b> after 3 consecutive AI failures the system stops calling the provider for 45 seconds and fails fast. An optional fallback model can be configured.</li>
+  <li>If there is no governed SQL and no AI, the user sees a friendly explanation with suggested questions, never a technical error.</li>
+</ul>
+
+<!-- ───────────────────────── 3. HYBRID ───────────────────────── -->
+<h2 id="hybrid">3. Leadership question: why not use the LLM for everything?</h2>
+
+<div class="grid">
+  <div class="card"><h4>Schema-first gives us</h4>
+    <ul>
+      <li><b>Accuracy:</b> “Revenue” is always <code>SUM(total_sales)</code>, the way Finance defines it.</li>
+      <li><b>Speed:</b> no model round-trip for most questions.</li>
+      <li><b>Governance:</b> definitions are version-controlled YAML, reviewed like code.</li>
+      <li><b>Consistency:</b> the same question gives the same SQL and the same number for every user, every day.</li>
+      <li><b>Cost:</b> zero tokens for the majority of questions.</li>
+    </ul>
+  </div>
+  <div class="card"><h4>The LLM gives us</h4>
+    <ul>
+      <li><b>Flexibility:</b> understands unusual phrasing.</li>
+      <li><b>Reasoning:</b> window logic, multi-period comparisons.</li>
+      <li><b>Complex analytics</b> beyond the governed set.</li>
+      <li><b>Follow-ups:</b> uses the prior query as context.</li>
+      <li><b>Ambiguity handling:</b> restates unclear questions into governed terms.</li>
+    </ul>
+  </div>
+  <div class="card"><h4>Why hybrid wins</h4>
+    <ul>
+      <li>An LLM alone can write SQL that <em>runs</em> but answers the wrong question, for example ranking “top selling” by revenue or confusing dealer with salesperson.</li>
+      <li>Our semantic layer gives the AI the rules, and our validator checks that it followed them.</li>
+      <li>If the AI is down, too slow or too costly, the business keeps getting answers.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="say">An LLM on its own is like a brilliant new analyst on day one: fluent, fast, and unaware of how we define revenue. Our semantic layer is the company rulebook. For everyday questions we answer straight from the rulebook: instant, free and consistent. For harder questions the analyst does the reasoning, but every query is checked against the rulebook before anyone sees a number.</div>
+
+<!-- ───────────────────────── 4. CORRECTNESS ───────────────────────── -->
+<h2 id="correct">4. Is schema-generated SQL always correct?</h2>
+
+<p><strong>It is consistent and governed, and correct to the extent the definitions are correct.</strong> These are the checks behind it:</p>
+
+<table>
+  <tr><th style="width:24%">Control</th><th>What it guarantees</th></tr>
+  <tr><td>Business glossary</td><td>Each business word maps to one approved formula, with disambiguation rules (“top selling” = units, not revenue).</td></tr>
+  <tr><td>Semantic definitions</td><td>Measures, dimensions and hierarchies are declared once, in the semantic pack, per domain.</td></tr>
+  <tr><td>Allowed joins</td><td>Joins come from declared relationships (e.g. sales → dealer on <code>dealer_id</code>); the AI is given only the relevant ones.</td></tr>
+  <tr><td>Allowed schema</td><td>Any table or column not in the active pack is rejected. Insurance tables can't leak into automotive answers.</td></tr>
+  <tr><td>Mandatory filters</td><td>Every named brand, city, segment or state must appear in the SQL, or it is rejected.</td></tr>
+  <tr><td>Shape validation</td><td>Rankings sort the right way; top-N per group partitions correctly; growth uses LAG; requested years and periods are present.</td></tr>
+  <tr><td>Safety guardrails</td><td>SELECT only; no writes, no chained statements, no file/sleep functions; read-only transaction; timeout; row limit.</td></tr>
+  <tr><td>Dry run (EXPLAIN)</td><td>The database checks the query before it runs.</td></tr>
+  <tr><td>Confidence gate</td><td>Low confidence → clarification, not a number.</td></tr>
+  <tr><td>Release benchmark</td><td>437 questions across both domains; release gate is 95% per domain. First unseen run: 95.9% (automotive 95.5%, insurance 96.2%); misses were then fixed generically to 100%.</td></tr>
+</table>
+
+<div class="callout amber">
+  <strong>Limitations to state openly</strong>
+  <ul style="margin:4px 0 0">
+    <li>The validator checks structure (tables, filters, sort order, windows), not every possible meaning. A query can pass and still answer a slightly different question. Example found while preparing this brief: <i>“Top SUV models in Maharashtra”</i> or <i>“Top sedan models by revenue”</i> is grouped by body style (segment) instead of by model. Brand and state filters work correctly (“Top Tata models”, “Top models in Maharashtra”). That is a planner gap we can fix.</li>
+    <li>The benchmark grades SQL against expectations; it does not execute against live data. The 100% figure is after fixes, so it is no longer an unseen score.</li>
+    <li>The governed compiler covers a bounded set of analysis shapes. Anything outside it relies on the AI plus validation, or a clarification.</li>
+    <li>Correctness depends on the definitions. If a glossary formula is wrong, it is consistently wrong. That is why business ownership of the glossary matters.</li>
+  </ul>
+</div>
+
+<!-- ───────────────────────── 5. GROWTH ───────────────────────── -->
+<h2 id="growth">5. Dynamic data growth</h2>
+
+<h3>5.1 The Entity Catalog</h3>
+<p>The Entity Catalog is the metadata layer that keeps AI Chat aware of what is actually in the warehouse. It records every business value (brand, model, city, state, segment, fuel type, colour, insurance product, channel…), how often it occurs, when it first appeared, and any schema change.</p>
+
+<table>
+  <tr><th>Trigger</th><th>When it refreshes</th></tr>
+  <tr><td>Startup</td><td>Every time the API starts.</td></tr>
+  <tr><td>Data load</td><td>A data pipeline can call the refresh endpoint with <code>trigger = data_load</code> when a load finishes.</td></tr>
+  <tr><td>Manual</td><td>An admin presses Refresh in the Admin Center.</td></tr>
+  <tr><td>Unknown name in a question</td><td>A targeted lookup for just that word (with a 10-minute cooldown per word), then the question is re-planned.</td></tr>
+</table>
+<p>After a refresh, the live value dictionary is swapped and the semantic, graph and answer caches are cleared, with no restart. Refreshes never run on every query.</p>
+
+<h3>5.2 What happens when a new value arrives</h3>
+<table>
+  <tr><th>New…</th><th>Does AI Chat pick it up automatically?</th></tr>
+  <tr><td>Brand / make, model, city, state, segment, fuel type, colour</td><td><span class="tag yes">Yes</span> These are value domains: picked up on the next refresh, or immediately via the unknown-name lookup. Marked “new” for 7 days, with a readiness status (AI-ready, missing synonyms, low confidence, needs review).</td></tr>
+  <tr><td>Insurance product line, coverage type, channel, region, state</td><td><span class="tag yes">Yes</span> Same mechanism.</td></tr>
+  <tr><td>Dealer (by name), salesperson (by name)</td><td><span class="tag part">Partly</span> New dealers appear in “top dealers” and every ranking immediately, because rankings read the data. Filtering by a <em>named</em> dealer isn't in the AI value dictionary yet; those columns are watched only.</td></tr>
+  <tr><td>A synonym business users invent (“sub-4m SUV”)</td><td><span class="tag part">Needs review</span> Added once to <code>value_aliases</code> in the semantic model; the catalog flags values with missing synonyms.</td></tr>
+  <tr><td>New column / removed column / type change</td><td><span class="tag part">Detected, not auto-applied</span> Schema drift is recorded with an impact rating (e.g. removed column = High impact on AI Chat). A person approves semantic-layer changes. That's deliberate governance.</td></tr>
+  <tr><td>New metric (e.g. “discount %”)</td><td><span class="tag no">Manual</span> Needs a glossary/semantic-model entry, and today also a small code change (see Risks).</td></tr>
+</table>
+
+<div class="say">New brands, cities, models and products are picked up automatically. The catalog sees them on the next refresh, or the moment someone asks about one. New metrics and structural changes are flagged for a person to approve, because we don't want the AI to quietly redefine what “revenue” means.</div>
+
+<!-- ───────────────────────── 6. KG ───────────────────────── -->
+<h2 id="kg">6. Knowledge Graph usage today</h2>
+
+<div class="callout red">
+  <strong>Direct answer</strong>
+  The Knowledge Graph is <b>not in the AI Chat runtime path today</b>. It is a <b>visual, explorable representation of the same semantic model that AI Chat uses</b>. Chat reads the semantic YAML directly; it does not query the graph.
+</div>
+
+<h3>6.1 What the Knowledge Graph is, concretely</h3>
+<ul>
+  <li>Built by <code>SemanticService</code> from <code>semantic_model.yaml</code> and <code>business_glossary.yaml</code>: tables become actors, events and entities; measures become outcomes; relationships become edges. Cached; rebuilt from the Admin Center or after a catalog refresh.</li>
+  <li>Served at <code>/api/v1/semantic/{industry}/ontology</code> and shown on the Knowledge Graph page (galaxy view, roles, filters, relationship labels).</li>
+  <li>It does <em>not</em> read value domains, so individual brands and cities are not graph nodes.</li>
+</ul>
+
+<h3>6.2 Does a question route through the graph?</h3>
+<table>
+  <tr><th>Capability</th><th>Graph used?</th><th>What actually does it</th></tr>
+  <tr><td>Entity resolution (“MG”, “Maharashtra”, “SUV”)</td><td><span class="tag no">No</span></td><td>Value dictionary + entity resolver (live warehouse values + YAML synonyms).</td></tr>
+  <tr><td>Relationship discovery (which joins)</td><td><span class="tag part">Same source, not the graph</span></td><td>The governed compiler and AI prompt read <code>relationships</code> from the same YAML the graph is drawn from. Some join snippets are also written in code.</td></tr>
+  <tr><td>Semantic understanding (what “revenue” means)</td><td><span class="tag part">Same source, not the graph</span></td><td>Business glossary + semantic model, read directly.</td></tr>
+  <tr><td>Query planning</td><td><span class="tag no">No</span></td><td>Question understanding + semantic planner + decision engine.</td></tr>
+</table>
+
+<table>
+  <tr><th>Example</th><th>What resolves it today</th></tr>
+  <tr><td>Show MG sales by year</td><td>“MG” → make = MG from the value dictionary; revenue by year from the glossary; governed SQL.</td></tr>
+  <tr><td>Top SUV models in Maharashtra</td><td>“SUV” → all SUV segments (value aliases); “Maharashtra” → state MH (synonym); governed SQL. Currently groups by SUV segment rather than model; see Risks.</td></tr>
+  <tr><td>Compare Tata vs Mahindra revenue</td><td>Both brands matched exactly; comparison by make; governed SQL.</td></tr>
+</table>
+
+<div class="say">Today the Knowledge Graph is the visual map of our business model: the same definitions AI Chat uses, drawn so business and data teams can see and review how concepts connect. AI Chat uses those definitions directly, not by walking the graph. Making the graph an active part of reasoning is the next phase.</div>
+
+<p><strong>Why it isn't in the runtime path yet:</strong> the two current domains have a single fact table each with a few dimensions (a star schema). Joins are one hop, so a graph traversal adds no accuracy today. The graph earns its place when there are many domains, multi-hop relationships, or questions across domains.</p>
+
+<!-- ───────────────────────── 7. VISION ───────────────────────── -->
+<h2 id="vision">7. Future vision: why we need a Knowledge Graph</h2>
+
+<div class="grid">
+  <div class="card"><h4>Cross-domain analytics</h4><p>“Do regions with higher car sales have higher motor-insurance claims?” The graph knows Region links Sales and Claims and plans the join safely.</p></div>
+  <div class="card"><h4>Business relationship discovery</h4><p>Show leaders how dealers, regions, models and targets connect, and which metrics depend on which data.</p></div>
+  <div class="card"><h4>Impact analysis</h4><p>“If the dealer table changes, which KPIs, dashboards and AI answers are affected?” This is already partly visible in schema-drift impact ratings.</p></div>
+  <div class="card"><h4>Entity resolution with context</h4><p>“Punch in Pune”: the graph knows Punch is a Tata model and Pune is in Maharashtra, so it resolves names through their relationships.</p></div>
+  <div class="card"><h4>Semantic search</h4><p>Find any concept, metric, document or dataset by business meaning, not table names.</p></div>
+  <div class="card"><h4>Context-aware AI and recommendations</h4><p>Suggest the next best question (“You looked at SUV revenue; dealer performance for SUVs is related”) and give the AI a precise, small context instead of the whole schema.</p></div>
+</div>
+
+<div class="say">As we add domains, the hard part stops being “write SQL” and becomes “know how our business connects”. The Knowledge Graph is that memory. It lets the AI answer questions across sales, insurance and finance safely, explain why a number moved, and tell us what breaks when data changes.</div>
+
+<!-- ───────────────────────── 8. RISKS ───────────────────────── -->
+<h2 id="risks">8. Risks and gaps: an honest assessment</h2>
+
+<h3>Current strengths</h3>
+<ul>
+  <li>Governed-first architecture: most questions need no AI, every answer path is validated, and the AI never sees result rows.</li>
+  <li>Works without an AI model; degrades gracefully when the provider is down (circuit breaker, governed fallback).</li>
+  <li>Clarify-instead-of-guess, with clickable options; answers carry confidence and “data as of”.</li>
+  <li>Live entity awareness: new values are found on refresh or on demand; schema drift is detected with impact ratings.</li>
+  <li>Model-agnostic: OpenAI, Claude, Gemini, Azure OpenAI and local Ollama models from one catalog; per-user quotas and cost tracking.</li>
+  <li>Measured: a 437-question benchmark with a 95% release gate per domain; 370+ automated API tests.</li>
+  <li>Executive narration without AI cost: summary, highlights, insight, focus area.</li>
+</ul>
+
+<h3>Current weaknesses and architectural gaps</h3>
+<table>
+  <tr><th style="width:30%">Gap</th><th>Impact</th><th>Fix direction</th></tr>
+  <tr><td>Knowledge Graph not used at runtime</td><td>Leadership may assume it powers the AI.</td><td>Position it accurately (section 6); next phase: graph-driven join planning and cross-domain questions.</td></tr>
+  <tr><td>Some business logic duplicated in code (metric formulas, join maps, intent words) as well as YAML</td><td>Adding a metric needs YAML + code; risk of the two drifting.</td><td>Generate formulas and joins from the semantic pack only.</td></tr>
+  <tr><td>Data Trust isn't wired into answers</td><td>An answer can be shown while the Reliability Center flags its table. The <code>dqFailed</code> flag on answers is never set.</td><td>Show a Data Trust badge when a used table has failing critical rules.</td></tr>
+  <tr><td>Planner gap: “Top SUV / sedan <i>models</i>…” groups by body style instead of model</td><td>A plausible but wrong breakdown in a demo.</td><td>Planner fix: the named subject (models) should win over the body-style filter's column.</td></tr>
+  <tr><td>“Why…” questions can trigger a clarification</td><td>Without the AI, “why” is read as an unknown name before the hybrid route is reached.</td><td>Treat why/explain words as vocabulary before the unknown-name gate.</td></tr>
+  <tr><td>No anomaly / “unusual pattern” analysis</td><td>Questions like “show unusual sales” end in clarification.</td><td>Add a governed anomaly shape (z-score or seasonal deviation) to the compiler.</td></tr>
+  <tr><td>Knowledge Hub search uses hashed word vectors, not semantic embeddings</td><td>Document answers are keyword-like, not meaning-based.</td><td>Use a real embedding model with the existing optional Qdrant store.</td></tr>
+  <tr><td>Named dealer/salesperson filters not in the value dictionary</td><td>“Sales for &lt;dealer name&gt;” may not resolve.</td><td>Promote watched columns to value domains with size limits.</td></tr>
+  <tr><td>Process-local caches and in-memory circuit breaker</td><td>Fine for one server; inconsistent across several.</td><td>Move to a shared cache (e.g. Redis) when scaling out.</td></tr>
+  <tr><td>Answer audit lives in query history, not a dedicated immutable audit log</td><td>Good for review, weaker for compliance.</td><td>Append-only audit store for AI answers.</td></tr>
+</table>
+
+<h3>Demo risks</h3>
+<ul>
+  <li><b>Stale data</b> lowers the Data Trust score (freshness). Run the daily top-up script before the demo and press “Run checks”.</li>
+  <li><b>AI provider latency or quota:</b> stick to simple questions if the network is slow; they need no AI.</li>
+  <li><b>Weekly quota:</b> admins have 100 AI calls / 60k tokens per week. Check the Admin Center before rehearsing.</li>
+  <li><b>Avoid</b> “Top SUV/sedan models…”, “why…”, and “unusual patterns” until those gaps are fixed. Safe alternatives that were verified: “Top models in Maharashtra”, “Top Tata models by units”, “SUV sales by state”, “Compare Tata vs Mahindra revenue”.</li>
+  <li><b>Cached answers</b> return instantly for 5 minutes. Don't present that speed as typical.</li>
+</ul>
+
+<h3>Where leadership may challenge</h3>
+<ul>
+  <li>“Is the Knowledge Graph real or decoration?” Answer with section 6: it is the shared model made visible, and runtime use is the roadmap.</li>
+  <li>“100% accuracy?” Say 95.9% unseen; 100% after fixes; SQL graded, not executed.</li>
+  <li>“Who owns the definitions?” Today the data team, in version-controlled YAML. Propose business stewardship.</li>
+  <li>“How does it scale to 20 domains?” One semantic pack per domain; the remaining code-level duplication must go first.</li>
+</ul>
+
+<!-- ───────────────────────── 9. Q&A ───────────────────────── -->
+<h2 id="qa">9. Leadership Q&amp;A preparation</h2>
+<p>Recommended answers, each backed by current behaviour. The small grey line under each answer points to the evidence.</p>
+
+<div class="qa"><h4>1. Why not use ChatGPT directly against the database?</h4>
+<p>Because it doesn't know our definitions. It can write SQL that runs but measures the wrong thing, such as ranking “top selling” by revenue, confusing dealer with salesperson, or ignoring a fiscal year. We answer most questions from approved definitions with no AI, and every AI-written query is validated against those definitions before it runs. The AI also never sees our data rows, only table names and matched values.</p>
+<p class="ev">Evidence: semantic layer + validator (<code>semantic_context.py</code>); narration is deterministic (<code>narration.py</code>).</p></div>
+
+<div class="qa"><h4>2. How do you prevent hallucinated SQL?</h4>
+<p>Four layers. The AI is given the plan as hard requirements. Its SQL must use only tables and columns in the semantic pack, include every named filter, and follow the right ranking, window and period logic. It must pass read-only safety rules and a database dry run. If it fails, it gets one correction attempt, and then we fall back to our governed query or ask the user.</p>
+<p class="ev">Evidence: <code>llm_assist.generate_validated_sql</code>, <code>validate_sql_against_plan</code>, <code>sql_guardrails.py</code>.</p></div>
+
+<div class="qa"><h4>3. How do you ensure metric consistency across users?</h4>
+<p>Each metric is defined once in the business glossary. Simple questions compile to the same SQL for everyone, every time. AI-written SQL must use the same formulas. Results are cached briefly and invalidated when the data changes.</p>
+<p class="ev">Evidence: <code>business_glossary.yaml</code>, <code>query_cache.py</code>.</p></div>
+
+<div class="qa"><h4>4. What is the role of the Semantic Layer?</h4>
+<p>It is the translation layer between business language and data: which words mean which metrics, which values exist, how tables join, and what is never allowed. It powers SQL generation, validation, AI prompts, the Knowledge Graph and the Entity Catalog from one source.</p>
+<p class="ev">Evidence: <code>semantic/packs/&lt;domain&gt;/*.yaml</code>.</p></div>
+
+<div class="qa"><h4>5. What business problem does the Knowledge Graph solve?</h4>
+<p>Today it makes our business model visible and reviewable: how dealers, vehicles, sales, regions and outcomes connect, and which metrics come from where. Next, it becomes the engine for cross-domain questions, impact analysis and context-aware recommendations. We are deliberately honest that it is not yet in the AI answer path.</p>
+<p class="ev">Evidence: <code>SemanticService._compile_snapshot</code>; chat does not call the graph.</p></div>
+
+<div class="qa"><h4>6. How do you handle new entities and new business terms?</h4>
+<p>New values such as brands, models, cities and products are discovered automatically by the Entity Catalog on startup, after a data load, on demand, or the moment a user asks about an unknown name. New business terms and synonyms are added once to the glossary and reviewed like code. Schema changes are flagged with an impact rating for approval.</p>
+<p class="ev">Evidence: <code>catalog/service.py</code> (triggers), <code>catalog/drift.py</code>.</p></div>
+
+<div class="qa"><h4>7. How do you measure AI accuracy?</h4>
+<p>With a 437-question release benchmark across automotive and insurance, including spelling mistakes, aliases, complex analytics and multi-turn follow-ups. The release gate is 95% per domain. The first unseen run scored 95.9%. Each answer also carries a confidence score, and low confidence becomes a clarification.</p>
+<p class="ev">Evidence: <code>docs/nlq-benchmark-report.md</code>, <code>tests/test_nlq_benchmark.py</code>.</p></div>
+
+<div class="qa"><h4>8. How do you control AI cost?</h4>
+<p>Most questions use zero tokens. Narration uses zero tokens. AI prompts are compact (only the relevant schema, capped in size). Each user has a weekly quota (users: 50 calls / 60k tokens; admins: 100 / 60k). The Admin Center shows cost per question, questions per dollar, spend against the monthly budget, and per-user consumption. Complex questions can also be switched to governed-only.</p>
+<p class="ev">Evidence: <code>governance/quota.py</code>, <code>usage.py</code>, Admin Center → LLM Cost &amp; Usage Intelligence.</p></div>
+
+<div class="qa"><h4>9. What happens if the LLM is unavailable?</h4>
+<p>The business keeps getting answers. Simple questions, narration, charts and dashboards don't need the AI. Complex questions use our governed SQL. A circuit breaker stops calling a failing provider, and a fallback model can be configured. Users see a friendly message, never a technical error.</p>
+<p class="ev">Evidence: <code>services/llm.py</code> (circuit breaker), <code>decision_engine.decide_route</code>.</p></div>
+
+<div class="qa"><h4>10. How is this different from ThoughtSpot, Power BI Copilot or Fabric Copilot?</h4>
+<p>Those are mature platforms, best inside their own ecosystems. Ask DB is a governed layer we own. Business definitions live in our version control, it is model-agnostic (cloud or local models), it works with no AI model at all, it encodes domain rules specific to Indian automotive and insurance, and it shows confidence, clarifications and executive narration by design. The PoC proves the governed-first pattern; build-versus-buy is a separate decision we can inform with these results.</p>
+<p class="ev">Positioning answer; avoid detailed claims about competitor internals.</p></div>
+
+<div class="qa"><h4>11. How do you audit AI-generated answers?</h4>
+<p>Every question stores the SQL that ran, whether it came from the semantic layer or the AI, the confidence and trust breakdown, row count, timings, and AI tokens and model. Admins can review usage per user and per execution mode. Users don't see execution internals; admins do.</p>
+<p class="ev">Evidence: <code>query_history</code>, <code>llm_usage</code> tables. Gap: no dedicated immutable audit log yet.</p></div>
+
+<div class="qa"><h4>12. How do you govern business definitions?</h4>
+<p>Definitions are YAML files in source control, so every change has an author, a review and a history. ALWAYS/NEVER rules capture policy (“never confuse salesperson with dealer”). The Semantic Model and Entity Catalog screens let stewards review terms, values, synonyms and readiness. Next step: formal business ownership of each term.</p></div>
+
+<div class="qa"><h4>13. How do you scale to multiple domains?</h4>
+<p>Each domain is a semantic pack (automotive and insurance today) with its own schema whitelist. Queries can't cross domains by accident. Adding a domain means a new pack plus its question shapes. To scale efficiently, we will remove the remaining domain logic in code so a new domain is mostly configuration, and move caches to shared infrastructure for multiple servers.</p></div>
+
+<div class="qa"><h4>14. How do you handle ambiguous questions?</h4>
+<p>We ask instead of guessing. Vague questions (“show me the numbers”), ambiguous ones, unknown names and unsupported metrics (“profit” without cost data) get a clarification with 3–5 clickable interpretations. If an AI model is available, it first tries to restate the question in governed terms, and that restatement is re-checked by our planner.</p></div>
+
+<div class="qa"><h4>15. Can users trust the results?</h4>
+<p>Each answer shows a confidence level, the data “as of” date, and notes on how the question was read (spelling corrections, interpretations). Numbers come from approved definitions and validated SQL. Data Trust monitors freshness, completeness and accuracy separately. Linking that score into each answer is the next improvement.</p></div>
+
+<div class="qa"><h4>16. How do you support follow-up questions?</h4>
+<p>The system remembers the previous question's metric, filters and grain. “What about Maharashtra only?” or “Show bottom 5 instead” changes just that part. A question that names its own metric and scope starts fresh, so context doesn't leak.</p>
+<p class="ev">Evidence: <code>conversation_context.py</code>, <code>semantic_query_planner.is_self_contained</code>.</p></div>
+
+<div class="qa"><h4>17. Why did you choose a hybrid architecture?</h4>
+<p>To get the accuracy, speed, cost and governance of approved definitions for the 80% of everyday questions, and the reasoning of AI for the rest, always under the same validation. It also removes dependency on any single AI vendor.</p></div>
+
+<div class="qa"><h4>18. How does the Entity Catalog improve AI understanding?</h4>
+<p>It gives the system a live list of what actually exists in the data. When someone types “Mahindar XUV in Pune”, it knows Mahindra, XUV and Pune are real values, applies them as mandatory filters, and can tell the user when a name isn't in the data instead of returning an empty or wrong answer. It also flags values that are new, missing synonyms or low-confidence.</p></div>
+
+<div class="qa"><h4>19. How does Data Trust integrate with AI Chat?</h4>
+<p><b>Honestly: partially.</b> Answers show the data “as of” date, and cached answers are invalidated when data changes. The Data Reliability Center scores freshness, accuracy, completeness and consistency separately, but AI answers don't yet show a warning when their source table has failing checks. That is a defined next step.</p>
+<p class="ev">Evidence: <code>dataAsOf</code> in answers; <code>dqFailed</code> is not populated yet.</p></div>
+
+<div class="qa"><h4>20. What would be the next phase after this PoC?</h4>
+<ol style="margin:4px 0">
+  <li>Wire Data Trust into every answer (trust badge, warnings).</li>
+  <li>Make the semantic pack the single source of truth: no metric or join logic in code.</li>
+  <li>Knowledge Graph in the runtime path: graph-based join planning, cross-domain questions, impact analysis.</li>
+  <li>New governed analyses: anomalies, root-cause (“why did X drop”), forecasting in chat.</li>
+  <li>Enterprise hardening: SSO, shared cache, immutable audit, monitoring, business stewardship of definitions.</li>
+  <li>Semantic document search for the Knowledge Hub.</li>
+</ol></div>
+
+<h3>Additional questions worth preparing</h3>
+
+<div class="qa"><h4>Does our data leave the company when the AI is used?</h4>
+<p>Data rows don't. The AI receives the question, table and column names, approved formulas, and the specific values the user named (e.g. “Tata”). Results, narration and insights are produced locally. Local models (Ollama) are supported if even that must stay in-house.</p></div>
+
+<div class="qa"><h4>Who can see and do what?</h4>
+<p>Users ask questions within their weekly quota. Admins also see the Admin Center: usage, cost, LLM settings, the Entity Catalog, monitoring and execution details. All AI queries are read-only, with time limits and row limits.</p></div>
+
+<div class="qa"><h4>How fast is it, and how will it scale?</h4>
+<p>Simple questions skip the AI entirely, and every stage is timed (understanding, AI, validation, execution) for monitoring. For scale: the analytics database is read-only to the AI path, results are row-limited, and the next step is shared caching and horizontal API servers.</p></div>
+
+<div class="qa"><h4>What is the Data Trust score and why might it drop?</h4>
+<p>It is a weighted score across accuracy, completeness, consistency, timeliness, validity and uniqueness, based on rule pass rates. It drops mostly when data isn't refreshed, because freshness is measured against today. The fix is to load data, not to change the rules.</p></div>
+
+<div class="qa"><h4>Can a user break or change the data through chat?</h4>
+<p>No. Only single SELECT statements are allowed. Writes, chained statements and dangerous functions are blocked, and queries run inside read-only transactions with a timeout.</p></div>
+
+<!-- ───────────────────────── APPENDIX ───────────────────────── -->
+<h2 id="appendix">Appendix: where things live in the code</h2>
+<table>
+  <tr><th>Area</th><th>Location (under <code>askdb/apps/api</code>)</th></tr>
+  <tr><td>Chat orchestration (streaming, routing, execution, recording)</td><td><code>app/services/chat/service.py</code></td></tr>
+  <tr><td>Planning pass (spell → resolve → intent → plan → SQL → validate)</td><td><code>app/services/chat/pipeline.py</code></td></tr>
+  <tr><td>Decision engine and confidence</td><td><code>app/services/chat/decision_engine.py</code></td></tr>
+  <tr><td>Data / documents / hybrid routing</td><td><code>app/services/chat/query_router.py</code></td></tr>
+  <tr><td>Entity resolution and value dictionary</td><td><code>app/services/chat/entity_resolver.py</code>, <code>value_dictionary.py</code>, <code>spell.py</code></td></tr>
+  <tr><td>Question understanding</td><td><code>app/services/chat/question_understanding.py</code>, <code>time_periods.py</code></td></tr>
+  <tr><td>Governed SQL</td><td><code>app/services/chat/templates.py</code>, <code>semantic_analytics.py</code>, <code>semantic_query_planner.py</code></td></tr>
+  <tr><td>Validation and safety</td><td><code>app/services/chat/semantic_context.py</code>, <code>app/analytics/sql_guardrails.py</code></td></tr>
+  <tr><td>AI under governance</td><td><code>app/services/chat/llm_assist.py</code>, <code>app/services/llm.py</code></td></tr>
+  <tr><td>Narration and insights</td><td><code>app/services/chat/narration.py</code>, <code>response_meta.py</code></td></tr>
+  <tr><td>Semantic packs</td><td><code>semantic/packs/automotive/*.yaml</code>, <code>semantic/packs/insurance/*.yaml</code></td></tr>
+  <tr><td>Knowledge Graph builder</td><td><code>app/semantic/service.py</code> (UI: <code>apps/web/components/ontology/</code>)</td></tr>
+  <tr><td>Entity Catalog and schema drift</td><td><code>app/services/catalog/</code></td></tr>
+  <tr><td>Knowledge Hub (documents)</td><td><code>app/services/knowledge.py</code>, <code>app/rag/store.py</code></td></tr>
+  <tr><td>Governance: quotas, usage, LLM settings</td><td><code>app/services/governance/</code>, <code>config/llm_catalog.py</code> (repo root)</td></tr>
+  <tr><td>Data Reliability (Data Trust)</td><td><code>app/services/reliability/</code></td></tr>
+  <tr><td>Benchmark</td><td><code>tests/benchmark/</code>, <code>docs/nlq-benchmark-report.md</code></td></tr>
+</table>
+
+<footer>
+  Prepared from the Ask DB codebase, October 2026. Example routings in sections 2 and 6 were verified by replaying the chat planning pipeline offline (no AI model, PoC seed values). Live behaviour with an AI model configured can differ for questions that go through AI restatement.
+</footer>
+
+</main>
+</body>
+</html>
