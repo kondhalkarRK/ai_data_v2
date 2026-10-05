@@ -14,6 +14,20 @@ from app.models.enums import Role
 
 DEFAULT_WEEKLY_TOKEN_LIMIT = 60_000
 DEFAULT_WEEKLY_CALL_LIMIT = 50
+ADMIN_WEEKLY_TOKEN_LIMIT = 60_000
+ADMIN_WEEKLY_CALL_LIMIT = 100
+
+
+def weekly_limits(
+    role: Role, token_limit: int | None, call_limit: int | None
+) -> tuple[int | None, int | None]:
+    """Effective (tokens, calls) per week; admin rows stored as NULL get the admin default."""
+    if role is Role.ADMIN:
+        return (
+            ADMIN_WEEKLY_TOKEN_LIMIT if token_limit is None else token_limit,
+            ADMIN_WEEKLY_CALL_LIMIT if call_limit is None else call_limit,
+        )
+    return token_limit, call_limit
 
 
 class User(TimestampMixin, Base):
@@ -67,8 +81,9 @@ class User(TimestampMixin, Base):
         server_default=Industry.INSURANCE.value,
     )
 
-    # NULL means unlimited (administrators). The database default (60000 / 50) lives in
-    # the migration only: an ORM server_default would turn an explicit NULL into the default.
+    # NULL on an admin row means the admin default (see ``weekly_limits``). The database
+    # default (60000 / 50) lives in the migration only: an ORM server_default would turn an
+    # explicit NULL into the default.
     weekly_token_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     weekly_call_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
 

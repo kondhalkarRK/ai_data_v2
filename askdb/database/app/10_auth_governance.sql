@@ -18,8 +18,9 @@
 BEGIN;
 
 -- Users ----------------------------------------------------------------------
--- Two roles only: 'admin' (unlimited AI usage, Admin Center) and 'user'.
--- NULL weekly limits mean unlimited; users default to 60,000 tokens and 50 calls.
+-- Two roles only: 'admin' (Admin Center) and 'user'. Both have weekly AI quotas:
+-- users default to 60,000 tokens and 50 calls; NULL limits on an admin row mean the
+-- admin default applied by the API (60,000 tokens and 100 calls).
 CREATE TABLE IF NOT EXISTS auth_users (
     user_id              UUID         NOT NULL,
     username             VARCHAR(80)  NOT NULL,

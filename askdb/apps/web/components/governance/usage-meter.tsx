@@ -47,7 +47,7 @@ export function UsageMeter({
       </div>
       {compact ? null : (
         <p className="text-xs text-muted-foreground">
-          {remaining === null ? "No weekly limit for administrators." : `${fmt(remaining)} ${unit} remaining`}
+          {remaining === null ? "No weekly limit." : `${fmt(remaining)} ${unit} remaining`}
         </p>
       )}
     </div>

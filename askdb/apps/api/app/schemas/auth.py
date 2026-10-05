@@ -5,11 +5,12 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import EmailStr, Field, field_validator
+from pydantic import EmailStr, Field, field_validator, model_validator
 
 from app.auth.passwords import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from app.core.config import Industry
 from app.models.enums import Role
+from app.models.user import weekly_limits
 from app.schemas.common import ApiModel
 
 
@@ -48,6 +49,13 @@ class UserProfile(ApiModel):
     weekly_call_limit: int | None = None
     last_login_at: datetime | None = None
     created_at: datetime
+
+    @model_validator(mode="after")
+    def _effective_limits(self) -> UserProfile:
+        self.weekly_token_limit, self.weekly_call_limit = weekly_limits(
+            self.role, self.weekly_token_limit, self.weekly_call_limit
+        )
+        return self
 
 
 class SessionResponse(ApiModel):

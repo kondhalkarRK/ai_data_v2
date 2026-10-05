@@ -147,7 +147,7 @@ export default function KnowledgePage() {
   return (
     <>
       <PageHeader
-        title="Knowledge Hub"
+        title="Knowledge Hub (Beta)"
         description="Give AI Chat the documents behind the numbers — policies, FAQs, and research — with citations."
         actions={
           <div className="flex flex-wrap gap-2">

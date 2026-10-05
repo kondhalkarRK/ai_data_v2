@@ -1,4 +1,4 @@
-"""Weekly AI quotas for the USER role.
+"""Weekly AI quotas for every role (users 60k tokens / 50 calls, admins 60k / 100).
 
 Usage is summed from ``llm_usage`` since Monday 00:00 UTC, so the allowance resets every
 week on its own; there is no reset job.
@@ -14,8 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import QuotaExceededError
 from app.models.activity import LlmUsage
-from app.models.enums import Role
-from app.models.user import User
+from app.models.user import User, weekly_limits
 
 
 def week_start(now: datetime | None = None) -> datetime:
@@ -73,11 +72,14 @@ async def weekly_usage(
             ).where(LlmUsage.user_id == user.id, LlmUsage.created_at >= start)
         )
     ).one()
+    token_limit, call_limit = weekly_limits(
+        user.role, user.weekly_token_limit, user.weekly_call_limit
+    )
     return WeeklyUsage(
         tokens_used=int(tokens),
         calls_used=int(calls),
-        token_limit=None if user.role is Role.ADMIN else user.weekly_token_limit,
-        call_limit=None if user.role is Role.ADMIN else user.weekly_call_limit,
+        token_limit=token_limit,
+        call_limit=call_limit,
         week_start=start,
     )
 

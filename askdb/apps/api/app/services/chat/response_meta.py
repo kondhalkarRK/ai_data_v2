@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from app.core.config import Industry
+from app.services.chat.narration import narrate
 
 GroundedSource = Literal[
     "Semantic Layer",
@@ -138,74 +139,46 @@ def build_insights(
     rows: list[dict[str, Any]],
     path: str,
     evidence: list[str] | None = None,
-) -> dict[str, str]:
-    """Derive executive vs analyst depth from real result shape — no invented KPIs."""
+) -> dict[str, Any]:
+    """Executive and analyst narration from the real result shape — no invented KPIs.
+
+    ``narrative`` is only used when the result has nothing numeric to narrate (documents,
+    empty results); processing notes never prefix the business story.
+    """
     n = len(rows)
     if n == 0:
         executive = (
             narrative.strip()
-            or "The query completed but returned no rows for the current filters."
+            or "No records matched the current filters for this question."
         )
         analyst = (
             executive
             if narrative.strip()
-            else f"{executive} Consider widening the date range or removing a filter."
+            else f"{executive} Try widening the date range or removing a filter."
         )
-        payload = {"executive": executive[:520], "analyst": analyst[:900]}
+        payload: dict[str, Any] = {"executive": executive[:520], "analyst": analyst[:900]}
         return merge_hybrid_evidence(payload, evidence or [])
 
-    # Prefer business storytelling over SQL-path commentary.
-    story = _business_story(columns, rows)
-    base = narrative.strip()
-    if story:
-        executive = f"{base.rstrip('.')}. {story}".strip() if base else story
-    elif base:
-        executive = f"{base.rstrip('.')} Across {n} result rows."
+    story = narrate(columns, rows)
+    if story is not None:
+        payload = {
+            "executive": story.executive_text()[:700],
+            "analyst": story.analyst_text()[:1200],
+            "narration": story.to_dict(),
+        }
     else:
-        executive = f"Returned {n} row{'s' if n != 1 else ''} across {len(columns)} fields."
-
-    analyst_parts = [executive]
-    first_cols = columns[:3]
-    if rows and first_cols:
-        head = rows[0]
-        sample_bits = [f"{col}={head.get(col)}" for col in first_cols if col in head]
-        if sample_bits:
-            analyst_parts.append("Leading row: " + ", ".join(str(b) for b in sample_bits) + ".")
-    if len(columns) >= 2 and rows:
-        y_key = columns[1]
-        numeric: list[float] = []
-        for row in rows:
-            try:
-                numeric.append(float(row[y_key]))  # type: ignore[arg-type]
-            except (TypeError, ValueError, KeyError):
-                continue
-        if len(numeric) >= 3:
-            peak = max(numeric)
-            trough = min(numeric)
-            mean = sum(numeric) / len(numeric)
-            analyst_parts.append(
-                f"On {y_key.replace('_', ' ')}: range {trough:g}–{peak:g}, "
-                f"average {mean:g} across {len(numeric)} points."
-            )
-            # Highlight simple anomalies relative to mean
-            outliers = [v for v in numeric if abs(v - mean) >= max(mean * 0.35, 1e-9)]
-            if outliers and len(numeric) >= 5:
-                analyst_parts.append(
-                    f"{len(outliers)} value(s) sit notably above or below the series average."
-                )
-    payload = {
-        "executive": executive[:520],
-        "analyst": " ".join(analyst_parts)[:900],
-    }
+        leaders = _business_story(columns, rows)
+        executive = leaders or narrative.strip() or "The result is ready in the table below."
+        payload = {"executive": executive[:520], "analyst": executive[:900]}
     return merge_hybrid_evidence(payload, evidence or [])
 
 
 def merge_hybrid_evidence(
-    insights: dict[str, str],
+    insights: dict[str, Any],
     snippets: list[str],
     *,
     entities: list[str] | None = None,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """Append up to two report sentences when they mention plan entities."""
     picked: list[str] = []
     wanted = [item.casefold() for item in (entities or []) if item]
@@ -226,12 +199,16 @@ def merge_hybrid_evidence(
     if not picked:
         return insights
     extra = " ".join(picked)
-    return {
-        "executive": f"{insights.get('executive', '').rstrip()} {extra}".strip()[:520],
+    merged = {
+        **insights,
+        "executive": f"{insights.get('executive', '').rstrip()} {extra}".strip()[:900],
         "analyst": (
             f"{insights.get('analyst', '').rstrip()} Report evidence: {extra}"
-        ).strip()[:900],
+        ).strip()[:1400],
     }
+    if isinstance(insights.get("narration"), dict):
+        merged["narration"] = {**insights["narration"], "evidence": picked}
+    return merged
 
 
 def _business_story(columns: list[str], rows: list[dict[str, Any]]) -> str:

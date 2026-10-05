@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.activity import LlmUsage
 from app.models.enums import ExecutionMode
 from app.models.governance import AdminAudit
-from app.models.user import User
+from app.models.user import User, weekly_limits
 from app.services.governance.audit import AUDIT_CATEGORIES
 from app.services.governance.quota import week_start
 
@@ -186,6 +186,9 @@ async def llm_usage_overview(session: AsyncSession, *, days: int = 30) -> dict[s
     table = []
     for user in users.values():
         bucket = stats.get(user.id) or stats.default_factory()
+        token_limit, call_limit = weekly_limits(
+            user.role, user.weekly_token_limit, user.weekly_call_limit
+        )
         table.append(
             {
                 "userId": str(user.id),
@@ -197,8 +200,8 @@ async def llm_usage_overview(session: AsyncSession, *, days: int = 30) -> dict[s
                 "avgResponseMs": _avg(bucket["times"]),
                 "weekTokens": bucket["weekTokens"],
                 "weekCalls": bucket["weekCalls"],
-                "tokenLimit": user.weekly_token_limit,
-                "callLimit": user.weekly_call_limit,
+                "tokenLimit": token_limit,
+                "callLimit": call_limit,
             }
         )
     table.sort(key=lambda item: (-int(item["tokens"]), -int(item["calls"]), str(item["user"])))

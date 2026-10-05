@@ -203,8 +203,11 @@ async def test_weekly_quota_is_enforced(
         assert caught.value.status_code == 429
         assert caught.value.details["tokenLimit"] == 60_000
 
-        # Administrators are unlimited.
-        await enforce_quota(session, admin)
+        # Administrators are governed too: 60,000 tokens and 100 calls per week.
+        admin_usage = await weekly_usage(session, admin)
+        assert admin_usage.token_limit == 60_000 and admin_usage.call_limit == 100
+        with pytest.raises(QuotaExceededError):
+            await enforce_quota(session, admin)
 
 
 async def test_call_limit_counts_questions(

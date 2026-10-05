@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { id: "model", label: "Semantic Model", icon: Boxes },
-  { id: "graph", label: "Knowledge Graph (Beta)", icon: Network },
+  { id: "graph", label: "Knowledge Graph", icon: Network },
 ] as const;
 
 export type AtlasTab = (typeof TABS)[number]["id"];

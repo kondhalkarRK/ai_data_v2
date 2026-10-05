@@ -117,7 +117,7 @@ flowchart TD
     A([User asks in AI Chat]):::user --> B{Logged in?}
     B -- no --> B1[Redirect to /login]:::stop
     B -- yes --> C[Load admin LLM settings<br/>provider, model, temperature, max tokens]:::gov
-    C --> D{"Weekly quota left?<br/>USER: 60k tokens / 50 calls<br/>ADMIN: unlimited"}:::gov
+    C --> D{"Weekly quota left?<br/>USER: 60k tokens / 50 calls<br/>ADMIN: 60k tokens / 100 calls"}:::gov
     D -- no --> D1[Weekly AI quota reached<br/>contact administrator]:::stop
     D -- yes --> E[Rewrite<br/>spelling fixes and business vocabulary]:::sem
     E --> F{Same question cached?}

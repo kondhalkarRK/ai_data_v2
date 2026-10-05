@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 SETTING_KEY = "llm"
 DEFAULT_PROVIDER = "openai"
+_PROVIDER_PREFIX = re.compile(r"^[a-z_]+\.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +127,20 @@ def endpoint(settings: Settings, provider: str) -> tuple[str, dict[str, str]] | 
     return None
 
 
+def _bare(model_id: str) -> str:
+    return _PROVIDER_PREFIX.sub("", model_id.strip().casefold(), count=1)
+
+
+def _priced_match(catalog: LlmCatalog, model_id: str) -> dict[str, Any] | None:
+    """Catalog entry for a model saved without (or with a different) provider prefix."""
+    wanted = _bare(model_id)
+    for provider in catalog.providers:
+        for model in provider.models:
+            if _bare(model.id) == wanted:
+                return model.to_dict()
+    return None
+
+
 def llm_settings_payload(settings: Settings) -> dict[str, Any]:
     """Current choice, every catalog provider with its models, and pricing assumptions."""
     catalog = load_catalog(settings)
@@ -133,14 +149,15 @@ def llm_settings_payload(settings: Settings) -> dict[str, Any]:
     for provider in catalog.providers:
         models = [model.to_dict() for model in provider.models]
         if provider.id == current.provider and all(m["id"] != current.model for m in models):
+            match = _priced_match(catalog, current.model) or {}
             models.insert(
                 0,
                 {
                     "id": current.model,
-                    "label": current.model,
-                    "tier": "",
-                    "inputUsdPer1m": None,
-                    "outputUsdPer1m": None,
+                    "label": match.get("label") or current.model,
+                    "tier": match.get("tier") or "",
+                    "inputUsdPer1m": match.get("inputUsdPer1m"),
+                    "outputUsdPer1m": match.get("outputUsdPer1m"),
                 },
             )
         providers.append(
@@ -157,6 +174,7 @@ def llm_settings_payload(settings: Settings) -> dict[str, Any]:
         "pricing": {
             "inputTokensPerQuestion": catalog.input_tokens_per_question,
             "outputTokensPerQuestion": catalog.output_tokens_per_question,
+            "monthlyBudgetUsd": settings.llm_monthly_budget_usd,
             "source": "config/llm_catalog.py",
         },
     }

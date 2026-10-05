@@ -12,6 +12,16 @@ export type ResponseTab = "table" | "chart" | "narration" | "sql";
 
 export type InsightDepth = "executive" | "analyst";
 
+/** Executive narration built from the result: each section is present only when relevant. */
+export interface NarrationSections {
+  summary: string;
+  highlights: string[];
+  insight: string | null;
+  focus: string | null;
+  context?: string;
+  evidence?: string[];
+}
+
 export interface QueryTimings {
   llmGenerationMs: number;
   semanticLookupMs: number;
@@ -131,7 +141,7 @@ export interface ResponseMeta {
   timings: QueryTimings;
   queryMeta: QueryMeta;
   queryPlan?: QueryPlanTrace;
-  insights: { executive: string; analyst: string };
+  insights: { executive: string; analyst: string; narration?: NarrationSections };
   anomalies: AnomalyMarker[];
   alternateInterpretations: string[];
   dqFailed?: boolean;

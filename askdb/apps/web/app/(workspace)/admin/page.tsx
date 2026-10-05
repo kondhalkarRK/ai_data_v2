@@ -13,6 +13,7 @@ import {
   TrustAdminPanel,
 } from "@/components/admin/admin-panels";
 import { EntityCatalogAdminPanel } from "@/components/admin/entity-catalog-admin";
+import { ChatQuotaWidget } from "@/components/governance/chat-quota-widget";
 import { PageHeader } from "@/components/shell/page-header";
 import { PageShell } from "@/components/ui/page-shell";
 import { EmptyState } from "@/components/ui/status-pill";
@@ -92,6 +93,7 @@ export default function AdminPage() {
       <PageHeader
         title="Admin Center"
         description="Govern the AI: model settings, how questions are answered, who uses what, and every admin action."
+        actions={<ChatQuotaWidget />}
       />
       <React.Suspense fallback={null}>
         <AdminCenter />

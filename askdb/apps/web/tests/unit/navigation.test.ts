@@ -11,7 +11,7 @@ const CORE = [
   "AI Chat",
   "Data Trust",
   "Semantic Atlas",
-  "Knowledge Graph (Beta)",
+  "Knowledge Graph",
 ];
 
 describe("sidebar visibility", () => {

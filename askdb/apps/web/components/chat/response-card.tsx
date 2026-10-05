@@ -8,7 +8,7 @@ import {
   failureKindFromCategory,
   ResponseErrorState,
 } from "@/components/chat/response-error-state";
-import { InsightSummary } from "@/components/chat/insight-summary";
+import { ExecutiveTakeaway, InsightSummary } from "@/components/chat/insight-summary";
 import { ResponseTabs } from "@/components/chat/response-tabs";
 import { ResultChart, type ChartKind } from "@/components/chat/result-chart";
 import { SQLViewer } from "@/components/chat/sql-viewer";
@@ -249,6 +249,10 @@ export function ResponseCard({
           </div>
         ) : null}
 
+        {!execFailed && !zeroRows && meta?.insights?.narration?.summary && tab !== "narration" ? (
+          <ExecutiveTakeaway text={meta.insights.narration.summary} />
+        ) : null}
+
         {!execFailed && (message.sql || message.rows?.length || meta) ? (
           <>
             <ResponseTabs value={tab} onChange={setTab} />
@@ -319,16 +323,16 @@ export function ResponseCard({
                         message.narrative ||
                         "Detailed analyst notes will appear when the answer is ready."
                       }
+                      narration={meta?.insights?.narration}
                       depth={insightDepth}
                       onDepthChange={setInsightDepth}
                     />
                     <p className="text-[11px] text-muted-foreground">
-                      AI Business Analyst — plain-language findings
                       {route === "knowledge"
-                        ? " from documents."
+                        ? "Findings from your documents."
                         : route === "hybrid"
-                          ? " from governed data plus report evidence."
-                          : " from the governed result, not SQL commentary."}
+                          ? "Findings from your data plus report evidence."
+                          : "Every figure comes from the result above."}
                     </p>
                     {route && route !== "sql" && message.citations?.length ? (
                       <ul className="space-y-1 text-[11px] text-muted-foreground">
@@ -375,10 +379,6 @@ export function ResponseCard({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
             <span className="font-medium text-foreground">Answered in {answered}</span>
             <span>Rows: {meta.rowCount.toLocaleString()}</span>
-            {meta.sourceDatabase ? <span>{meta.sourceDatabase}</span> : null}
-            {meta.validationStatus === "auto_repaired" ? (
-              <span className="text-amber-800 dark:text-amber-200">Auto-repaired SQL</span>
-            ) : null}
             <details className="group">
               <summary className="cursor-pointer list-none font-medium text-foreground underline-offset-2 hover:underline [&::-webkit-details-marker]:hidden">
                 Timing
@@ -481,15 +481,8 @@ function QueryPlanNote({ plan }: { plan: QueryPlanTrace }) {
 
 function AnswerProvenance({ meta }: { meta: ResponseMeta }) {
   const confidence = meta.confidence;
-  const decision = meta.decision;
   const corrections = meta.corrections ?? [];
-  if (!confidence && !decision && !corrections.length && !meta.reinterpretedAs) return null;
-  const answeredBy =
-    decision?.answeredBy === "llm"
-      ? "Planner + AI reasoning"
-      : decision
-        ? "Semantic layer"
-        : null;
+  if (!confidence && !corrections.length && !meta.reinterpretedAs) return null;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
       {confidence ? (
@@ -501,11 +494,6 @@ function AnswerProvenance({ meta }: { meta: ResponseMeta }) {
           title={confidence.reasons.join(" · ") || undefined}
         >
           {confidence.label}
-          {answeredBy ? ` · ${answeredBy}` : ""}
-        </span>
-      ) : answeredBy ? (
-        <span className="rounded-full border border-border/70 px-2 py-0.5 font-medium text-muted-foreground">
-          {answeredBy}
         </span>
       ) : null}
       {corrections.length ? (

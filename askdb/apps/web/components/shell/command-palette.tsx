@@ -71,7 +71,7 @@ export function CommandPalette() {
       },
       {
         id: "graph-knowledge",
-        label: "Knowledge Hub",
+        label: "Knowledge Hub (Beta)",
         hint: "Upload documents and retrieve cited context",
         group: "Semantic Graph",
         href: "/knowledge",

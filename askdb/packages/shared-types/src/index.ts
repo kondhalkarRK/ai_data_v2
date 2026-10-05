@@ -46,7 +46,7 @@ export interface UserProfile {
   defaultIndustry: Industry;
   isActive: boolean;
   mustChangePassword: boolean;
-  /** `null` means unlimited (administrators). */
+  /** `null` means no weekly limit. */
   weeklyTokenLimit: number | null;
   weeklyCallLimit: number | null;
   lastLoginAt: string | null;

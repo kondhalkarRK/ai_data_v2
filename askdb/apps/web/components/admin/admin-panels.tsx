@@ -34,7 +34,8 @@ import {
   useUsageOverview,
 } from "@/hooks/use-admin";
 import { ApiError } from "@/lib/api-client";
-import { estimateCost, formatUsd } from "@/lib/llm-cost";
+import { useMyUsage } from "@/hooks/use-my-usage";
+import { costOfTokens, estimateCost, formatUsd, questionsForBudget } from "@/lib/llm-cost";
 import { cn } from "@/lib/utils";
 
 // --- shared ---------------------------------------------------------------------
@@ -145,7 +146,9 @@ export function AiGovernancePanel() {
 
   const providers = settings.data.providers;
   const provider = providers.find((p) => p.id === form.provider);
-  const selectedModel = provider?.models.find((m) => m.id === form.model);
+  const selectedModel =
+    provider?.models.find((m) => m.id === form.model) ??
+    providers.flatMap((p) => p.models).find((m) => m.id === form.model && m.inputUsdPer1m != null);
   const dirty =
     form.provider !== current.provider ||
     form.model !== current.model ||
@@ -266,12 +269,33 @@ export function AiGovernancePanel() {
         </CardContent>
       </Card>
 
-      <CostIntelligence model={selectedModel} pricing={settings.data.pricing} />
+      <CostIntelligence
+        providerLabel={provider?.label ?? form.provider}
+        model={selectedModel}
+        modelId={form.model}
+        pricing={settings.data.pricing}
+      />
     </div>
   );
 }
 
-function CostIntelligence({ model, pricing }: { model: CatalogModel | undefined; pricing: LlmPricingAssumptions }) {
+function questions(count: number | null): string {
+  return count == null ? "Unlimited" : `~${count.toLocaleString()}`;
+}
+
+function CostIntelligence({
+  providerLabel,
+  model,
+  modelId,
+  pricing,
+}: {
+  providerLabel: string;
+  model: CatalogModel | undefined;
+  modelId: string;
+  pricing: LlmPricingAssumptions;
+}) {
+  const mine = useMyUsage();
+  const team = useUsageOverview(7);
   const estimate = model
     ? estimateCost(
         model.inputUsdPer1m,
@@ -280,38 +304,100 @@ function CostIntelligence({ model, pricing }: { model: CatalogModel | undefined;
         pricing.outputTokensPerQuestion,
       )
     : null;
+  const budget = pricing.monthlyBudgetUsd;
+  const teamRows = team.data?.users ?? [];
+  const teamCalls = teamRows.reduce((sum, row) => sum + row.weekCalls, 0);
+  const teamTokens = teamRows.reduce((sum, row) => sum + row.weekTokens, 0);
+  const usage = mine.data;
+
   return (
     <Card>
-      <CardContent className="space-y-4 pt-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <CardTitle className="text-base">LLM cost &amp; usage intelligence</CardTitle>
-          <span className="text-xs text-muted-foreground">Model: {model?.label ?? "—"}</span>
+      <CardContent className="space-y-5 pt-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">LLM Cost &amp; Usage Intelligence</CardTitle>
+            <CardDescription>What the selected model costs, and how much of this week&apos;s allowance is used.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1">
+              Provider: <span className="font-medium text-foreground">{providerLabel}</span>
+            </span>
+            <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1">
+              Model: <span className="font-medium text-foreground">{model?.label ?? modelId}</span>
+            </span>
+          </div>
         </div>
-        {model && estimate ? (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+
+        <section className="space-y-3">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Model economics</h3>
+          {model && estimate ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Kpi label="Input cost" value={formatUsd(model.inputUsdPer1m ?? 0)} hint="per 1M tokens" />
               <Kpi label="Output cost" value={formatUsd(model.outputUsdPer1m ?? 0)} hint="per 1M tokens" />
-              <Kpi label="Est. cost per 1M tokens" value={formatUsd(estimate.per1mTokens)} hint="blended" />
-              <Kpi label="Est. cost per question" value={formatUsd(estimate.perQuestion)} />
+              <Kpi label="Average cost per question" value={formatUsd(estimate.perQuestion)} hint={`blended ${formatUsd(estimate.per1mTokens)} / 1M tokens`} />
               <Kpi
                 label="Questions per $1"
-                value={estimate.questionsPerDollar == null ? "Unlimited" : `~${estimate.questionsPerDollar.toLocaleString()}`}
+                value={questions(estimate.questionsPerDollar)}
                 hint={estimate.questionsPerDollar == null ? "local model, no token cost" : undefined}
               />
+              <Kpi label="Questions per $10" value={questions(questionsForBudget(estimate, 10))} />
+              <Kpi
+                label="Questions per monthly budget"
+                value={questions(questionsForBudget(estimate, budget))}
+                hint={`budget ${formatUsd(budget)} / month`}
+              />
+              <Kpi
+                label="Est. spend this week"
+                value={team.data ? formatUsd(costOfTokens(estimate, teamTokens)) : "—"}
+                hint={`${teamTokens.toLocaleString()} tokens across all users`}
+              />
+              <Kpi
+                label="Budget used (week)"
+                value={team.data && budget > 0 ? `${((costOfTokens(estimate, teamTokens) / budget) * 100).toFixed(1)}%` : "—"}
+                hint="of the monthly budget"
+              />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Indicative pricing from {pricing.source}. Assumes about{" "}
-              {pricing.inputTokensPerQuestion.toLocaleString()} input and{" "}
-              {pricing.outputTokensPerQuestion.toLocaleString()} output tokens per AI Chat question; questions
-              answered by the semantic layer or cache use no tokens.
+          ) : (
+            <p className="rounded-[var(--radius-control)] bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              {model?.label ?? modelId} has no pricing in {pricing.source}. Add usd_per_1m_input and usd_per_1m_output
+              for it to see cost estimates.
             </p>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            This model has no pricing in {pricing.source}. Add usd_per_1m_input and usd_per_1m_output to see estimates.
-          </p>
-        )}
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Current weekly usage (your admin quota)
+          </h3>
+          {usage ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Kpi label="Calls used" value={usage.callsUsed.toLocaleString()} hint={usage.callLimit != null ? `of ${usage.callLimit.toLocaleString()}` : undefined} />
+                <Kpi label="Calls remaining" value={usage.callsRemaining == null ? "Unlimited" : usage.callsRemaining.toLocaleString()} />
+                <Kpi label="Tokens used" value={usage.tokensUsed.toLocaleString()} hint={usage.tokenLimit != null ? `of ${usage.tokenLimit.toLocaleString()}` : undefined} />
+                <Kpi label="Tokens remaining" value={usage.tokensRemaining == null ? "Unlimited" : usage.tokensRemaining.toLocaleString()} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <UsageMeter label="AI calls" used={usage.callsUsed} limit={usage.callLimit} unit="calls" />
+                <UsageMeter label="Tokens" used={usage.tokensUsed} limit={usage.tokenLimit} unit="tokens" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Resets {new Date(usage.resetsAt).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" })}.
+                {team.data ? ` All users this week: ${teamCalls.toLocaleString()} calls, ${teamTokens.toLocaleString()} tokens.` : ""}
+              </p>
+            </>
+          ) : mine.isError ? (
+            <p className="text-sm text-muted-foreground">Weekly usage is unavailable right now.</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading weekly usage…</p>
+          )}
+        </section>
+
+        <p className="text-xs text-muted-foreground">
+          Indicative pricing from {pricing.source}. Assumes about {pricing.inputTokensPerQuestion.toLocaleString()} input
+          and {pricing.outputTokensPerQuestion.toLocaleString()} output tokens per AI question; answers from the semantic
+          layer or cache use no tokens, so real spend is usually lower.
+        </p>
       </CardContent>
     </Card>
   );

@@ -931,13 +931,7 @@ class ChatService:
             alternate_interpretations = interpretation_options(
                 plan, industry=self._industry, question=question, limit=3
             )
-        if ai_generated:
-            notes.append(
-                "Planner + AI reasoning: SQL drafted by the AI from the query plan and "
-                "approved by the validator."
-            )
-        else:
-            notes.append(f"Answered with governed template: {planned.title}.")
+        if not ai_generated:
             yield _sse("stage", {"stage": "template", "title": planned.title})
         narrative += " ".join(notes)
 
@@ -1186,6 +1180,11 @@ class ChatService:
                 [citation.snippet for citation in citations],
                 entities=plan_entities(plan),
             )
+        if isinstance(insights.get("narration"), dict):
+            context_note = narrative.strip()
+            if context_note:
+                insights["narration"]["context"] = context_note
+            narrative = f"{context_note} {insights['executive']}".strip()
         grounded = resolve_grounded_on(
             path=path,
             glossary_matches=glossary_matches,

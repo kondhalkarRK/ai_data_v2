@@ -37,8 +37,42 @@ const CURRENT = {
   updatedBy: null,
 };
 
+const WEEK_USAGE = {
+  days: 7,
+  kpis: { totalLlmCalls: 3, totalTokens: 20000, mostUsedModel: "openai.gpt-5-mini", activeUsers: 1 },
+  topUsers: [],
+  users: [
+    {
+      userId: "u1",
+      user: "admin",
+      role: "admin",
+      calls: 14,
+      llmCalls: 3,
+      tokens: 20000,
+      avgResponseMs: 900,
+      weekTokens: 20000,
+      weekCalls: 14,
+      tokenLimit: 60000,
+      callLimit: 100,
+    },
+  ],
+  models: [],
+};
+
 const RESPONSES: Record<string, unknown> = {
   "/api/v1/auth/me": { id: "u1", username: "admin", role: "admin", defaultIndustry: "automotive" },
+  "/api/v1/auth/me/usage": {
+    tokenLimit: 60000,
+    tokensUsed: 18250,
+    tokensRemaining: 41750,
+    callLimit: 100,
+    callsUsed: 14,
+    callsRemaining: 86,
+    unlimited: false,
+    weekStart: "2026-10-05T00:00:00Z",
+    resetsAt: "2026-10-12T00:00:00Z",
+  },
+  "/api/v1/admin/usage?days=7": WEEK_USAGE,
   "/api/v1/admin/llm": {
     current: CURRENT,
     providers: [
@@ -57,7 +91,12 @@ const RESPONSES: Record<string, unknown> = {
         models: [{ id: "llama3.1", label: "Llama 3.1", tier: "small", inputUsdPer1m: 0, outputUsdPer1m: 0 }],
       },
     ],
-    pricing: { inputTokensPerQuestion: 2000, outputTokensPerQuestion: 500, source: "config/llm_catalog.py" },
+    pricing: {
+      inputTokensPerQuestion: 2000,
+      outputTokensPerQuestion: 500,
+      monthlyBudgetUsd: 50,
+      source: "config/llm_catalog.py",
+    },
   },
   "/api/v1/admin/governance?days=30": {
     days: 30,
@@ -154,10 +193,18 @@ beforeEach(() => {
 });
 
 describe("Admin Center panels render without crashing", () => {
-  it("LLM Settings shows the catalog models and the cost estimate", async () => {
+  it("LLM Settings shows model economics and the admin's weekly usage", async () => {
     renderPanel(<AiGovernancePanel />);
-    expect(await screen.findByText(/LLM cost & usage intelligence/)).toBeInTheDocument();
+    expect(await screen.findByText("LLM Cost & Usage Intelligence")).toBeInTheDocument();
+    // GPT-5 mini: (0.25 × 2,000 + 2 × 500) / 1M = $0.0015 per question.
+    expect(screen.getByText("$0.0015")).toBeInTheDocument();
     expect(screen.getByText("~666")).toBeInTheDocument();
+    expect(screen.getByText("~6,666")).toBeInTheDocument();
+    expect(screen.getByText("~33,333")).toBeInTheDocument();
+    expect(await screen.findByText("86")).toBeInTheDocument();
+    expect(screen.getByText("41,750")).toBeInTheDocument();
+    // 20,000 team tokens at the blended $0.60 / 1M.
+    expect(await screen.findByText("$0.01")).toBeInTheDocument();
   });
 
   it("LLM Settings survives an API that predates the catalog payload", async () => {

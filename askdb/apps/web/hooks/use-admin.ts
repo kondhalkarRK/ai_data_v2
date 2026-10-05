@@ -37,6 +37,8 @@ export interface ProviderOption {
 export interface LlmPricingAssumptions {
   inputTokensPerQuestion: number;
   outputTokensPerQuestion: number;
+  /** Monthly AI budget from the API settings (LLM_MONTHLY_BUDGET_USD). */
+  monthlyBudgetUsd: number;
   source: string;
 }
 
@@ -134,6 +136,7 @@ const ADMIN = ["admin"] as const;
 const DEFAULT_PRICING: LlmPricingAssumptions = {
   inputTokensPerQuestion: 2000,
   outputTokensPerQuestion: 500,
+  monthlyBudgetUsd: 50,
   source: "config/llm_catalog.py",
 };
 

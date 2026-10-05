@@ -67,10 +67,10 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         href: "/semantic?tab=graph",
-        label: "Knowledge Graph (Beta)",
+        label: "Knowledge Graph",
         icon: Share2,
         minRole: "user",
-        description: "Explore the enterprise knowledge graph. Still evolving.",
+        description: "Explore the enterprise knowledge graph.",
       },
     ],
   },
@@ -101,10 +101,10 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         href: "/knowledge",
-        label: "Knowledge Hub",
+        label: "Knowledge Hub (Beta)",
         icon: BookOpen,
         minRole: "user",
-        description: "Retrieve cited business context for AI Chat.",
+        description: "Retrieve cited business context for AI Chat. Still evolving.",
       },
       {
         href: "/saved-questions",

@@ -23,6 +23,16 @@ export function estimateCost(
   };
 }
 
+/** Whole questions a budget buys; null when the model is free (local). */
+export function questionsForBudget(estimate: CostEstimate, budgetUsd: number): number | null {
+  return estimate.perQuestion > 0 ? Math.floor(budgetUsd / estimate.perQuestion) : null;
+}
+
+/** USD for a token count at the blended rate. */
+export function costOfTokens(estimate: CostEstimate, tokens: number): number {
+  return (estimate.per1mTokens * tokens) / 1_000_000;
+}
+
 export function formatUsd(value: number): string {
   if (value === 0) return "$0";
   if (value < 0.01) return `$${value.toPrecision(2)}`;

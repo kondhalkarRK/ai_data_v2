@@ -53,11 +53,21 @@ def test_sql_diff_and_anomalies() -> None:
     rows = [{"x": i, "y": 10 if i != 5 else 100} for i in range(10)]
     markers = detect_anomalies(["x", "y"], rows)
     assert markers
+
+def test_insights_narrate_the_result_without_processing_notes() -> None:
+    rows = [
+        {"dealer_name": "Alpha Motors", "revenue": 52_000_000},
+        {"dealer_name": "Beta Cars", "revenue": 31_000_000},
+        {"dealer_name": "Gamma Auto", "revenue": 9_000_000},
+    ]
     insights = build_insights(
-        narrative="Revenue rose.",
-        columns=["x", "y"],
+        narrative="Answered with governed template: Revenue by dealer.",
+        columns=["dealer_name", "revenue"],
         rows=rows,
         path="template",
     )
-    assert insights["executive"]
-    assert "template" in insights["analyst"]
+    assert "template" not in insights["executive"]
+    narration = insights["narration"]
+    assert narration["summary"].startswith("Alpha Motors")
+    assert "\u20b95.20 Cr" in narration["summary"]
+    assert narration["highlights"]

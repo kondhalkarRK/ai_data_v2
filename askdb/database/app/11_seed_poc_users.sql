@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------------
 -- Ask DB - PoC seed users (askdb_app database)
 --
---     admin / admin123   role admin, unlimited AI usage
+--     admin / admin123   role admin, 60,000 tokens / 100 calls per week
 --     user1 / user123    role user, 60,000 tokens and 50 AI calls per week
 --
 -- Passwords are stored as Argon2id hashes. These short demo passwords skip the
