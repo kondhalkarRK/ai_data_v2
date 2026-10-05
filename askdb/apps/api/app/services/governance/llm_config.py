@@ -1,6 +1,7 @@
 """Admin-governed LLM configuration: provider, model, temperature and max tokens.
 
-The choice lives in ``app_settings`` (key ``llm``). Each API process keeps a copy that the
+Providers and models come from ``config/llm_catalog.py`` (see ``llm_catalog``). The
+choice lives in ``app_settings`` (key ``llm``). Each API process keeps a copy that the
 chat routes re-read once per question, so every worker follows the admin's latest choice.
 Without a saved choice the environment defaults apply.
 """
@@ -8,6 +9,7 @@ Without a saved choice the environment defaults apply.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -19,26 +21,12 @@ from app.core.exceptions import ValidationError
 from app.models.governance import AppSetting
 from app.models.user import User
 from app.services.governance.audit import AdminAction, record_admin_action
+from app.services.governance.llm_catalog import LlmCatalog, load_catalog
 
 logger = logging.getLogger(__name__)
 
 SETTING_KEY = "llm"
-
-
-@dataclass(frozen=True, slots=True)
-class ProviderInfo:
-    id: str
-    label: str
-    suggested_models: tuple[str, ...]
-
-
-PROVIDERS: dict[str, ProviderInfo] = {
-    "openai": ProviderInfo("openai", "OpenAI", ("gpt-4.1", "gpt-4.1-mini", "gpt-4o-mini")),
-    "claude": ProviderInfo("claude", "Claude", ("claude-sonnet-4-5", "claude-haiku-4-5")),
-    "gemini": ProviderInfo("gemini", "Gemini", ("gemini-2.5-pro", "gemini-2.5-flash")),
-    "azure_openai": ProviderInfo("azure_openai", "Azure OpenAI", ("gpt-4.1", "gpt-4o-mini")),
-    "ollama": ProviderInfo("ollama", "Ollama", ("llama3.1", "qwen2.5-coder")),
-}
+DEFAULT_PROVIDER = "openai"
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,12 +37,13 @@ class GovernedLlm:
     max_tokens: int
     updated_at: str | None = None
     updated_by: str | None = None
+    provider_label: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         return {
             "provider": data["provider"],
-            "providerLabel": PROVIDERS[self.provider].label,
+            "providerLabel": self.provider_label or self.provider,
             "model": data["model"],
             "temperature": data["temperature"],
             "maxTokens": data["max_tokens"],
@@ -66,12 +55,24 @@ class GovernedLlm:
 _ACTIVE: GovernedLlm | None = None
 
 
+def _label(catalog: LlmCatalog, provider_id: str) -> str:
+    provider = catalog.provider(provider_id)
+    return provider.label if provider else provider_id
+
+
 def default_llm(settings: Settings) -> GovernedLlm:
+    catalog = load_catalog(settings)
+    model = settings.llm_default_model
+    provider = next(
+        (p.id for p in catalog.providers if any(m.id == model for m in p.models)),
+        DEFAULT_PROVIDER,
+    )
     return GovernedLlm(
-        provider="openai",
-        model=settings.llm_default_model,
+        provider=provider,
+        model=model,
         temperature=settings.llm_temperature,
         max_tokens=settings.llm_max_completion_tokens,
+        provider_label=_label(catalog, provider),
     )
 
 
@@ -88,54 +89,85 @@ def _secret(value: Any) -> str:
     return value.get_secret_value().strip() if value is not None else ""
 
 
+def _connection(settings: Settings, provider_id: str) -> str:
+    provider = load_catalog(settings).provider(provider_id)
+    if provider is not None:
+        return provider.connection
+    # A saved or default provider missing from the catalog still reaches the gateway.
+    return "gateway" if provider_id == DEFAULT_PROVIDER else ""
+
+
 def endpoint(settings: Settings, provider: str) -> tuple[str, dict[str, str]] | None:
     """Base URL and auth headers for a provider, or ``None`` when it is not configured."""
-    if provider == "openai":
+    connection = _connection(settings, provider)
+    if connection == "gateway":
         key = _secret(settings.llm_api_key)
         return (settings.llm_base_url, {"Authorization": f"Bearer {key}"}) if key else None
-    if provider == "claude":
+    if connection == "anthropic":
         key = _secret(settings.anthropic_api_key)
         return (settings.anthropic_base_url, {"Authorization": f"Bearer {key}"}) if key else None
-    if provider == "gemini":
+    if connection == "gemini":
         key = _secret(settings.gemini_api_key)
         return (settings.gemini_base_url, {"Authorization": f"Bearer {key}"}) if key else None
-    if provider == "azure_openai":
+    if connection == "azure_openai":
         key = _secret(settings.azure_openai_api_key)
         url = settings.azure_openai_base_url.strip()
         return (url, {"api-key": key}) if key and url else None
-    if provider == "ollama":
+    if connection == "ollama":
         url = settings.ollama_base_url.strip()
         return (url, {"Authorization": "Bearer ollama"}) if url else None
+    if connection == "openai_compatible":
+        entry = load_catalog(settings).provider(provider)
+        if entry is None or not entry.base_url:
+            return None
+        key = os.environ.get(entry.api_key_env, "").strip() if entry.api_key_env else ""
+        return (entry.base_url, {"Authorization": f"Bearer {key}"}) if key else None
     return None
 
 
-def provider_options(settings: Settings) -> list[dict[str, Any]]:
+def llm_settings_payload(settings: Settings) -> dict[str, Any]:
+    """Current choice, every catalog provider with its models, and pricing assumptions."""
+    catalog = load_catalog(settings)
     current = active_llm(settings)
-    options = []
-    for info in PROVIDERS.values():
-        models = list(info.suggested_models)
-        if info.id == "openai":
-            for model in (settings.llm_default_model, settings.llm_fallback_model.strip()):
-                if model and model not in models:
-                    models.insert(0, model)
-        if info.id == current.provider and current.model not in models:
-            models.insert(0, current.model)
-        options.append(
+    providers = []
+    for provider in catalog.providers:
+        models = [model.to_dict() for model in provider.models]
+        if provider.id == current.provider and all(m["id"] != current.model for m in models):
+            models.insert(
+                0,
+                {
+                    "id": current.model,
+                    "label": current.model,
+                    "tier": "",
+                    "inputUsdPer1m": None,
+                    "outputUsdPer1m": None,
+                },
+            )
+        providers.append(
             {
-                "id": info.id,
-                "label": info.label,
-                "configured": endpoint(settings, info.id) is not None,
+                "id": provider.id,
+                "label": provider.label,
+                "configured": endpoint(settings, provider.id) is not None,
                 "models": models,
             }
         )
-    return options
+    return {
+        "current": current.to_dict(),
+        "providers": providers,
+        "pricing": {
+            "inputTokensPerQuestion": catalog.input_tokens_per_question,
+            "outputTokensPerQuestion": catalog.output_tokens_per_question,
+            "source": "config/llm_catalog.py",
+        },
+    }
 
 
 def _from_row(settings: Settings, row: AppSetting) -> GovernedLlm:
     base = default_llm(settings)
+    catalog = load_catalog(settings)
     value = row.value or {}
     provider = str(value.get("provider") or base.provider)
-    if provider not in PROVIDERS:
+    if catalog.providers and catalog.provider(provider) is None:
         provider = base.provider
     return GovernedLlm(
         provider=provider,
@@ -144,6 +176,7 @@ def _from_row(settings: Settings, row: AppSetting) -> GovernedLlm:
         max_tokens=int(value.get("max_tokens", base.max_tokens)),
         updated_at=row.updated_at.isoformat() if row.updated_at else None,
         updated_by=value.get("updated_by"),
+        provider_label=_label(catalog, provider),
     )
 
 
@@ -168,11 +201,13 @@ async def update_llm_config(
     temperature: float,
     max_tokens: int,
 ) -> GovernedLlm:
-    if provider not in PROVIDERS:
-        raise ValidationError(f"Unknown provider '{provider}'.")
+    catalog = load_catalog(settings)
+    entry = catalog.provider(provider)
+    if entry is None:
+        raise ValidationError(f"Unknown provider '{provider}'. Add it to config/llm_catalog.py.")
     if endpoint(settings, provider) is None:
         raise ValidationError(
-            f"{PROVIDERS[provider].label} is not configured on the server. "
+            f"{entry.label} is not configured on the server. "
             "Add its API key / endpoint to the API environment first."
         )
     model = model.strip()
@@ -180,6 +215,9 @@ async def update_llm_config(
         raise ValidationError("Choose a model name (up to 120 characters).")
 
     before = await sync_llm_config(session, settings)
+    known = {m.id for m in entry.models}
+    if known and model not in known and not (provider == before.provider and model == before.model):
+        raise ValidationError(f"'{model}' is not a {entry.label} model in config/llm_catalog.py.")
     after = GovernedLlm(
         provider=provider,
         model=model,
@@ -187,6 +225,7 @@ async def update_llm_config(
         max_tokens=int(max_tokens),
         updated_at=datetime.now(UTC).isoformat(),
         updated_by=actor.username,
+        provider_label=entry.label,
     )
 
     changes: list[tuple[str, str]] = []
@@ -194,7 +233,7 @@ async def update_llm_config(
         changes.append(
             (
                 AdminAction.CHANGED_LLM_PROVIDER,
-                f"{PROVIDERS[before.provider].label} → {PROVIDERS[after.provider].label}",
+                f"{before.provider_label or before.provider} → {after.provider_label}",
             )
         )
     if before.model != after.model:

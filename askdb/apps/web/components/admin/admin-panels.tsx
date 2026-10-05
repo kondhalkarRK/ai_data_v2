@@ -22,7 +22,9 @@ import { Section } from "@/components/ui/page-shell";
 import { EmptyState, StatusPill } from "@/components/ui/status-pill";
 import {
   type AdminActionResult,
+  type CatalogModel,
   type ExecutionMode,
+  type LlmPricingAssumptions,
   useAdminAction,
   useAudit,
   useDqRules,
@@ -32,6 +34,7 @@ import {
   useUsageOverview,
 } from "@/hooks/use-admin";
 import { ApiError } from "@/lib/api-client";
+import { estimateCost, formatUsd } from "@/lib/llm-cost";
 import { cn } from "@/lib/utils";
 
 // --- shared ---------------------------------------------------------------------
@@ -120,7 +123,7 @@ function ResultNotice({ result, error }: { result: AdminActionResult | null; err
 const TABLE_HEAD = "px-3 py-2 text-left text-xs font-medium text-muted-foreground";
 const TABLE_CELL = "px-3 py-2 align-top";
 
-// --- 1. AI Governance -----------------------------------------------------------
+// --- 1. LLM Settings ------------------------------------------------------------
 
 export function AiGovernancePanel() {
   const settings = useLlmSettings();
@@ -142,6 +145,7 @@ export function AiGovernancePanel() {
 
   const providers = settings.data.providers;
   const provider = providers.find((p) => p.id === form.provider);
+  const selectedModel = provider?.models.find((m) => m.id === form.model);
   const dirty =
     form.provider !== current.provider ||
     form.model !== current.model ||
@@ -174,7 +178,7 @@ export function AiGovernancePanel() {
                 value={form.provider}
                 onChange={(event) => {
                   const next = providers.find((p) => p.id === event.target.value);
-                  setDraft({ ...form, provider: event.target.value, model: next?.models[0] ?? form.model });
+                  setDraft({ ...form, provider: event.target.value, model: next?.models[0]?.id ?? "" });
                 }}
               >
                 {providers.map((option) => (
@@ -185,23 +189,26 @@ export function AiGovernancePanel() {
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">
-                Providers need their API key or endpoint in the API environment before they can be selected.
+                Loaded from {settings.data.pricing.source}. Providers need their API key or endpoint in the API
+                environment before they can be selected.
               </p>
             </div>
             <div className="space-y-1.5">
               <label htmlFor="llm-model" className="text-sm font-medium">Model</label>
-              <Input
+              <select
                 id="llm-model"
-                list="llm-model-options"
+                className="h-9 w-full rounded-[var(--radius-control)] border border-border bg-background px-3 text-sm"
                 value={form.model}
                 onChange={(event) => setDraft({ ...form, model: event.target.value })}
-              />
-              <datalist id="llm-model-options">
-                {(provider?.models ?? []).map((model) => (
-                  <option key={model} value={model} />
+              >
+                {(provider?.models ?? []).map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                    {option.tier ? ` · ${option.tier}` : ""}
+                  </option>
                 ))}
-              </datalist>
-              <p className="text-xs text-muted-foreground">Pick a suggested model or type the provider&apos;s model name.</p>
+              </select>
+              <p className="truncate text-xs text-muted-foreground">Model ID: {form.model || "—"}</p>
             </div>
             <div className="space-y-1.5">
               <div className="flex justify-between">
@@ -258,7 +265,55 @@ export function AiGovernancePanel() {
           {update.isError ? <ResultNotice result={null} error={update.error} /> : null}
         </CardContent>
       </Card>
+
+      <CostIntelligence model={selectedModel} pricing={settings.data.pricing} />
     </div>
+  );
+}
+
+function CostIntelligence({ model, pricing }: { model: CatalogModel | undefined; pricing: LlmPricingAssumptions }) {
+  const estimate = model
+    ? estimateCost(
+        model.inputUsdPer1m,
+        model.outputUsdPer1m,
+        pricing.inputTokensPerQuestion,
+        pricing.outputTokensPerQuestion,
+      )
+    : null;
+  return (
+    <Card>
+      <CardContent className="space-y-4 pt-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <CardTitle className="text-base">LLM cost &amp; usage intelligence</CardTitle>
+          <span className="text-xs text-muted-foreground">Model: {model?.label ?? "—"}</span>
+        </div>
+        {model && estimate ? (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Kpi label="Input cost" value={formatUsd(model.inputUsdPer1m ?? 0)} hint="per 1M tokens" />
+              <Kpi label="Output cost" value={formatUsd(model.outputUsdPer1m ?? 0)} hint="per 1M tokens" />
+              <Kpi label="Est. cost per 1M tokens" value={formatUsd(estimate.per1mTokens)} hint="blended" />
+              <Kpi label="Est. cost per question" value={formatUsd(estimate.perQuestion)} />
+              <Kpi
+                label="Questions per $1"
+                value={estimate.questionsPerDollar == null ? "Unlimited" : `~${estimate.questionsPerDollar.toLocaleString()}`}
+                hint={estimate.questionsPerDollar == null ? "local model, no token cost" : undefined}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Indicative pricing from {pricing.source}. Assumes about{" "}
+              {pricing.inputTokensPerQuestion.toLocaleString()} input and{" "}
+              {pricing.outputTokensPerQuestion.toLocaleString()} output tokens per AI Chat question; questions
+              answered by the semantic layer or cache use no tokens.
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            This model has no pricing in {pricing.source}. Add usd_per_1m_input and usd_per_1m_output to see estimates.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

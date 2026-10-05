@@ -1,4 +1,4 @@
-"""PoC AI governance: quotas, usage tracking, governed LLM settings and audit."""
+﻿"""PoC AI governance: quotas, usage tracking, governed LLM settings and audit."""
 
 from app.services.governance.audit import (
     AdminAction,
@@ -9,7 +9,7 @@ from app.services.governance.audit import (
 from app.services.governance.llm_config import (
     active_llm,
     endpoint,
-    provider_options,
+    llm_settings_payload,
     sync_llm_config,
     update_llm_config,
 )
@@ -32,8 +32,8 @@ __all__ = [
     "enforce_quota",
     "execution_mode",
     "governance_overview",
+    "llm_settings_payload",
     "llm_usage_overview",
-    "provider_options",
     "record_admin_action",
     "record_login",
     "record_logout",

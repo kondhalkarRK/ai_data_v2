@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Bot, Database, Gauge, ScrollText, ShieldCheck } from "lucide-react";
+import { Activity, Bot, Database, DatabaseZap, Gauge, ScrollText, ShieldCheck } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 
@@ -12,6 +12,7 @@ import {
   SemanticAdminPanel,
   TrustAdminPanel,
 } from "@/components/admin/admin-panels";
+import { EntityCatalogAdminPanel } from "@/components/admin/entity-catalog-admin";
 import { PageHeader } from "@/components/shell/page-header";
 import { PageShell } from "@/components/ui/page-shell";
 import { EmptyState } from "@/components/ui/status-pill";
@@ -19,11 +20,12 @@ import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { id: "ai", label: "AI Governance", icon: Bot, panel: AiGovernancePanel },
+  { id: "ai", label: "LLM Settings", icon: Bot, panel: AiGovernancePanel },
   { id: "governance", label: "Hybrid AI Dashboard", icon: Activity, panel: GovernanceDashboardPanel },
   { id: "usage", label: "LLM Usage", icon: Gauge, panel: LlmUsagePanel },
   { id: "trust", label: "Data Trust Admin", icon: ShieldCheck, panel: TrustAdminPanel },
   { id: "semantic", label: "Semantic Admin", icon: Database, panel: SemanticAdminPanel },
+  { id: "catalog", label: "Entity Catalog (Admin)", icon: DatabaseZap, panel: EntityCatalogAdminPanel },
   { id: "audit", label: "Audit Center", icon: ScrollText, panel: AuditCenterPanel },
 ] as const;
 

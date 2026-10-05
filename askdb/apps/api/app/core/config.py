@@ -164,6 +164,8 @@ class Settings(BaseSettings):
     azure_openai_api_key: SecretStr = SecretStr("")
     azure_openai_base_url: str = ""  # e.g. https://<resource>.openai.azure.com/openai/v1
     ollama_base_url: str = "http://localhost:11434/v1"
+    # Providers / models / pricing for Admin → LLM Settings; empty = <repo>/../config/llm_catalog.py
+    llm_catalog_path: str = ""
 
     # --- rag ---------------------------------------------------------------
     upload_max_bytes: int = Field(default=26_214_400, ge=1)

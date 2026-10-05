@@ -18,16 +18,32 @@ export interface LlmConfig {
   updatedBy: string | null;
 }
 
+export interface CatalogModel {
+  id: string;
+  label: string;
+  tier: string;
+  /** Indicative USD per 1M tokens; null when the model is not priced in the catalog. */
+  inputUsdPer1m: number | null;
+  outputUsdPer1m: number | null;
+}
+
 export interface ProviderOption {
   id: string;
   label: string;
   configured: boolean;
-  models: string[];
+  models: CatalogModel[];
+}
+
+export interface LlmPricingAssumptions {
+  inputTokensPerQuestion: number;
+  outputTokensPerQuestion: number;
+  source: string;
 }
 
 export interface LlmSettingsResponse {
   current: LlmConfig;
   providers: ProviderOption[];
+  pricing: LlmPricingAssumptions;
 }
 
 type ModeCounts = Record<ExecutionMode, number>;

@@ -9,6 +9,7 @@ import { type ActionKey } from "@/components/chat/action-toolbar";
 import { ResponseCard } from "@/components/chat/response-card";
 import { applyChatSseEvent } from "@/components/chat/sse";
 import type { ChatMessage } from "@/components/chat/types";
+import { ChatQuotaWidget } from "@/components/governance/chat-quota-widget";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { myUsageKey, quotaMessage } from "@/hooks/use-my-usage";
@@ -214,21 +215,24 @@ export function ChatWorkspace() {
             Grounded NLQ · table, chart, and SQL in one place
           </p>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          className="gap-1.5"
-          onClick={() => setPanelOpen((value) => !value)}
-          aria-pressed={panelOpen}
-        >
-          {panelOpen ? (
-            <PanelRightClose className="size-3.5" />
-          ) : (
-            <PanelRightOpen className="size-3.5" />
-          )}
-          {panelOpen ? "Hide panel" : "Show panel"}
-        </Button>
+        <div className="flex items-center gap-3">
+          <ChatQuotaWidget />
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => setPanelOpen((value) => !value)}
+            aria-pressed={panelOpen}
+          >
+            {panelOpen ? (
+              <PanelRightClose className="size-3.5" />
+            ) : (
+              <PanelRightOpen className="size-3.5" />
+            )}
+            {panelOpen ? "Hide panel" : "Show panel"}
+          </Button>
+        </div>
       </div>
 
       <div

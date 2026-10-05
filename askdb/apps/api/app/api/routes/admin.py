@@ -1,4 +1,4 @@
-"""Admin Center: AI governance, usage dashboards, DQ / semantic refreshes and the audit log."""
+﻿"""Admin Center: AI governance, usage dashboards, DQ / semantic refreshes and the audit log."""
 
 from __future__ import annotations
 
@@ -33,8 +33,8 @@ from app.services.governance import (
     audit_counts,
     audit_log,
     governance_overview,
+    llm_settings_payload,
     llm_usage_overview,
-    provider_options,
     record_admin_action,
     sync_llm_config,
     update_llm_config,
@@ -79,15 +79,15 @@ async def get_llm(
     admin: RequireAdmin, session: SessionDep, settings: SettingsDep
 ) -> dict[str, Any]:
     del admin
-    current = await sync_llm_config(session, settings)
-    return {"current": current.to_dict(), "providers": provider_options(settings)}
+    await sync_llm_config(session, settings)
+    return llm_settings_payload(settings)
 
 
 @router.put("/llm")
 async def put_llm(
     body: UpdateLlmRequest, admin: RequireAdmin, session: SessionDep, settings: SettingsDep
 ) -> dict[str, Any]:
-    current = await update_llm_config(
+    await update_llm_config(
         session,
         settings,
         admin,
@@ -96,7 +96,7 @@ async def put_llm(
         temperature=body.temperature,
         max_tokens=body.max_tokens,
     )
-    return {"current": current.to_dict(), "providers": provider_options(settings)}
+    return llm_settings_payload(settings)
 
 
 # --- dashboards ----------------------------------------------------------------

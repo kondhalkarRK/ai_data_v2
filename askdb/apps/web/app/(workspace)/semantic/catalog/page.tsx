@@ -1,7 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { SemanticAtlasShell } from "@/components/semantic/semantic-atlas-shell";
-
+/** The Entity Catalog is an admin governance tool in the Admin Center. */
 export default function EntityCatalogPage() {
-  return <SemanticAtlasShell initialTab="catalog" />;
+  redirect("/admin?tab=catalog");
 }

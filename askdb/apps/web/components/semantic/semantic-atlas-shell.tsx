@@ -1,12 +1,11 @@
 "use client";
 
-import { Boxes, DatabaseZap, Network } from "lucide-react";
+import { Boxes, Network } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { LoadingState } from "@/components/loading/loading-state";
 import { OntologyBrowser } from "@/components/ontology/ontology-browser";
-import { EntityCatalog } from "@/components/semantic/entity-catalog";
 import { SemanticModelPanel } from "@/components/semantic/semantic-model-panel";
 import { IndustrySwitcher } from "@/components/shell/industry-switcher";
 import { PageHeader } from "@/components/shell/page-header";
@@ -16,8 +15,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { id: "model", label: "Semantic Model", icon: Boxes },
-  { id: "graph", label: "Knowledge Graph", icon: Network },
-  { id: "catalog", label: "Entity Catalog", icon: DatabaseZap },
+  { id: "graph", label: "Knowledge Graph (Beta)", icon: Network },
 ] as const;
 
 export type AtlasTab = (typeof TABS)[number]["id"];
@@ -25,7 +23,6 @@ export type AtlasTab = (typeof TABS)[number]["id"];
 function tabFromPath(pathname: string): AtlasTab | null {
   if (pathname.includes("/models") || pathname.includes("/glossary")) return "model";
   if (pathname.includes("/ontology")) return "graph";
-  if (pathname.includes("/catalog")) return "catalog";
   return null;
 }
 
@@ -118,7 +115,6 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
           <AtlasTabs tab={tab} onSelect={selectTab} />
 
           {tab === "model" ? <SemanticModelPanel key={searchQuery} pack={pack.data} initialQuery={searchQuery} /> : null}
-          {tab === "catalog" ? <EntityCatalog /> : null}
         </>
       )}
     </div>
@@ -139,7 +135,7 @@ function AtlasTabs({
       className={cn(
         compact
           ? "ml-auto flex shrink-0 gap-1"
-          : "mb-8 grid grid-cols-3 gap-3",
+          : "mb-8 grid grid-cols-2 gap-3",
       )}
       role="tablist"
       aria-label="Semantic Atlas"
