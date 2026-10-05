@@ -26,17 +26,26 @@ AnalyticsVizKind = Literal[
 
 AnalyticsAnalysisKind = Literal[
     "basic",
-    "breakdown",
-    "ranking",
+    "trend",
+    "comparison",
     "top_n",
     "bottom_n",
+    "top_n_per_group",
+    "ranking",
     "contribution",
     "running_total",
     "moving_average",
     "period_growth",
-    "trend",
+    "yoy_growth",
+    "growth_contribution",
+    "actual_vs_target",
+    "above_average",
+    # Saved before the redesign: "breakdown" is Standard, "variance" is Above average.
+    "breakdown",
     "variance",
 ]
+
+RankMethod = Literal["rank", "dense_rank", "row_number"]
 
 
 class AnalyticsFilterSpec(ApiModel):
@@ -46,7 +55,7 @@ class AnalyticsFilterSpec(ApiModel):
 
 
 class AnalyticsSpec(ApiModel):
-    """Business-facing analysis definition — never exposes physical tables."""
+    """Business-facing analysis definition; never exposes physical tables."""
 
     metrics: list[str] = Field(
         default_factory=list,
@@ -65,6 +74,8 @@ class AnalyticsSpec(ApiModel):
     date_preset: str | None = None
     date_from: str | None = None
     date_to: str | None = None
+    rank_method: RankMethod = "rank"
+    window: int = Field(default=3, ge=2, le=24, description="Moving-average periods")
 
 
 class AnalyticsRunRequest(ApiModel):
@@ -75,12 +86,15 @@ class AnalyticsChartPayload(ApiModel):
     type: str
     x: str
     y: str
+    series: list[str] = Field(default_factory=list)
     points: list[dict[str, Any]] = Field(default_factory=list)
+    note: str | None = None
 
 
 class AnalyticsInsights(ApiModel):
     executive: str
     analyst: str
+    narration: dict[str, Any] | None = None
 
 
 class AnalyticsRunResponse(ApiModel):
@@ -139,3 +153,102 @@ class SavedAnalysisResponse(ApiModel):
     sql_snapshot: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+# --- guided building ---------------------------------------------------------
+
+FixAction = Literal[
+    "add_dimension",
+    "remove_dimension",
+    "set_analysis",
+    "set_metric",
+    "open_filters",
+    "remove_filter",
+    "clear_date",
+]
+
+
+class AnalyticsFix(ApiModel):
+    """One click that turns an invalid selection into a valid one."""
+
+    label: str
+    action: FixAction
+    value: str | None = None
+
+
+class AnalyticsIssue(ApiModel):
+    code: str
+    severity: Literal["error", "warning"] = "error"
+    message: str
+    fixes: list[AnalyticsFix] = Field(default_factory=list)
+
+
+class AnalyticsOption(ApiModel):
+    id: str
+    label: str
+    available: bool = True
+    reason: str | None = None
+
+
+class AnalyticsSuggestion(ApiModel):
+    label: str
+    description: str
+    spec: AnalyticsSpec
+
+
+class AnalyticsInspection(ApiModel):
+    valid: bool
+    issues: list[AnalyticsIssue] = Field(default_factory=list)
+    analyses: list[AnalyticsOption] = Field(default_factory=list)
+    metrics: list[AnalyticsOption] = Field(default_factory=list)
+    dimensions: list[AnalyticsOption] = Field(default_factory=list)
+    suggestions: list[AnalyticsSuggestion] = Field(default_factory=list)
+
+
+class AnalyticsInspectRequest(ApiModel):
+    spec: AnalyticsSpec
+
+
+class MetricCapability(ApiModel):
+    id: str
+    label: str
+    description: str | None = None
+    format: str
+    additive: bool
+    supported: bool = True
+    reason: str | None = None
+
+
+class DimensionCapability(ApiModel):
+    id: str
+    label: str
+    group: str
+    time: bool = False
+    filter_domain: str | None = None
+
+
+class AnalysisCapability(ApiModel):
+    id: str
+    label: str
+    group: str
+    description: str
+    requirement: str
+
+
+class FilterDomainCapability(ApiModel):
+    id: str
+    label: str
+
+
+class DatePresetCapability(ApiModel):
+    id: str
+    label: str
+
+
+class AnalyticsCapabilities(ApiModel):
+    metrics: list[MetricCapability]
+    dimensions: list[DimensionCapability]
+    analyses: list[AnalysisCapability]
+    filter_domains: list[FilterDomainCapability]
+    date_presets: list[DatePresetCapability]
+    data_as_of: str | None = None

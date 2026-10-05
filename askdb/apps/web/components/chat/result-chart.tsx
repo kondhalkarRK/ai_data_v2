@@ -182,9 +182,22 @@ function prettyKey(key: string): string {
   return key.replace(/_/g, " ");
 }
 
-function numberOf(value: unknown): number {
+function maybeNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
   const n = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Axis bounds that always include zero, so negative values (growth %) draw below the baseline. */
+function axisBounds(values: number[]): { min: number; max: number; range: number } {
+  const max = Math.max(0, ...values);
+  const min = Math.min(0, ...values);
+  const range = max - min || 1;
+  return { min, max: max === min ? min + 1 : max, range };
+}
+
+function tickLabel(value: number): string {
+  return Math.abs(value) >= 1000 ? Math.round(value).toLocaleString() : String(Math.round(value * 10) / 10);
 }
 
 function MultiSeriesChart({
@@ -204,11 +217,14 @@ function MultiSeriesChart({
   const pad = { top: 28, right: 16, bottom: 52, left: 58 };
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
-  const maxY = Math.max(1, ...rows.flatMap((row) => seriesKeys.map((key) => numberOf(row[key]))));
+  const bounds = axisBounds(
+    rows.flatMap((row) => seriesKeys.map((key) => maybeNumber(row[key])).filter((v): v is number => v != null)),
+  );
   const slot = plotW / Math.max(rows.length, 1);
   const barW = Math.max(3, (slot - 6) / seriesKeys.length);
   const cx = (index: number) => pad.left + index * slot + slot / 2;
-  const cy = (value: number) => pad.top + (1 - value / maxY) * plotH;
+  const cy = (value: number) => pad.top + ((bounds.max - value) / bounds.range) * plotH;
+  const baseline = cy(0);
 
   return (
     <div className="relative w-full space-y-2 overflow-x-auto">
@@ -219,24 +235,28 @@ function MultiSeriesChart({
             <g key={t}>
               <line x1={pad.left} x2={width - pad.right} y1={y} y2={y} stroke="currentColor" className="text-border" />
               <text x={pad.left - 8} y={y + 3} textAnchor="end" className="fill-muted-foreground text-[10px]">
-                {Math.round(maxY * t).toLocaleString()}
+                {tickLabel(bounds.min + bounds.range * t)}
               </text>
             </g>
           );
         })}
+        {bounds.min < 0 ? (
+          <line x1={pad.left} x2={width - pad.right} y1={baseline} y2={baseline} stroke="currentColor" className="text-muted-foreground" strokeWidth={1.25} />
+        ) : null}
         {seriesKeys.map((key, s) => {
           const color = SERIES_PALETTE[s % SERIES_PALETTE.length];
           if (chartType === "bar") {
             return rows.map((row, index) => {
-              const value = numberOf(row[key]);
-              const h = (value / maxY) * plotH;
+              const value = maybeNumber(row[key]);
+              if (value == null) return null;
+              const y = cy(value);
               return (
                 <rect
                   key={`${key}-${index}`}
                   x={pad.left + index * slot + 3 + s * barW}
-                  y={pad.top + plotH - h}
+                  y={Math.min(y, baseline)}
                   width={Math.max(1, barW - 1)}
-                  height={Math.max(1, h)}
+                  height={Math.max(1, Math.abs(baseline - y))}
                   rx={2}
                   fill={color}
                   opacity={hover == null || hover === index ? 0.9 : 0.45}
@@ -244,14 +264,25 @@ function MultiSeriesChart({
               );
             });
           }
+          let pen = false;
           const path = rows
-            .map((row, index) => `${index === 0 ? "M" : "L"} ${cx(index)} ${cy(numberOf(row[key]))}`)
+            .map((row, index) => {
+              const value = maybeNumber(row[key]);
+              if (value == null) {
+                pen = false;
+                return "";
+              }
+              const segment = `${pen ? "L" : "M"} ${cx(index)} ${cy(value)}`;
+              pen = true;
+              return segment;
+            })
+            .filter(Boolean)
             .join(" ");
           return (
             <g key={key}>
-              {chartType === "area" ? (
+              {chartType === "area" && s === 0 ? (
                 <path
-                  d={`${path} L ${cx(rows.length - 1)} ${pad.top + plotH} L ${cx(0)} ${pad.top + plotH} Z`}
+                  d={`${path} L ${cx(rows.length - 1)} ${baseline} L ${cx(0)} ${baseline} Z`}
                   fill={color}
                   opacity={0.12}
                 />
@@ -259,15 +290,19 @@ function MultiSeriesChart({
               {chartType !== "scatter" ? (
                 <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
               ) : null}
-              {rows.map((row, index) => (
-                <circle
-                  key={index}
-                  cx={cx(index)}
-                  cy={cy(numberOf(row[key]))}
-                  r={chartType === "scatter" ? 4 : hover === index ? 4 : 2.25}
-                  fill={color}
-                />
-              ))}
+              {rows.map((row, index) => {
+                const value = maybeNumber(row[key]);
+                if (value == null) return null;
+                return (
+                  <circle
+                    key={index}
+                    cx={cx(index)}
+                    cy={cy(value)}
+                    r={chartType === "scatter" ? 4 : hover === index ? 4 : 2.25}
+                    fill={color}
+                  />
+                );
+              })}
             </g>
           );
         })}
@@ -308,7 +343,10 @@ function MultiSeriesChart({
         <HoverCard
           title={String(rows[hover]?.[xKey] ?? "")}
           detail={seriesKeys
-            .map((key) => `${prettyKey(key)}: ${numberOf(rows[hover]?.[key]).toLocaleString()}`)
+            .map((key) => {
+              const value = maybeNumber(rows[hover]?.[key]);
+              return `${prettyKey(key)}: ${value == null ? "—" : value.toLocaleString()}`;
+            })
             .join(" · ")}
         />
       ) : null}
@@ -370,27 +408,28 @@ function CartesianChart({
   const width = 640;
   const height = 260;
   const pad = { top: 28, right: 16, bottom: 52, left: 58 };
-  const maxY = Math.max(...points.map((p) => p.y), 1);
+  const bounds = axisBounds(points.map((p) => p.y));
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
   const barW = Math.max(6, plotW / points.length - 4);
   const anomalyByIndex = new Map(anomalies.map((item) => [item.index, item]));
+  const toY = (value: number) => pad.top + ((bounds.max - value) / bounds.range) * plotH;
+  const baseline = toY(0);
 
   const coords = points.map((point, index) => {
     const x =
       chartType === "scatter"
         ? pad.left + ((index + 0.5) / points.length) * plotW
         : pad.left + index * (plotW / points.length) + 2 + barW / 2;
-    const y = pad.top + (1 - point.y / maxY) * plotH;
-    return { ...point, cx: x, cy: y };
+    return { ...point, cx: x, cy: toY(point.y) };
   });
 
   const linePath = coords
     .map((point, index) => `${index === 0 ? "M" : "L"} ${point.cx} ${point.cy}`)
     .join(" ");
-  const areaPath = `${linePath} L ${coords[coords.length - 1]?.cx ?? pad.left} ${
-    pad.top + plotH
-  } L ${coords[0]?.cx ?? pad.left} ${pad.top + plotH} Z`;
+  const areaPath = `${linePath} L ${coords[coords.length - 1]?.cx ?? pad.left} ${baseline} L ${
+    coords[0]?.cx ?? pad.left
+  } ${baseline} Z`;
 
   return (
     <div className="relative w-full overflow-x-auto">
@@ -414,11 +453,14 @@ function CartesianChart({
                 textAnchor="end"
                 className="fill-muted-foreground text-[10px]"
               >
-                {Math.round(maxY * t).toLocaleString()}
+                {tickLabel(bounds.min + bounds.range * t)}
               </text>
             </g>
           );
         })}
+        {bounds.min < 0 ? (
+          <line x1={pad.left} x2={width - pad.right} y1={baseline} y2={baseline} stroke="currentColor" className="text-muted-foreground" strokeWidth={1.25} />
+        ) : null}
 
         {chartType === "area" ? (
           <path d={areaPath} fill={CHART_SERIES.primary} opacity={0.18} />
@@ -436,7 +478,6 @@ function CartesianChart({
 
         {coords.map((point, index) => {
           const anomaly = anomalyByIndex.get(point.index);
-          const h = (point.y / maxY) * plotH;
           const barX = pad.left + index * (plotW / points.length) + 2;
           return (
             <g
@@ -447,9 +488,9 @@ function CartesianChart({
               {chartType === "bar" ? (
                 <rect
                   x={barX}
-                  y={pad.top + plotH - h}
+                  y={Math.min(point.cy, baseline)}
                   width={barW}
-                  height={Math.max(2, h)}
+                  height={Math.max(2, Math.abs(baseline - point.cy))}
                   rx={4}
                   fill={anomaly ? CHART_SERIES.attention : CHART_SERIES.primary}
                   opacity={hover === point.index ? 1 : 0.88}

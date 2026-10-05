@@ -22,6 +22,9 @@ from app.db.session import DatabaseRegistry
 from app.schemas.analytics import (
     AnalyticsAssistRequest,
     AnalyticsAssistResponse,
+    AnalyticsCapabilities,
+    AnalyticsInspection,
+    AnalyticsInspectRequest,
     AnalyticsRunRequest,
     AnalyticsRunResponse,
     FilterValuesResponse,
@@ -30,7 +33,7 @@ from app.schemas.analytics import (
     SavedAnalysisUpdate,
 )
 from app.semantic.service import SemanticService
-from app.services.analytics.runner import AnalyticsService
+from app.services.analytics.runner import AnalyticsService, inspect_spec
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -62,6 +65,29 @@ def _service(
 
 
 AnalyticsServiceDep = Annotated[AnalyticsService, Depends(_service)]
+
+
+@router.get(
+    "/capabilities",
+    response_model=AnalyticsCapabilities,
+    summary="Metrics, dimensions, analyses, filters and date ranges the builder supports",
+)
+async def capabilities(service: AnalyticsServiceDep) -> AnalyticsCapabilities:
+    return await service.capabilities()
+
+
+@router.post(
+    "/inspect",
+    response_model=AnalyticsInspection,
+    summary="Validate a selection and return available options, fixes and suggestions",
+)
+async def inspect_analysis(
+    body: AnalyticsInspectRequest,
+    _user: RequireUser,
+    industry: ActiveIndustry,
+    semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
+) -> AnalyticsInspection:
+    return await inspect_spec(semantic_service, industry, body.spec)
 
 
 @router.post("/run", response_model=AnalyticsRunResponse, summary="Run a structured analysis")

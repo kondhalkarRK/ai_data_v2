@@ -67,6 +67,9 @@ ignore = ["S101"]
 "app/api/routes/*" = ["B008"]  # FastAPI Depends/Query/File defaults
 "app/services/kpi/*" = ["S608", "SIM108"]
 "app/services/chat/*" = ["E501"]
+"app/services/analytics/*" = ["E501"]
+"app/services/analytics/compiler.py" = ["E501", "S608"]  # identifiers from the governed catalog
+"app/services/analytics/runner.py" = ["E501", "S608"]
 "app/services/kpi/windows.py" = ["E501", "SIM108"]
 "app/services/kpi/insurance.py" = ["E501", "S608"]
 

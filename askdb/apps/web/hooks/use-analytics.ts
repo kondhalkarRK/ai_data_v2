@@ -2,12 +2,15 @@
 
 import type {
   AnalyticsAssistResponse,
+  AnalyticsCapabilities,
+  AnalyticsInspection,
   AnalyticsRunResponse,
   AnalyticsSpec,
   FilterValuesResponse,
   SavedAnalysis,
 } from "@nql/shared-types";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as React from "react";
 
 import { useActiveIndustry } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
@@ -24,7 +27,40 @@ export const EMPTY_SPEC: AnalyticsSpec = {
   datePreset: null,
   dateFrom: null,
   dateTo: null,
+  rankMethod: "rank",
+  window: 3,
 };
+
+export function useAnalyticsCapabilities() {
+  const industry = useActiveIndustry();
+  return useQuery({
+    queryKey: ["analytics-capabilities", industry],
+    queryFn: () =>
+      apiClient.get<AnalyticsCapabilities>("/api/v1/analytics/capabilities", { industry }),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Live validation: available options, issues with fixes and suggestions for the spec. */
+export function useAnalyticsInspect(spec: AnalyticsSpec, delayMs = 250) {
+  const industry = useActiveIndustry();
+  const [debounced, setDebounced] = React.useState(spec);
+  React.useEffect(() => {
+    const handle = window.setTimeout(() => setDebounced(spec), delayMs);
+    return () => window.clearTimeout(handle);
+  }, [spec, delayMs]);
+  return useQuery({
+    queryKey: ["analytics-inspect", industry, JSON.stringify(debounced)],
+    queryFn: () =>
+      apiClient.post<AnalyticsInspection>(
+        "/api/v1/analytics/inspect",
+        { spec: debounced },
+        { industry },
+      ),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
 
 export function useAnalyticsRun() {
   const industry = useActiveIndustry();

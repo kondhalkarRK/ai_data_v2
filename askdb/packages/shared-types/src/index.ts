@@ -378,16 +378,25 @@ export type AnalyticsVizKind =
 
 export type AnalyticsAnalysisKind =
   | "basic"
-  | "breakdown"
-  | "ranking"
+  | "trend"
+  | "comparison"
   | "top_n"
   | "bottom_n"
+  | "top_n_per_group"
+  | "ranking"
   | "contribution"
   | "running_total"
   | "moving_average"
   | "period_growth"
-  | "trend"
+  | "yoy_growth"
+  | "growth_contribution"
+  | "actual_vs_target"
+  | "above_average"
+  /** Saved before the redesign: Standard and Above average. */
+  | "breakdown"
   | "variance";
+
+export type AnalyticsRankMethod = "rank" | "dense_rank" | "row_number";
 
 export interface AnalyticsFilterSpec {
   domain: string;
@@ -407,6 +416,32 @@ export interface AnalyticsSpec {
   datePreset?: string | null;
   dateFrom?: string | null;
   dateTo?: string | null;
+  rankMethod?: AnalyticsRankMethod;
+  window?: number;
+}
+
+export interface AnalyticsNarration {
+  summary: string;
+  highlights: string[];
+  insight?: string | null;
+  focus?: string | null;
+}
+
+export interface AnalyticsRunMeta {
+  path?: string;
+  analysis?: AnalyticsAnalysisKind;
+  metric?: string | null;
+  metricFormat?: string;
+  valueColumn?: string;
+  dimensions?: string[];
+  rowCount?: number;
+  truncated?: boolean;
+  dataAsOf?: string | null;
+  dateLabel?: string | null;
+  partialPeriod?: string | null;
+  notes?: string[];
+  warnings?: string[];
+  [key: string]: unknown;
 }
 
 export interface AnalyticsRunResponse {
@@ -418,11 +453,74 @@ export interface AnalyticsRunResponse {
     type: string;
     x: string;
     y: string;
+    series?: string[];
     points: Array<Record<string, unknown>>;
+    note?: string | null;
   } | null;
   recommendedViz: AnalyticsVizKind;
-  insights?: { executive: string; analyst: string } | null;
-  meta: Record<string, unknown>;
+  insights?: { executive: string; analyst: string; narration?: AnalyticsNarration | null } | null;
+  meta: AnalyticsRunMeta;
+}
+
+export type AnalyticsFixAction =
+  | "add_dimension"
+  | "remove_dimension"
+  | "set_analysis"
+  | "set_metric"
+  | "open_filters"
+  | "remove_filter"
+  | "clear_date";
+
+export interface AnalyticsFix {
+  label: string;
+  action: AnalyticsFixAction;
+  value?: string | null;
+}
+
+export interface AnalyticsIssue {
+  code: string;
+  severity: "error" | "warning";
+  message: string;
+  fixes: AnalyticsFix[];
+}
+
+export interface AnalyticsOption {
+  id: string;
+  label: string;
+  available: boolean;
+  reason?: string | null;
+}
+
+export interface AnalyticsSuggestion {
+  label: string;
+  description: string;
+  spec: AnalyticsSpec;
+}
+
+export interface AnalyticsInspection {
+  valid: boolean;
+  issues: AnalyticsIssue[];
+  analyses: AnalyticsOption[];
+  metrics: AnalyticsOption[];
+  dimensions: AnalyticsOption[];
+  suggestions: AnalyticsSuggestion[];
+}
+
+export interface AnalyticsCapabilities {
+  metrics: Array<{
+    id: string;
+    label: string;
+    description?: string | null;
+    format: string;
+    additive: boolean;
+    supported: boolean;
+    reason?: string | null;
+  }>;
+  dimensions: Array<{ id: string; label: string; group: string; time: boolean; filterDomain?: string | null }>;
+  analyses: Array<{ id: AnalyticsAnalysisKind; label: string; group: string; description: string; requirement: string }>;
+  filterDomains: Array<{ id: string; label: string }>;
+  datePresets: Array<{ id: string; label: string }>;
+  dataAsOf?: string | null;
 }
 
 export interface AnalyticsAssistResponse {

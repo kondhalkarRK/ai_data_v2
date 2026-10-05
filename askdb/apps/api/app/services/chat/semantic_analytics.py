@@ -158,6 +158,12 @@ def _metric_spec(plan: QuestionPlan) -> MetricSpec:
                 "SUM({alias}.total_sales) / NULLIF(SUM({alias}.order_qty), 0)",
                 "average_selling_price",
             ),
+            "active_salespeople": MetricSpec(
+                "active_salespeople",
+                "fact_sales",
+                "COUNT(DISTINCT {alias}.sales_person_id)",
+                "active_salespeople",
+            ),
         }
     else:
         specs = {

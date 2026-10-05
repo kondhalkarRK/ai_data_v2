@@ -69,6 +69,7 @@ MetricKind = Literal[
     "renewal_rate",
     "loss_ratio",
     "average_selling_price",
+    "active_salespeople",
     "unknown",
 ]
 OrderDirection = Literal["asc", "desc"]

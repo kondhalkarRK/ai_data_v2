@@ -256,7 +256,8 @@ def spec_to_plan(spec: AnalyticsSpec, industry: Industry, pack: Any | None) -> Q
 
 def plan_to_builder_spec(plan: QuestionPlan, pack: Any | None = None) -> AnalyticsSpec:
     """Inverse map for AI Assist — surface business-friendly measure/dimension ids."""
-    from app.schemas.analytics import AnalyticsFilterSpec, AnalyticsSpec as Spec
+    from app.schemas.analytics import AnalyticsFilterSpec
+    from app.schemas.analytics import AnalyticsSpec as Spec
 
     metric_to_measure: dict[str, str] = {
         "revenue": "revenue",
