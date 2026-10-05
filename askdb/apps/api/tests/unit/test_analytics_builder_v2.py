@@ -13,7 +13,12 @@ from app.semantic.service import SemanticService
 from app.services.analytics.catalog import Catalog
 from app.services.analytics.compiler import compile_builder_query, date_window, driver_sql
 from app.services.analytics.insights import InsightContext, build_narration
-from app.services.analytics.runner import _partial_period, assist_spec, build_chart
+from app.services.analytics.runner import (
+    _partial_period,
+    assist_spec,
+    build_chart,
+    capabilities_for,
+)
 from app.services.chat.question_understanding import understand_question
 
 
@@ -42,7 +47,9 @@ def codes(catalog: Catalog, s: AnalyticsSpec) -> list[str]:
 
 
 def test_salesperson_as_metric_is_explained_with_fixes() -> None:
-    report = auto().inspect(spec(metrics=["salesperson"], dimensions=["month"], analysis="moving_average"))
+    report = auto().inspect(
+        spec(metrics=["salesperson"], dimensions=["month"], analysis="moving_average")
+    )
     assert not report.valid
     issue = report.issues[0]
     assert issue.code == "metric_is_dimension"
@@ -57,52 +64,84 @@ def test_salesperson_as_metric_is_explained_with_fixes() -> None:
     ["moving_average", "running_total", "period_growth", "yoy_growth", "trend"],
 )
 def test_time_analyses_need_a_time_dimension(analysis: str) -> None:
-    report = auto().inspect(spec(metrics=["revenue"], dimensions=["salesperson"], analysis=analysis))
+    report = auto().inspect(
+        spec(metrics=["revenue"], dimensions=["salesperson"], analysis=analysis)
+    )
     assert [i.code for i in report.issues] == ["time_required"]
     assert {f.value for f in report.issues[0].fixes} == {"month", "quarter", "year"}
 
 
 @pytest.mark.parametrize("analysis", ["top_n", "bottom_n", "ranking", "contribution"])
 def test_ranking_needs_a_business_dimension(analysis: str) -> None:
-    assert codes(auto(), spec(metrics=["revenue"], dimensions=["month"], analysis=analysis)) == ["category_required"]
+    assert codes(auto(), spec(metrics=["revenue"], dimensions=["month"], analysis=analysis)) == [
+        "category_required"
+    ]
 
 
 def test_top_n_with_time_offers_top_n_within_group() -> None:
-    report = auto().inspect(spec(metrics=["revenue"], dimensions=["model", "month"], analysis="top_n"))
+    report = auto().inspect(
+        spec(metrics=["revenue"], dimensions=["model", "month"], analysis="top_n")
+    )
     issue = report.issues[0]
     assert issue.code == "time_not_allowed"
     assert any(f.value == "top_n_per_group" for f in issue.fixes)
 
 
 def test_comparison_needs_two_values() -> None:
-    one = spec(metrics=["revenue"], dimensions=["make"], analysis="comparison",
-               filters=[{"domain": "Make", "values": ["Tata"]}])
-    two = spec(metrics=["revenue"], dimensions=["make"], analysis="comparison",
-               filters=[{"domain": "Make", "values": ["Tata", "Mahindra"]}])
+    one = spec(
+        metrics=["revenue"],
+        dimensions=["make"],
+        analysis="comparison",
+        filters=[{"domain": "Make", "values": ["Tata"]}],
+    )
+    two = spec(
+        metrics=["revenue"],
+        dimensions=["make"],
+        analysis="comparison",
+        filters=[{"domain": "Make", "values": ["Tata", "Mahindra"]}],
+    )
     assert codes(auto(), one) == ["compare_values_required"]
     assert codes(auto(), two) == []
 
 
 def test_running_total_rejects_ratio_metrics() -> None:
-    report = auto().inspect(spec(metrics=["average_selling_price"], dimensions=["month"], analysis="running_total"))
+    report = auto().inspect(
+        spec(metrics=["average_selling_price"], dimensions=["month"], analysis="running_total")
+    )
     assert report.issues[0].code == "metric_not_additive"
     assert report.issues[0].fixes[0].value == "moving_average"
 
 
 def test_actual_vs_target_rules() -> None:
-    assert codes(auto(), spec(metrics=["orders"], dimensions=["make"], analysis="actual_vs_target")) == ["target_metric"]
-    assert codes(auto(), spec(metrics=["revenue"], dimensions=["region"], analysis="actual_vs_target")) == [
-        "target_dimension"
-    ]
-    region = spec(metrics=["revenue"], dimensions=["make"], analysis="actual_vs_target",
-                  filters=[{"domain": "Region", "values": ["North"]}])
+    assert codes(
+        auto(), spec(metrics=["orders"], dimensions=["make"], analysis="actual_vs_target")
+    ) == ["target_metric"]
+    assert codes(
+        auto(), spec(metrics=["revenue"], dimensions=["region"], analysis="actual_vs_target")
+    ) == ["target_dimension"]
+    region = spec(
+        metrics=["revenue"],
+        dimensions=["make"],
+        analysis="actual_vs_target",
+        filters=[{"domain": "Region", "values": ["North"]}],
+    )
     assert codes(auto(), region) == ["target_filter"]
-    assert codes(auto(), spec(metrics=["revenue"], dimensions=["make", "month"], analysis="actual_vs_target")) == []
+    assert (
+        codes(
+            auto(),
+            spec(metrics=["revenue"], dimensions=["make", "month"], analysis="actual_vs_target"),
+        )
+        == []
+    )
 
 
 def test_insurance_blocks_fan_out_combinations() -> None:
-    assert codes(ins(), spec(metrics=["gross_written_premium"], dimensions=["claim_status"])) == ["dimension_incompatible"]
-    assert codes(ins(), spec(metrics=["loss_ratio"], dimensions=["region"])) == ["metric_unsupported"]
+    assert codes(ins(), spec(metrics=["gross_written_premium"], dimensions=["claim_status"])) == [
+        "dimension_incompatible"
+    ]
+    assert codes(ins(), spec(metrics=["loss_ratio"], dimensions=["region"])) == [
+        "metric_unsupported"
+    ]
     assert codes(ins(), spec(metrics=["claims_paid"], dimensions=["agent"])) == []
 
 
@@ -112,6 +151,21 @@ def test_unavailable_options_carry_reasons() -> None:
     assert not moving.available and "time dimension" in (moving.reason or "")
     ranking = next(o for o in report.analyses if o.id == "ranking")
     assert ranking.available
+
+
+async def test_capabilities_load_when_the_warehouse_is_down() -> None:
+    class _Semantic:
+        async def get_pack(self, industry: Industry) -> Any:
+            return _catalog(industry).pack
+
+    class _DownRegistry:
+        def analytics_connection(self, industry: Industry) -> Any:
+            raise ConnectionError("warehouse unreachable")
+
+    caps = await capabilities_for(_Semantic(), Industry.AUTOMOTIVE, _DownRegistry())  # type: ignore[arg-type]
+    dumped = caps.model_dump(by_alias=True)
+    assert dumped["metrics"] and dumped["dimensions"] and dumped["analyses"]
+    assert dumped["dataAsOf"] is None
 
 
 def test_suggestions_are_valid_and_role_aware() -> None:
@@ -126,7 +180,9 @@ def test_suggestions_are_valid_and_role_aware() -> None:
 
 
 def test_custom_date_validation() -> None:
-    bad = spec(metrics=["revenue"], date_preset="custom", date_from="2025-05-01", date_to="2025-01-01")
+    bad = spec(
+        metrics=["revenue"], date_preset="custom", date_from="2025-05-01", date_to="2025-01-01"
+    )
     assert codes(auto(), bad) == ["date_order"]
 
 
@@ -135,8 +191,13 @@ def test_custom_date_validation() -> None:
 
 def test_last_12_months_is_bounded_and_anchored_with_lookback() -> None:
     q = compile_builder_query(
-        spec(metrics=["revenue"], dimensions=["month"], analysis="moving_average", window=3,
-             date_preset="last_12_months"),
+        spec(
+            metrics=["revenue"],
+            dimensions=["month"],
+            analysis="moving_average",
+            window=3,
+            date_preset="last_12_months",
+        ),
         auto(),
     )
     assert "MAX(fact_sales_latest.sales_date)" in q.sql
@@ -152,7 +213,12 @@ def test_last_12_months_is_bounded_and_anchored_with_lookback() -> None:
 )
 def test_every_time_analysis_respects_the_date_filter(analysis: str) -> None:
     q = compile_builder_query(
-        spec(metrics=["units_sold"], dimensions=["month"], analysis=analysis, date_preset="last_12_months"),
+        spec(
+            metrics=["units_sold"],
+            dimensions=["month"],
+            analysis=analysis,
+            date_preset="last_12_months",
+        ),
         auto(),
     )
     assert "f.sales_date >=" in q.sql and "f.sales_date <" in q.sql
@@ -160,12 +226,18 @@ def test_every_time_analysis_respects_the_date_filter(analysis: str) -> None:
 
 def test_top_n_per_group_and_dense_rank() -> None:
     per_group = compile_builder_query(
-        spec(metrics=["revenue"], dimensions=["make", "model"], analysis="top_n_per_group", limit=3), auto()
+        spec(
+            metrics=["revenue"], dimensions=["make", "model"], analysis="top_n_per_group", limit=3
+        ),
+        auto(),
     )
     assert "ROW_NUMBER() OVER (PARTITION BY make ORDER BY revenue DESC" in per_group.sql
     assert "row_number <= 3" in per_group.sql
     dense = compile_builder_query(
-        spec(metrics=["revenue"], dimensions=["dealer"], analysis="ranking", rank_method="dense_rank"), auto()
+        spec(
+            metrics=["revenue"], dimensions=["dealer"], analysis="ranking", rank_method="dense_rank"
+        ),
+        auto(),
     )
     assert "DENSE_RANK() OVER (ORDER BY revenue DESC" in dense.sql
 
@@ -180,15 +252,21 @@ def test_yoy_uses_calendar_exact_self_join() -> None:
 
 
 def test_contribution_has_share_and_cumulative() -> None:
-    q = compile_builder_query(spec(metrics=["claims_paid"], dimensions=["line_of_business"],
-                                   analysis="contribution"), ins())
+    q = compile_builder_query(
+        spec(metrics=["claims_paid"], dimensions=["line_of_business"], analysis="contribution"),
+        ins(),
+    )
     assert "claims_paid_share_pct" in q.sql and "cumulative_share_pct" in q.sql
 
 
 def test_actual_vs_target_uses_complete_months_and_full_join() -> None:
     q = compile_builder_query(
-        spec(metrics=["units_sold"], dimensions=["make"], analysis="actual_vs_target",
-             filters=[{"domain": "Make", "values": ["Tata"]}]),
+        spec(
+            metrics=["units_sold"],
+            dimensions=["make"],
+            analysis="actual_vs_target",
+            filters=[{"domain": "Make", "values": ["Tata"]}],
+        ),
         auto(),
     )
     assert "SUM(t.target_units)" in q.sql
@@ -197,8 +275,15 @@ def test_actual_vs_target_uses_complete_months_and_full_join() -> None:
 
 
 def test_growth_contribution_compares_equal_windows() -> None:
-    q = compile_builder_query(spec(metrics=["revenue"], dimensions=["model"], analysis="growth_contribution",
-                                   date_preset="last_3_months"), auto())
+    q = compile_builder_query(
+        spec(
+            metrics=["revenue"],
+            dimensions=["model"],
+            analysis="growth_contribution",
+            date_preset="last_3_months",
+        ),
+        auto(),
+    )
     assert "contribution_to_change_pct" in q.sql
     assert "period_bucket" in q.sql
 
@@ -212,14 +297,20 @@ def test_custom_window_end_is_inclusive() -> None:
 
 def test_filter_values_are_escaped() -> None:
     q = compile_builder_query(
-        spec(metrics=["revenue"], dimensions=["model"], filters=[{"domain": "Make", "values": ["O'Brien"]}]),
+        spec(
+            metrics=["revenue"],
+            dimensions=["model"],
+            filters=[{"domain": "Make", "values": ["O'Brien"]}],
+        ),
         auto(),
     )
     assert "'O''Brien'" in q.sql
 
 
 def test_driver_query_compares_complete_periods() -> None:
-    compiled = driver_sql(spec(metrics=["revenue"], dimensions=["month"]), auto(), grain="month", dimension="model")
+    compiled = driver_sql(
+        spec(metrics=["revenue"], dimensions=["month"]), auto(), grain="month", dimension="model"
+    )
     assert compiled is not None
     assert "period_start" in compiled[0]
 
@@ -232,7 +323,9 @@ def _rows_trend() -> list[dict[str, Any]]:
 
 
 def test_time_by_category_chart_is_pivoted() -> None:
-    q = compile_builder_query(spec(metrics=["revenue"], dimensions=["month", "make"], analysis="trend"), auto())
+    q = compile_builder_query(
+        spec(metrics=["revenue"], dimensions=["month", "make"], analysis="trend"), auto()
+    )
     rows = [
         {"month": "2026-01-01", "make": "Tata", "revenue": 10.0},
         {"month": "2026-01-01", "make": "Kia", "revenue": 5.0},
@@ -245,18 +338,27 @@ def test_time_by_category_chart_is_pivoted() -> None:
 
 
 def test_moving_average_chart_overlays_actual_and_average() -> None:
-    q = compile_builder_query(spec(metrics=["revenue"], dimensions=["month"], analysis="moving_average"), auto())
+    q = compile_builder_query(
+        spec(metrics=["revenue"], dimensions=["month"], analysis="moving_average"), auto()
+    )
     rows = [{"month": "2026-01-01", "revenue": 1.0, "moving_avg_revenue": None}]
     chart, _ = build_chart(q, ["month", "revenue", "moving_avg_revenue"], rows, "auto")
     assert chart is not None and chart.series == ["revenue", "moving_avg_revenue"]
 
 
 def test_trend_insight_names_change_and_skips_partial_month() -> None:
-    q = compile_builder_query(spec(metrics=["revenue"], dimensions=["month"], analysis="trend"), auto())
+    q = compile_builder_query(
+        spec(metrics=["revenue"], dimensions=["month"], analysis="trend"), auto()
+    )
     rows = _rows_trend()
     narration = build_narration(
-        InsightContext(query=q, columns=["month", "revenue"], rows=rows, metric_label="Revenue",
-                       partial_period="Jun 2026")
+        InsightContext(
+            query=q,
+            columns=["month", "revenue"],
+            rows=rows,
+            metric_label="Revenue",
+            partial_period="Jun 2026",
+        )
     )
     assert narration is not None
     assert narration.summary.startswith("Revenue increased")
@@ -265,10 +367,24 @@ def test_trend_insight_names_change_and_skips_partial_month() -> None:
 
 
 def test_actual_vs_target_insight() -> None:
-    q = compile_builder_query(spec(metrics=["revenue"], dimensions=["make"], analysis="actual_vs_target"), auto())
+    q = compile_builder_query(
+        spec(metrics=["revenue"], dimensions=["make"], analysis="actual_vs_target"), auto()
+    )
     rows = [
-        {"make": "Tata", "actual": 90.0, "target": 100.0, "variance": -10.0, "achievement_pct": 90.0},
-        {"make": "Kia", "actual": 120.0, "target": 100.0, "variance": 20.0, "achievement_pct": 120.0},
+        {
+            "make": "Tata",
+            "actual": 90.0,
+            "target": 100.0,
+            "variance": -10.0,
+            "achievement_pct": 90.0,
+        },
+        {
+            "make": "Kia",
+            "actual": 120.0,
+            "target": 100.0,
+            "variance": 20.0,
+            "achievement_pct": 120.0,
+        },
     ]
     narration = build_narration(
         InsightContext(query=q, columns=list(rows[0]), rows=rows, metric_label="Revenue")

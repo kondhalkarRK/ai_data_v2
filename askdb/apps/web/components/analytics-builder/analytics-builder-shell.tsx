@@ -130,6 +130,17 @@ function startersFor(caps: AnalyticsCapabilities | undefined): Array<{ label: st
   return items.slice(0, 4);
 }
 
+function capabilitiesErrorText(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 404) {
+      return "The API server is running an older build without the builder endpoints. Restart the API and retry.";
+    }
+    if (err.isAuthError) return "Your session has expired. Sign in again and retry.";
+    return `${err.message}${err.requestId ? ` (request ${err.requestId})` : ""}`;
+  }
+  return "The API server could not be reached. Make sure it is running on port 8000, then retry.";
+}
+
 function issuesFromError(err: unknown): { issues: AnalyticsIssue[]; suggestions: AnalyticsSuggestion[] } {
   if (!(err instanceof ApiError)) return { issues: [], suggestions: [] };
   const details = err.details ?? {};
@@ -377,7 +388,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
     setShowFilters(Boolean(next.filters.length));
     setActiveAnalysisId(item.id);
     setSaveTitle(item.title);
-    showFlash(`Loaded â€œ${item.title}â€`);
+    showFlash(`Loaded “${item.title}”`);
     if (next.metrics.length) await executeSpec(next);
   }
 
@@ -430,7 +441,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
           </div>
           <div className="flex flex-col items-end gap-1">
             <Link href={ontologyHref} className="text-xs font-medium text-primary hover:underline">
-              Inspect in Ontology â†’
+              Inspect in Ontology →
             </Link>
             {caps?.dataAsOf ? (
               <span className="text-[11px] text-muted-foreground">Data through {caps.dataAsOf}</span>
@@ -446,7 +457,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
               onKeyDown={(event) => {
                 if (event.key === "Enter") void handleAssist();
               }}
-              placeholder="Try â€œTop 3 models within each brandâ€ or â€œRevenue trend last 12 monthsâ€"
+              placeholder="Try “Top 3 models within each brand” or “Revenue trend last 12 months”"
               className="h-10 border-border/60 bg-background/70 pl-10"
               aria-label="AI assisted builder prompt"
             />
@@ -510,15 +521,28 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
 
           <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-3 shadow-sm">
             {!caps ? (
-              <p className="flex items-center gap-2 py-6 text-xs text-muted-foreground">
+              <div className="flex flex-col gap-2 py-6 text-xs text-muted-foreground">
                 {capsQuery.isError ? (
-                  "Could not load the builder options. Refresh to try again."
-                ) : (
                   <>
-                    <Loader2 className="size-3.5 animate-spin" /> Loading optionsâ€¦
+                    <p className="font-medium text-foreground">Could not load the builder options.</p>
+                    <p>{capabilitiesErrorText(capsQuery.error)}</p>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="w-fit"
+                      disabled={capsQuery.isFetching}
+                      onClick={() => void capsQuery.refetch()}
+                    >
+                      {capsQuery.isFetching ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                      Retry
+                    </Button>
                   </>
+                ) : (
+                  <p className="flex items-center gap-2">
+                    <Loader2 className="size-3.5 animate-spin" /> Loading options…
+                  </p>
                 )}
-              </p>
+              </div>
             ) : composerTab === "metrics" ? (
               <>
                 <SelectedPills ids={spec.metrics} labels={metricLabels} onRemove={toggleMetric} />
@@ -660,7 +684,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                 <SummaryChip label="Date" value={dateLabel || "All dates"} />
                 <SummaryChip
                   label="Filters"
-                  value={spec.filters.map((item) => `${item.domain}: ${item.values.join(", ")}`).join(" Â· ") || "None"}
+                  value={spec.filters.map((item) => `${item.domain}: ${item.values.join(", ")}`).join(" · ") || "None"}
                 />
               </div>
             </div>
@@ -741,7 +765,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                         className="rounded-full bg-info/15 px-2 py-0.5 text-[10px] font-medium"
                         onClick={() => upsertFilter(filt.domain, filt.values.filter((entry) => entry !== value))}
                       >
-                        {filt.domain}: {value} Ã—
+                        {filt.domain}: {value} ×
                       </button>
                     )),
                   )}
@@ -814,7 +838,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                 ) : run.isPending ? (
                   <div className="flex h-[320px] items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" />
-                    Compiling governed SQL and runningâ€¦
+                    Compiling governed SQL and running…
                   </div>
                 ) : result ? (
                   <ResultPreview
@@ -859,7 +883,7 @@ function ResultMetaLine({ result }: { result: AnalyticsRunResponse }) {
     meta.dateLabel ? String(meta.dateLabel) : null,
     meta.dataAsOf ? `data through ${String(meta.dataAsOf)}` : null,
   ].filter(Boolean);
-  return <>{parts.join(" Â· ")}</>;
+  return <>{parts.join(" · ")}</>;
 }
 
 function IssuesPanel({
@@ -1100,7 +1124,7 @@ function SelectedPills({
           className="rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] font-medium"
           onClick={() => onRemove(id)}
         >
-          {labels[id] ?? prettyLabel(id)} Ã—
+          {labels[id] ?? prettyLabel(id)} ×
         </button>
       ))}
     </div>
@@ -1126,7 +1150,7 @@ function SearchableChips({
     <div>
       <div className="relative mb-2">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search metricsâ€¦" className="h-8 pl-8 text-xs" />
+        <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search metrics…" className="h-8 pl-8 text-xs" />
       </div>
       <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">
         {filtered.map((item) => {
@@ -1173,7 +1197,7 @@ function GroupedChips({
     <div>
       <div className="relative mb-2">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search dimensionsâ€¦" className="h-8 pl-8 text-xs" />
+        <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search dimensions…" className="h-8 pl-8 text-xs" />
       </div>
       <div className="max-h-64 space-y-2 overflow-y-auto">
         {groups.map(({ group, items }) => {
@@ -1318,7 +1342,7 @@ function FilterRow({
     <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
       <SearchableMenu
         label="Filter field"
-        placeholder="Search fieldsâ€¦"
+        placeholder="Search fields…"
         display={domain ? domainLabel : "Select field"}
         query={fieldQuery}
         onQuery={setFieldQuery}
@@ -1339,20 +1363,20 @@ function FilterRow({
       </SearchableMenu>
       <SearchableMenu
         label="Values"
-        placeholder={domain ? `Search ${domainLabel}â€¦` : "Select a field first"}
+        placeholder={domain ? `Search ${domainLabel}…` : "Select a field first"}
         display={
           selected.length
             ? selected.slice(0, 3).join(", ") + (selected.length > 3 ? ` +${selected.length - 3}` : "")
             : domain
               ? "Select values"
-              : "â€”"
+              : "—"
         }
         query={valueQuery}
         onQuery={setValueQuery}
         disabled={!domain}
       >
         {valuesQuery.isPending && domain ? (
-          <p className="px-3 py-2 text-[11px] text-muted-foreground">Loading valuesâ€¦</p>
+          <p className="px-3 py-2 text-[11px] text-muted-foreground">Loading values…</p>
         ) : null}
         {valuesQuery.isError ? (
           <p className="px-3 py-2 text-[11px] text-muted-foreground">Values couldn&apos;t be loaded. Try again shortly.</p>
@@ -1367,7 +1391,7 @@ function FilterRow({
               onClick={() => onValuesChange(active ? selected.filter((v) => v !== item.value) : [...selected, item.value])}
             >
               <span className={cn("flex size-3.5 items-center justify-center rounded border text-[9px]", active ? "border-info bg-info/20" : "border-border")}>
-                {active ? "âœ“" : ""}
+                {active ? "✓" : ""}
               </span>
               <span className="flex-1 truncate">{item.label ?? item.value}</span>
               {item.frequency ? (
@@ -1771,7 +1795,7 @@ function SavedList({
       <h3 className="text-sm font-semibold">Saved analyses</h3>
       <p className="mb-3 text-[11px] text-muted-foreground">Definitions only; reopening re-runs against the latest data.</p>
       {loading ? (
-        <p className="text-xs text-muted-foreground">Loadingâ€¦</p>
+        <p className="text-xs text-muted-foreground">Loading…</p>
       ) : !items.length ? (
         <p className="text-xs text-muted-foreground">No saved analyses yet.</p>
       ) : (

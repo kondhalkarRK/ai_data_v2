@@ -33,7 +33,7 @@ from app.schemas.analytics import (
     SavedAnalysisUpdate,
 )
 from app.semantic.service import SemanticService
-from app.services.analytics.runner import AnalyticsService, inspect_spec
+from app.services.analytics.runner import AnalyticsService, capabilities_for, inspect_spec
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -72,8 +72,13 @@ AnalyticsServiceDep = Annotated[AnalyticsService, Depends(_service)]
     response_model=AnalyticsCapabilities,
     summary="Metrics, dimensions, analyses, filters and date ranges the builder supports",
 )
-async def capabilities(service: AnalyticsServiceDep) -> AnalyticsCapabilities:
-    return await service.capabilities()
+async def capabilities(
+    _user: RequireUser,
+    industry: ActiveIndustry,
+    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
+    semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
+) -> AnalyticsCapabilities:
+    return await capabilities_for(semantic_service, industry, registry)
 
 
 @router.post(

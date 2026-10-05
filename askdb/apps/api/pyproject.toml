@@ -61,6 +61,7 @@ ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S105", "S106"]
+"tests/unit/test_analytics_builder_v2.py" = ["E501"]
 "migrations/*" = ["N999", "E501"]
 "app/analytics/*" = ["S311"]  # deterministic synthetic data, not cryptography
 "scripts/*" = ["S608"]

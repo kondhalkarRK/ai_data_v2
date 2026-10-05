@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.core.config import Industry, Settings
 from app.core.exceptions import NotFoundError, NqlError
+from app.db.session import DatabaseRegistry
 from app.models.activity import SavedAnalysis
 from app.models.user import User
 from app.schemas.analytics import (
@@ -108,6 +109,34 @@ async def inspect_spec(
 ) -> AnalyticsInspection:
     """Validation and guidance without touching the warehouse."""
     return (await catalog_for(semantic, industry)).inspect(spec)
+
+
+async def capabilities_for(
+    semantic: SemanticService, industry: Industry, registry: DatabaseRegistry
+) -> AnalyticsCapabilities:
+    """Builder options come from the semantic pack; the warehouse only supplies the
+    "data through" date, so an unreachable warehouse must not hide the options."""
+    catalog = await catalog_for(semantic, industry)
+    as_of: date | None = None
+    try:
+        async with registry.analytics_connection(industry) as connection:
+            as_of = await _latest_date(connection, *_PRIMARY_FACT[industry])
+    except Exception:
+        logger.warning("Analytics warehouse unavailable for capabilities", exc_info=True)
+    return catalog.capabilities(data_as_of=as_of.isoformat() if as_of else None)
+
+
+async def _latest_date(connection: AsyncConnection, table: str, column: str) -> date | None:
+    if not table or not column:
+        return None
+    try:
+        value = (await connection.execute(text(f"SELECT MAX({column}) FROM {table}"))).scalar()
+    except Exception:
+        logger.warning("Could not read the latest date of %s", table, exc_info=True)
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    return value if isinstance(value, date) else None
 
 
 class AnalyticsService:
@@ -244,18 +273,7 @@ class AnalyticsService:
         await self._analytics.execute(text(f"SET LOCAL statement_timeout = {timeout_ms}"))
 
     async def _data_as_of(self, table: str, column: str) -> date | None:
-        if not table or not column:
-            return None
-        try:
-            value = (
-                await self._analytics.execute(text(f"SELECT MAX({column}) FROM {table}"))
-            ).scalar()
-        except Exception:
-            logger.warning("Could not read the latest date of %s", table, exc_info=True)
-            return None
-        if isinstance(value, datetime):
-            return value.date()
-        return value if isinstance(value, date) else None
+        return await _latest_date(self._analytics, table, column)
 
     async def _driver(
         self, spec: AnalyticsSpec, catalog: Catalog, query: BuilderQuery
