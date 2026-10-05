@@ -3,3 +3,8 @@
 --
 --   python scripts/migrate.py automotive upgrade head
 --   python scripts/seed_automotive.py --rows 1000000 --replace
+--
+-- Before a demo, keep Data Trust freshness green with a small top-up (about 100 orders
+-- dated yesterday, plus a rollup refresh):
+--
+--   psql -U askdb_owner -h localhost -d askdb_automotive -f database/automotive/20_daily_refresh_small.sql
