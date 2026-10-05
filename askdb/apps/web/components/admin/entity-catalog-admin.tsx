@@ -64,11 +64,19 @@ export function EntityCatalogAdminPanel() {
   }
 
   const data = summary.data;
-  const rows = [...(entities.data ?? [])].sort(
-    (a, b) => b.newValues - a.newValues || a.group.localeCompare(b.group) || a.label.localeCompare(b.label),
-  );
+  const rows = (Array.isArray(entities.data) ? entities.data : [])
+    .map((row) => ({
+      key: row.key,
+      label: row.label || row.key,
+      group: row.group || "—",
+      distinctValues: row.distinctValues ?? 0,
+      newValues: row.newValues ?? 0,
+      lastUpdated: row.lastUpdated ?? null,
+    }))
+    .sort((a, b) => b.newValues - a.newValues || a.group.localeCompare(b.group) || a.label.localeCompare(b.label));
   const lastRefresh = data.lastCompleted?.finishedAt ?? data.lastRefresh?.finishedAt ?? null;
   const running = refresh.isPending || data.lastRefresh?.status === "running";
+  const newValueCount = refresh.data?.refresh?.newValueCount ?? 0;
 
   return (
     <div className="space-y-6">
@@ -98,14 +106,13 @@ export function EntityCatalogAdminPanel() {
       ) : null}
       {refresh.isSuccess ? (
         <p role="status" className="rounded-[var(--radius-control)] bg-success/10 px-3 py-2 text-sm text-success">
-          Catalog refreshed. {refresh.data.refresh.newValueCount.toLocaleString()} new value
-          {refresh.data.refresh.newValueCount === 1 ? "" : "s"} detected.
+          Catalog refreshed. {newValueCount.toLocaleString()} new value{newValueCount === 1 ? "" : "s"} detected.
         </p>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile label="Business entities" value={data.totalEntities.toLocaleString()} />
-        <Tile label="New values detected" value={data.newValues.toLocaleString()} />
+        <Tile label="Business entities" value={(data.totalEntities ?? rows.length).toLocaleString()} />
+        <Tile label="New values detected" value={(data.newValues ?? 0).toLocaleString()} />
         <Tile label="Last refresh" value={formatDate(lastRefresh)} />
         <Tile label="Last data load ID" value={data.lastLoadId ?? "—"} />
       </div>

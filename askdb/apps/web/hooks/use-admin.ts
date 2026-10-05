@@ -131,18 +131,47 @@ export interface AdminActionResult {
 
 const ADMIN = ["admin"] as const;
 
+const DEFAULT_PRICING: LlmPricingAssumptions = {
+  inputTokensPerQuestion: 2000,
+  outputTokensPerQuestion: 500,
+  source: "config/llm_catalog.py",
+};
+
+type RawProvider = Omit<ProviderOption, "models"> & { models?: Array<CatalogModel | string> };
+type RawLlmSettings = Omit<LlmSettingsResponse, "providers" | "pricing"> & {
+  providers?: RawProvider[];
+  pricing?: Partial<LlmPricingAssumptions>;
+};
+
+/** Fills gaps so the page renders even against an API that predates the catalog payload. */
+export function normalizeLlmSettings(raw: RawLlmSettings): LlmSettingsResponse {
+  return {
+    current: raw.current,
+    providers: (raw.providers ?? []).map((provider) => ({
+      ...provider,
+      models: (provider.models ?? []).map((model) =>
+        typeof model === "string"
+          ? { id: model, label: model, tier: "", inputUsdPer1m: null, outputUsdPer1m: null }
+          : model,
+      ),
+    })),
+    pricing: { ...DEFAULT_PRICING, ...raw.pricing },
+  };
+}
+
 export function useLlmSettings() {
   return useQuery({
     queryKey: [...ADMIN, "llm"],
-    queryFn: () => apiClient.get<LlmSettingsResponse>("/api/v1/admin/llm"),
+    queryFn: async () =>
+      normalizeLlmSettings(await apiClient.get<RawLlmSettings>("/api/v1/admin/llm")),
   });
 }
 
 export function useUpdateLlmSettings() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: Pick<LlmConfig, "provider" | "model" | "temperature" | "maxTokens">) =>
-      apiClient.put<LlmSettingsResponse>("/api/v1/admin/llm", body),
+    mutationFn: async (body: Pick<LlmConfig, "provider" | "model" | "temperature" | "maxTokens">) =>
+      normalizeLlmSettings(await apiClient.put<RawLlmSettings>("/api/v1/admin/llm", body)),
     onSuccess: (data) => {
       queryClient.setQueryData([...ADMIN, "llm"], data);
       void queryClient.invalidateQueries({ queryKey: [...ADMIN, "audit"] });
