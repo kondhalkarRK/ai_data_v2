@@ -1,3 +1,5 @@
+psql -U askdb_owner -h localhost -d askdb_automotive -f database/automotive/20_daily_refresh_small.sql
+
 What I changed:
 
 Clear database errors: a new handler in apps/api/app/main.py, with the logic in apps/api/app/db/errors.py, returns one of two specific messages instead of the generic one:
