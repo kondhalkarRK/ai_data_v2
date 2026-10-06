@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -14,11 +13,10 @@ from app.api.deps import (
     RequireUser,
     get_app_session,
     get_app_settings,
-    get_registry,
+    get_scoped_analytics,
     get_semantic_service,
 )
 from app.core.config import Settings
-from app.db.session import DatabaseRegistry
 from app.models.enums import Role
 from app.schemas.reliability import (
     BulkMonitorRequest,
@@ -47,16 +45,7 @@ from app.services.trust import (
 
 router = APIRouter(prefix="/trust", tags=["trust"])
 
-
-async def get_analytics_connection(
-    industry: ActiveIndustry,
-    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
-) -> AsyncIterator[AsyncConnection]:
-    async with registry.analytics_connection(industry) as connection:
-        yield connection
-
-
-AnalyticsConnection = Annotated[AsyncConnection, Depends(get_analytics_connection)]
+AnalyticsConnection = Annotated[AsyncConnection, Depends(get_scoped_analytics)]
 SemanticDep = Annotated[SemanticService, Depends(get_semantic_service)]
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 SessionDep = Annotated[AsyncSession, Depends(get_app_session)]

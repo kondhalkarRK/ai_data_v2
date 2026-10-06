@@ -10,8 +10,9 @@ from pydantic import EmailStr, Field, field_validator, model_validator
 from app.auth.passwords import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from app.core.config import Industry
 from app.models.enums import Role
-from app.models.user import weekly_limits
+from app.models.user import User, weekly_limits
 from app.schemas.common import ApiModel
+from app.services.security.region_scope import RegionScope
 
 
 class LoginRequest(ApiModel):
@@ -36,6 +37,12 @@ class LoginRequest(ApiModel):
         return value
 
 
+class RegionAccess(ApiModel):
+    unrestricted: bool = True
+    zones: list[str] = Field(default_factory=list)
+    hide_region_filter: bool = False
+
+
 class UserProfile(ApiModel):
     id: uuid.UUID
     username: str
@@ -49,6 +56,7 @@ class UserProfile(ApiModel):
     weekly_call_limit: int | None = None
     last_login_at: datetime | None = None
     created_at: datetime
+    region_access: RegionAccess = Field(default_factory=RegionAccess)
 
     @model_validator(mode="after")
     def _effective_limits(self) -> UserProfile:
@@ -56,6 +64,19 @@ class UserProfile(ApiModel):
             self.role, self.weekly_token_limit, self.weekly_call_limit
         )
         return self
+
+
+def user_profile(user: User, scope: RegionScope | None = None) -> UserProfile:
+    profile = UserProfile.model_validate(user)
+    if scope is None:
+        return profile
+    payload = scope.to_api()
+    profile.region_access = RegionAccess(
+        unrestricted=bool(payload["unrestricted"]),
+        zones=list(payload["zones"]),
+        hide_region_filter=bool(payload["hide_region_filter"]),
+    )
+    return profile
 
 
 class SessionResponse(ApiModel):

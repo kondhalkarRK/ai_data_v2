@@ -7,7 +7,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, Request
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.auth.cookies import read_access_token, read_csrf_cookie
 from app.auth.rate_limit import FixedWindowRateLimiter, client_ip
@@ -26,6 +26,11 @@ from app.db.session import DatabaseRegistry
 from app.models.enums import Role
 from app.models.user import User
 from app.semantic.service import SemanticService
+from app.services.security.region_scope import (
+    RegionScope,
+    RegionScopedConnection,
+    load_region_scope,
+)
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -62,9 +67,7 @@ def get_registry(request: Request) -> DatabaseRegistry:
 
 
 def get_semantic_service(request: Request) -> SemanticService:
-    service: SemanticService | None = getattr(
-        request.app.state, "semantic_service", None
-    )
+    service: SemanticService | None = getattr(request.app.state, "semantic_service", None)
     if service is None:
         raise DependencyUnavailableError("The semantic service is not initialised.")
     return service
@@ -208,9 +211,7 @@ def resolve_industry(
             industry = Industry(raw.strip().lower())
         except ValueError as exc:
             valid = ", ".join(member.value for member in Industry)
-            raise ValidationError(
-                f"Unknown industry '{raw}'. Expected one of: {valid}."
-            ) from exc
+            raise ValidationError(f"Unknown industry '{raw}'. Expected one of: {valid}.") from exc
     else:
         industry = user.default_industry
 
@@ -219,3 +220,22 @@ def resolve_industry(
 
 
 ActiveIndustry = Annotated[Industry, Depends(resolve_industry)]
+
+
+async def get_region_scope(
+    user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+) -> RegionScope:
+    return await load_region_scope(session, user)
+
+
+RegionScopeDep = Annotated[RegionScope, Depends(get_region_scope)]
+
+
+async def get_scoped_analytics(
+    industry: ActiveIndustry,
+    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
+    scope: RegionScopeDep,
+) -> AsyncIterator[AsyncConnection]:
+    async with registry.analytics_connection(industry) as connection:
+        yield RegionScopedConnection(connection, industry, scope)  # type: ignore[misc]

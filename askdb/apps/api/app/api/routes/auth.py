@@ -33,8 +33,10 @@ from app.schemas.auth import (
     SessionResponse,
     UpdatePreferencesRequest,
     UserProfile,
+    user_profile,
 )
 from app.services.governance.quota import weekly_usage
+from app.services.security.region_scope import load_region_scope
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -44,7 +46,12 @@ FingerprintDep = Annotated[RequestFingerprint, Depends(get_fingerprint)]
 
 
 def _session_response(
-    response: Response, settings: Settings, tokens: SessionTokens, *, persistent: bool = True
+    response: Response,
+    settings: Settings,
+    tokens: SessionTokens,
+    *,
+    persistent: bool = True,
+    scope=None,
 ) -> SessionResponse:
     set_session_cookies(
         response,
@@ -55,7 +62,7 @@ def _session_response(
         persistent=persistent,
     )
     return SessionResponse(
-        user=UserProfile.model_validate(tokens.user),
+        user=user_profile(tokens.user, scope),
         csrf_token=tokens.csrf_token,
         access_expires_at=tokens.access_expires_at,
     )
@@ -76,7 +83,10 @@ async def login(
     tokens = await service.login(
         login=payload.username, password=payload.password, fingerprint=fingerprint
     )
-    return _session_response(response, settings, tokens, persistent=payload.remember_me)
+    scope = await load_region_scope(service._session, tokens.user)
+    return _session_response(
+        response, settings, tokens, persistent=payload.remember_me, scope=scope
+    )
 
 
 @router.post(
@@ -101,7 +111,10 @@ async def refresh(
         # token that will never work again.
         clear_session_cookies(response, settings)
         raise
-    return _session_response(response, settings, tokens, persistent=read_persistent(request))
+    scope = await load_region_scope(service._session, tokens.user)
+    return _session_response(
+        response, settings, tokens, persistent=read_persistent(request), scope=scope
+    )
 
 
 @router.post(
@@ -131,8 +144,10 @@ async def logout(
 
 
 @router.get("/me", response_model=UserProfile, summary="Current user profile")
-async def me(user: CurrentUser) -> UserProfile:
-    return UserProfile.model_validate(user)
+async def me(
+    user: CurrentUser, session: Annotated[AsyncSession, Depends(get_app_session)]
+) -> UserProfile:
+    return user_profile(user, await load_region_scope(session, user))
 
 
 @router.get("/me/usage", summary="The caller's AI usage for the current week")
@@ -152,7 +167,8 @@ async def update_preferences(
     payload: UpdatePreferencesRequest, user: CurrentUser, service: ServiceDep
 ) -> UserProfile:
     await service.users.set_default_industry(user, payload.default_industry)
-    return UserProfile.model_validate(user)
+    scope = await load_region_scope(service._session, user)
+    return user_profile(user, scope)
 
 
 @router.post(
@@ -205,7 +221,7 @@ async def create_user(
         must_change_password=payload.must_change_password,
         fingerprint=fingerprint,
     )
-    return UserProfile.model_validate(user)
+    return user_profile(user)
 
 
 @router.get(
@@ -220,4 +236,4 @@ async def list_users(
     offset: int = 0,
 ) -> list[UserProfile]:
     users = await service.users.list_all(limit=min(limit, 500), offset=max(offset, 0))
-    return [UserProfile.model_validate(user) for user in users]
+    return [user_profile(user) for user in users]

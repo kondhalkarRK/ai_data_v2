@@ -20,12 +20,11 @@ from app.api.deps import (
     RequireUser,
     get_app_session,
     get_app_settings,
-    get_registry,
+    get_scoped_analytics,
     get_semantic_service,
 )
 from app.core.config import Industry, Settings
 from app.core.exceptions import NqlError
-from app.db.session import DatabaseRegistry
 from app.models.user import User
 from app.schemas.common import ApiModel
 from app.semantic.service import SemanticService
@@ -102,12 +101,7 @@ class SaveQuestionRequest(ApiModel):
     sql_text: str | None = None
 
 
-async def _analytics(
-    industry: ActiveIndustry,
-    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
-) -> AsyncIterator[AsyncConnection]:
-    async with registry.analytics_connection(industry) as connection:
-        yield connection
+AnalyticsConnection = Annotated[AsyncConnection, Depends(get_scoped_analytics)]
 
 
 @router.post("/chat/ask")
@@ -117,7 +111,7 @@ async def chat_ask(
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+    analytics: AnalyticsConnection,
     semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
 ) -> StreamingResponse:
     await _prepare_question(session, settings, user)
@@ -198,7 +192,7 @@ async def chat_ask_sync(
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+    analytics: AnalyticsConnection,
     semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
 ) -> dict[str, Any]:
     """One JSON response for hosts (Vercel) that buffer SSE and never paint tokens."""
@@ -251,7 +245,7 @@ async def cancel_chat(
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+    analytics: AnalyticsConnection,
 ) -> dict[str, Any]:
     _cancel_requested.add(history_id)
     service = ChatService(
@@ -277,7 +271,7 @@ async def query_history(
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+    analytics: AnalyticsConnection,
 ) -> list[dict[str, Any]]:
     service = ChatService(
         app_session=session,
@@ -308,7 +302,7 @@ async def list_saved_questions(
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+    analytics: AnalyticsConnection,
 ) -> list[dict[str, Any]]:
     service = ChatService(
         app_session=session,
@@ -338,7 +332,7 @@ async def save_question(
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+    analytics: AnalyticsConnection,
 ) -> dict[str, Any]:
     service = ChatService(
         app_session=session,
@@ -411,7 +405,7 @@ async def cost_analytics(
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: Annotated[AsyncConnection, Depends(_analytics)],
+    analytics: AnalyticsConnection,
 ) -> dict[str, Any]:
     service = ChatService(
         app_session=session,

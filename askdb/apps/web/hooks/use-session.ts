@@ -91,6 +91,19 @@ export function useActiveIndustry(): Industry {
   return override ?? user?.defaultIndustry ?? "insurance";
 }
 
+export function useRegionAccess() {
+  const { data: user } = useSession();
+  const access = user?.regionAccess;
+  const unrestricted = access?.unrestricted ?? true;
+  const zones = access?.zones ?? [];
+  return {
+    unrestricted,
+    zones,
+    hideRegionFilter: access?.hideRegionFilter ?? false,
+    label: unrestricted ? "All regions" : zones.join(" · ") || "Restricted",
+  };
+}
+
 export function useSetDefaultIndustry() {
   const queryClient = useQueryClient();
 

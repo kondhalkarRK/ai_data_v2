@@ -88,6 +88,12 @@ from app.services.chat.value_dictionary import (
 )
 from app.services.knowledge import KnowledgeService
 from app.services.llm import llm_configured
+from app.services.security.region_scope import (
+    RegionScope,
+    deny_if_out_of_scope,
+    forbidden_zones,
+    load_region_scope,
+)
 from app.services.web_retrieval import WebRetrievalService
 
 logger = logging.getLogger(__name__)
@@ -217,6 +223,7 @@ class ChatService:
         user: User,
         industry: Industry,
         semantic_service: SemanticService | None = None,
+        region_scope: RegionScope | None = None,
     ) -> None:
         self._app = app_session
         self._analytics = analytics
@@ -224,6 +231,7 @@ class ChatService:
         self._user = user
         self._industry = industry
         self._semantic = semantic_service or SemanticService(settings)
+        self._region_scope = region_scope or RegionScope.all_regions(user)
         self.usage_model = ""
         self.usage_prompt_tokens = 0
         self.usage_completion_tokens = 0
@@ -283,6 +291,7 @@ class ChatService:
         question = (question or "").strip()
         if not question:
             raise ValidationError("Question is required.")
+        self._region_scope = await load_region_scope(self._app, self._user)
 
         profile = QueryProfile(
             question=question,
@@ -302,6 +311,36 @@ class ChatService:
         self.last_history = history
         await self._app.flush()
         await self._app.commit()
+
+        blocked = forbidden_zones(question, self._region_scope)
+        if blocked:
+            attempted = " and ".join(blocked)
+            try:
+                await deny_if_out_of_scope(
+                    self._app,
+                    self._region_scope,
+                    attempted=attempted,
+                    action="AI Chat",
+                )
+            except Exception as exc:
+                narrative = getattr(exc, "message", None) or str(exc)
+                history.status = "completed"
+                history.error_message = narrative[:500]
+                await self._app.flush()
+                await self._app.commit()
+                yield _sse(
+                    "clarification",
+                    {
+                        "kind": "denied",
+                        "title": "Access denied",
+                        "message": narrative,
+                        "historyId": str(history_id),
+                    },
+                )
+                insights = build_insights(narrative=narrative, columns=[], rows=[], path="denied")
+                yield _sse("meta", {"insights": insights})
+                yield _sse("done", {"ok": False, "code": "region_forbidden"})
+                return
 
         async def cancelled() -> bool:
             if (cancel_event is not None and cancel_event.is_set()) or (
@@ -693,6 +732,7 @@ class ChatService:
             industry=self._industry.value,
             question=question,
             current_data_as_of=data_as_of_hint,
+            scope=self._region_scope.cache_key(),
         )
         if cached is not None:
             profile.cache_hit = True
@@ -1284,6 +1324,7 @@ class ChatService:
             QUERY_CACHE.put(
                 industry=self._industry.value,
                 question=question,
+                scope=self._region_scope.cache_key(),
                 answer=CachedAnswer(
                     sql=sql_text,
                     columns=columns,

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import io
-from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -15,11 +14,10 @@ from app.api.deps import (
     ActiveIndustry,
     RequireUser,
     get_app_settings,
-    get_registry,
+    get_scoped_analytics,
     get_semantic_service,
 )
 from app.core.config import Settings
-from app.db.session import DatabaseRegistry
 from app.schemas.data import DataQualityReport, PreviewPage, PreviewTableSummary
 from app.semantic.service import SemanticService
 from app.services.data_preview import DataPreviewService
@@ -27,16 +25,7 @@ from app.services.data_quality import DataQualityService
 
 router = APIRouter(prefix="/data", tags=["data"])
 
-
-async def get_analytics_connection(
-    industry: ActiveIndustry,
-    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
-) -> AsyncIterator[AsyncConnection]:
-    async with registry.analytics_connection(industry) as connection:
-        yield connection
-
-
-AnalyticsConnection = Annotated[AsyncConnection, Depends(get_analytics_connection)]
+AnalyticsConnection = Annotated[AsyncConnection, Depends(get_scoped_analytics)]
 SemanticDep = Annotated[SemanticService, Depends(get_semantic_service)]
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 

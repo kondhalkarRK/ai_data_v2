@@ -4,6 +4,9 @@
 --     admin / admin123   role admin, 60,000 tokens / 100 calls per week
 --     user1 / user123    role user, 60,000 tokens and 50 AI calls per week
 --
+-- Region-scoped demo users (North / South / East / West) are in
+-- ``13_seed_region_users.sql``.
+--
 -- Passwords are stored as Argon2id hashes. These short demo passwords skip the
 -- 12-character policy the app enforces for accounts it creates, so use them for the
 -- PoC only and change or disable both accounts before any shared deployment.

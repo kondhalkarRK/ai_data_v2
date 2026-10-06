@@ -37,6 +37,12 @@ export interface ApiErrorResponse {
 
 // --- auth -------------------------------------------------------------------
 
+export interface RegionAccess {
+  unrestricted: boolean;
+  zones: string[];
+  hideRegionFilter: boolean;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -51,6 +57,7 @@ export interface UserProfile {
   weeklyCallLimit: number | null;
   lastLoginAt: string | null;
   createdAt: string;
+  regionAccess: RegionAccess;
 }
 
 /** `GET /auth/me/usage` — the caller's AI usage since Monday 00:00 UTC. */

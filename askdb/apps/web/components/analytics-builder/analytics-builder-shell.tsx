@@ -74,6 +74,7 @@ import {
   prettyLabel,
   recommendViz,
 } from "@/lib/analytics/helpers";
+import { useRegionAccess } from "@/hooks/use-session";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
@@ -151,6 +152,7 @@ function issuesFromError(err: unknown): { issues: AnalyticsIssue[]; suggestions:
 }
 
 export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) {
+  const regionAccess = useRegionAccess();
   const [spec, setSpec] = React.useState<AnalyticsSpec>(EMPTY_SPEC);
   const [aiPrompt, setAiPrompt] = React.useState("");
   const [sqlOpen, setSqlOpen] = React.useState(false);
@@ -662,7 +664,11 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
               <div className="mt-3 border-t border-border/50 pt-3">
                 <FilterBuilder
                   key={focusDomain ?? "filters"}
-                  domains={caps?.filterDomains ?? []}
+                  domains={(caps?.filterDomains ?? []).filter(
+                    (domain) =>
+                      !regionAccess.hideRegionFilter ||
+                      !["region", "city", "state"].includes(domain.id.toLowerCase()),
+                  )}
                   filters={spec.filters}
                   focusDomain={focusDomain}
                   onChange={upsertFilter}

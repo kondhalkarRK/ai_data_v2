@@ -25,6 +25,7 @@ import type {
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { useRegionAccess } from "@/hooks/use-session";
 
 const FILTER_LABELS: Record<FilterKey, string> = {
   year: "Year",
@@ -50,6 +51,7 @@ function toQuery(filters: CockpitFilters): string {
 }
 
 export function ExecutiveCockpit({ industry }: { industry: Industry }) {
+  const regionAccess = useRegionAccess();
   const [filters, setFilters] = React.useState<CockpitFilters>({});
   const [paneOpen, setPaneOpen] = React.useState(false);
   const refreshNext = React.useRef(false);
@@ -244,6 +246,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
         onOpenChange={setPaneOpen}
         filters={filters}
         options={options.data}
+        hideGeography={regionAccess.hideRegionFilter}
         onChange={setFilters}
         onClear={() => setFilters({})}
       />

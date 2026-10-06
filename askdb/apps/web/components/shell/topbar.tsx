@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { IndustrySwitcher } from "@/components/shell/industry-switcher";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { useRegionAccess } from "@/hooks/use-session";
 import { MAIN_TABS } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
@@ -18,6 +19,7 @@ export function Topbar() {
   const presenterMode = useUiStore((state) => state.presenterMode);
   const togglePresenterMode = useUiStore((state) => state.togglePresenterMode);
   const setCommandPaletteOpen = useUiStore((state) => state.setCommandPaletteOpen);
+  const regionAccess = useRegionAccess();
 
   return (
     <header className="sticky top-0 z-20 flex h-[var(--topbar-height)] shrink-0 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur">
@@ -82,6 +84,11 @@ export function Topbar() {
           <Presentation />
         </Button>
         <IndustrySwitcher />
+        {!regionAccess.unrestricted ? (
+          <span className="hidden rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary sm:inline">
+            {regionAccess.label} only
+          </span>
+        ) : null}
         <ThemeToggle className="hidden md:inline-flex" />
       </div>
     </header>

@@ -37,8 +37,8 @@ class QueryResultCache:
         self._lock = threading.Lock()
         self._store: dict[str, CachedAnswer] = {}
 
-    def _key(self, industry: str, question: str) -> str:
-        raw = f"{industry}|{normalize_question(question)}"
+    def _key(self, industry: str, question: str, scope: str = "all") -> str:
+        raw = f"{industry}|{scope}|{normalize_question(question)}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
     def get(
@@ -47,8 +47,9 @@ class QueryResultCache:
         industry: str,
         question: str,
         current_data_as_of: str | None,
+        scope: str = "all",
     ) -> CachedAnswer | None:
-        key = self._key(industry, question)
+        key = self._key(industry, question, scope)
         with self._lock:
             hit = self._store.get(key)
             if hit is None:
@@ -62,8 +63,10 @@ class QueryResultCache:
                 return None
             return hit
 
-    def put(self, *, industry: str, question: str, answer: CachedAnswer) -> None:
-        key = self._key(industry, question)
+    def put(
+        self, *, industry: str, question: str, answer: CachedAnswer, scope: str = "all"
+    ) -> None:
+        key = self._key(industry, question, scope)
         with self._lock:
             if len(self._store) >= self._max and key not in self._store:
                 # Drop oldest

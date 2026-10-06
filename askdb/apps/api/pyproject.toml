@@ -62,6 +62,7 @@ ignore = ["S101"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S105", "S106"]
 "tests/unit/test_analytics_builder_v2.py" = ["E501"]
+"tests/unit/test_region_rls.py" = ["E501"]
 "migrations/*" = ["N999", "E501"]
 "app/analytics/*" = ["S311"]  # deterministic synthetic data, not cryptography
 "scripts/*" = ["S608"]
@@ -71,6 +72,7 @@ ignore = ["S101"]
 "app/services/analytics/*" = ["E501"]
 "app/services/analytics/compiler.py" = ["E501", "S608"]  # identifiers from the governed catalog
 "app/services/analytics/runner.py" = ["E501", "S608"]
+"app/services/security/region_scope.py" = ["E501", "S608"]
 "app/services/kpi/windows.py" = ["E501", "SIM108"]
 "app/services/kpi/insurance.py" = ["E501", "S608"]
 

@@ -132,7 +132,10 @@ async def test_me_returns_profile_after_login(
     response = await client.get("/api/v1/auth/me")
 
     assert response.status_code == 200
-    assert response.json()["email"] == ADMIN_EMAIL
+    body = response.json()
+    assert body["email"] == ADMIN_EMAIL
+    assert body["regionAccess"]["unrestricted"] is True
+    assert body["regionAccess"]["hideRegionFilter"] is False
 
 
 async def test_refresh_rotates_the_token(

@@ -61,6 +61,7 @@ from app.services.chat.question_understanding import QuestionPlan, understand_qu
 from app.services.chat.response_meta import build_insights
 from app.services.chat.semantic_analytics import SemanticCompileError
 from app.services.chat.value_dictionary import BusinessValue, get_value_dictionary
+from app.services.security.region_scope import assert_requested_region, load_region_scope
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,12 @@ class AnalyticsService:
     # -- run --
 
     async def run(self, spec: AnalyticsSpec) -> AnalyticsRunResponse:
+        scope = await load_region_scope(self._app, self._user)
+        for filt in spec.filters:
+            domain = (filt.domain or "").casefold()
+            if domain in {"region", "city", "state"}:
+                for value in filt.values:
+                    assert_requested_region(scope, value)
         catalog = await catalog_for(self._semantic, self._industry)
         report = catalog.inspect(spec)
         blocking = first_error(report.issues)

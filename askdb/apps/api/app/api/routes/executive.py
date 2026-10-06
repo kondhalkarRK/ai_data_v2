@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,12 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
     ActiveIndustry,
+    RegionScopeDep,
     RequireUser,
     get_app_session,
-    get_registry,
+    get_scoped_analytics,
 )
 from app.core.config import Industry
-from app.db.session import DatabaseRegistry
 from app.models.activity import InsightFeedback
 from app.schemas.executive import (
     ExecutiveIntelligenceResponse,
@@ -40,19 +39,11 @@ from app.services.executive.region_map import (
     fetch_region_dealers,
     fetch_region_map,
 )
+from app.services.security.region_scope import assert_requested_region
 
 router = APIRouter(prefix="/executive", tags=["executive"])
 
-
-async def get_analytics_connection(
-    industry: ActiveIndustry,
-    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
-) -> AsyncIterator[AsyncConnection]:
-    async with registry.analytics_connection(industry) as connection:
-        yield connection
-
-
-AnalyticsConnection = Annotated[AsyncConnection, Depends(get_analytics_connection)]
+AnalyticsConnection = Annotated[AsyncConnection, Depends(get_scoped_analytics)]
 
 
 @router.get("/intelligence", response_model=ExecutiveIntelligenceResponse)
@@ -60,13 +51,15 @@ async def executive_intelligence(
     user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
+    scope: RegionScopeDep,
     window: WindowId = Query(default="ytd"),
     lob: str | None = Query(default=None),
     region: str | None = Query(default=None),
     make: str | None = Query(default=None),
     refresh: bool = Query(default=False),
 ) -> ExecutiveIntelligenceResponse:
-    del user  # Auth gate only; same warehouse ACLs as KPI/chat readers.
+    del user
+    assert_requested_region(scope, region)
     if refresh:
         clear_executive_cache()
     service = ExecutiveIntelligenceService(connection=connection, industry=industry)
@@ -76,6 +69,7 @@ async def executive_intelligence(
         region=region,
         make=make,
         force_refresh=refresh,
+        scope_key=scope.cache_key(),
     )
 
 
@@ -84,6 +78,7 @@ async def executive_cockpit(
     user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
+    scope: RegionScopeDep,
     year: int | None = Query(default=None, ge=2000, le=2100),
     quarter: int | None = Query(default=None, ge=1, le=4),
     month: int | None = Query(default=None, ge=1, le=12),
@@ -101,6 +96,9 @@ async def executive_cockpit(
     del user
     if industry != Industry.AUTOMOTIVE:
         raise HTTPException(status_code=404, detail="The KPI cockpit is available for automotive.")
+    assert_requested_region(scope, zone)
+    assert_requested_region(scope, state)
+    assert_requested_region(scope, city)
     filters = CockpitFilters(
         year=year, quarter=quarter, month=month, make=make, model=model,
         engine_type=engine_type, car_type=car_type, zone=zone, state=state, city=city,
@@ -108,7 +106,9 @@ async def executive_cockpit(
     )  # fmt: skip
     if refresh:
         clear_cockpit_cache()
-    return await ExecutiveCockpitService(connection).get_cockpit(filters, force_refresh=refresh)
+    return await ExecutiveCockpitService(connection).get_cockpit(
+        filters, force_refresh=refresh, scope_key=scope.cache_key()
+    )
 
 
 @router.get("/cockpit/options", response_model=CockpitOptions)
@@ -116,12 +116,13 @@ async def executive_cockpit_options(
     user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
+    scope: RegionScopeDep,
     dealer_id: int | None = Query(default=None),
 ) -> CockpitOptions:
     del user
     if industry != Industry.AUTOMOTIVE:
         raise HTTPException(status_code=404, detail="The KPI cockpit is available for automotive.")
-    return await fetch_cockpit_options(connection, dealer_id=dealer_id)
+    return await fetch_cockpit_options(connection, dealer_id=dealer_id, scope_key=scope.cache_key())
 
 
 @router.get("/region-map", response_model=list[RegionMapPoint])

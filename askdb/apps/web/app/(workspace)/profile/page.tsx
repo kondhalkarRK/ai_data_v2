@@ -47,6 +47,14 @@ export default function ProfilePage() {
               <CardDescription>Role</CardDescription>
               <StatusPill tone={user.role === "admin" ? "info" : "neutral"} label={user.role.toUpperCase()} />
             </div>
+            <div>
+              <CardDescription>Region access</CardDescription>
+              <p className="font-medium text-foreground">
+                {user.regionAccess?.unrestricted
+                  ? "All regions"
+                  : (user.regionAccess?.zones ?? []).join(", ") || "Restricted"}
+              </p>
+            </div>
             {user.lastLoginAt ? (
               <div>
                 <CardDescription>Last login</CardDescription>

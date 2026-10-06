@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -15,6 +14,7 @@ from app.api.deps import (
     get_app_session,
     get_app_settings,
     get_registry,
+    get_scoped_analytics,
     get_semantic_service,
 )
 from app.core.config import Settings
@@ -38,20 +38,12 @@ from app.services.analytics.runner import AnalyticsService, capabilities_for, in
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
-async def _analytics_conn(
-    industry: ActiveIndustry,
-    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
-) -> AsyncIterator[AsyncConnection]:
-    async with registry.analytics_connection(industry) as connection:
-        yield connection
-
-
 def _service(
     user: RequireUser,
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: Annotated[AsyncConnection, Depends(_analytics_conn)],
+    analytics: Annotated[AsyncConnection, Depends(get_scoped_analytics)],
     semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
 ) -> AnalyticsService:
     return AnalyticsService(

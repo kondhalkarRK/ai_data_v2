@@ -11,6 +11,7 @@ from app.models.catalog import CatalogChange, CatalogColumn, CatalogRefresh, Cat
 from app.models.enums import AuthEventType, ExecutionMode, Role
 from app.models.governance import AdminAudit, AppSetting, LoginAudit
 from app.models.refresh_token import RefreshToken
+from app.models.region_access import UserRegionAccess
 from app.models.reliability import DqRuleRun, DqRuleSetting, DqScoreSnapshot
 from app.models.user import User
 
@@ -37,4 +38,5 @@ __all__ = [
     "SavedAnalysis",
     "SavedQuestion",
     "User",
+    "UserRegionAccess",
 ]

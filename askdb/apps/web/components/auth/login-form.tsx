@@ -132,6 +132,11 @@ export function LoginForm() {
             )}
           </Button>
         </form>
+        <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
+          Demo: <code>admin</code> / admin123 (all regions). Region users{" "}
+          <code>user_north</code>, <code>user_south</code>, <code>user_west</code>,{" "}
+          <code>user_east</code> — passwords north123, south123, west123, east123.
+        </p>
       </CardContent>
     </Card>
   );

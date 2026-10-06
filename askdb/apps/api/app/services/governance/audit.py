@@ -17,6 +17,7 @@ class AdminAction:
     USER_LOGIN = "User Login"
     USER_LOGOUT = "User Logout"
     LOGIN_FAILED = "Login Failed"
+    REGION_ACCESS_DENIED = "Region Access Denied"
     CHANGED_LLM_PROVIDER = "Changed LLM Provider"
     CHANGED_LLM_MODEL = "Changed LLM Model"
     CHANGED_TEMPERATURE = "Changed Temperature"
@@ -33,6 +34,7 @@ class AdminAction:
 
 AUDIT_CATEGORIES: dict[str, tuple[str, ...]] = {
     "logins": (AdminAction.USER_LOGIN, AdminAction.LOGIN_FAILED),
+    "security": (AdminAction.REGION_ACCESS_DENIED,),
     "logouts": (AdminAction.USER_LOGOUT,),
     "llm": (
         AdminAction.CHANGED_LLM_PROVIDER,

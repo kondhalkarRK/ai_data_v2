@@ -13,6 +13,8 @@
 --
 --     psql -d askdb_app -f database/app/10_auth_governance.sql
 --     psql -d askdb_app -f database/app/11_seed_poc_users.sql
+--     psql -d askdb_app -f database/app/12_user_region_access.sql
+--     psql -d askdb_app -f database/app/13_seed_region_users.sql
 -- ---------------------------------------------------------------------------
 
 BEGIN;

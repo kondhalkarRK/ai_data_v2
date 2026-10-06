@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import date
 from typing import Annotated
 
@@ -12,10 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.api.deps import (
     ActiveIndustry,
+    RegionScopeDep,
     RequireUser,
-    get_registry,
+    get_scoped_analytics,
 )
-from app.db.session import DatabaseRegistry
 from app.schemas.kpi import (
     KpiFilterOptions,
     KpiSummaryResponse,
@@ -24,19 +23,11 @@ from app.schemas.kpi import (
     WindowId,
 )
 from app.services.kpi import KpiService
+from app.services.security.region_scope import assert_requested_region
 
 router = APIRouter(prefix="/kpis", tags=["kpis"])
 
-
-async def get_analytics_connection(
-    industry: ActiveIndustry,
-    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
-) -> AsyncIterator[AsyncConnection]:
-    async with registry.analytics_connection(industry) as connection:
-        yield connection
-
-
-AnalyticsConnection = Annotated[AsyncConnection, Depends(get_analytics_connection)]
+AnalyticsConnection = Annotated[AsyncConnection, Depends(get_scoped_analytics)]
 
 
 @router.get("/filters", response_model=KpiFilterOptions)
@@ -53,6 +44,7 @@ async def kpi_summary(
     user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
+    scope: RegionScopeDep,
     window: WindowId = Query(default="ytd"),
     lob: str | None = Query(default=None),
     region: str | None = Query(default=None),
@@ -60,6 +52,7 @@ async def kpi_summary(
     as_of: date | None = Query(default=None),
     compare: bool = Query(default=True),
 ) -> KpiSummaryResponse:
+    assert_requested_region(scope, region)
     return await KpiService(connection, industry).summary(
         window=window,
         lob=lob,
@@ -75,12 +68,14 @@ async def kpi_export(
     user: RequireUser,
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
+    scope: RegionScopeDep,
     window: WindowId = Query(default="ytd"),
     lob: str | None = Query(default=None),
     region: str | None = Query(default=None),
     make: str | None = Query(default=None),
     as_of: date | None = Query(default=None),
 ) -> PlainTextResponse:
+    assert_requested_region(scope, region)
     csv_text = await KpiService(connection, industry).export_csv(
         window=window, lob=lob, region=region, make=make, as_of=as_of
     )

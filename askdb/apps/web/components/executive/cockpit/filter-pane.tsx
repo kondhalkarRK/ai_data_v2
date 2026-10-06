@@ -20,6 +20,7 @@ export function FilterPane({
   options,
   onChange,
   onClear,
+  hideGeography = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,6 +28,7 @@ export function FilterPane({
   options: CockpitOptions | undefined;
   onChange: (next: CockpitFilters) => void;
   onClear: () => void;
+  hideGeography?: boolean;
 }) {
   const count = activeFilterCount(filters);
 
@@ -160,7 +162,14 @@ export function FilterPane({
                 />
               </Group>
               <Group title="Geography & channel">
-                <Select label="Region" value={filters.zone} onChange={(v) => set("zone", v)} options={options?.zones ?? []} />
+                {hideGeography ? (
+                  <p className="px-0.5 text-[11px] text-muted-foreground">
+                    Region is set by your login and cannot be changed.
+                  </p>
+                ) : (
+                  <Select label="Region" value={filters.zone} onChange={(v) => set("zone", v)} options={options?.zones ?? []} />
+                )}
+                {hideGeography ? null : (
                 <Select
                   label="State"
                   value={filters.state}
@@ -168,7 +177,8 @@ export function FilterPane({
                   options={states}
                   grouped={!filters.zone}
                 />
-                {filters.city ? (
+                )}
+                {hideGeography || !filters.city ? null : (
                   <div className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs dark:bg-muted">
                     <span>
                       <span className="text-slate-500">City</span>{" "}
@@ -178,7 +188,7 @@ export function FilterPane({
                       <X className="size-3.5 text-slate-400 hover:text-slate-700" />
                     </button>
                   </div>
-                ) : null}
+                )}
                 <Select
                   label="Dealer"
                   value={filters.dealer_id}

@@ -50,8 +50,9 @@ class ExecutiveIntelligenceService:
         region: str | None = None,
         make: str | None = None,
         force_refresh: bool = False,
+        scope_key: str = "all",
     ) -> ExecutiveIntelligenceResponse:
-        cache_key = f"{self._industry.value}|{window}|{lob}|{region}|{make}"
+        cache_key = f"{self._industry.value}|{scope_key}|{window}|{lob}|{region}|{make}"
         now = time.time()
         if not force_refresh and cache_key in _CACHE:
             expires, payload = _CACHE[cache_key]

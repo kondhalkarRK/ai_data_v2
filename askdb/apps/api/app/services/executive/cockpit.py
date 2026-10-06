@@ -438,9 +438,13 @@ class ExecutiveCockpitService:
     # ------------------------------------------------------------------ bundle
 
     async def get_cockpit(
-        self, filters: CockpitFilters, *, force_refresh: bool = False
+        self,
+        filters: CockpitFilters,
+        *,
+        force_refresh: bool = False,
+        scope_key: str = "all",
     ) -> CockpitResponse:
-        key = filters.cache_key()
+        key = f"{scope_key}|{filters.cache_key()}"
         now = time.time()
         cached = _CACHE.get(key)
         if cached and cached[0] > now and not force_refresh:
@@ -1050,9 +1054,9 @@ class ExecutiveCockpitService:
 
 
 async def fetch_cockpit_options(
-    connection: AsyncConnection, dealer_id: int | None = None
+    connection: AsyncConnection, dealer_id: int | None = None, *, scope_key: str = "all"
 ) -> CockpitOptions:
-    key = f"options|{dealer_id}"
+    key = f"options|{scope_key}|{dealer_id}"
     cached = _OPTIONS_CACHE.get(key)
     if cached and cached[0] > time.time():
         return cached[1]
