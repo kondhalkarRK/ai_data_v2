@@ -46,6 +46,19 @@ def test_sql_rewrite_scopes_fact_and_region_tables() -> None:
     assert apply_region_sql(sql, Industry.AUTOMOTIVE, RegionScope.all_regions()) == sql
 
 
+def test_sql_rewrite_keeps_explicit_alias_for_ordered_queries() -> None:
+    sql = (
+        "SELECT dealer_id, dealer_name, city "
+        "FROM automotive.dim_dealer "
+        "WHERE dealer_id = ANY(:ids) "
+        "ORDER BY dealer_name"
+    )
+    out = apply_region_sql(sql, Industry.AUTOMOTIVE, _north())
+    assert "AS _rls_" in out.lower()
+    assert "ORDER BY dealer_name" in out.upper()
+    assert "dealer_id = ANY(:ids)" in out
+
+
 def test_explain_and_set_are_left_intact() -> None:
     assert apply_region_sql(
         "SET LOCAL statement_timeout = 5000", Industry.AUTOMOTIVE, _north()

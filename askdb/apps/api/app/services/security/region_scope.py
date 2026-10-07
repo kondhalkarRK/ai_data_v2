@@ -165,9 +165,12 @@ _SCOPED_TABLES = (
     "insurance.fact_forecast_monthly",
 )
 _DIM_REGION = frozenset({"automotive.dim_region", "insurance.dim_region"})
+_RESERVED_SQL_WORDS = "(?:" + "|".join(
+    re.escape(word) for word in sorted(_SQL_KEYWORDS, key=len, reverse=True)
+) + ")"
 _TABLE_RE = re.compile(
     r"\b(FROM|JOIN)\s+(" + "|".join(re.escape(t) for t in _SCOPED_TABLES) + r")"
-    r"(?:\s+(?:AS\s+)?([A-Za-z_][A-Za-z0-9_]*))?",
+    r"(?:\s+(?:AS\s+)?(?!" + _RESERVED_SQL_WORDS + r"\b)([A-Za-z_][A-Za-z0-9_]*))?",
     re.IGNORECASE,
 )
 
@@ -396,9 +399,9 @@ def _rewrite_tables(sql: str, industry: Industry, scope: RegionScope) -> str:
             return match.group(0)
         wrapped = _scoped_subquery(table.lower(), industry, scope)
         if alias and alias.upper() not in _SQL_KEYWORDS:
-            return f"{kind} {wrapped} {alias}"
+            return f"{kind} {wrapped} AS {alias}"
         counter += 1
-        return f"{kind} {wrapped} _rls_{counter}"
+        return f"{kind} {wrapped} AS _rls_{counter}"
 
     return _TABLE_RE.sub(repl, sql)
 
