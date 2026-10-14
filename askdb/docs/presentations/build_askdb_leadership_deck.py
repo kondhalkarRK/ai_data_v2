@@ -10,25 +10,28 @@ from pathlib import Path
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import nsmap
 from pptx.oxml import parse_xml
 from pptx.util import Emu, Inches, Pt
 
-# --- Brand / light theme ----------------------------------------------------
-BG = RGBColor(0xF7, 0xF9, 0xFC)
-CARD = RGBColor(0xFF, 0xFF, 0xFF)
-INK = RGBColor(0x0F, 0x1C, 0x2E)
-MUTED = RGBColor(0x5B, 0x6B, 0x7C)
-LINE = RGBColor(0xD7, 0xE0, 0xEA)
-ASK = RGBColor(0x1D, 0x6F, 0xE8)  # blue / cyan family
-DB = RGBColor(0x0D, 0x9F, 0x8F)  # teal / green family
-ACCENT = RGBColor(0x2B, 0x6C, 0xBE)
-WARN = RGBColor(0xC2, 0x5E, 0x00)
-OK = RGBColor(0x1B, 0x8A, 0x5A)
-PURPLE = RGBColor(0x6D, 0x5C, 0xF0)
-ORANGE = RGBColor(0xE0, 0x7A, 0x2F)
+# --- Brand / dark AI theme ----------------------------------------------------
+BG = RGBColor(0x06, 0x0D, 0x16)
+BG2 = RGBColor(0x0A, 0x16, 0x22)
+CARD = RGBColor(0x11, 0x1D, 0x2A)
+CARD_2 = RGBColor(0x17, 0x26, 0x36)
+INK = RGBColor(0xE9, 0xF5, 0xFF)
+MUTED = RGBColor(0xB7, 0xC7, 0xD8)
+LINE = RGBColor(0x2E, 0x3C, 0x4B)
+ASK = RGBColor(0x4A, 0xC7, 0xFF)  # cyan / AI blue
+DB = RGBColor(0x52, 0xE5, 0xC2)  # mint / product green
+ACCENT = RGBColor(0x7A, 0xA7, 0xFF)
+WARN = RGBColor(0xFF, 0xB8, 0x5A)
+OK = RGBColor(0x72, 0xF0, 0xBA)
+PURPLE = RGBColor(0xA6, 0x7C, 0xFF)
+ORANGE = RGBColor(0xFF, 0x8A, 0x65)
+GLASS = RGBColor(0x1B, 0x2A, 0x35)
 
 FOOTER_L = "Ask DB · Capgemini AI Data Platform"
 FOOTER_R = "Company Confidential © Capgemini 2026. All rights reserved."
@@ -182,6 +185,22 @@ def arrow_right(slide, left, top):
     add_textbox(slide, left, top, Inches(0.3), Inches(0.3), "→", size=16, bold=True, color=ASK, align=PP_ALIGN.CENTER)
 
 
+def add_connector(slide, x1, y1, x2, y2, color=ASK, width=1.2):
+    line = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x1, y1, x2, y2)
+    line.line.color.rgb = color
+    line.line.width = Emu(int(width * 91440 / 1)) if False else 1.5
+    line.line.end_arrowhead = "arrow"
+    return line
+
+
+def add_orb(slide, left, top, width, height, color):
+    shape = slide.shapes.add_shape(MSO_SHAPE.OVAL, left, top, width, height)
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = color
+    shape.line.fill.background()
+    return shape
+
+
 def build() -> Path:
     prs = Presentation()
     prs.slide_width = Inches(13.333)
@@ -195,7 +214,10 @@ def build() -> Path:
     add_rect(s, Inches(0), Inches(0), Inches(13.333), Inches(7.5), BG)
     add_rect(s, Inches(0), Inches(0), Inches(0.18), Inches(7.5), ASK)
     add_rect(s, Inches(0.18), Inches(0), Inches(0.08), Inches(7.5), DB)
-    brand_title(s, Inches(0.8), Inches(2.2), Inches(11), Inches(0.8), size=40)
+    add_orb(s, Inches(8.8), Inches(1.2), Inches(3.5), Inches(3.5), RGBColor(0x12, 0x2E, 0x42))
+    add_orb(s, Inches(9.5), Inches(1.8), Inches(2.2), Inches(2.2), RGBColor(0x1D, 0x6F, 0xE8))
+    add_orb(s, Inches(10.3), Inches(2.4), Inches(1.0), Inches(1.0), RGBColor(0x52, 0xE5, 0xC2))
+    brand_title(s, Inches(0.8), Inches(2.1), Inches(11), Inches(0.8), size=40)
     add_textbox(
         s,
         Inches(0.8),
@@ -210,13 +232,14 @@ def build() -> Path:
         s,
         Inches(0.8),
         Inches(4.0),
-        Inches(10),
+        Inches(10.6),
         Inches(0.8),
         "Enterprise NLQ over PostgreSQL · Semantic Atlas · Data Trust · Executive Intelligence",
         size=14,
         color=INK,
     )
-    add_textbox(s, Inches(0.8), Inches(5.6), Inches(6), Inches(0.3), "Leadership briefing · Capgemini 2026", size=12, color=MUTED)
+    add_textbox(s, Inches(0.8), Inches(5.7), Inches(6), Inches(0.3), "Leadership briefing · Capgemini 2026", size=12, color=MUTED)
+    add_rect(s, Inches(0.8), Inches(5.95), Inches(2.8), Inches(0.16), ASK)
     footer(s, 1, total)
 
     # 2 Agenda
@@ -334,9 +357,9 @@ def build() -> Path:
 
     layers = [
         ("INPUT", ASK, ["Natural language chat", "Industry switch (Auto / Insurance)", "Connected data sources status"]),
-        ("SEMANTIC", PURPLE, ["YAML semantic packs", "Business glossary + ontology", "Value dictionary (live distincts)", "SQL guardrails (SELECT-only)"]),
-        ("EXECUTION", DB, ["PostgreSQL analytics (RO)", "Template-first + LLM fallback", "Retry / self-heal EXPLAIN", "Query cache + SSE progress"]),
-        ("PRESENTATION", ORANGE, ["Table / Chart / SQL tabs", "Executive Intelligence KPIs", "Data Trust Center", "Semantic Atlas · LLM Observability"]),
+        ("SEMANTIC", PURPLE, ["Knowledge graph + Semantic Atlas", "YAML semantic packs", "Business glossary + ontology", "Value dictionary (live distincts)"]),
+        ("EXECUTION", DB, ["PostgreSQL analytics (RO)", "Template-first + LLM fallback", "Query cache + SSE progress", "Query history + replay"]),
+        ("GOVERNANCE", ORANGE, ["Role-based access control", "Admin dashboard & audit trail", "LLM observability & cost controls", "Configurable LLM gateway"]),
     ]
     for i, (name, color, items) in enumerate(layers):
         left = Inches(0.4) + Inches(i * 3.2)
@@ -345,14 +368,15 @@ def build() -> Path:
         add_textbox(s, left + Inches(0.15), Inches(1.45), Inches(2.7), Inches(0.35), name, size=14, bold=True, color=CARD, align=PP_ALIGN.CENTER)
         for j, item in enumerate(items):
             add_textbox(s, left + Inches(0.2), Inches(2.15) + Inches(j * 0.7), Inches(2.65), Inches(0.6), f"• {item}", size=12, color=INK)
+    add_rect(s, Inches(0.5), Inches(6.0), Inches(12.25), Inches(0.28), CARD_2, LINE)
     add_textbox(
         s,
-        Inches(0.5),
-        Inches(6.25),
-        Inches(12),
-        Inches(0.4),
+        Inches(0.8),
+        Inches(6.05),
+        Inches(11.7),
+        Inches(0.2),
         "Tech: Next.js · FastAPI · PostgreSQL · YAML semantic packs · Capgemini LLM API · TanStack Query · React Flow",
-        size=12,
+        size=11,
         color=MUTED,
     )
     footer(s, 5, total)
@@ -370,8 +394,17 @@ def build() -> Path:
         (9.3, 4.5, 3.3, 1.0, "App DB\nAuth · History · Cost", ASK),
         (6.0, 4.8, 2.6, 1.0, "Result UI\nTable · Chart · SQL", DB),
     ]
-    for left, top, w, h, text, color in boxes:
-        shape = add_rect(s, Inches(left), Inches(top), Inches(w), Inches(h), CARD, color)
+    connector_specs = [
+        ((1.5, 3.5), (3.0, 3.5)),
+        ((5.4, 3.5), (6.0, 3.5)),
+        ((8.6, 3.5), (9.3, 2.0)),
+        ((8.6, 3.5), (9.3, 3.5)),
+        ((8.6, 3.5), (9.3, 5.0)),
+        ((6.0, 4.3), (6.0, 4.8)),
+        ((6.0, 3.0), (6.0, 2.2)),
+    ]
+    for x1, y1, x2, y2, text, color in boxes:
+        shape = add_rect(s, Inches(x1), Inches(y1), Inches(x2), Inches(y2), CARD, color)
         tf = shape.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
@@ -381,11 +414,14 @@ def build() -> Path:
         p.font.color.rgb = INK
         p.font.name = "Calibri"
         p.alignment = PP_ALIGN.CENTER
+    for (x1, y1), (x2, y2) in connector_specs:
+        add_connector(s, Inches(x1), Inches(y1), Inches(x2), Inches(y2), color=ASK, width=1.2)
     notes = [
         "Browser never holds LLM keys or executes SQL",
         "Numbers always come from PostgreSQL — not the model",
-        "Semantic truth from YAML packs, not ad-hoc prompts",
-        "Analytics pools are read-only with statement timeout + LIMIT",
+        "Semantic truth from YAML packs and knowledge graph, not ad-hoc prompts",
+        "Analytics pools are read-only with RBAC, statement timeout + LIMIT",
+        "Admin console governs audit, query history, LLM config and usage visibility",
     ]
     for i, n in enumerate(notes):
         add_textbox(s, Inches(0.5), Inches(1.2) + Inches(i * 0.4), Inches(8.5), Inches(0.35), f"✓  {n}", size=13, color=MUTED)
@@ -470,17 +506,17 @@ def build() -> Path:
     section_title(s, "Key features")
     left_feats = [
         ("Intent recognition", "Understands ‘top performers’ as ORDER BY … DESC LIMIT — not keyword match."),
-        ("Schema-aware context", "Pack columns, grains, and live value domains ground the LLM before it answers."),
-        ("Governed relationships", "Join contracts + cardinality from Semantic Atlas — not silent cross joins."),
-        ("Self-healing SQL", "Failed EXPLAIN / validation triggers repair; aborted transactions are recovered."),
-        ("Config-driven domains", "Automotive & Insurance packs map business terms to physical columns."),
+        ("Semantic Atlas", "Knowledge graph and glossary connect business terms to tables, joins, and KPIs."),
+        ("Analytics Builder", "Compose executive charts, KPI cards, and drill-downs across region, dealer, and model views."),
+        ("Role-based access", "Granular RBAC enforces user scopes, team visibility, and admin-only controls."),
+        ("Admin audit & governance", "Queries, changes, and user activity are tracked for compliance and operational review."),
     ]
     right_feats = [
         ("Follow-up memory", "Prior SQL preserved so ‘only Mumbai’ revises the last successful query."),
         ("SQL guardrails", "SELECT-only · read-only txn · statement timeout · hard row LIMIT."),
         ("Executive Intelligence", "8 KPI cards, performance charts, India region → dealer → model map."),
-        ("Data Trust Center", "Trust score, incidents, dataset health, profiling, lineage, rules."),
-        ("Smart presentation", "Table-first results with Chart (X/Y/type) and SQL tabs; no fake confidence %."),
+        ("LLM observability", "Trace prompts, latency, token cost, and model quality with pipeline transparency."),
+        ("Configurable LLM", "Switch providers/models with cost controls, routing policies, and production guardrails."),
     ]
     for i, (t, d) in enumerate(left_feats):
         feature_row(s, Inches(0.5), Inches(1.15) + Inches(i * 1.05), Inches(5.7), t, d, ASK)
@@ -494,13 +530,13 @@ def build() -> Path:
     section_title(s, "Major product components")
     comps = [
         ("Home / Hero", "Ask DB branding, live demo loop, connected sources"),
-        ("AI Chat", "SSE progress, Table/Chart/SQL, sticky layout"),
+        ("AI Chat", "SSE progress, Table/Chart/SQL, sticky layout, follow-up memory"),
         ("Executive Intelligence", "KPIs, AI insights, performance analytics + map"),
-        ("Data Trust Center", "Overview + Technical trust & DQ operations"),
-        ("Semantic Atlas", "Ontology · Model · Glossary (cardinality)"),
-        ("LLM Observability", "Cost analytics + sampling controls"),
-        ("Data Preview", "Governed table browsing"),
-        ("Activity", "Saved questions · history · system logs"),
+        ("Data Trust Center", "Overview + technical trust & DQ operations"),
+        ("Semantic Atlas", "Knowledge graph · ontology · glossary · cardinality"),
+        ("Admin Dashboard", "Operational overview, user activity, live system health"),
+        ("Role-based Access", "Regional, team, and admin-level governance controls"),
+        ("LLM Config + Audit", "Model selection, cost monitoring, traceability, and query history"),
     ]
     for i, (t, d) in enumerate(comps):
         col = i % 4
@@ -530,12 +566,12 @@ def build() -> Path:
         "Limited enterprise shell",
     ]
     new = [
-        "Next.js + design-system UI",
+        "Next.js + Node.js product shell",
         "PostgreSQL analytics (RO pools)",
-        "Industry semantic YAML packs",
-        "Light premium product UI",
-        "Modular services + SSE NLQ",
-        "RBAC, Trust, EI, Observability",
+        "Semantic Atlas + knowledge graph",
+        "Analytics Builder + EI dashboards",
+        "Modular services + SSE NLQ + query history",
+        "RBAC, admin audit, configurable LLM, observability",
     ]
     for i, t in enumerate(old):
         add_textbox(s, Inches(0.85), Inches(2.1) + Inches(i * 0.6), Inches(5.2), Inches(0.45), f"• {t}", size=14, color=MUTED)
@@ -564,12 +600,12 @@ def build() -> Path:
     set_slide_bg(s, BG)
     section_title(s, "Technology stack")
     stack = [
-        ("Frontend", "Next.js App Router · React · Tailwind · TanStack Query · Zustand · React Flow"),
-        ("API", "FastAPI · Pydantic v2 · SQLAlchemy 2 · SSE streaming · Argon2 / JWT auth"),
-        ("Data", "PostgreSQL (app + automotive + insurance) · read-only analytics pools"),
-        ("Semantic", "YAML packs · glossary · ontology compiler · value dictionary"),
-        ("AI", "Capgemini LLM API · model fallback · temperature / top-p / top-k controls"),
-        ("Ops", "Docker · health/readiness · cost metering · system logs · RBAC"),
+        ("Frontend", "Next.js + Node.js · React · Tailwind · TanStack Query · Zustand · React Flow"),
+        ("API", "FastAPI · Pydantic v2 · SQLAlchemy 2 · SSE streaming · JWT / RBAC auth"),
+        ("Data", "PostgreSQL (app + automotive + insurance) · read-only analytics pools · query history"),
+        ("Semantic", "Semantic Atlas · YAML packs · glossary · ontology compiler · value dictionary"),
+        ("AI", "Configurable LLM gateway · Capgemini LLM API · model fallback · observability · cost controls"),
+        ("Ops", "Docker · health/readiness · admin dashboard · audit logs · governance controls"),
     ]
     for i, (t, d) in enumerate(stack):
         top = Inches(1.2) + Inches(i * 0.85)
@@ -584,10 +620,10 @@ def build() -> Path:
     set_slide_bg(s, BG)
     section_title(s, "Future roadmap")
     phases = [
-        ("Now", "Stabilize NLQ accuracy · EI map · Trust · Ask DB brand polish"),
-        ("Next", "Deeper access control on region/dealer drill-downs · richer chart packs"),
-        ("Later", "What-If return · forecasting (optional) · durable metrics backend"),
-        ("Scale", "Multi-tenant packs · warehouse connectors · production LLM budgets"),
+        ("Now", "Stabilize NLQ accuracy · EI dashboards · Trust · Ask DB brand polish"),
+        ("Next", "RBAC refinement · admin audit completion · query-history replay · richer chart packs"),
+        ("Later", "What-if analysis · forecasting · semantic graph expansion · reusable analytics builder"),
+        ("Scale", "Multi-tenant packs · configurable-model governance · warehouse connectors · production LLM budgets"),
     ]
     for i, (t, d) in enumerate(phases):
         left = Inches(0.45) + Inches(i * 3.2)
