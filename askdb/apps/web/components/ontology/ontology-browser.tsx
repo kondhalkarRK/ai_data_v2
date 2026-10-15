@@ -1046,7 +1046,7 @@ function OntologyBrowserInner({
                 label="All"
                 count={knowledgeCounts.all ?? 0}
                 active={knowledgeFilters.includes("all")}
-                hint="Show the whole knowledge graph."
+                hint="Show the whole ontology graph."
                 onClick={() =>
                   setKnowledgeFilters((current) => toggleFilter(current, "all"))
                 }

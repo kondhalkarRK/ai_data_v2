@@ -46,6 +46,13 @@ def test_sql_rewrite_scopes_fact_and_region_tables() -> None:
     assert apply_region_sql(sql, Industry.AUTOMOTIVE, RegionScope.all_regions()) == sql
 
 
+def test_data_preview_select_is_scoped() -> None:
+    sql = "SELECT * FROM automotive.fact_sales ORDER BY sale_id DESC LIMIT 50"
+    out = apply_region_sql(sql, Industry.AUTOMOTIVE, _north())
+    assert "/*rls*/" in out
+    assert "IN ('North')" in out
+
+
 def test_sql_rewrite_keeps_explicit_alias_for_ordered_queries() -> None:
     sql = (
         "SELECT dealer_id, dealer_name, city "
@@ -54,8 +61,8 @@ def test_sql_rewrite_keeps_explicit_alias_for_ordered_queries() -> None:
         "ORDER BY dealer_name"
     )
     out = apply_region_sql(sql, Industry.AUTOMOTIVE, _north())
-    assert "AS _rls_" in out.lower()
-    assert "ORDER BY dealer_name" in out.upper()
+    assert "as _rls_" in out.lower()
+    assert "ORDER BY DEALER_NAME" in out.upper()
     assert "dealer_id = ANY(:ids)" in out
 
 

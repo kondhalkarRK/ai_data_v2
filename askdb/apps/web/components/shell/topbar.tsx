@@ -86,7 +86,9 @@ export function Topbar() {
         <IndustrySwitcher />
         {!regionAccess.unrestricted ? (
           <span className="hidden rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary sm:inline">
-            {regionAccess.label} only
+            {regionAccess.zones.length
+              ? regionAccess.zones.map((zone) => `${zone} User`).join(" · ")
+              : "Restricted User"}
           </span>
         ) : null}
         <ThemeToggle className="hidden md:inline-flex" />

@@ -733,8 +733,9 @@ class ExecutiveCockpitService:
     ) -> tuple[list[TrendPoint], list[TrendEvent]]:
         points: list[TrendPoint] = []
         month = trend_start
-        while month <= forecast_end:
-            actual = actuals.get(month) if month <= end_month else None
+        # Do not extend the chart with forecast months that would read as zero revenue.
+        while month <= end_month:
+            actual = actuals.get(month)
             prior = actuals.get(month_add(month, -12))
             fc = forecast.get(month)
             yoy = growth(actual.revenue, prior.revenue) if actual and prior else None

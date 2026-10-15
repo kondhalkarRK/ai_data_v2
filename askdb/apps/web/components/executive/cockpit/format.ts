@@ -45,6 +45,14 @@ export function formatMonth(iso: string, withYear = true): string {
   return date.toLocaleString("en-IN", withYear ? { month: "short", year: "2-digit" } : { month: "short" });
 }
 
+/** e.g. "Sep 2026 — MTD" for in-progress months on the revenue trend chart. */
+export function formatTrendMonthLabel(iso: string, partial = false): string {
+  const [year, month] = iso.split("-").map(Number);
+  const date = new Date(year ?? 2000, (month ?? 1) - 1, 1);
+  const base = date.toLocaleString("en-IN", { month: "short", year: "numeric" });
+  return partial ? `${base} — MTD` : base;
+}
+
 export function formatDate(iso: string): string {
   const date = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(date.getTime())) return iso;

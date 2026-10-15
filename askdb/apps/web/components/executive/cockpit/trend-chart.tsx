@@ -4,7 +4,14 @@ import * as React from "react";
 
 import { ChartFrame, ChartTooltip } from "@/components/executive/cockpit/chart-frame";
 import { monotonePath, niceMax, runs, useElementSize } from "@/components/executive/cockpit/chart-utils";
-import { formatCompact, formatCount, formatInr, formatMonth, formatPct } from "@/components/executive/cockpit/format";
+import {
+  formatCompact,
+  formatCount,
+  formatInr,
+  formatMonth,
+  formatPct,
+  formatTrendMonthLabel,
+} from "@/components/executive/cockpit/format";
 import { COCKPIT } from "@/components/executive/cockpit/palette";
 import type { CockpitData, TrendPoint } from "@/components/executive/cockpit/types";
 import { cn } from "@/lib/utils";
@@ -30,10 +37,18 @@ export function TrendChart({ data, className }: { data: CockpitData; className?:
     units: true,
     prior: false,
   });
+  const hasPartialMonth = React.useMemo(
+    () => actualMonths(data.trend).some((p) => p.partial),
+    [data.trend],
+  );
   return (
     <ChartFrame
       title="Revenue trend"
-      subtitle="Last 24 months · Diwali and shocks highlighted"
+      subtitle={
+        hasPartialMonth
+          ? "Completed months = full-month revenue · current month = month-to-date (MTD)"
+          : "Last 24 months · Diwali and shocks highlighted"
+      }
       exportName="revenue-trend"
       className={className}
       csv={() =>
@@ -178,10 +193,18 @@ function TrendSvg({
                 const path = monotonePath(run.map(([idx, v]) => [x(idx), yRev(v)]));
                 const first = run[0]!;
                 const last = run[run.length - 1]!;
+                const dashed = run.some(([idx]) => points[idx]?.partial);
                 return (
                   <g key={`rev-${i}`}>
                     <path d={`${path} L${x(last[0])},${baseline} L${x(first[0])},${baseline} Z`} fill="url(#trend-revenue-fill)" />
-                    <path d={path} fill="none" stroke={COCKPIT.blue} strokeWidth={2.2} strokeLinecap="round" />
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={COCKPIT.blue}
+                      strokeWidth={2.2}
+                      strokeLinecap="round"
+                      strokeDasharray={dashed ? "6 4" : undefined}
+                    />
                   </g>
                 );
               })
@@ -205,7 +228,7 @@ function TrendSvg({
                 ) : p.partial && p.revenue != null ? (
                   <g key={`mtd-${p.month}`}>
                     <circle cx={x(i)} cy={yRev(p.revenue)} r={3.5} fill="#fff" stroke={COCKPIT.blue} strokeWidth={1.5} strokeDasharray="2 2" />
-                    <text x={x(i)} y={yRev(p.revenue) - 8} textAnchor="middle" fontSize={9} fill="#94a3b8">
+                    <text x={x(i)} y={yRev(p.revenue) - 8} textAnchor="middle" fontSize={8.5} fontWeight={600} fill={COCKPIT.blue}>
                       MTD
                     </text>
                   </g>
@@ -215,8 +238,16 @@ function TrendSvg({
 
           {points.map((p, i) =>
             i % labelEvery === 0 || i === n - 1 ? (
-              <text key={`lbl-${p.month}`} x={x(i)} y={height - 8} textAnchor="middle" fontSize={10} fill="#94a3b8">
-                {formatMonth(p.month)}
+              <text
+                key={`lbl-${p.month}`}
+                x={x(i)}
+                y={height - 8}
+                textAnchor="middle"
+                fontSize={p.partial ? 8.5 : 10}
+                fontWeight={p.partial ? 600 : 400}
+                fill={p.partial ? COCKPIT.blue : "#94a3b8"}
+              >
+                {p.partial ? formatTrendMonthLabel(p.month, true) : formatMonth(p.month)}
               </text>
             ) : null,
           )}
@@ -250,11 +281,20 @@ function TrendSvg({
       {hovered && hover != null ? (
         <ChartTooltip x={x(hover)} y={margin.top} width={width}>
           <p className="mb-1 font-semibold text-slate-800 dark:text-foreground">
-            {formatMonth(hovered.month)}
-            {hovered.partial ? " · month to date" : ""}
+            {formatTrendMonthLabel(hovered.month, hovered.partial)}
             {eventByMonth.get(hovered.month) ? ` · ${eventByMonth.get(hovered.month)!.label}` : ""}
           </p>
-          <TooltipRow colour={COCKPIT.blue} label="Revenue" value={formatInr(hovered.revenue)} />
+          {hovered.partial ? (
+            <p className="mb-1 text-[11px] leading-snug text-slate-500">
+              This month is still in progress. Revenue and units are month-to-date only (through the latest data
+              refresh), not a full calendar month.
+            </p>
+          ) : null}
+          <TooltipRow
+            colour={COCKPIT.blue}
+            label={hovered.partial ? "Revenue (MTD)" : "Revenue"}
+            value={formatInr(hovered.revenue)}
+          />
           <TooltipRow colour={COCKPIT.teal} label="Units" value={formatCount(hovered.units)} />
           {hovered.revenue != null && hovered.priorRevenue ? (
             <TooltipRow colour="#94a3b8" label="YoY" value={formatPct(hovered.revenue / hovered.priorRevenue - 1, true)} />

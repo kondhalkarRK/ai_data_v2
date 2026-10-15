@@ -240,7 +240,7 @@ describe("Admin Center panels render without crashing", () => {
 
   it("Semantic Admin", () => {
     renderPanel(<SemanticAdminPanel />);
-    expect(screen.getByText("Refresh Knowledge Graph")).toBeInTheDocument();
+    expect(screen.getByText("Refresh Ontology Browser")).toBeInTheDocument();
   });
 
   it("Entity Catalog (Admin)", async () => {

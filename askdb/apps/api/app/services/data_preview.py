@@ -176,19 +176,14 @@ class DataPreviewService:
         )
 
     async def _estimate_rows(self, schema: str, table: str) -> int | None:
-        result = await self._connection.execute(
-            text(
-                """
-                SELECT c.reltuples::bigint AS estimate
-                FROM pg_class c
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = :schema AND c.relname = :table
-                """
-            ),
-            {"schema": schema, "table": table},
-        )
+        """Scoped row count (respects regional RBAC on the analytics connection)."""
+        qualified = qualify_table(schema, table)
+        sql = f"SELECT COUNT(*)::bigint AS estimate FROM {qualified}"  # noqa: S608
+        ok, reason = sql_is_safe(sql)
+        if not ok:
+            raise GuardrailViolationError(reason)
+        result = await self._connection.execute(text(sql))
         row = result.first()
         if row is None:
             return None
-        estimate = int(row.estimate)
-        return max(estimate, 0)
+        return max(int(row.estimate), 0)

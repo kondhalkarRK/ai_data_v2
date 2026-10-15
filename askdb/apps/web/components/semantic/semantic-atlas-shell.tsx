@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { id: "model", label: "Semantic Model", icon: Boxes },
-  { id: "graph", label: "Knowledge Graph", icon: Network },
+  { id: "graph", label: "Ontology Browser", icon: Network },
 ] as const;
 
 export type AtlasTab = (typeof TABS)[number]["id"];
@@ -65,7 +65,7 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
       {graphFirst ? (
         <div className="mb-2 flex shrink-0 items-center gap-2 overflow-x-auto">
           <h1 className="shrink-0 text-base font-semibold tracking-tight text-foreground">
-            Semantic Atlas
+            Ontology Browser
           </h1>
           <IndustrySwitcher />
           <AtlasTabs tab={tab} onSelect={selectTab} compact />
@@ -73,7 +73,7 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
       ) : (
         <PageHeader
           title="Semantic Atlas"
-          description="The business meaning behind every AI answer: measures, relationships and the knowledge graph."
+          description="The business meaning behind every AI answer: measures, relationships, and the ontology browser."
         />
       )}
 
@@ -91,7 +91,7 @@ function SemanticAtlasInner({ initialTab }: { initialTab?: AtlasTab }) {
             {snapshot.isPending ? (
               <LoadingState title="Building semantic relationships" size="lg" />
             ) : snapshot.isError || !snapshot.data ? (
-              <p className="text-sm text-danger">The knowledge graph could not be loaded.</p>
+              <p className="text-sm text-danger">The ontology browser could not be loaded.</p>
             ) : (
               <OntologyBrowser
                 snapshot={snapshot.data}

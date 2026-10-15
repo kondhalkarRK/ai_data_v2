@@ -78,8 +78,8 @@ export function CommandPalette() {
       },
       {
         id: "graph-ontology",
-        label: "Open Semantic Galaxy",
-        hint: "Jump to the ontology knowledge graph",
+        label: "Ontology Browser",
+        hint: "Explore ontology maps and relationship views",
         group: "Semantic Graph",
         href: "/semantic?tab=graph",
       },

@@ -701,8 +701,8 @@ const SEMANTIC_ACTIONS = [
   {
     key: "graph",
     icon: Network,
-    title: "Refresh Knowledge Graph",
-    detail: "Rebuild the knowledge graph from the current semantic model.",
+    title: "Refresh Ontology Browser",
+    detail: "Rebuild the ontology browser graph from the current semantic model.",
   },
   {
     key: "cache",
