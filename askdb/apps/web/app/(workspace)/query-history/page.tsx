@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
-import { useActiveIndustry } from "@/hooks/use-session";
+import { useActiveIndustry, useSession } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
 
 interface HistoryRow {
@@ -17,13 +17,16 @@ interface HistoryRow {
   trustScore: number | null;
   latencyMs: number | null;
   createdAt: string;
+  username?: string;
 }
 
 export default function QueryHistoryPage() {
   const industry = useActiveIndustry();
+  const { data: user } = useSession();
   const history = useQuery({
-    queryKey: ["history", industry],
+    queryKey: ["history", industry, user?.id ?? "anon"],
     queryFn: () => apiClient.get<HistoryRow[]>("/api/v1/history", { industry }),
+    enabled: Boolean(user?.id),
   });
 
   return (
@@ -38,6 +41,7 @@ export default function QueryHistoryPage() {
               <CardContent className="pt-4">
                 <CardTitle className="text-sm">{row.question}</CardTitle>
                 <CardDescription>
+                  {row.username ? `${row.username} · ` : ""}
                   {row.status} · trust {row.trustScore ?? "—"} · {row.latencyMs ?? "—"} ms ·{" "}
                   {new Date(row.createdAt).toLocaleString()}
                 </CardDescription>

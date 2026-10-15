@@ -53,6 +53,21 @@ def test_data_preview_select_is_scoped() -> None:
     assert "IN ('North')" in out
 
 
+def test_quoted_table_names_from_data_preview_are_scoped() -> None:
+    sql = 'SELECT COUNT(*)::bigint AS estimate FROM "automotive"."fact_sales"'
+    out = apply_region_sql(sql, Industry.AUTOMOTIVE, _north())
+    assert "/*rls*/" in out
+    assert "IN ('North')" in out
+
+
+def test_dimension_preview_tables_filter_via_scoped_facts() -> None:
+    sql = 'SELECT * FROM "automotive"."dim_carline" ORDER BY carline_id DESC LIMIT 25'
+    out = apply_region_sql(sql, Industry.AUTOMOTIVE, _north())
+    assert "/*rls*/" in out
+    assert "automotive.fact_sales" in out
+    assert "carline_id IN" in out
+
+
 def test_sql_rewrite_keeps_explicit_alias_for_ordered_queries() -> None:
     sql = (
         "SELECT dealer_id, dealer_name, city "

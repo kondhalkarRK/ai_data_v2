@@ -12,6 +12,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
@@ -25,6 +26,7 @@ from app.api.deps import (
 )
 from app.core.config import Industry, Settings
 from app.core.exceptions import NqlError
+from app.models.enums import Role
 from app.models.user import User
 from app.schemas.common import ApiModel
 from app.semantic.service import SemanticService
@@ -281,6 +283,13 @@ async def query_history(
         industry=industry,
     )
     rows = await service.list_history()
+    usernames: dict[uuid.UUID, str] = {}
+    if user.role == Role.ADMIN and rows:
+        user_ids = {row.user_id for row in rows}
+        result = await session.execute(
+            select(User.id, User.username).where(User.id.in_(user_ids))
+        )
+        usernames = {uid: name for uid, name in result.all()}
     return [
         {
             "id": str(row.id),
@@ -291,6 +300,11 @@ async def query_history(
             "trustScore": row.trust_score,
             "latencyMs": row.latency_ms,
             "createdAt": row.created_at.isoformat(),
+            **(
+                {"userId": str(row.user_id), "username": usernames.get(row.user_id, "—")}
+                if user.role == Role.ADMIN
+                else {}
+            ),
         }
         for row in rows
     ]

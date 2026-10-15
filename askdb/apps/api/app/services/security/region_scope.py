@@ -155,6 +155,9 @@ _SQL_KEYWORDS = frozenset(
 _SCOPED_TABLES = (
     "automotive.dim_region",
     "automotive.dim_dealer",
+    "automotive.dim_carline",
+    "automotive.dim_color",
+    "automotive.dim_salesman",
     "automotive.fact_sales",
     "automotive.fact_forecast_monthly",
     "insurance.dim_region",
@@ -165,6 +168,12 @@ _SCOPED_TABLES = (
     "insurance.fact_forecast_monthly",
 )
 _DIM_REGION = frozenset({"automotive.dim_region", "insurance.dim_region"})
+# Dimensions without region_id: limit rows to keys that appear in region-scoped facts.
+_DIM_VIA_FACT: dict[str, tuple[str, str, str]] = {
+    "automotive.dim_carline": ("carline_id", "carline_id", "automotive.fact_sales"),
+    "automotive.dim_color": ("colour_id", "colour_id", "automotive.fact_sales"),
+    "automotive.dim_salesman": ("sales_person_id", "sales_person_id", "automotive.fact_sales"),
+}
 _RESERVED_SQL_WORDS = "(?:" + "|".join(
     re.escape(word) for word in sorted(_SQL_KEYWORDS, key=len, reverse=True)
 ) + ")"
@@ -374,6 +383,16 @@ async def load_region_scope(session: AsyncSession, user: User) -> RegionScope:
     return RegionScope(unrestricted=False, zones=zones, user_id=user.id, username=user.username)
 
 
+def _canonicalize_quoted_scoped_tables(sql: str) -> str:
+    """Data Preview uses qualify_table() → \"schema\".\"table\"; the rewriter expects schema.table."""
+    out = sql
+    for table in _SCOPED_TABLES:
+        schema, name = table.split(".", 1)
+        pattern = rf'"{re.escape(schema)}"\s*\.\s*"{re.escape(name)}"'
+        out = re.sub(pattern, table, out, flags=re.IGNORECASE)
+    return out
+
+
 def apply_region_sql(sql: str, industry: Industry, scope: RegionScope) -> str:
     if not scope.restricted or not sql or not sql.strip():
         return sql
@@ -382,6 +401,7 @@ def apply_region_sql(sql: str, industry: Industry, scope: RegionScope) -> str:
         return sql
     explain = re.match(r"^(EXPLAIN(?:\s+ANALYZE)?)\s+", stripped, re.I)
     body = stripped[explain.end() :] if explain else stripped
+    body = _canonicalize_quoted_scoped_tables(body)
     rewritten = _rewrite_tables(body, industry, scope)
     if explain:
         return f"{explain.group(1)} {rewritten}"
@@ -406,13 +426,27 @@ def _rewrite_tables(sql: str, industry: Industry, scope: RegionScope) -> str:
     return _TABLE_RE.sub(repl, sql)
 
 
-def _scoped_subquery(table: str, industry: Industry, scope: RegionScope) -> str:
+def _region_id_predicate(table: str, industry: Industry, scope: RegionScope) -> str:
     dim = "insurance.dim_region" if table.startswith("insurance.") else "automotive.dim_region"
+    ind = Industry.INSURANCE if table.startswith("insurance.") else industry
+    return (
+        f"region_id IN (SELECT region_id FROM {dim} WHERE {scope.dim_predicate(ind)})"
+    )
+
+
+def _scoped_subquery(table: str, industry: Industry, scope: RegionScope) -> str:
     ind = Industry.INSURANCE if table.startswith("insurance.") else industry
     if table in _DIM_REGION:
         pred = scope.dim_predicate(ind)
         return f"(SELECT * FROM {table} WHERE {pred}) /*rls*/"
-    pred = f"region_id IN (SELECT region_id FROM {dim} WHERE {scope.dim_predicate(ind)})"
+    if table in _DIM_VIA_FACT:
+        dim_col, fact_col, fact_table = _DIM_VIA_FACT[table]
+        region_pred = _region_id_predicate(fact_table, industry, scope)
+        return (
+            f"(SELECT * FROM {table} WHERE {dim_col} IN "
+            f"(SELECT DISTINCT {fact_col} FROM {fact_table} WHERE {region_pred})) /*rls*/"
+        )
+    pred = _region_id_predicate(table, industry, scope)
     return f"(SELECT * FROM {table} WHERE {pred}) /*rls*/"
 
 

@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { PageShell } from "@/components/ui/page-shell";
-import { useActiveIndustry } from "@/hooks/use-session";
+import { useActiveIndustry, useSession } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
@@ -29,17 +29,19 @@ function typeGlyph(dataType: string | undefined): string {
 
 export default function DataPreviewPage() {
   const industry = useActiveIndustry();
+  const { data: user } = useSession();
   const [selected, setSelected] = useState<string | null>(null);
 
   const tables = useQuery({
-    queryKey: ["data-tables", industry],
+    queryKey: ["data-tables", industry, user?.id ?? "anon"],
     queryFn: () => apiClient.get<PreviewTableSummary[]>("/api/v1/data/tables", { industry }),
+    enabled: Boolean(user?.id),
   });
 
   const activeTable = selected ?? tables.data?.[0]?.name ?? null;
 
   const preview = useInfiniteQuery({
-    queryKey: ["data-preview", industry, activeTable],
+    queryKey: ["data-preview", industry, user?.id ?? "anon", activeTable],
     enabled: Boolean(activeTable),
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) => {

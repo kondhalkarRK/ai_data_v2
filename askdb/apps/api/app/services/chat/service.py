@@ -20,6 +20,7 @@ from app.analytics.sql_guardrails import sql_is_safe
 from app.core.config import Industry, Settings
 from app.core.exceptions import ValidationError
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuestion
+from app.models.enums import Role
 from app.models.user import User
 from app.semantic.service import SemanticService
 from app.services.catalog import EntityCatalogService
@@ -1474,6 +1475,7 @@ class ChatService:
     ) -> str | None:
         result = await self._app.execute(
             select(QueryHistory.sql_text)
+            .where(QueryHistory.user_id == self._user.id)
             .where(QueryHistory.conversation_id == conversation_id)
             .where(QueryHistory.id != current_history_id)
             .where(QueryHistory.sql_text.is_not(None))
@@ -1487,6 +1489,7 @@ class ChatService:
     ) -> dict[str, Any] | None:
         result = await self._app.execute(
             select(QueryHistory.trust_breakdown)
+            .where(QueryHistory.user_id == self._user.id)
             .where(QueryHistory.conversation_id == conversation_id)
             .where(QueryHistory.id != current_history_id)
             .where(QueryHistory.status == "completed")
@@ -1500,13 +1503,15 @@ class ChatService:
         return state if isinstance(state, dict) else None
 
     async def list_history(self, *, limit: int = 50) -> list[QueryHistory]:
-        result = await self._app.execute(
+        stmt = (
             select(QueryHistory)
-            .where(QueryHistory.user_id == self._user.id)
             .where(QueryHistory.industry == self._industry.value)
             .order_by(QueryHistory.created_at.desc())
             .limit(limit)
         )
+        if self._user.role != Role.ADMIN:
+            stmt = stmt.where(QueryHistory.user_id == self._user.id)
+        result = await self._app.execute(stmt)
         return list(result.scalars().all())
 
     async def list_saved(self) -> list[SavedQuestion]:
