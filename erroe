@@ -1,19 +1,49 @@
-psql -U askdb_owner -h localhost -d askdb_automotive -f database/automotive/20_daily_refresh_small.sql
+AskDB — AI Data Platform
+One workspace for natural-language analytics, executive dashboards, and governed data—built for business users, not SQL experts.
 
-What I changed:
+AI Chat
+Ask questions in plain English; answers come from validated SQL on PostgreSQL, with tables, charts, SQL, and narrative—not guesses from the model alone.
 
-Clear database errors: a new handler in apps/api/app/main.py, with the logic in apps/api/app/db/errors.py, returns one of two specific messages instead of the generic one:
+Executive Intelligence
+KPI cockpit, revenue trends (including clear MTD for the current month), regional performance, sunburst drill-downs, and map-style exploration for leadership reviews.
 
-Login rejected or database unreachable: tells you to check that PostgreSQL is running and that the askdb_app credentials in .env match the database.
-Missing table or column: tells you to run python scripts/migrate.py app upgrade head, then restart the API.
-The Admin Center shows this text directly under "This view could not be loaded".
+Analytics Builder
+Self-service analysis without writing SQL: pick metrics, dimensions, filters, and advanced patterns (ranking, top N, moving averages, growth, contribution).
 
-Safer SQL script: database\app\10_auth_governance.sql now upgrades an old llm_usage table in place. It renames the old columns, adds the missing ones, and points the foreign key at auth_users. It's safe to run more than once.
+Meaning & quality
+Semantic Atlas
+Business glossary, measures, dimensions, and join logic in one place—so “revenue” and “region” mean the same thing in Chat, Builder, and dashboards.
 
-Tests: added tests/test_db_errors.py. It and the governance tests all pass (13 tests).
+Ontology Browser
+Ontology Map and Relationship Network to see how makes, models, dealers, regions, and outcomes connect—stewardship and trust, not just pretty graphs.
 
-To fix it on your machine:
+Data Trust Center
+Trust scores, dataset health, incidents, and data-quality dimensions (accuracy, completeness, timeliness, etc.) so leaders see reliability—not only charts.
 
-Make the database password match .env. Open SQL Shell (psql) as the postgres user and run ALTER ROLE askdb_app WITH PASSWORD '<the password in askdb\.env>';.
-From the askdb folder, run python scripts/migrate.py app upgrade head. If you set up with the SQL scripts instead, re-run psql -U askdb_app -h localhost -d askdb_app -f database\app\10_auth_governance.sql.
-Restart the API and open Admin Center. If a tab still fails, it will now say why. Send me that message and I'll fix it.
+Entity Catalog (Admin)
+Discover new values after data loads (makes, cities, dealers) and refresh metadata so AI and analytics stay aligned with the real world.
+
+Data access & continuity
+Data Preview
+Governed, paginated browsing of semantic tables with server-enforced caps—explore raw rows without exporting the warehouse to Excel.
+
+Query History
+Every question with status, SQL, trust signals, and latency; users see their own runs, admins can oversee the full audit trail.
+
+Saved Questions
+Bookmark recurring business questions for yourself or the team—reuse without retyping.
+
+Knowledge Hub (Beta)
+Upload and retrieve cited business documents to enrich context for AI answers (evolving capability—label as beta on the slide).
+Governance & enterprise controls
+Regional access (RBAC)
+North / South / East / West users see the same app but only their zone’s data—enforced in the API and SQL path, not just hidden filters.
+
+Admin Center & LLM governance
+Configure models and limits, monitor tokens and cost estimates, refresh semantics and ontology, and review audit activity.
+
+Hybrid AI execution
+Semantic compiler and templates first, LLM when needed—with guardrails (read-only SQL, limits, validation/repair) and usage metering.
+
+Multi-industry packs
+Switch context (e.g. automotive, insurance) with YAML-driven semantic packs—one platform pattern, multiple domains.
