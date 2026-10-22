@@ -1,3 +1,13 @@
+AskDB helps business users ask questions in everyday language and get answers backed by real data from your database, with clear rules so numbers stay trustworthy.
+
+It combines an executive dashboard, AI chat, and data-quality checks so leaders see KPIs, analysts explore ad hoc questions, and stewards keep definitions and access under control.
+
+Regional access and admin governance (who can see what, how AI is used, and audit trails) aim to make the platform safe enough for pilot and production use—not a black-box chatbot.
+
+Overall, the goal is governed self-service analytics: faster insights than traditional BI alone, without giving up security, transparency, or alignment with how your organization defines metrics.
+
+
+
 Executive Dashboard
 A leadership screen that shows the business numbers leaders care about—sales, trends, and regional performance—in charts and KPIs. Everything comes from your database reports, not from AI guessing.
 
