@@ -1,3 +1,23 @@
+Executive Dashboard
+A leadership screen that shows the business numbers leaders care about—sales, trends, and regional performance—in charts and KPIs. Everything comes from your database reports, not from AI guessing.
+
+Ontology Browser
+A map of how your data fits together (customers, products, regions, etc.) so stewards can see and check the model. It helps people understand the data; AI chat does not use this map directly today.
+
+Admin Center — Hybrid AI Dashboard
+A control panel for admins to see how staff used “ask a question” features: answered by fixed rules, by AI, or a mix. It helps leaders track adoption, cost, and whether answers followed governed paths.
+
+AI Chat
+Lets users ask questions in plain English and get answers backed by real database queries, with guardrails and usage limits. Admins can see what was asked and how it was answered.
+
+RBAC (access control)
+Decides who can log in, who can run admin settings, and which regions of data each user may see. It stops people from viewing data outside their assigned area.
+
+DQ engine (data quality)
+Automatically checks whether data looks complete, consistent, and trustworthy before leaders and analysts rely on it. It flags problems and feeds trust scores shown elsewhere in the product.
+
+
+
 Executive Dashboard — SQL-driven executive cockpit (KPIs, trends, geo drill-down) on governed warehouse data; not LLM-generated.
 
 Ontology Browser — Visual explorer of the semantic ontology from the API; for stewards to validate the model; not used in chat SQL today.
