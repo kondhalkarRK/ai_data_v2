@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>AskDB Leadership Briefing</title>
+<style>
+:root {
+  --navy: #071A33; --blue: #2563eb; --cyan: #0891b2;
+  --ink: #172033; --muted: #586579; --line: #dbe4ef;
+  --paper: #ffffff; --wash: #f3f7fc; --softblue: #eaf3ff;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--wash); color: var(--ink);
+  font: 16px/1.68 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.hero {
+  color: white; background: linear-gradient(130deg, #071A33 0%, #102e56 65%, #0b4564 100%);
+  padding: 54px 24px 42px; border-bottom: 5px solid #22D3EE;
+}
+.hero-inner, main { max-width: 1120px; margin: 0 auto; }
+.eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: .76rem; font-weight: 800; color: #67e8f9; }
+h1 { font-size: clamp(2.1rem, 5vw, 3.5rem); line-height: 1.1; margin: 12px 0; letter-spacing: -.035em; }
+.subtitle { max-width: 760px; color: #d7e8fa; font-size: 1.08rem; margin: 0; }
+.hero-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.hero-tags span { border: 1px solid #52769a; background: #ffffff12; padding: 6px 11px; border-radius: 999px; font-size: .82rem; }
+main { padding: 28px 20px 64px; }
+main > h1 { display:none; }
+h2 { color: var(--navy); font-size: clamp(1.45rem, 3vw, 2rem); line-height: 1.25; margin: 2.5rem 0 1rem; padding-bottom: .55rem; border-bottom: 2px solid var(--line); }
+h3 { color: #12365e; font-size: 1.16rem; margin: 1.8rem 0 .5rem; line-height: 1.4; }
+h4 { color: #12365e; }
+p { margin: .65rem 0 1rem; }
+strong { color: #102846; }
+a { color: #1d4ed8; }
+ul, ol { padding-left: 1.5rem; }
+li { padding-left: .18rem; margin: .25rem 0; }
+blockquote { margin: 1.2rem 0; padding: .8rem 1.1rem; border-left: 4px solid var(--cyan); background: var(--softblue); border-radius: 0 10px 10px 0; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; margin: 1.1rem 0 1.6rem; background: white; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: .94rem; }
+th { text-align: left; background: #eaf1fa; color: #102846; font-weight: 750; }
+th, td { padding: 11px 13px; vertical-align: top; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th:last-child, td:last-child { border-right: 0; }
+tr:nth-child(even) td { background: #fbfdff; }
+code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: .88em; background: #edf2f8; padding: .12em .32em; border-radius: 4px; overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0c1f37; color: #e5f1ff; padding: 1rem; border-radius: 10px; overflow-x: auto; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 2.2rem 0; }
+main > p:first-of-type { font-size: 1.02rem; }
+main > h2:first-of-type { margin-top: .8rem; }
+footer { background: var(--navy); color: #cbd9e9; padding: 22px; text-align: center; font-size: .85rem; }
+.toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; max-width:1120px; margin: 0 auto; padding: 14px 20px 0; }
+.toolbar-note { color:var(--muted); font-size:.85rem; }
+button { border:0; background:var(--blue); color:white; padding:10px 15px; border-radius:8px; font-weight:700; cursor:pointer; }
+button:hover { background:#1d4ed8; }
+@media (max-width: 700px) {
+  .hero { padding: 38px 20px 30px; }
+  main { padding: 18px 14px 42px; }
+  table { display:block; overflow-x:auto; }
+  th, td { min-width: 130px; }
+}
+@media print {
+  body { background:white; font-size: 10.5pt; }
+  .hero { background: var(--navy) !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; padding: 24px; }
+  .toolbar { display:none; }
+  main { max-width:none; padding: 0; }
+  h2 { break-after: avoid; }
+  table, blockquote { break-inside: avoid; }
+  a { color: inherit; text-decoration: none; }
+}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">Executive briefing · Code-backed assessment</div>
+    <h1>AskDB Leadership Briefing</h1>
+    <p class="subtitle">Security, governance, production readiness, database coverage, and competitive positioning — organized for leadership discussions without changing the source meaning.</p>
+    <div class="hero-tags">
+      <span>POC → Staging</span><span>Data security</span><span>Governance</span><span>Go-live roadmap</span><span>Competitive positioning</span>
+    </div>
+  </div>
+</header>
+<div class="toolbar">
+  <span class="toolbar-note">Standalone HTML · Responsive layout · Print-friendly</span>
+  <button onclick="window.print()">Print / Save as PDF</button>
+</div>
+<main>
+<h1>AskDB leadership briefing (code-backed)</h1>
+<h2>Executive summary</h2>
+<p>**AskDB (NQL Insight)** is a **POC-to-staging** natural-language analytics platform: **Next.js + FastAPI** over **PostgreSQL** warehouses, with a **governed semantic layer** (YAML packs), **read-only SQL execution**, optional **LLM-generated SQL**, regional **application-layer row scoping**, and **admin governance** (LLM settings, quotas, audit). **Numbers always come from SQL executed in your DB**; the LLM receives the **user question plus compact schema/glossary hints**, not bulk fact-table exports.</p>
+<p>**Production readiness:** Strong **foundation** (auth, read-only analytics pools, SQL guardrails, EXPLAIN validation, usage quotas, log redaction, production config gates). **Not production-complete** without closing **regional scope gaps on some routes**, **enterprise IdP/RBAC**, **formal security testing**, **multi-DB connectors**, and **LLM data-processing agreements** (provider, residency, retention).</p>
+<p>**Value proposition:** **Semantic-governed NLQ** that can sit **on top of existing Postgres (or future warehouses)** with **explicit SQL transparency**, **hybrid schema/LLM routing**, and **stewardship surfaces** (Semantic Atlas, Ontology Browser, Entity Catalog, DQ/Trust)—complementary to **Databricks/Snowflake/Power BI Copilot**, which optimize inside their own stacks.</p>
+<hr>
+<h2>Status legend</h2>
+<pre class='table-fallback'>| **Label**         | **Meaning**                              |</pre>
+<pre class='table-fallback'>| :---------------- | :--------------------------------------- |</pre>
+<pre class='table-fallback'>| **Implemented**   | In code and used on main paths           |</pre>
+<pre class='table-fallback'>| **Partial**       | Exists but limited coverage or POC depth |</pre>
+<pre class='table-fallback'>| **Planned / gap** | Documented or implied; not fully built   |</pre>
+<hr>
+<h2>1. Data security &amp; LLM privacy</h2>
+<h3>Q1. What data is sent to the LLM?</h3>
+<p>**Answer:** The **natural-language question**, a **system prompt** (PostgreSQL SELECT-only rules), and **domain hints** from `build_domain_sql_hints()`—tables/columns/measures, glossary rules, resolved filters, join hints—not full query result sets. Prior SQL snippets (≤\~1800 chars) and validator feedback may be included on retries. **Implemented:** `apps/api/app/services/llm.py` (`_slim_system_prompt`), `apps/api/app/services/chat/semantic_context.py`.</p>
+<h3>Q2. Are actual business records sent to the LLM?</h3>
+<p>**Answer:** **Not as the primary NLQ path.** Answers are produced by **executing SQL** against the analytics DB. **Partial exception:** **Knowledge/RAG** retrieves document chunks (citations to the user); hybrid chat may attach **top-k chunks** (`service.py` \~1187–1194). **DQ/reliability** can sample **up to 5 rows** internally (`reliability/engine.py`)—not the main chat LLM prompt.</p>
+<h3>Q3. How are API keys and credentials protected?</h3>
+<p>**Answer:** **Pydantic `SecretStr`** in settings; keys resolved server-side only (`config.py`, `governance/llm_config.py` `endpoint()`). **Log redaction** for DSNs, bearer tokens, JWTs (`observability/redaction.py`). Diagnostics expose **configured flags**, not secret values (`system.py` comment). **Implemented.**</p>
+<h3>Q4. What SQL security controls exist?</h3>
+<p>**Answer:** **`sql_is_safe()`**—SELECT/WITH only, blocks DML/chaining/dangerous PG functions (`analytics/sql_guardrails.py`). **DB layer:** analytics pool `default_transaction_read_only=on`, `statement_timeout`, `SET TRANSACTION READ ONLY` per connection (`db/session.py`). Chat uses **EXPLAIN** before run (`chat/service.py`). Row caps: `sql_max_result_rows`, NLQ default limit (`config.py`).</p>
+<h3>Q5. Is there dynamic data masking?</h3>
+<p>**Answer:** **No field-level masking layer** in code for LLM or API responses. Protection is **access control + scoped SQL + read-only role**. **Gap** for PII columns if mis-scoped SQL is generated.</p>
+<h3>Q6. Can users exfiltrate data via the LLM provider?</h3>
+<p>**Answer:** **Risk:** Question text and **schema metadata** (and filter values from question understanding) go to the configured provider (default OpenAI-compatible endpoint in `config.py`; admin can switch via `llm_catalog`). **Mitigation:** Use **private endpoint / Azure / Ollama** (`llm_config`, env keys); **weekly quotas** (`governance/quota.py`); **no bulk row upload** in NLQ path. **Partial**—no DLP scan on outbound prompts.</p>
+<h3>Q7. What about prompt injection?</h3>
+<p>**Answer:** **Regex-based** `is_out_of_bounds()` blocks obvious injection/SQL-in-question patterns (`chat/intents.py`); chat calls it (`service.py` \~480). **Partial**—not a dedicated LLM firewall; checklist marks corpus tests **pending** (`docs/06-security-checklist.md`).</p>
+<h3>Q8. Where do query results go?</h3>
+<p>**Answer:** To the **authenticated user** via SSE/API; stored in **query history** (app DB) with user scoping for non-admins (`chat/service.py`, `chat.py` history). **Not** re-sent to LLM for narrative except repair/validation flows with **SQL text**, not full result grids.</p>
+<hr>
+<h2>2. Governance &amp; access control</h2>
+<h3>Q9. How does authentication work?</h3>
+<p>**Answer:** **Email/password, Argon2id**, **JWT access + rotating refresh**, **CSRF** on state-changing cookie flows, **login rate limit** (`auth/service.py`, `deps.py`, `config.py`). **Implemented.**</p>
+<h3>Q10. What RBAC exists today?</h3>
+<p>**Answer:** Two roles: **`admin`** and **`user`** (`models/enums.py`). Admins see all query history in industry; users see own (`chat/service.py`). **Regional access** is a **separate dimension** (`user_region_access`, zones N/S/E/W)—not a third role. README “three roles” is **out of date** vs code.</p>
+<h3>Q11. How is regional data isolation enforced?</h3>
+<p>**Answer:** **SQL rewrite** on scoped analytics connections (`security/region_scope.py`, `RegionScopedConnection` via `get_scoped_analytics` in `deps.py`). Applied on **chat, KPI, executive, analytics, data preview, trust** routes (grep on routes). **Not PostgreSQL RLS.** Denials audited (`AdminAction.REGION_ACCESS_DENIED`).</p>
+<h3>Q12. Gaps in regional enforcement?</h3>
+<p>**Answer:** **Entity Catalog** refresh/lookup uses **unscoped** `analytics_connection` (`catalog/service.py`). **Ontology/semantic** APIs are metadata-first. **`dim_targets`** and some tables are **outside** `_SCOPED_TABLES` (`region_scope.py` \~155–169). **Gap** for strict multi-region production.</p>
+<h3>Q13. Audit logging?</h3>
+<p>**Answer:** **Login/logout/failures**, **admin LLM/DQ/catalog/graph changes**, **region denials** (`governance/audit.py`). **LLM usage** per question in `llm_usage` (`governance/usage.py`).</p>
+<h3>Q14. Usage quotas?</h3>
+<p>**Answer:** **Weekly token/call limits** per role from `weekly_limits`, enforced before chat (`quota.py`, `chat.py` `enforce_quota`). **Implemented.**</p>
+<h3>Q15. Database permissions model?</h3>
+<p>**Answer:** Runtime DSN uses **`askdb_reader`**; migrations/seeds use **`askdb_owner`** (`config.py`). API never needs DDL on warehouses. **Operator rule** in security checklist.</p>
+<h3>Q16. SQL injection prevention?</h3>
+<p>**Answer:** **Parameterized app DB**; analytics path relies on **LLM/governed SQL + `sql_is_safe` + EXPLAIN**—not a full SQL parser allowlist. **Defense in depth:** read-only DB user. **Residual risk** on creative SELECTs (e.g., subqueries touching unscoped tables).</p>
+<h3>Q17. AUTH_BYPASS in dev?</h3>
+<p>**Answer:** **`auth_bypass`** skips JWT and acts as first admin (`deps.py`); **refused in production** (`config.py` `_enforce_production_hardening`). Must stay **false** in prod.</p>
+<hr>
+<h2>3. Implementation &amp; go-live plan</h2>
+<h3>Q18. What is implemented?</h3>
+<p>**Answer:** Phases 1–7 **largely scaffolded** per `README.md` and `docs/03-phased-plan.md`: auth, semantic packs, ontology browser, 1M-row PG seeds (automotive/insurance), executive KPIs, SSE chat (schema / LLM / hybrid / knowledge routes), data preview/DQ, trust, admin center, regional RBAC on core analytics paths, unit tests e.g. `tests/unit/test_region_rls.py`.</p>
+<h3>Q19. What is missing for production?</h3>
+<p>**Answer:** From `docs/06-security-checklist.md`: **prompt-injection test corpus**, **a11y audit**, **SSRF-safe web fetch** (web retrieval gated off). **Multi-DB**, **enterprise SSO**, **PG RLS or policy engine**, **catalog scoped to region**, **production Qdrant/Mongo** (RAG often **hash embed** locally). README: live verification depends on **local Postgres + optional LLM key**.</p>
+<h3>Q20. Phased roadmap (practical)</h3>
+<pre class='table-fallback'>| **Phase**          | **Focus**                      | **Milestones**                                                                                           |</pre>
+<pre class='table-fallback'>| :----------------- | :----------------------------- | :------------------------------------------------------------------------------------------------------- |</pre>
+<pre class='table-fallback'>| **0 – Harden POC** | Security                       | Turn off bypass; prod secrets; CORS/cookies; pen test on chat + region users; close catalog/scope gaps   |</pre>
+<pre class='table-fallback'>| **1 – Pilot**      | One industry, one region model | SSO (OIDC); audit export; SLOs on `/ready`; LLM private endpoint + DPA                                   |</pre>
+<pre class='table-fallback'>| **2 – Scale**      | Governance                     | Fine-grained RBAC; column masks; query approval for new SQL patterns; RLS or warehouse-native policies   |</pre>
+<pre class='table-fallback'>| **3 – Expand**     | Data platform                  | Second warehouse dialect (e.g. Snowflake) via connector + dialect-aware semantic compiler                |</pre>
+<pre class='table-fallback'>| **4 – Operate**    | SRE                            | DR, key rotation runbooks, cost caps (`llm_monthly_budget_usd`), chaos on LLM circuit breaker (`llm.py`) |</pre>
+<hr>
+<h2>4. Database support</h2>
+<h3>Q21. What is supported today?</h3>
+<p>**Answer:** **PostgreSQL only**—app DB `askdb_app` + per-industry analytics URLs (`config.py`, `Industry` enum: **automotive**, **insurance**). Async driver: **`postgresql+psycopg`**.</p>
+<h3>Q22. What would SQL Server / Snowflake / Databricks SQL / BigQuery take?</h3>
+<p>**Answer:** **Not in repo** (no connectors). Would need: (1) **dialect-specific** semantic packs and `sql_is_safe`/identifier rules; (2) **connection registry** like `DatabaseRegistry`; (3) **region scoping** rewritten for each dialect or **delegated to warehouse RLS**; (4) **EXPLAIN** equivalents; (5) **read-only roles** and timeouts per platform. Estimate: **connector + compiler slice per engine**, not a config toggle.</p>
+<hr>
+<h2>5. Competitive positioning</h2>
+<h3>Q23. vs Databricks / Snowflake AI?</h3>
+<p>**Answer:** They offer **in-warehouse** genie/copilot tied to **their** compute and governance. AskDB is **application-layer NLQ** with **visible SQL**, **semantic YAML stewardship**, and **portable Postgres-first** deployment—**complement** when the warehouse is PG or when you want a **consistent UX** across industries/packs.</p>
+<h3>Q24. vs Power BI Copilot?</h3>
+<p>**Answer:** Copilot optimizes **reports/datasets in Power BI**. AskDB targets **ad hoc governed SQL** and **operational semantic layer** (catalog, DQ, trust, ontology exploration) with **API-first** integration. **Different buyer moment:** embedded analytics vs analyst desktop.</p>
+<h3>Q25. Realistic differentiators?</h3>
+<p>**Answer:** **Hybrid governance** (`ExecutionMode`: SCHEMA / LLM / HYBRID in `enums.py`); **admin-governed LLM** (`llm_config.py`); **transparent SQL + EXPLAIN**; **industry semantic packs**; **Ontology Browser** for stewards (explicitly **not** in LLM path today—`docs/ontology-browser-and-llm.md`). **Weak differentiator** if the customer is already all-in on one vendor’s copilot and RLS.</p>
+<h3>Q26. Compete or complement?</h3>
+<p>**Answer:** **Complement by default**—front-end to **Postgres or future warehouses** and **Capgemini-style** delivery (semantic modeling, DQ, regional demos). **Compete** only where buyers want a **standalone governed NLQ product** without replacing the warehouse.</p>
+<hr>
+<h2>Top 5 security risks &amp; actions before go-live</h2>
+<pre class='table-fallback'>| **#** | **Risk**                                                          | **Evidence**                                                           | **Recommended action**                                                                           |</pre>
+<pre class='table-fallback'>| :---- | :---------------------------------------------------------------- | :--------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------- |</pre>
+<pre class='table-fallback'>| 1     | **LLM prompt leakage** (questions + schema hints to external API) | `llm.py`, `semantic_context.py`, default `llm_base_url` in `config.py` | Private LLM/Azure; DPA; optional on-prem Ollama; prompt logging policy                           |</pre>
+<pre class='table-fallback'>| 2     | **Incomplete regional scope** (catalog, unlisted tables)          | `catalog/service.py` unscoped analytics; `_SCOPED_TABLES` finite list  | Scope catalog reads; extend table map; or **warehouse RLS**                                      |</pre>
+<pre class='table-fallback'>| 3     | **LLM-generated SQL** bypassing intent                            | Regex guardrails only; not full SQL AST                                | Expand tests; governed-first mode (`nlq_llm_reasoning_mode`); block unscoped tables in validator |</pre>
+<pre class='table-fallback'>| 4     | **Weak prompt-injection defense**                                 | `intents.py`; checklist **pending**                                    | Security test corpus; rate limits; refuse system override patterns                               |</pre>
+<pre class='table-fallback'>| 5     | **Dev auth bypass / misconfig**                                   | `auth_bypass`, short JWT in prod blocked but ops error-prone           | CI guard; separate prod env templates; no bypass in staging                                      |</pre>
+<hr>
+<h2>Evidence index (quick reference)</h2>
+<pre class='table-fallback'>| **Topic**          | **Path**                                                                               |</pre>
+<pre class='table-fallback'>| :----------------- | :------------------------------------------------------------------------------------- |</pre>
+<pre class='table-fallback'>| LLM payload        | `apps/api/app/services/llm.py`, `chat/semantic_context.py`                             |</pre>
+<pre class='table-fallback'>| SQL safety         | `apps/api/app/analytics/sql_guardrails.py`, `chat/service.py`                          |</pre>
+<pre class='table-fallback'>| Read-only DB       | `apps/api/app/db/session.py`                                                           |</pre>
+<pre class='table-fallback'>| Region scope       | `apps/api/app/services/security/region_scope.py`, `api/deps.py` `get_scoped_analytics` |</pre>
+<pre class='table-fallback'>| Quotas &amp; usage     | `apps/api/app/services/governance/quota.py`, `usage.py`                                |</pre>
+<pre class='table-fallback'>| Audit              | `apps/api/app/services/governance/audit.py`                                            |</pre>
+<pre class='table-fallback'>| Production gates   | `apps/api/app/core/config.py`                                                          |</pre>
+<pre class='table-fallback'>| Security checklist | `askdb/docs/06-security-checklist.md`                                                  |</pre>
+<pre class='table-fallback'>| Ontology vs LLM    | `askdb/docs/ontology-browser-and-llm.md`                                               |</pre>
+<hr>
+<p>**Bottom line for leadership:** AskDB is a **credible governed NLQ POC** with **real controls** on the main query path, but **go-live** should be framed as **pilot with explicit LLM and regional-scope policies**, not as a drop-in replacement for warehouse-native copilots until **IdP, scope completeness, security testing, and target DB strategy** are decided</p>
+</main>
+<footer>AskDB Leadership Briefing · Content preserved from the supplied Cursor response; presentation and layout enhanced.</footer>
+</body>
+</html>
