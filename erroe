@@ -1,49 +1,41 @@
-AskDB — AI Data Platform
-One workspace for natural-language analytics, executive dashboards, and governed data—built for business users, not SQL experts.
+AskDB helps business users ask questions in everyday language and get answers backed by real data from your database, with clear rules so numbers stay trustworthy.
 
-AI Chat
-Ask questions in plain English; answers come from validated SQL on PostgreSQL, with tables, charts, SQL, and narrative—not guesses from the model alone.
+It combines an executive dashboard, AI chat, and data-quality checks so leaders see KPIs, analysts explore ad hoc questions, and stewards keep definitions and access under control.
 
-Executive Intelligence
-KPI cockpit, revenue trends (including clear MTD for the current month), regional performance, sunburst drill-downs, and map-style exploration for leadership reviews.
+Regional access and admin governance (who can see what, how AI is used, and audit trails) aim to make the platform safe enough for pilot and production use—not a black-box chatbot.
 
-Analytics Builder
-Self-service analysis without writing SQL: pick metrics, dimensions, filters, and advanced patterns (ranking, top N, moving averages, growth, contribution).
+Overall, the goal is governed self-service analytics: faster insights than traditional BI alone, without giving up security, transparency, or alignment with how your organization defines metrics.
 
-Meaning & quality
-Semantic Atlas
-Business glossary, measures, dimensions, and join logic in one place—so “revenue” and “region” mean the same thing in Chat, Builder, and dashboards.
+
+
+Executive Dashboard
+A leadership screen that shows the business numbers leaders care about—sales, trends, and regional performance—in charts and KPIs. Everything comes from your database reports, not from AI guessing.
 
 Ontology Browser
-Ontology Map and Relationship Network to see how makes, models, dealers, regions, and outcomes connect—stewardship and trust, not just pretty graphs.
+A map of how your data fits together (customers, products, regions, etc.) so stewards can see and check the model. It helps people understand the data; AI chat does not use this map directly today.
 
-Data Trust Center
-Trust scores, dataset health, incidents, and data-quality dimensions (accuracy, completeness, timeliness, etc.) so leaders see reliability—not only charts.
+Admin Center — Hybrid AI Dashboard
+A control panel for admins to see how staff used “ask a question” features: answered by fixed rules, by AI, or a mix. It helps leaders track adoption, cost, and whether answers followed governed paths.
 
-Entity Catalog (Admin)
-Discover new values after data loads (makes, cities, dealers) and refresh metadata so AI and analytics stay aligned with the real world.
+AI Chat
+Lets users ask questions in plain English and get answers backed by real database queries, with guardrails and usage limits. Admins can see what was asked and how it was answered.
 
-Data access & continuity
-Data Preview
-Governed, paginated browsing of semantic tables with server-enforced caps—explore raw rows without exporting the warehouse to Excel.
+RBAC (access control)
+Decides who can log in, who can run admin settings, and which regions of data each user may see. It stops people from viewing data outside their assigned area.
 
-Query History
-Every question with status, SQL, trust signals, and latency; users see their own runs, admins can oversee the full audit trail.
+DQ engine (data quality)
+Automatically checks whether data looks complete, consistent, and trustworthy before leaders and analysts rely on it. It flags problems and feeds trust scores shown elsewhere in the product.
 
-Saved Questions
-Bookmark recurring business questions for yourself or the team—reuse without retyping.
 
-Knowledge Hub (Beta)
-Upload and retrieve cited business documents to enrich context for AI answers (evolving capability—label as beta on the slide).
-Governance & enterprise controls
-Regional access (RBAC)
-North / South / East / West users see the same app but only their zone’s data—enforced in the API and SQL path, not just hidden filters.
 
-Admin Center & LLM governance
-Configure models and limits, monitor tokens and cost estimates, refresh semantics and ontology, and review audit activity.
+Executive Dashboard — SQL-driven executive cockpit (KPIs, trends, geo drill-down) on governed warehouse data; not LLM-generated.
 
-Hybrid AI execution
-Semantic compiler and templates first, LLM when needed—with guardrails (read-only SQL, limits, validation/repair) and usage metering.
+Ontology Browser — Visual explorer of the semantic ontology from the API; for stewards to validate the model; not used in chat SQL today.
 
-Multi-industry packs
-Switch context (e.g. automotive, insurance) with YAML-driven semantic packs—one platform pattern, multiple domains.
+Admin Center — Hybrid AI Dashboard — Admin view of how chat ran: schema-only, LLM, hybrid, or cache, plus usage and per-user breakdown.
+
+AI Chat — Natural-language questions → governed SQL (optional LLM), streaming answers, trust/history; auth, quotas, and region-scoped DB.
+
+RBAC — admin / user roles plus optional regional zones (SQL rewrite + UI scope); not warehouse-native RLS.
+
+DQ engine — Read-only rule SQL on analytics data; scores trust and supports admin/reliability views
