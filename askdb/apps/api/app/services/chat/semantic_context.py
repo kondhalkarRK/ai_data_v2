@@ -172,7 +172,7 @@ _SCHEMA_TABLE = re.compile(
 
 
 _PARTITION = re.compile(r"partition\s+by\s+([\s\S]*?)(?:\border\s+by\b|\)|\brows\b)")
-_TIME_KEYS = frozenset({"month", "quarter", "year"})
+_TIME_KEYS = frozenset({"month", "quarter", "half", "year"})
 
 
 def _dimension_tokens(plan: QuestionPlan, key: str) -> tuple[str, ...]:

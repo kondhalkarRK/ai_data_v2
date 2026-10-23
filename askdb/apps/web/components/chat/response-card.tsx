@@ -14,6 +14,7 @@ import { ResultChart, type ChartKind } from "@/components/chat/result-chart";
 import { SQLViewer } from "@/components/chat/sql-viewer";
 import { SuggestedQuestions } from "@/components/chat/suggested-questions";
 import { TrustIndicators } from "@/components/chat/trust-indicators";
+import { formatChatCell } from "@/lib/format-chat-cell";
 import type {
   AnswerConfidence,
   ChatMessage,
@@ -278,7 +279,7 @@ export function ResponseCard({
                           <tr key={index} className="border-t border-border/50">
                             {message.columns?.map((column) => (
                               <td key={column} className="px-3 py-2 font-mono">
-                                {String(row[column] ?? "—")}
+                                {formatChatCell(row[column], column)}
                               </td>
                             ))}
                           </tr>

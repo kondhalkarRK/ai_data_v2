@@ -4,6 +4,7 @@ import * as React from "react";
 
 import type { AnomalyMarker } from "@/components/chat/types";
 import { CHART_SERIES } from "@/lib/design";
+import { formatChatCell } from "@/lib/format-chat-cell";
 import { cn } from "@/lib/utils";
 
 export type ChartKind = "bar" | "line" | "area" | "pie" | "scatter";
@@ -87,7 +88,7 @@ export function ResultChart({
       const y = typeof raw === "number" ? raw : Number(raw);
       return {
         index,
-        x: String(row[xKey] ?? index),
+        x: formatChatCell(row[xKey], xKey),
         y: Number.isFinite(y) ? y : 0,
       };
     });

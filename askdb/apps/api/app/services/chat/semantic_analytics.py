@@ -13,11 +13,12 @@ from typing import Any
 
 from app.core.config import Industry
 from app.services.chat.question_understanding import QuestionPlan, filter_predicate
+from app.services.chat.period_labels import period_label_sql
 from app.services.chat.time_periods import anchor_sql, period_predicate
 
 # Monthly series without a stated period show the latest two years.
 TREND_MONTHS = 24
-_TIME_GRAINS = frozenset({"month", "quarter", "year"})
+_TIME_GRAINS = frozenset({"month", "quarter", "half", "year"})
 _DATE_COLUMNS = {
     "fact_sales": "sales_date",
     "fact_policy_monthly": "accounting_month",
@@ -78,7 +79,7 @@ _AUTOMOTIVE_DIMENSIONS = {
         "fact_sales",
         "sales_date",
         "month",
-        "date_trunc('month', {alias}.sales_date)::date",
+        period_label_sql("{alias}.sales_date", "month"),
         "month",
     ),
     "quarter": DimensionSpec(
@@ -86,8 +87,16 @@ _AUTOMOTIVE_DIMENSIONS = {
         "fact_sales",
         "sales_date",
         "quarter",
-        "date_trunc('quarter', {alias}.sales_date)::date",
+        period_label_sql("{alias}.sales_date", "quarter"),
         "quarter",
+    ),
+    "half": DimensionSpec(
+        "half",
+        "fact_sales",
+        "sales_date",
+        "half",
+        period_label_sql("{alias}.sales_date", "half"),
+        "half",
     ),
     "year": DimensionSpec(
         "year",
@@ -235,8 +244,9 @@ def _dimension_specs(plan: QuestionPlan, base_table: str) -> list[DimensionSpec]
     if plan.industry is Industry.INSURANCE:
         date_column = "accounting_month" if base_table == "fact_policy_monthly" else "reported_date"
         for grain, expression in {
-            "month": f"date_trunc('month', {{alias}}.{date_column})::date",
-            "quarter": f"date_trunc('quarter', {{alias}}.{date_column})::date",
+            "month": period_label_sql(f"{{alias}}.{date_column}", "month"),
+            "quarter": period_label_sql(f"{{alias}}.{date_column}", "quarter"),
+            "half": period_label_sql(f"{{alias}}.{date_column}", "half"),
             "year": f"EXTRACT(YEAR FROM {{alias}}.{date_column})::int",
         }.items():
             catalog[grain] = DimensionSpec(

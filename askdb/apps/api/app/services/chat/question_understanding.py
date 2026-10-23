@@ -339,7 +339,7 @@ _SALES_TREND_ONLY = re.compile(
     r"(?:sales\s+trends?|trends?|trend\s+of\s+sales|sales\s+over\s+time)$",
     re.I,
 )
-_TIME_DIMS = ("month", "quarter", "year")
+_TIME_DIMS = ("month", "quarter", "half", "year")
 # Filter column -> GROUP BY dimension when several values are compared.
 FILTER_DIMENSION: dict[str, str] = {
     "make": "make",
@@ -635,7 +635,7 @@ def _apply_business_shape(plan: QuestionPlan, question: str) -> None:
 
     _ensure_time_axis(plan, question)
     dims = plan.dimensions
-    plan.time_grain = next((g for g in ("month", "quarter", "year") if g in dims), None)
+    plan.time_grain = next((g for g in _TIME_DIMS if g in dims), None)
     if plan.analysis == "basic" and dims:
         plan.analysis = "breakdown"
     if plan.analysis == "ranking" and plan.intent not in {"comparison"}:
@@ -660,7 +660,12 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
 
     patterns: list[tuple[str, str]] = [
         ("month", r"\bmonthly\b|\bby\s+month\b|\bper\s+month\b|\bmonth[-\s]*over[-\s]*month\b|\bmom\b"),
-        ("quarter", r"\bquarterly\b|\bby\s+quarter\b|\bper\s+quarter\b"),
+        ("quarter", r"\bquarterly\b|\bby\s+quarter\b|\bper\s+quarter\b|\bqtr\b|\bqtrs\b"),
+        (
+            "half",
+            r"\b(?:half[\s-]?year(?:ly)?|bi[\s-]?annual(?:ly)?|semi[\s-]?annual(?:ly)?|"
+            r"biannual(?:ly)?|by\s+half)\b",
+        ),
         ("year", r"\byearly\b|\bby\s+year\b|\bper\s+year\b|\beach\s+year\b|\byear[-\s]*over[-\s]*year\b|\byoy\b"),
     ]
     if industry is Industry.AUTOMOTIVE:
@@ -792,13 +797,10 @@ def _enrich_analytical_plan(plan: QuestionPlan, question: str) -> None:
         # "Which colour sells most" is a colour ranking, not a vehicle list.
         plan.entity = "metric_only"
 
-    if _TREND.search(question) and not any(d in dimensions for d in ("month", "quarter", "year")):
+    if _TREND.search(question) and not any(d in dimensions for d in _TIME_DIMS):
         dimensions.insert(0, "month")
     plan.dimensions = dimensions
-    plan.time_grain = next(
-        (grain for grain in ("month", "quarter", "year") if grain in dimensions),
-        None,
-    )
+    plan.time_grain = next((grain for grain in _TIME_DIMS if grain in dimensions), None)
 
     divergence = _parse_divergence(question)
     if divergence:
@@ -870,7 +872,7 @@ def _enrich_analytical_plan(plan: QuestionPlan, question: str) -> None:
         ]
         plan.dimensions = dimensions
     elif plan.analysis in {"period_growth", "running_total", "moving_average"}:
-        plan.partition_by = [d for d in dimensions if d not in {"month", "quarter", "year"}]
+        plan.partition_by = [d for d in dimensions if d not in set(_TIME_DIMS)]
 
     if plan.metric in {"orders", "claim_count"}:
         plan.aggregation = "count_distinct"

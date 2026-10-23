@@ -16,6 +16,7 @@ from app.services.chat.semantic_analytics import (
     compile_analytical_query,
     time_scope_clauses,
 )
+from app.services.chat.period_labels import period_label_sql
 from app.services.chat.time_periods import anchor_sql, period_predicate
 
 
@@ -210,7 +211,7 @@ def _year_window_sql(plan: QuestionPlan) -> TemplateHit:
         path="semantic_compiler",
         sql=f"""
 SELECT EXTRACT(YEAR FROM f.sales_date)::int AS year,
-       date_trunc('month', f.sales_date)::date AS month,
+       {_MONTH_LABEL} AS month,
        {metrics}
 FROM automotive.fact_sales f
 WHERE f.sales_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '{years} years'
@@ -231,7 +232,11 @@ def _growth_sql(plan: QuestionPlan) -> TemplateHit:
     label = "yoy_growth_pct" if plan.time_grain == "year" else "mom_growth_pct"
     grain_key = "year" if plan.time_grain == "year" else "month"
     grain_expr, grain_alias, _grain_join = _DIM_EXPR[grain_key]
-    extras = [key for key in plan.dimensions if key not in {"month", "quarter", "year"} and key in _DIM_EXPR]
+    extras = [
+        key
+        for key in plan.dimensions
+        if key not in {"month", "quarter", "half", "year"} and key in _DIM_EXPR
+    ]
     selects = [f"{grain_expr} AS {grain_alias}"]
     joins: list[str] = []
     aliases: set[str] = set()
@@ -276,10 +281,16 @@ LIMIT 36
     )
 
 
+_SALES_DATE = "f.sales_date"
+_MONTH_LABEL = period_label_sql(_SALES_DATE, "month")
+_QUARTER_LABEL = period_label_sql(_SALES_DATE, "quarter")
+_HALF_LABEL = period_label_sql(_SALES_DATE, "half")
+
 _DIM_EXPR: dict[str, tuple[str, str, str | None]] = {
     "year": ("EXTRACT(YEAR FROM f.sales_date)::int", "year", None),
-    "quarter": ("date_trunc('quarter', f.sales_date)::date", "quarter", None),
-    "month": ("date_trunc('month', f.sales_date)::date", "month", None),
+    "half": (_HALF_LABEL, "half", None),
+    "quarter": (_QUARTER_LABEL, "quarter", None),
+    "month": (_MONTH_LABEL, "month", None),
     "region": (
         "COALESCE(r.region_name, 'Unknown')",
         "region_name",
@@ -318,7 +329,7 @@ _DIM_EXPR: dict[str, tuple[str, str, str | None]] = {
 }
 
 
-_TIME_KEYS = ("year", "quarter", "month")
+_TIME_KEYS = ("year", "half", "quarter", "month")
 _TREND_MONTHS = 24
 # Monthly trends without a year show the latest window, not the oldest rows.
 _RECENT_MONTHS = (
@@ -655,7 +666,7 @@ LIMIT {limit}
             title="Revenue by month",
             glossary_matches=2,
             sql=f"""
-SELECT date_trunc('month', f.sales_date)::date AS month,
+SELECT {_MONTH_LABEL} AS month,
        SUM(f.total_sales) AS revenue,
        SUM(f.order_qty) AS units_sold
 FROM automotive.fact_sales f
@@ -691,7 +702,7 @@ LIMIT 20
             title="Revenue by month",
             glossary_matches=2,
             sql="""
-SELECT date_trunc('month', f.sales_date)::date AS month,
+SELECT {_MONTH_LABEL} AS month,
        SUM(f.total_sales) AS revenue,
        SUM(f.order_qty) AS units_sold
 FROM automotive.fact_sales f
@@ -1090,16 +1101,16 @@ def _insurance_templates(q: str) -> TemplateHit | None:
         return TemplateHit(
             title="Loss ratio by month",
             glossary_matches=2,
-            sql="""
+            sql=f"""
 WITH claims AS (
-  SELECT date_trunc('month', c.reported_date)::date AS month,
+  SELECT {period_label_sql("c.reported_date", "month")} AS month,
          SUM(c.incurred_amount) AS claims_incurred
   FROM insurance.fact_claims c
   WHERE c.reported_date >= DATE '2024-01-01'
   GROUP BY 1
 ),
 premium AS (
-  SELECT date_trunc('month', pm.accounting_month)::date AS month,
+  SELECT {period_label_sql("pm.accounting_month", "month")} AS month,
          SUM(pm.earned_premium) AS earned_premium
   FROM insurance.fact_policy_monthly pm
   WHERE pm.accounting_month >= DATE '2024-01-01'

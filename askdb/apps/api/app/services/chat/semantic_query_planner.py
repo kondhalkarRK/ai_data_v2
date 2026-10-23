@@ -192,7 +192,7 @@ def recommend_chart(plan: QuestionPlan | None, columns: list[str]) -> str:
     """Pick a chart from intent, not from a default bar."""
     if plan is None or len(columns) < 2:
         return "table"
-    if plan.time_grain in {"month", "quarter", "year"} or plan.intent == "trend":
+    if plan.time_grain in {"month", "quarter", "half", "year"} or plan.intent == "trend":
         return "line"
     if plan.analysis == "year_window_compare":
         return "line"
