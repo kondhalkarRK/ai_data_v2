@@ -30,6 +30,7 @@ class AdminAction:
     REFRESHED_SEMANTIC_METADATA = "Refreshed Semantic Metadata"
     REFRESHED_KNOWLEDGE_GRAPH = "Refreshed Knowledge Graph"
     REFRESHED_SEMANTIC_CACHE = "Refreshed Semantic Cache"
+    RESET_LLM_USAGE = "Reset LLM Usage"
 
 
 AUDIT_CATEGORIES: dict[str, tuple[str, ...]] = {
@@ -41,6 +42,7 @@ AUDIT_CATEGORIES: dict[str, tuple[str, ...]] = {
         AdminAction.CHANGED_LLM_MODEL,
         AdminAction.CHANGED_TEMPERATURE,
         AdminAction.CHANGED_MAX_TOKENS,
+        AdminAction.RESET_LLM_USAGE,
     ),
     "dq": (
         AdminAction.REFRESHED_DQ_RULES,

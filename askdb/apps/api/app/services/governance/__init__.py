@@ -21,6 +21,7 @@ from app.services.governance.usage import (
     governance_overview,
     llm_usage_overview,
     record_question_usage,
+    reset_llm_usage,
 )
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     "record_login",
     "record_logout",
     "record_question_usage",
+    "reset_llm_usage",
     "sync_llm_config",
     "update_llm_config",
     "weekly_usage",

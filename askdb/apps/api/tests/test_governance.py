@@ -26,6 +26,7 @@ from app.services.governance.usage import (
     governance_overview,
     llm_usage_overview,
     record_question_usage,
+    reset_llm_usage,
 )
 
 PASSWORD = "Vh7!kRq2$mTx9pLw"
@@ -253,3 +254,53 @@ def test_execution_mode_rules() -> None:
 def test_week_starts_monday_utc() -> None:
     start = week_start(datetime(2026, 10, 1, 15, 30, tzinfo=UTC))  # a Thursday
     assert start == datetime(2026, 9, 28, tzinfo=UTC)
+
+
+async def test_reset_llm_usage_tokens_vs_calls(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user = await _seed(session_factory, "user1", Role.USER)
+    async with session_factory() as session:
+        await record_question_usage(
+            session,
+            user_id=user.id,
+            question="Revenue by month",
+            industry="automotive",
+            mode=ExecutionMode.SCHEMA,
+            model_name="none",
+            prompt_tokens=0,
+            completion_tokens=0,
+            response_time_ms=100,
+            query_history_id=None,
+        )
+        await record_question_usage(
+            session,
+            user_id=user.id,
+            question="Top dealer",
+            industry="automotive",
+            mode=ExecutionMode.LLM,
+            model_name="gpt",
+            prompt_tokens=500,
+            completion_tokens=200,
+            response_time_ms=800,
+            query_history_id=None,
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        tokens_out = await reset_llm_usage(
+            session, user_id=user.id, all_users=False, reset="tokens"
+        )
+        await session.commit()
+        assert tokens_out["updatedRows"] == 2
+        usage = await weekly_usage(session, user)
+        assert usage.tokens_used == 0 and usage.calls_used == 2
+
+    async with session_factory() as session:
+        calls_out = await reset_llm_usage(
+            session, user_id=user.id, all_users=False, reset="calls"
+        )
+        await session.commit()
+        assert calls_out["deletedRows"] == 2
+        usage = await weekly_usage(session, user)
+        assert usage.calls_used == 0

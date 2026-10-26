@@ -225,7 +225,9 @@ describe("Admin Center panels render without crashing", () => {
 
   it("LLM Usage", async () => {
     renderPanel(<LlmUsagePanel />);
-    expect(await screen.findByText("user1")).toBeInTheDocument();
+    expect(await screen.findByText("Total LLM calls")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reset usage/i })).toBeInTheDocument();
+    expect(screen.getAllByText("user1").length).toBeGreaterThan(0);
   });
 
   it("Audit Center", async () => {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -36,9 +37,11 @@ from app.services.governance import (
     llm_settings_payload,
     llm_usage_overview,
     record_admin_action,
+    reset_llm_usage,
     sync_llm_config,
     update_llm_config,
 )
+from app.services.governance.usage import ResetUsageKind
 from app.services.governance.audit import AUDIT_CATEGORIES
 from app.services.reliability import (
     DataReliabilityService,
@@ -65,6 +68,12 @@ class UpdateLlmRequest(ApiModel):
 
 class ToggleRuleRequest(ApiModel):
     enabled: bool
+
+
+class ResetUsageRequest(ApiModel):
+    user_id: str | None = Field(default=None, max_length=36)
+    all_users: bool = False
+    reset: ResetUsageKind = "both"
 
 
 def _done(action: str, message: str, **extra: Any) -> dict[str, Any]:
@@ -120,6 +129,40 @@ async def usage(
 ) -> dict[str, Any]:
     del admin
     return await llm_usage_overview(session, days=days)
+
+
+@router.post("/usage/reset")
+async def usage_reset(
+    body: ResetUsageRequest,
+    admin: RequireAdmin,
+    session: SessionDep,
+) -> dict[str, Any]:
+    target_id: uuid.UUID | None = None
+    if body.user_id:
+        try:
+            target_id = uuid.UUID(body.user_id)
+        except ValueError:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Invalid user id.") from None
+    if not body.all_users and target_id is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Select a user or reset all users.")
+    outcome = await reset_llm_usage(
+        session,
+        user_id=target_id,
+        all_users=body.all_users,
+        reset=body.reset,
+    )
+    scope = "all users" if body.all_users else f"user {target_id}"
+    detail = (
+        f"{scope}; reset={body.reset}; "
+        f"deleted={outcome['deletedRows']}; updated={outcome['updatedRows']}"
+    )
+    await record_admin_action(session, admin.id, AdminAction.RESET_LLM_USAGE, detail)
+    label = {"tokens": "token totals", "calls": "call history", "both": "calls and tokens"}[body.reset]
+    return _done(
+        "usage_reset",
+        f"Reset {label} for {scope}. Weekly quota limits were not changed.",
+        **outcome,
+    )
 
 
 @router.get("/audit")

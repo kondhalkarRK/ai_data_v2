@@ -5,11 +5,12 @@ from __future__ import annotations
 import uuid
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import ValidationError
 from app.models.activity import LlmUsage
 from app.models.enums import ExecutionMode
 from app.models.governance import AdminAudit
@@ -238,6 +239,62 @@ async def audit_log(
         }
         for row in rows
     ]
+
+
+ResetUsageKind = Literal["tokens", "calls", "both"]
+
+
+def _usage_filter(user_id: uuid.UUID | None, all_users: bool):
+    if all_users:
+        return None
+    if user_id is None:
+        raise ValidationError("Select a user or choose all users.")
+    return LlmUsage.user_id == user_id
+
+
+async def reset_llm_usage(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID | None,
+    all_users: bool,
+    reset: ResetUsageKind,
+) -> dict[str, Any]:
+    """Clear recorded usage for quotas and dashboards. Weekly limits on users are unchanged."""
+    if all_users and user_id is not None:
+        raise ValidationError("Pass either a user or all users, not both.")
+    predicate = _usage_filter(user_id, all_users)
+
+    if reset in {"calls", "both"}:
+        stmt = delete(LlmUsage)
+        if predicate is not None:
+            stmt = stmt.where(predicate)
+        result = await session.execute(stmt)
+        deleted = int(result.rowcount or 0)
+        return {
+            "reset": reset,
+            "deletedRows": deleted,
+            "updatedRows": 0,
+            "allUsers": all_users,
+            "userId": str(user_id) if user_id else None,
+        }
+
+    stmt = update(LlmUsage).values(
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        estimated_cost_usd=0,
+    )
+    if predicate is not None:
+        stmt = stmt.where(predicate)
+    result = await session.execute(stmt)
+    updated = int(result.rowcount or 0)
+    return {
+        "reset": reset,
+        "deletedRows": 0,
+        "updatedRows": updated,
+        "allUsers": all_users,
+        "userId": str(user_id) if user_id else None,
+    }
 
 
 async def audit_counts(session: AsyncSession, *, days: int = 30) -> dict[str, int]:

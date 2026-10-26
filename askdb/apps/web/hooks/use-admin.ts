@@ -131,6 +131,16 @@ export interface AdminActionResult {
   message: string;
 }
 
+export type ResetUsageKind = "tokens" | "calls" | "both";
+
+export interface ResetUsageResult extends AdminActionResult {
+  reset: ResetUsageKind;
+  deletedRows: number;
+  updatedRows: number;
+  allUsers: boolean;
+  userId: string | null;
+}
+
 const ADMIN = ["admin"] as const;
 
 const DEFAULT_PRICING: LlmPricingAssumptions = {
@@ -197,6 +207,24 @@ export function useUsageOverview(days: number) {
     queryKey: [...ADMIN, "usage", days],
     queryFn: () => apiClient.get<UsageOverview>(`/api/v1/admin/usage?days=${days}`),
     refetchInterval: 30_000,
+  });
+}
+
+export function useResetLlmUsage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { userId: string | null; allUsers: boolean; reset: ResetUsageKind }) =>
+      apiClient.post<ResetUsageResult>("/api/v1/admin/usage/reset", {
+        user_id: body.userId,
+        all_users: body.allUsers,
+        reset: body.reset,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...ADMIN, "usage"] });
+      void queryClient.invalidateQueries({ queryKey: [...ADMIN, "governance"] });
+      void queryClient.invalidateQueries({ queryKey: [...ADMIN, "audit"] });
+      void queryClient.invalidateQueries({ queryKey: ["auth", "me", "usage"] });
+    },
   });
 }
 

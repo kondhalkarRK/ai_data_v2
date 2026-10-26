@@ -5,6 +5,7 @@ import {
   Loader2,
   Network,
   RefreshCw,
+  RotateCcw,
   Save,
   ShieldCheck,
   Sparkles,
@@ -30,6 +31,8 @@ import {
   useDqRules,
   useGovernance,
   useLlmSettings,
+  type ResetUsageKind,
+  useResetLlmUsage,
   useUpdateLlmSettings,
   useUsageOverview,
 } from "@/hooks/use-admin";
@@ -496,6 +499,162 @@ export function GovernanceDashboardPanel() {
 
 // --- 3. LLM Usage Monitoring ----------------------------------------------------
 
+const RESET_LABELS: Record<ResetUsageKind, string> = {
+  tokens: "Token totals only (zeros tokens, keeps question rows)",
+  calls: "Call counts (deletes usage rows)",
+  both: "Calls and tokens (deletes all usage rows)",
+};
+
+function ResetUsageDialog({
+  open,
+  onClose,
+  onConfirm,
+  busy,
+  summary,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  busy: boolean;
+  summary: string;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/25 p-4 pt-[14vh] backdrop-blur-sm"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reset-usage-title"
+        className="w-full max-w-md rounded-[var(--radius-card)] border border-border bg-background p-5 shadow-xl"
+      >
+        <h3 id="reset-usage-title" className="text-base font-semibold text-foreground">
+          Reset LLM usage?
+        </h3>
+        <p className="mt-2 text-sm text-muted-foreground">{summary}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Weekly quota limits on each user are not changed. This cannot be undone.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="secondary" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" variant="danger" disabled={busy} onClick={onConfirm}>
+            {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+            Reset usage
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResetLlmUsageCard({ users }: { users: Array<{ userId: string; user: string }> }) {
+  const reset = useResetLlmUsage();
+  const [userId, setUserId] = React.useState("");
+  const [allUsers, setAllUsers] = React.useState(false);
+  const [kind, setKind] = React.useState<ResetUsageKind>("both");
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+
+  const targetLabel = allUsers
+    ? "all users"
+    : users.find((row) => row.userId === userId)?.user ?? "the selected user";
+  const canSubmit = allUsers || Boolean(userId);
+
+  const summary = `Reset ${RESET_LABELS[kind].toLowerCase()} for ${targetLabel}.`;
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 pt-5">
+        <div className="flex items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-muted">
+            <RotateCcw className="size-4 text-muted-foreground" aria-hidden="true" />
+          </span>
+          <div>
+            <CardTitle className="text-base">Reset LLM usage</CardTitle>
+            <CardDescription className="mt-1">
+              Clear recorded tokens and/or call counts for quotas and this dashboard. User weekly limits stay
+              as configured.
+            </CardDescription>
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor="reset-user" className="text-sm font-medium">User</label>
+            <select
+              id="reset-user"
+              className="h-9 w-full rounded-[var(--radius-control)] border border-border bg-background px-3 text-sm disabled:opacity-50"
+              value={userId}
+              disabled={allUsers}
+              onChange={(event) => setUserId(event.target.value)}
+            >
+              <option value="">Select a user…</option>
+              {users.map((row) => (
+                <option key={row.userId} value={row.userId}>
+                  {row.user}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="reset-kind" className="text-sm font-medium">Reset</label>
+            <select
+              id="reset-kind"
+              className="h-9 w-full rounded-[var(--radius-control)] border border-border bg-background px-3 text-sm"
+              value={kind}
+              onChange={(event) => setKind(event.target.value as ResetUsageKind)}
+            >
+              <option value="both">Calls and tokens</option>
+              <option value="tokens">Token totals only</option>
+              <option value="calls">Call counts only</option>
+            </select>
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 rounded border-border"
+            checked={allUsers}
+            onChange={(event) => {
+              setAllUsers(event.target.checked);
+              if (event.target.checked) setUserId("");
+            }}
+          />
+          Apply to all users
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!canSubmit || reset.isPending}
+            onClick={() => setConfirmOpen(true)}
+          >
+            Reset usage…
+          </Button>
+          <ResultNotice result={reset.data ?? null} error={reset.error} />
+        </div>
+        <ResetUsageDialog
+          open={confirmOpen}
+          busy={reset.isPending}
+          summary={summary}
+          onClose={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            reset.mutate(
+              { userId: allUsers ? null : userId, allUsers, reset: kind },
+              { onSuccess: () => setConfirmOpen(false) },
+            );
+          }}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
 export function LlmUsagePanel() {
   const [days, setDays] = React.useState(30);
   const usage = useUsageOverview(days);
@@ -509,6 +668,7 @@ export function LlmUsagePanel() {
       <div className="flex justify-end">
         <DaysPicker days={days} onChange={setDays} />
       </div>
+      <ResetLlmUsageCard users={data.users.map((row) => ({ userId: row.userId, user: row.user }))} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Total LLM calls" value={data.kpis.totalLlmCalls.toLocaleString()} hint="Questions that used tokens" />
         <Kpi label="Total tokens" value={data.kpis.totalTokens.toLocaleString()} />
