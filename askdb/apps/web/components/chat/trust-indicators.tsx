@@ -13,6 +13,8 @@ const ALL_SOURCES: GroundedSource[] = [
   "Semantic Layer",
   "Business Glossary",
   "KPI Definition",
+  "LLM",
+  "Schema",
   "Data Quality Check",
 ];
 

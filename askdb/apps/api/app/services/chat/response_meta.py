@@ -15,6 +15,8 @@ GroundedSource = Literal[
     "Semantic Layer",
     "Business Glossary",
     "KPI Definition",
+    "LLM",
+    "Schema",
     "Data Quality Check",
 ]
 
@@ -119,6 +121,8 @@ def resolve_grounded_on(
     glossary_matches: int,
     has_sql: bool,
     dq_checked: bool,
+    llm_invoked: bool = False,
+    schema_used: bool = False,
 ) -> list[GroundedSource]:
     grounded: list[GroundedSource] = []
     if path in {"template", "semantic", "semantic_llm"} or has_sql:
@@ -127,6 +131,10 @@ def resolve_grounded_on(
         grounded.append("Business Glossary")
     if path == "template" or (has_sql and glossary_matches >= 1):
         grounded.append("KPI Definition")
+    if llm_invoked:
+        grounded.append("LLM")
+    if schema_used:
+        grounded.append("Schema")
     if dq_checked:
         grounded.append("Data Quality Check")
     return grounded

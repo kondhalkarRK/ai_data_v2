@@ -388,8 +388,10 @@ async def llm_controls(
 ) -> dict[str, Any]:
     del user
     catalog = model_catalog(settings)
+    governed = active_llm(settings)
     return {
-        "defaultModel": active_llm(settings).model,
+        "defaultProvider": governed.provider,
+        "defaultModel": governed.model,
         "fallbackModel": (settings.llm_fallback_model or "").strip() or None,
         "defaultTemperature": settings.llm_temperature,
         "monthlyBudgetUsd": settings.llm_monthly_budget_usd,

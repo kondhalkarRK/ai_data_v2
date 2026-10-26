@@ -88,6 +88,7 @@ from app.services.chat.value_dictionary import (
     resolver_for,
 )
 from app.services.knowledge import KnowledgeService
+from app.services.governance.llm_config import active_llm
 from app.services.llm import llm_configured
 from app.services.security.region_scope import (
     RegionScope,
@@ -234,11 +235,27 @@ class ChatService:
         self._semantic = semantic_service or SemanticService(settings)
         self._region_scope = region_scope or RegionScope.all_regions(user)
         self.usage_model = ""
+        self.usage_llm_provider = ""
         self.usage_prompt_tokens = 0
         self.usage_completion_tokens = 0
         self.usage_llm_steps = 0
+        self._schema_used = False
         self.last_profile: QueryProfile | None = None
         self.last_history: QueryHistory | None = None
+
+    def _cache_scope(self) -> str:
+        governed = active_llm(self._settings)
+        return f"{self._region_scope.cache_key()}|llm:{governed.provider}:{governed.model}"
+
+    def _llm_runtime_meta(self) -> dict[str, Any]:
+        governed = active_llm(self._settings)
+        return {
+            "invoked": self.usage_llm_steps > 0,
+            "provider": self.usage_llm_provider or governed.provider,
+            "model": self.usage_model or governed.model,
+            "configuredProvider": governed.provider,
+            "configuredModel": governed.model,
+        }
 
     async def _recover_analytics(self) -> None:
         """Clear an aborted Postgres transaction so later statements can run.
@@ -293,6 +310,12 @@ class ChatService:
         if not question:
             raise ValidationError("Question is required.")
         self._region_scope = await load_region_scope(self._app, self._user)
+        self.usage_model = ""
+        self.usage_llm_provider = ""
+        self.usage_prompt_tokens = 0
+        self.usage_completion_tokens = 0
+        self.usage_llm_steps = 0
+        self._schema_used = False
 
         profile = QueryProfile(
             question=question,
@@ -420,6 +443,8 @@ class ChatService:
                         glossary_matches=0,
                         has_sql=False,
                         dq_checked=False,
+                        llm_invoked=self.usage_llm_steps > 0,
+                        schema_used=self._schema_used,
                     ),
                     "ambiguityFlag": ambiguity,
                     "validationStatus": "skipped",
@@ -433,6 +458,7 @@ class ChatService:
                     "anomalies": [],
                     "alternateInterpretations": alternates or [],
                     "cacheHit": False,
+                    "llmRuntime": self._llm_runtime_meta(),
                 },
             )
             for token in narrative.split():
@@ -507,6 +533,8 @@ class ChatService:
             )
             value_dictionary = ValueDictionarySnapshot(self._industry, ())
         allowed_schema = build_allowed_schema(semantic_pack)
+        if allowed_schema:
+            self._schema_used = True
         resolver = resolver_for(value_dictionary, semantic_pack)
         llm_ready = llm_configured(self._settings)
 
@@ -574,7 +602,7 @@ class ChatService:
             profile.completion_tokens += tokens_out
             if tokens_in or tokens_out:
                 await self._record_usage(
-                    model_override or self._settings.llm_default_model, tokens_in, tokens_out
+                    model_override or active_llm(self._settings).model, tokens_in, tokens_out
                 )
             if restated:
                 second = plan_turn(
@@ -733,7 +761,7 @@ class ChatService:
             industry=self._industry.value,
             question=question,
             current_data_as_of=data_as_of_hint,
-            scope=self._region_scope.cache_key(),
+            scope=self._cache_scope(),
         )
         if cached is not None:
             profile.cache_hit = True
@@ -1231,6 +1259,8 @@ class ChatService:
             glossary_matches=glossary_matches,
             has_sql=bool(sql_text),
             dq_checked=False,
+            llm_invoked=self.usage_llm_steps > 0,
+            schema_used=self._schema_used or bool(query_meta.tables_used),
         )
         if "chart" not in completed_steps:
             completed_steps.append("chart")
@@ -1275,6 +1305,7 @@ class ChatService:
             "cacheHit": False,
             "route": decision.route,
             "routeReason": decision.reason,
+            "llmRuntime": self._llm_runtime_meta(),
         }
         yield _sse("meta", meta_payload)
 
@@ -1325,7 +1356,7 @@ class ChatService:
             QUERY_CACHE.put(
                 industry=self._industry.value,
                 question=question,
-                scope=self._region_scope.cache_key(),
+                scope=self._cache_scope(),
                 answer=CachedAnswer(
                     sql=sql_text,
                     columns=columns,
@@ -1666,7 +1697,9 @@ class ChatService:
 
     async def _record_usage(self, model: str, prompt_tokens: int, completion_tokens: int) -> None:
         """Accumulate LLM tokens; the chat route stores one ``llm_usage`` row per question."""
-        self.usage_model = model or self.usage_model
+        governed = active_llm(self._settings)
+        self.usage_model = model or governed.model
+        self.usage_llm_provider = governed.provider
         self.usage_prompt_tokens += max(0, prompt_tokens)
         self.usage_completion_tokens += max(0, completion_tokens)
         self.usage_llm_steps += 1

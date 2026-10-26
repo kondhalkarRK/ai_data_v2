@@ -30,6 +30,14 @@ def test_grounded_on_only_lists_used_sources() -> None:
     assert resolve_grounded_on(
         path="template", glossary_matches=2, has_sql=True, dq_checked=False
     ) == ["Semantic Layer", "Business Glossary", "KPI Definition"]
+    assert resolve_grounded_on(
+        path="semantic_llm",
+        glossary_matches=0,
+        has_sql=True,
+        dq_checked=False,
+        llm_invoked=True,
+        schema_used=True,
+    ) == ["Semantic Layer", "LLM", "Schema"]
     assert "Data Quality Check" not in resolve_grounded_on(
         path="fallback", glossary_matches=0, has_sql=False, dq_checked=False
     )

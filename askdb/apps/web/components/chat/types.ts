@@ -4,7 +4,17 @@ export type GroundedSource =
   | "Semantic Layer"
   | "Business Glossary"
   | "KPI Definition"
+  | "LLM"
+  | "Schema"
   | "Data Quality Check";
+
+export interface LlmRuntimeMeta {
+  invoked: boolean;
+  provider: string;
+  model: string;
+  configuredProvider: string;
+  configuredModel: string;
+}
 
 export type ValidationStatus = "passed" | "auto_repaired" | "failed" | "skipped";
 
@@ -154,6 +164,7 @@ export interface ResponseMeta {
   decision?: RouteDecision;
   corrections?: Array<{ from: string; to: string }>;
   reinterpretedAs?: string | null;
+  llmRuntime?: LlmRuntimeMeta;
 }
 
 export interface AnswerConfidence {
