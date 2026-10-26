@@ -1,41 +1,164 @@
-AskDB helps business users ask questions in everyday language and get answers backed by real data from your database, with clear rules so numbers stay trustworthy.
+Here’s where the “Ask DB” name comes from and what to touch to rename it.
 
-It combines an executive dashboard, AI chat, and data-quality checks so leaders see KPIs, analysts explore ad hoc questions, and stewards keep definitions and access under control.
+Primary (UI name in the top-left + browser tab)
+File	Role
+askdb/apps/web/lib/brand.ts
+Main source: APP_NAME and APP_TAGLINE. Used for page title, applicationName, and accessibility text. Change APP_NAME here first.
+askdb/apps/web/components/brand/wordmark.tsx
+Visible wordmark is hardcoded as “Ask” + “DB” (two colors). Renaming to anything else (e.g. “Acme Analytics”) requires editing this component, not only brand.ts.
+askdb/apps/web/components/brand/logo.tsx
+Sidebar/login logo: icon + BrandWordmark + screen-reader APP_NAME.
+askdb/apps/web/app/layout.tsx
+Browser tab title: default: APP_NAME, template %s · ${APP_NAME}.
+askdb/apps/web/components/shell/sidebar.tsx
+Top-left link uses <Logo />; aria-label="Ask DB home" is hardcoded — update if you rename.
+Home hero: askdb/apps/web/app/(workspace)/home/page.tsx uses <BrandWordmark size="hero" /> — same wordmark component.
 
-Regional access and admin governance (who can see what, how AI is used, and audit trails) aim to make the platform safe enough for pilot and production use—not a black-box chatbot.
+Login / 404: app/(auth)/login/page.tsx, app/not-found.tsx use <Logo />.
 
-Overall, the goal is governed self-service analytics: faster insights than traditional BI alone, without giving up security, transparency, or alignment with how your organization defines metrics.
+Optional (not the corner label, but still says “Ask DB”)
+File	Notes
+askdb/apps/api/app/core/config.py
+app_name: str = "Ask DB" (API metadata; not the web corner).
+askdb/apps/api/app/main.py
+OpenAPI title="Ask DB API".
+askdb/apps/api/app/services/llm.py
+System prompt: "You are Ask DB for …".
+askdb/.env / askdb/.env.example
+NEXT_PUBLIC_APP_NAME=Ask DB — not referenced in apps/web code today; branding is lib/brand.ts, not this env var.
+askdb/apps/web/.env.local
+Has NEXT_PUBLIC_APP_NAME=NQL Insight — also unused by the app; can confuse you; align or remove.
+Static HTML under apps/web/public/ (user-guide.html, knowledge-graph-guide.html, knowledge-hub/AskDB_Guide.html)
+Separate docs, not the shell UI.
+askdb/apps/web/tests/e2e/auth.spec.ts
+Expects heading “Ask DB.” — update if you change the hero wordmark + period.
+Practical rename checklist
+Set APP_NAME (and tagline if needed) in lib/brand.ts.
+Update wordmark.tsx so the visible text matches (not only APP_NAME if the name isn’t “Ask” + “DB”).
+Fix sidebar.tsx aria-label.
+Run the app and check sidebar, home hero, login, and browser tab.
+Optionally sync API title, LLM prompt, docs, and e2e test.
+Note: The product name in the top-left is the sidebar Logo, not topbar.tsx (top bar is industry/user/region, not the brand).
 
 
+What “Data Trust” is (one sentence)
+Data Trust is AskDB’s data reliability control room: it runs automated checks on your warehouse, rolls them into a trust score (0–100), and shows what is wrong, how serious it is, and which dashboards/chat answers depend on that data.
 
-Executive Dashboard
-A leadership screen that shows the business numbers leaders care about—sales, trends, and regional performance—in charts and KPIs. Everything comes from your database reports, not from AI guessing.
+In the app: sidebar Data Trust → route /data-quality (Reliability Center UI).
 
-Ontology Browser
-A map of how your data fits together (customers, products, regions, etc.) so stewards can see and check the model. It helps people understand the data; AI chat does not use this map directly today.
+What a “monitor” is
+A monitor is a data-quality rule the platform runs on a schedule (when you Run checks or refresh). Each monitor:
 
-Admin Center — Hybrid AI Dashboard
-A control panel for admins to see how staff used “ask a question” features: answered by fixed rules, by AI, or a mix. It helps leaders track adoption, cost, and whether answers followed governed paths.
+Targets a dataset (e.g. sales transactions, claims).
+Checks something concrete (missing values, duplicates, stale data, invalid codes, etc.).
+Has a pass threshold (e.g. “at least 99% of rows must pass”).
+Maps to a quality dimension (Completeness, Timeliness, Validity, …).
+Contributes to the overall trust score and shows as passing / failing with optional sample failures.
+There are two kinds:
 
-AI Chat
-Lets users ask questions in plain English and get answers backed by real database queries, with guardrails and usage limits. Admins can see what was asked and how it was answered.
+Type	Who defines it	Can delete?
+Built-in rules
+Shipped per industry (automotive / insurance) — reconciliations, freshness, volume, cross-table checks
+No — admins enable/disable or tune threshold/owner
+Custom monitors
+Admins create via New monitor
+Yes — only custom ones
+Custom monitors do not accept free-form SQL; the server builds read-only checks from a safe template (column must exist on the dataset catalog). That limits risk and keeps checks consistent.
 
-RBAC (access control)
-Decides who can log in, who can run admin settings, and which regions of data each user may see. It stops people from viewing data outside their assigned area.
+How monitors help the business
+Early warning — Problems surface in Data Trust before executives see wrong KPIs or AI gives confident answers on bad data.
+Single trust score — One number plus bands (Excellent / Good / Fair / Risk) and 6 dimensions (Accuracy, Completeness, Consistency, Timeliness, Validity, Uniqueness), each with a plain question (e.g. “Is the data refreshed within its agreed SLA?”).
+Prioritization — Severity (critical → low) and owner so teams know who acts.
+Traceability to use cases — Built-in datasets are tagged with where data is used (e.g. Executive cockpit, Revenue dashboard, AI Chat answers), so leaders see why a failing rule matters.
+Trend — Score and dimension trends over time (e.g. 7-day delta on the hero).
+Operational detail — Freshness table, schema drift, entity/catalog changes, alerts, drill-down on a rule.
+Important distinction for leadership: The trust % on an individual AI Chat answer is a separate, answer-level score (semantic match, SQL path, empty results). Data Trust monitors govern warehouse quality; they do not replace per-answer trust, but they reduce the chance that chat and dashboards run on bad data.
 
-DQ engine (data quality)
-Automatically checks whether data looks complete, consistent, and trustworthy before leaders and analysts rely on it. It flags problems and feeds trust scores shown elsewhere in the product.
+Monitor types (what you can add)
+When an admin clicks New monitor, they choose a kind (UI labels):
 
+Kind	Business meaning	Example
+Required values (not_null)
+Column must be filled
+Every sales row has a dealer
+No duplicates (unique)
+Business key unique
+order_id not repeated
+Value range (range)
+Min/max business limits
+total_sales ≥ 0
+Allowed values (allowed_values)
+Approved code list
+claim_status only Open/Closed/…
+Format (pattern) (pattern)
+Regex format
+Policy number pattern
+Freshness (freshness)
+Data not older than X hours
+Sales loaded within 36 hours
+Reference match (reference)
+Values exist in another dataset
+dealer_id exists in dealers
+Each kind maps to a dimension (e.g. Freshness → Timeliness).
 
+How to add a monitor (for admins)
+Who: Administrators only (API: RequireAdmin; UI: New monitor only when role === admin).
 
-Executive Dashboard — SQL-driven executive cockpit (KPIs, trends, geo drill-down) on governed warehouse data; not LLM-generated.
+Where: Data Trust → top right New monitor (also Run checks to execute all active rules).
 
-Ontology Browser — Visual explorer of the semantic ontology from the API; for stewards to validate the model; not used in chat SQL today.
+Steps (same as the dialog):
 
-Admin Center — Hybrid AI Dashboard — Admin view of how chat ran: schema-only, LLM, hybrid, or cache, plus usage and per-user breakdown.
+Name (≥ 3 characters) and optional description.
+Kind (see table above).
+Dataset and column (from catalog — unknown columns are rejected).
+Severity and target (threshold 0–100% pass rate).
+Owner (e.g. Data Engineering) and optional tags.
+Submit → API POST /api/v1/trust/reliability/monitors → monitor is saved and included in the next run.
+After creation: use Run checks (or wait for cached refresh) to see status in the rules catalog and impact on the trust score.
 
-AI Chat — Natural-language questions → governed SQL (optional LLM), streaming answers, trust/history; auth, quotas, and region-scoped DB.
+Admin Center → Data Trust Admin is complementary: enable/disable built-in DQ rules and refresh trust scores platform-wide, without building a new custom monitor.
 
-RBAC — admin / user roles plus optional regional zones (SQL rewrite + UI scope); not warehouse-native RLS.
+Leadership examples (storytelling)
+Example 1 — Maruti / automotive sales
+Goal: Ensure AI Chat and revenue views are not using stale sales.
 
-DQ engine — Read-only rule SQL on analytics data; scores trust and supports admin/reliability views
+Built-in: Freshness on fact_sales (SLA-style; already in defaults).
+Custom monitor (admin adds):
+Kind: Freshness
+Dataset: Sales transactions
+Max age: 36 hours
+Severity: High
+Target: 100%
+If it fails: Timeliness dimension drops; hero shows Risk/Fair; rule detail explains lag; assets list includes AI Chat answers so leaders know NLQ is affected.
+Example 2 — Insurance claims
+Goal: No claims with invalid status breaking loss-ratio KPIs.
+
+Custom monitor:
+Kind: Allowed values
+Dataset: Claims
+Column: claim_status
+Allowed: Open, Closed, Pending, …
+Dimension: Validity
+Target: 99%
+If it fails: Validity fails; drill-down shows sample bad values; executives see trust drop before trusting claim dashboards.
+Example 3 — Dealer consistency
+Goal: Sales rows must point to real dealers.
+
+Custom monitor:
+Kind: Reference match
+Dataset: Sales
+Column: dealer_id
+Reference: Dealers dataset, same column
+Dimension: Consistency
+Helps: Prevents “orphan” sales that inflate regional rollups and confuse chat answers that filter by dealer.
+What leaders should remember
+Monitors = automated promises about data (“fresh enough,” “complete,” “consistent”).
+Built-in rules cover industry-critical reconciliations; custom monitors let the business add their policies without writing SQL.
+Trust score is the rollup for steering meetings; failing critical monitors mean “slow down decisions on that data until fixed.”
+Only admins create/delete custom monitors; all users can view Data Trust to see transparency.
+Fixing data or the pipeline improves the score on the next Run checks; disabling a rule hides the signal but does not fix the underlying issue.
+Optional one-liner for the board
+“Data Trust monitors are like smoke detectors on our analytics warehouse—they run every day, feed one trust score, and tell us if dashboards and Ask DB are safe to use before we act on the numbers.”
+
+If you want this as a single slide, I can turn it into 4–5 bullets plus one Maruti example only
+
