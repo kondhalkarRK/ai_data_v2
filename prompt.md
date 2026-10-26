@@ -1,78 +1,61 @@
-Document-only questions. Include a phrase like "in the document", "from the report", "policy document", "key findings", "concerns" or "recommendations". Without one, a question that mentions a metric or brand goes to SQL instead.
+Hello Everyone, Welcome to the AI Era!
+Capgemini Invent  presents AskDB - Ask Questions on Your Data and Get Instant Insights
 
-Summarize the dealer policy document
-What are the key findings in the report?
-According to the policy document, what is the maximum discount on electric vehicles?
-What does the document say about Grade C dealers?
-From the report, what is the EV battery warranty?
-What concerns or risks are mentioned in the report?
-What recommendations does the document make?
-Data plus document questions. These start with "why" or "factors". You should get the SQL answer plus citations from the document.
+Home Page: This is our landing page of AskDB. Here, it provides a sample visual representation of how the AI chat works. As we scroll down, we can find the active connections currently available in the application. All databases are connected, and the LLM API key is also configured.
 
-Why did Tata EV sales grow in 2025?
-Why is East region below target?
-What factors are behind hatchback decline in 2025?
+This application supports multi-domain databases and multiple data modules, which can be toggled from here.
+
+Now let's move further to the Data Preview section. As the name suggests, it provides a view of the data available in our system. In the current database, we have around 2 million records for the automotive domain, while the insurance domain contains approximately 100K records.
+
+As we are dealing with data, we require a strong Data Quality mechanism. AskDB provides a "Data Trust Center", which consists of six data quality indicators used to calculate quality scores. We have implemented 15+ DQ rules to ensure data quality remains at the highest standard.
+
+This is completely represented through dashboards, making it easy for business users to navigate and understand the module.
+
+On top of our data, we have built a semantic layer called "Semantic Atlas." This semantic layer significantly enhances the quality of the application. Since LLMs do not inherently understand business data, the semantic layer helps user questions navigate the correct path and provides the right business context and keywords to the LLM, enabling accurate SQL generation.
+
+For example, if a user asks, "Revenue by Month," the semantic layer understands that Revenue = Total Sales. Similarly, it maps business measures and dimensions, making the semantic layer powerful in reducing LLM hallucinations and improving response accuracy.
+
+A few more examples:
+
+If a user asks for "ASP," the AI understands it as "Average Selling Price."
+If a user asks for the "top-selling car in NCR," the AI understands NCR as the Delhi NCR region.
+
+Ontology Browser: This helps users understand the business meaning of data and see how a Sales table is connected to other tables or entities.
+
+It provides visibility into relationships, showing where a table is connected and how those connections are established.
+
+Relationship Network: Concepts are arranged in concentric rings, similar to a target. The most central concept appears in the bullseye, while concepts become less central as they move outward. The top five concepts are numbered, making it easy to identify key business hubs. For example, the #1 hub could be Sales.
 
 
+Executive KPI Analytics: This module provides executive KPI dashboards with various dashboard utilities that can be managed and customized as needed. We have incorporated most major chart types to support business analysis.
 
-#	Question	Expected path	What it tests
-1
-Top 5 dealers by revenue in 2025
-Compiled
-Ranking, year filter, dealer vs salesperson rule
-2
-(follow-up) now show bottom 5
-Compiled
-Follow-up flips the ranking direction
-3
-Top 3 models per state by units sold in 2025
-Compiled
-Top-N per group (ranking within each state)
-4
-Month over month revenue growth for Hyundai in 2025
-Compiled
-Period growth, brand filter
-5
-3 month moving average of units sold for SUVs
-Compiled
-Moving average; "SUV" expands to all SUV segments
-6
-Market share of each brand by units in 2025
-Compiled
-Share against a window total
-7
-Fastest growing dealers in Maharashtra by revenue
-Compiled
-Growth ranking; Maharashtra maps to state code MH
-8
-Which brands have increasing units but decreasing average selling price?
-Compiled
-Divergence analysis
-9
-Revenue contribution of electric vehicles by city in Karnataka
-Compiled
-Contribution, EV synonym, state filter
-10
-Salespeople with above average revenue in Pune
-Compiled
-Above-average logic, salesperson entity
-11
-top sellng suvs in bangalore by revnue last quater
-Compiled after rewrite
-Spelling fixes, city alias, "last quarter"
-12
-Target achievement % by make for 2025, units sold vs target units
-LLM
-Targets aren't compiled, so the LLM must join targets on make and month
-13
-Units sold per active salesperson by dealer grade in 2025
-LLM / mixed
-Ratio with a safe denominator, three-table join
-14
-Why did revenue drop in East region in 2025?
-Mixed (data + document)
-"Why" routes to data plus document citations
-15
-Re-ask question 1 exactly
-Cache
-Should be instant and show as CACHE in Admin Center → LLM Usage
+These are interactive dashboards that business users can utilize based on their specific requirements and preferences.
+
+Now, coming to the core part of the application, the AI Chat.
+
+Users can ask questions in natural language and receive responses in the form of charts, narratives, and SQL queries.
+
+If users have a SQL background, they can validate the generated SQL. We also have mechanisms in place to ensure responses remain grounded in the available data, along with generating a trust score for each response.
+
+The system also suggests follow-up questions, allowing users to drill down further into their analysis. Each question is stored in the backend using a unique hash key.
+
+Users can also monitor LLM usage, including token consumption and API call statistics.
+
+
+Analytics Builder: This module is designed for business users who want to perform ad hoc analysis. Users can leverage metrics, dimensions, and advanced analytics capabilities to perform deeper analysis directly from this section.
+
+Query History: This is the place where users can view their complete query history.
+
+Users can also monitor their individual token usage and API call consumption.
+
+Admin Center: This is the area where administrators can manage multiple aspects of the application.
+
+LLM Settings: Administrators can change LLM models, adjust temperature settings, select the best-performing models, and analyze model-related costs.
+
+Admin LLM Dashboard: Administrators can view LLM usage statistics across all users, including trend reports and usage analytics.
+
+Audit Center: The application records every action performed within the system and stores it in the audit logs, which can later be used for monitoring and analysis.
+
+Data Trust Admin: Administrators can enable or disable DQ rules whenever changes are required within the Data Quality Engine.
+
+RBAC: We have integrated role-based access control at the regional level. For example, a North_User can only view North region data, while South_User can only access South region data. The same access restrictions apply to users from the other regions.
