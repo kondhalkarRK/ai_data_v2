@@ -1,3 +1,55 @@
+Questions that tend to hit the LLM (decision.path = llm_reasoning, stage llm)
+These use complex analysis (moving average, growth, top-N per group, divergence, etc.) so with llm_first the backend calls generate_validated_sql even when a governed query exists.
+
+Automotive
+
+Top 3 models in each state by revenue
+6-month moving average of Tata revenue by month
+Month-over-month revenue growth for Hyundai by month
+Which dealers are above the regional average for revenue?
+Brands with increasing revenue but decreasing unit sales
+Year-on-year growth ranking of dealers by revenue
+Insurance
+
+Top 3 agents in each region by written premium
+3-month moving average of loss ratio by month
+Period-over-period growth in claims incurred by product
+Regions above average for claim severity
+Products with rising earned premium but falling claim count
+YoY growth ranking of channels by written premium
+Extra LLM touch (interpretation, not always full SQL generation)
+Messy or non-governed phrasing with no matching template — e.g. “toto sales revnue all tata modls last yr” — may trigger interpret when nlq_llm_interpretation is on, then planning. Less predictable than the list above.
+
+Won’t hit LLM (good controls)
+
+Revenue by month
+Top brand by revenue
+Maruti Suzuki sales by year
+Questions that tend to hit hybrid (route = hybrid — SQL plus knowledge snippets)
+Hybrid is triggered by words like why, reason, factors, insights, drivers, explain the increase/decrease, etc. The app still runs analytics SQL, then searches the knowledge base and merges snippets into the narrative.
+
+Automotive (SQL + docs)
+
+Why did Tata revenue increase in 2024 compared to 2023?
+What factors drove the drop in SUV sales last quarter?
+Explain the decrease in Maruti revenue in the west region
+What insights explain the spike in electric vehicle sales by month?
+Drivers of revenue growth for Hyundai dealers in 2024
+Insurance
+
+Why did loss ratio increase in the north region last year?
+What contributed to the rise in claim severity for motor policies?
+Explain the decrease in written premium by channel in Q2
+What insights can you share about claim frequency and regional trends?
+Reasons behind the growth in claims incurred for health products
+Hybrid is much more useful if you have uploaded reports / knowledge hub content; with an empty corpus you still get hybrid routing but citations may be thin.
+
+Pure knowledge (no SQL — for contrast)
+Summarize the key findings from the uploaded report
+What does the policy document say about deductible limits?
+→ route = knowledge, not hybrid, no LLM required for routing.
+
+
 Here’s where the “Ask DB” name comes from and what to touch to rename it.
 
 Primary (UI name in the top-left + browser tab)
