@@ -169,10 +169,58 @@ def _automotive_filter_parts(
     return joins, where
 
 
+def _above_average_dealer_region_sql(plan: QuestionPlan) -> TemplateHit | None:
+    """Dealers above the average within each region (dealer home region, not sale region)."""
+    if plan.analysis != "above_average":
+        return None
+    if "dealer" not in plan.dimensions or "region" not in plan.dimensions:
+        return None
+    select_metrics, metric_alias = _order_metric(
+        plan.metric if plan.metric != "unknown" else "revenue"
+    )
+    joins, where = _automotive_filter_parts(plan, base_aliases={"d", "r"})
+    extra_joins = "\n".join(joins)
+    limit = max(1, min(plan.limit or 20, 100))
+    partition = "region_name"
+    return TemplateHit(
+        title="Dealers above regional average for revenue"
+        if metric_alias == "revenue"
+        else f"Dealers above regional average ({metric_alias})",
+        glossary_matches=3,
+        path="semantic_compiler",
+        sql=f"""
+WITH aggregated AS (
+  SELECT r.region_name AS region_name,
+         d.dealer_name AS dealer_name,
+         {select_metrics}
+  FROM automotive.fact_sales f
+  JOIN automotive.dim_dealer d ON d.dealer_id = f.dealer_id
+  JOIN automotive.dim_region r ON r.region_id = d.region_id
+  {extra_joins}
+  {where}
+  GROUP BY r.region_name, d.dealer_name
+), compared AS (
+  SELECT aggregated.*,
+         AVG({metric_alias}) OVER (PARTITION BY {partition}) AS group_average
+  FROM aggregated
+)
+SELECT *
+FROM compared
+WHERE {metric_alias} > group_average
+ORDER BY {metric_alias} DESC, dealer_name
+LIMIT {limit}
+""".strip(),
+    )
+
+
 def _governed_automotive(plan: QuestionPlan) -> TemplateHit | None:
     """Pack-free SQL for business questions the legacy entity templates skip."""
     if plan.industry is not Industry.AUTOMOTIVE:
         return None
+    if plan.analysis == "above_average":
+        hit = _above_average_dealer_region_sql(plan)
+        if hit is not None:
+            return hit
     if plan.analysis == "year_window_compare":
         return _year_window_sql(plan)
     if plan.analysis == "period_growth":

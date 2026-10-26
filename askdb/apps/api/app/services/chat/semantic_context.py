@@ -216,6 +216,18 @@ def validate_analytical_shape(lowered: str, plan: QuestionPlan) -> tuple[bool, s
     if analysis in {"contribution", "market_share"} and not re.search(r"\bover\s*\(", lowered):
         return False, "Share needs a window total (SUM(...) OVER ())"
 
+    if analysis == "above_average":
+        if not re.search(r"\bavg\s*\([^)]*\)\s*over\s*\(", lowered):
+            return False, "Above average needs AVG(...) OVER the scope dimension"
+        for key in plan.partition_by:
+            if not any(
+                re.search(rf"\b{re.escape(t)}\b", partitions)
+                for t in _dimension_tokens(plan, key)
+            ):
+                return False, f"Above-average must PARTITION BY {key}"
+        if not re.search(r">\s*group_average\b|>\s*avg\b", lowered):
+            return False, "Above average must filter to rows above the group average"
+
     if analysis == "year_window_compare":
         return True, None
     period = plan.period

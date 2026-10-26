@@ -310,7 +310,33 @@ def _relationship_path(pack: Any, start: str, target: str) -> list[Any]:
     raise SemanticCompileError(f"No semantic join path from {start} to {target}")
 
 
-def _join_clauses(pack: Any, base_table: str, required_tables: set[str]) -> list[str]:
+def _dealer_home_region_join(plan: QuestionPlan, base_table: str, required_tables: set[str]) -> bool:
+    """Dealer vs region should use dim_dealer.region_id, not fact_sales.region_id."""
+    if plan.industry is not Industry.AUTOMOTIVE or base_table != "fact_sales":
+        return False
+    if "dim_dealer" not in required_tables or "dim_region" not in required_tables:
+        return False
+    scope_dims = set(plan.partition_by or []) | set(plan.dimensions)
+    return plan.entity == "dealer" or ("dealer" in scope_dims and "region" in scope_dims)
+
+
+def _join_clauses(
+    pack: Any,
+    base_table: str,
+    required_tables: set[str],
+    plan: QuestionPlan | None = None,
+) -> list[str]:
+    if plan is not None and _dealer_home_region_join(plan, base_table, required_tables):
+        tables = _model_tables(pack)
+        physical_d = getattr(tables["dim_dealer"], "physical_name", "automotive.dim_dealer")
+        physical_r = getattr(tables["dim_region"], "physical_name", "automotive.dim_region")
+        f = _ALIASES["fact_sales"]
+        d = _ALIASES["dim_dealer"]
+        r = _ALIASES["dim_region"]
+        return [
+            f"JOIN {physical_d} {d} ON {d}.dealer_id = {f}.dealer_id",
+            f"JOIN {physical_r} {r} ON {r}.region_id = {d}.region_id",
+        ]
     tables = _model_tables(pack)
     joined = {base_table}
     clauses: list[str] = []
@@ -596,7 +622,7 @@ def compile_analytical_query(
 
     required_tables = {spec.table for spec in dimensions if spec.table != metric.table}
     where = _where_clauses(plan, pack, required_tables, metric.table)
-    joins = _join_clauses(pack, metric.table, required_tables)
+    joins = _join_clauses(pack, metric.table, required_tables, plan)
     physical_base = getattr(_model_tables(pack)[metric.table], "physical_name", metric.table)
     sql = _render_advanced_sql(
         plan,
@@ -653,7 +679,7 @@ def _compile_period_change(plan: QuestionPlan, pack: Any) -> AnalyticalQuery:
 
     required_tables = {spec.table for spec in dimensions if spec.table != base_table}
     where = _where_clauses(plan, pack, required_tables, base_table, include_time=False)
-    joins = _join_clauses(pack, base_table, required_tables)
+    joins = _join_clauses(pack, base_table, required_tables, entity_plan)
     physical_base = getattr(_model_tables(pack)[base_table], "physical_name", base_table)
     alias = _ALIASES[base_table]
     date_column = _DATE_COLUMNS[base_table]

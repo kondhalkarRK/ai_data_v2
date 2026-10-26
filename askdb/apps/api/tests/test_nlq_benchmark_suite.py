@@ -103,6 +103,22 @@ def test_top_dealer_by_revenue_uses_dim_dealer() -> None:
     assert "dim_salesman" not in hit.sql.lower()
 
 
+def test_dealers_above_regional_average_use_dealer_region_join() -> None:
+    question = "Which dealers are above the regional average for revenue"
+    plan = understand_question(Industry.AUTOMOTIVE, question)
+    assert plan.entity == "dealer"
+    assert plan.analysis == "above_average"
+    assert "dealer" in plan.dimensions and "region" in plan.dimensions
+    hit = resolve_template(Industry.AUTOMOTIVE, question, plan=plan)
+    assert hit is not None
+    sql = hit.sql.lower()
+    assert "dim_dealer" in sql
+    assert "r.region_id = d.region_id" in sql
+    assert "group_average" in sql
+    ok, reason = validate_sql_against_plan(hit.sql, plan)
+    assert ok, reason
+
+
 def test_top_selling_car_is_ambiguous() -> None:
     plan = understand_question(Industry.AUTOMOTIVE, "Top selling car")
     assert plan.is_ambiguous
