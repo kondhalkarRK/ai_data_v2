@@ -12,7 +12,7 @@ export { APP_NAME as BRAND_NAME, APP_TAGLINE as BRAND_TAGLINE };
 
 /**
  * Brand mark from the supplied logo (brain). White paper is stripped so the mark
- * works on light and dark surfaces. Wordmark text is Ask DB (mark asset unchanged).
+ * works on light and dark surfaces. Wordmark text follows APP_NAME (mark asset unchanged).
  */
 
 const HAS_BRAND_ASSETS = true;
@@ -82,7 +82,7 @@ export function LogoMark({ size = "md", className, animated = false }: LogoMarkP
           className="relative flex size-full items-center justify-center rounded-[0.4rem] bg-primary font-semibold tracking-tight text-primary-foreground"
           style={{ fontSize: pixels * 0.42 }}
         >
-          AD
+          AM
         </span>
       )}
     </span>

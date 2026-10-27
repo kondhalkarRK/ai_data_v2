@@ -31,7 +31,7 @@ test("signing in lands on the workspace and shows the shell", async ({ page }) =
   await signIn(page);
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Workspace" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Ask DB." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask Me." })).toBeVisible();
 });
 
 test("a wrong password is rejected without saying which field was wrong", async ({ page }) => {

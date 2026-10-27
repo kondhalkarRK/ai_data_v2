@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { Logo } from "@/components/brand/logo";
+import { APP_NAME } from "@/lib/brand";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@/hooks/use-session";
@@ -56,7 +57,7 @@ export function Sidebar({ user }: { user: UserProfile }) {
         <Link
           href="/home"
           className="rounded-[var(--radius-control)]"
-          aria-label="Ask DB home"
+          aria-label={`${APP_NAME} home`}
         >
           <Logo compact={collapsed} size="sm" />
         </Link>

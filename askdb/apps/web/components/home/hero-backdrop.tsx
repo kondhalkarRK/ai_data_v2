@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-/** Lightweight ambient motion for the Ask DB hero — CSS-only, respects reduced motion. */
+/** Lightweight ambient motion for the Ask Me hero — CSS-only, respects reduced motion. */
 export function HeroBackdrop({ className }: { className?: string }) {
   return (
     <div aria-hidden="true" className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)}>

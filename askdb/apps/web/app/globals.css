@@ -252,6 +252,7 @@
     letter-spacing: -0.03em;
   }
 
+  .brand-me,
   .brand-db {
     color: hsl(var(--teal));
     letter-spacing: -0.02em;

@@ -11,7 +11,7 @@ const SIZE: Record<WordmarkSize, string> = {
 };
 
 /**
- * Product wordmark: ASK (cyan/blue) + DB (teal) — complementary brand treatment.
+ * Product wordmark: Ask (cyan/blue) + Me (teal) — complementary brand treatment.
  */
 export function BrandWordmark({
   size = "md",
@@ -22,6 +22,9 @@ export function BrandWordmark({
   withPeriod?: boolean;
   className?: string;
 }) {
+  const [lead, ...rest] = APP_NAME.trim().split(/\s+/);
+  const tail = rest.join(" ") || "Me";
+
   return (
     <span
       className={cn(
@@ -31,8 +34,8 @@ export function BrandWordmark({
       )}
       aria-label={APP_NAME}
     >
-      <span className="brand-ask">Ask</span>
-      <span className="brand-db ml-[0.18em]">DB</span>
+      <span className="brand-ask">{lead}</span>
+      {tail ? <span className="brand-me ml-[0.18em]">{tail}</span> : null}
       {withPeriod ? <span className="text-foreground/80">.</span> : null}
     </span>
   );
