@@ -285,6 +285,18 @@ def validate_sql_against_plan(
         required_direction = plan.order_direction.lower()
         if not re.search(rf"\border\s+by\b[\s\S]*?\b{required_direction}\b", lowered):
             return False, f"Ranking SQL must order {required_direction.upper()}"
+    if plan.intent == "lookup" and plan.entity == "vehicle":
+        if "dim_carline" not in lowered:
+            return False, "Vehicle lookup must join automotive.dim_carline"
+        if "distinct" not in lowered and not re.search(r"\bc\.model\b|\bmodel\b", lowered):
+            return False, "Vehicle lookup must list distinct make/model rows"
+        if re.search(r"\bdate_trunc\s*\(\s*'month'", lowered) and plan.time_grain not in {
+            "month",
+            "quarter",
+            "half",
+            "year",
+        } and "month" not in plan.dimensions:
+            return False, "Vehicle lookup must not default to a monthly revenue trend"
 
     if plan.dimensions and re.search(r"\b(sum|count|avg)\s*\(", lowered):
         if "group by" not in lowered:

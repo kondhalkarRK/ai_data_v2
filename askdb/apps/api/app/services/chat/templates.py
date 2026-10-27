@@ -217,6 +217,8 @@ def _governed_automotive(plan: QuestionPlan) -> TemplateHit | None:
     """Pack-free SQL for business questions the legacy entity templates skip."""
     if plan.industry is not Industry.AUTOMOTIVE:
         return None
+    if plan.intent == "lookup":
+        return None
     if plan.analysis == "above_average":
         hit = _above_average_dealer_region_sql(plan)
         if hit is not None:
@@ -659,6 +661,25 @@ LEFT JOIN automotive.dim_region r ON r.region_id = f.region_id
 GROUP BY 1
 ORDER BY {order_alias} {direction}
 LIMIT {limit}
+""".strip(),
+        )
+
+    if plan.entity == "vehicle" and plan.intent == "lookup":
+        joins, where = _automotive_filter_parts(plan, base_aliases={"c"})
+        extra_joins = "\n".join(joins)
+        filter_label = ", ".join(f.label for f in plan.filters) or "criteria"
+        row_limit = max(100, limit)
+        return TemplateHit(
+            title=f"Cars matching {filter_label}",
+            glossary_matches=2 + len(plan.filters),
+            sql=f"""
+SELECT DISTINCT c.make, c.model, c.car_type
+FROM automotive.fact_sales f
+JOIN automotive.dim_carline c ON c.carline_id = f.carline_id
+{extra_joins}
+{where}
+ORDER BY c.make, c.model, c.car_type
+LIMIT {row_limit}
 """.strip(),
         )
 

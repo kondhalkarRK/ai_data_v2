@@ -17,6 +17,11 @@ _DECLINING = re.compile(r"\b(declin\w*|decreas\w*|falling|dropping|shrinking)\b"
 _GROWING = re.compile(r"\b(increas\w*|growing|rising|improving)\b", re.I)
 _BY_MONTH = re.compile(r"\bby\s+month\b|\bmonthly\b|\bper\s+month\b", re.I)
 _MODELS = re.compile(r"\bmodels?\b", re.I)
+_VEHICLE_LIST = re.compile(
+    r"\b(?:which|what)\s+(?:all\s+)?(?:the\s+)?(?:car|cars|vehicle|vehicles|model|models)\b|"
+    r"\b(?:car|cars)\s+(?:has|have|with)\b",
+    re.I,
+)
 _METRIC_ALIASES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bunits?\b|\bvolume\b", re.I), "units"),
     (re.compile(r"\baverage\s+selling\s+price\b|\basp\b", re.I), "average_selling_price"),
@@ -44,6 +49,14 @@ def coverage_gaps(question: str, plan: QuestionPlan) -> list[str]:
     if _MODELS.search(q) and "model" not in plan.dimensions and plan.entity != "vehicle":
         if plan.analysis != "divergence" or "model" not in plan.dimensions:
             gaps.append("Question asks about models but the plan has no model grouping.")
+
+    if _VEHICLE_LIST.search(q) and not _BY_MONTH.search(q):
+        if plan.intent != "lookup":
+            gaps.append(
+                "Question asks which cars match criteria but the plan is not a vehicle lookup."
+            )
+        elif plan.time_grain or any(d in plan.dimensions for d in ("month", "quarter", "year")):
+            gaps.append("Vehicle list questions should not include a time breakdown.")
 
     if _BY_MONTH.search(q) and not any(d in plan.dimensions for d in ("month", "quarter", "year")):
         if plan.time_grain not in {"month", "quarter", "half", "year"}:

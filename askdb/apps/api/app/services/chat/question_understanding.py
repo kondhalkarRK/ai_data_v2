@@ -409,6 +409,18 @@ _MOVING_WINDOW = re.compile(r"\b(\d{1,2})[-\s]*(?:month|period|point)s?\s+(?:mov
 _DEALER_GRADE = re.compile(r"\b[Gg]rade[-\s]+([ABCabc])\b|\b([ABC])[-\s]+[Gg]rade\b")
 _BY_WORD = re.compile(r"\b(by|per|each|across|every|wise|breakdown|split)\b", re.I)
 _FRAUD = re.compile(r"\bfraud(?:ulent)?\b|\bsuspicious\b", re.I)
+_VEHICLE_ENUM = re.compile(
+    r"\b(?:which|what)\s+(?:all\s+)?(?:the\s+)?(?:car|cars|vehicle|vehicles|model|models)\b|"
+    r"\b(?:list|show)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:car|cars|vehicle|vehicles|model|models)\b|"
+    r"\b(?:car|cars|vehicle|vehicles|model|models)\s+(?:that|which)\s+"
+    r"(?:have|has|are|come|were|use|uses)\b",
+    re.I,
+)
+_ENUM_ANALYTICS = re.compile(
+    r"\b(?:revenue|sales\s+value|turnover|units?|volume|orders?|trend|growth|"
+    r"market\s+share|top|best|highest|lowest|most|least|selling|sold)\b",
+    re.I,
+)
 
 # Seeded car_type values (automotive.dim_carline.car_type).
 _BODY_STYLES: list[tuple[re.Pattern[str], str]] = [
@@ -556,6 +568,7 @@ def understand_question(
         plan.ambiguity_options = list(VAGUE_OPTIONS[industry])
         plan.notes.append("No metric was named; offering the main measures.")
     if not plan.is_ambiguous:
+        _apply_vehicle_enumeration(plan, q)
         _apply_business_shape(plan, q)
         if explicit := _EXPLICIT_N.search(q):
             plan.limit = max(1, min(int(explicit.group(1)), 50))
@@ -614,8 +627,66 @@ def _resolve_time_grain(plan: QuestionPlan) -> str | None:
     return plan.time_grain
 
 
+def _asks_colour_breakdown(question: str) -> bool:
+    """True when colour is a breakdown axis, not an attribute on a named vehicle list."""
+    return bool(
+        re.search(
+            r"\b(?:by|per|each|across|top|best|which)\s+colou?rs?\b|"
+            r"\bcolou?rs?\s+(?:sell|sold|sales|perform|rank)\b|"
+            r"\bpaint\s+colou?rs?\b",
+            question,
+            re.I,
+        )
+    )
+
+
+def _is_vehicle_enumeration(question: str, plan: QuestionPlan) -> bool:
+    """Questions that list cars/models matching filters, not KPI trends or rankings."""
+    if plan.industry is not Industry.AUTOMOTIVE or plan.is_ambiguous:
+        return False
+    if not (
+        _VEHICLE_ENUM.search(question)
+        or (
+            _VEHICLE.search(question)
+            and re.search(r"\b(?:which|what|list)\b", question, re.I)
+        )
+    ):
+        return False
+    if _TOP.search(question) or _TREND.search(question) or _GROWTH_RANK.search(question):
+        return False
+    if re.search(r"\bwhich\s+colou?r\b", question, re.I):
+        return False
+    if _ENUM_ANALYTICS.search(question) and not re.search(
+        r"\b(?:which|what|list)\b", question, re.I
+    ):
+        return False
+    has_filter = bool(plan.filters)
+    has_attribute_phrase = bool(
+        re.search(r"\b(?:has|have|with|in)\s+.+\s+colou?r\b", question, re.I)
+    )
+    if not has_filter and not has_attribute_phrase:
+        return False
+    return True
+
+
+def _apply_vehicle_enumeration(plan: QuestionPlan, question: str) -> None:
+    if not _is_vehicle_enumeration(question, plan):
+        return
+    plan.intent = "lookup"
+    plan.entity = "vehicle"
+    plan.metric = "units"
+    plan.dimensions = []
+    plan.partition_by = []
+    plan.time_grain = None
+    plan.analysis = "basic"
+    plan.limit = max(plan.limit or 0, 100)
+    plan.notes.append("List distinct vehicles matching the named filters.")
+
+
 def _apply_business_shape(plan: QuestionPlan, question: str) -> None:
     """Complete the plan from every part of the question: brand, comparison, period, share."""
+    if plan.intent == "lookup":
+        return
     dims = plan.dimensions
     _apply_time_scope(plan, question)
 
@@ -756,6 +827,11 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
             hits.append((match.start(), name))
     for _, name in sorted(hits):
         _append_unique(dimensions, name)
+    if industry is Industry.AUTOMOTIVE and "colour" in dimensions and not _asks_colour_breakdown(
+        question
+    ):
+        if re.search(r"\b(?:has|have|with|in)\s+.+\s+colou?r\b", question, re.I):
+            dimensions.remove("colour")
     return dimensions
 
 
