@@ -14,6 +14,13 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  --ai: 199 89% 48%;
+  --ai-foreground: 0 0% 100%;
+  --ai-muted: 214 90% 96%;
+  --chart-grid: 214 25% 90%;
+  --chart-axis: 215 16% 45%;
+  --overlay: 213 27% 15%;
+
   /* Surfaces */
   --background: 0 0% 100%;
   --surface: 210 25% 98%;
@@ -76,19 +83,24 @@
 }
 
 .dark {
-  --background: 217 45% 5%;
-  --surface: 213 52% 8%;
-  --surface-raised: 213 44% 11%;
-  --surface-sunken: 217 48% 6%;
+  /* Midnight charcoal base — distinct surface ladder, not flat black */
+  --background: 222 47% 6%;
+  --surface: 220 42% 9%;
+  --surface-raised: 218 38% 12%;
+  --surface-sunken: 222 44% 7%;
 
-  --foreground: 213 31% 91%;
-  --muted: 215 32% 14%;
-  --muted-foreground: 215 20% 65%;
+  --foreground: 210 40% 96%;
+  --muted: 217 32% 16%;
+  --muted-foreground: 215 18% 62%;
 
-  --primary: 234 89% 74%;
-  --primary-foreground: 222 47% 11%;
-  --accent: 255 92% 76%;
-  --accent-foreground: 222 47% 11%;
+  /* Restrained electric blue + cyan for interactive / AI affordances */
+  --primary: 214 88% 62%;
+  --primary-foreground: 222 47% 8%;
+  --accent: 192 82% 52%;
+  --accent-foreground: 222 47% 8%;
+  --ai: 192 82% 52%;
+  --ai-foreground: 222 47% 8%;
+  --ai-muted: 214 55% 18%;
   --success: 158 64% 67%;
   --success-foreground: 222 47% 11%;
   --warning: 45 96% 74%;
@@ -101,18 +113,22 @@
   --orange: 24 95% 68%;
   --orange-foreground: 222 47% 11%;
 
-  --border: 215 30% 18%;
-  --input: 215 30% 18%;
-  --ring: 234 89% 74%;
-  --sidebar: 213 52% 7%;
-  --sidebar-border: 215 30% 16%;
+  --border: 217 28% 20%;
+  --input: 217 28% 20%;
+  --ring: 214 88% 62%;
+  --sidebar: 222 44% 7%;
+  --sidebar-border: 217 28% 17%;
 
-  --chart-1: 234 89% 74%;
-  --chart-2: 173 58% 52%;
-  --chart-3: 158 64% 67%;
-  --chart-4: 24 95% 68%;
-  --chart-5: 255 92% 76%;
-  --chart-6: 215 20% 55%;
+  --chart-1: 214 88% 62%;
+  --chart-2: 192 72% 48%;
+  --chart-3: 158 58% 52%;
+  --chart-4: 28 88% 58%;
+  --chart-5: 258 72% 68%;
+  --chart-6: 215 16% 48%;
+
+  --chart-grid: 217 28% 20%;
+  --chart-axis: 215 18% 55%;
+  --overlay: 222 47% 4%;
 
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --shadow-raised: 0 4px 14px -2px rgb(0 0 0 / 0.5);
@@ -155,6 +171,12 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
   --color-chart-6: hsl(var(--chart-6));
+  --color-ai: hsl(var(--ai));
+  --color-ai-foreground: hsl(var(--ai-foreground));
+  --color-ai-muted: hsl(var(--ai-muted));
+  --color-chart-grid: hsl(var(--chart-grid));
+  --color-chart-axis: hsl(var(--chart-axis));
+  --color-overlay: hsl(var(--overlay));
 
   --radius-card: var(--radius-card);
   --radius-control: var(--radius-control);
@@ -373,6 +395,142 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* Shared module chrome — prefer these over per-page slate/hex pairs */
+  .panel-surface {
+    background-color: hsl(var(--surface-raised));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .panel-surface-elevated {
+    background-color: hsl(var(--surface-raised));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .icon-btn-ghost {
+    border-radius: var(--radius-control);
+    padding: 0.375rem;
+    color: hsl(var(--muted-foreground));
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .icon-btn-ghost:hover {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+  }
+
+  .segmented-control {
+    display: inline-flex;
+    border-radius: 0.5rem;
+    background-color: hsl(var(--muted));
+    padding: 0.125rem;
+    font-size: var(--text-2xs);
+  }
+
+  .segmented-control button[data-active="true"] {
+    background-color: hsl(var(--surface-raised));
+    color: hsl(var(--foreground));
+    box-shadow: var(--shadow-card);
+  }
+
+  .segmented-control button[data-active="false"] {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .segmented-control button[data-active="false"]:hover {
+    color: hsl(var(--foreground));
+  }
+
+  .data-table-wrap {
+    overflow: auto;
+    border-radius: var(--radius-card);
+    border: 1px solid hsl(var(--border));
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-xs);
+  }
+
+  .data-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: color-mix(in oklab, hsl(var(--muted)) 92%, hsl(var(--surface-raised)));
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .data-table tbody tr:hover {
+    background-color: hsl(var(--muted) / 0.45);
+  }
+
+  .data-table td.tabular {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .empty-state {
+    border-radius: var(--radius-card);
+    border: 1px dashed hsl(var(--border));
+    background-color: hsl(var(--muted) / 0.35);
+    padding: 1rem 0.75rem;
+    text-align: center;
+    font-size: var(--text-2xs);
+    color: hsl(var(--muted-foreground));
+  }
+
+  .overlay-scrim {
+    background-color: hsl(var(--overlay) / 0.72);
+    backdrop-filter: blur(6px);
+  }
+
+  .ai-surface {
+    border: 1px solid color-mix(in oklab, hsl(var(--ai)) 35%, hsl(var(--border)));
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, hsl(var(--ai-muted)) 55%, hsl(var(--surface-raised))),
+      hsl(var(--surface-raised))
+    );
+  }
+
+  .ai-indicator-pulse {
+    box-shadow: 0 0 0 0 hsl(var(--ai) / 0.35);
+    animation: ai-pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes ai-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--ai) / 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 4px hsl(var(--ai) / 0);
+  }
+}
+
+/* React Flow — match workspace surfaces in dark mode */
+.dark .react-flow__minimap {
+  background-color: hsl(var(--surface-raised));
+}
+
+.dark .react-flow__edge-path {
+  stroke: color-mix(in oklab, hsl(var(--muted-foreground)) 55%, transparent);
 }
 
 @keyframes hero-drift {

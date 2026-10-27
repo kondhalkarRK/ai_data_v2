@@ -127,7 +127,7 @@ export function RulesCatalog({
           <button
             type="button"
             onClick={onCreate}
-            className="mr-1 inline-flex h-7 items-center gap-1 rounded-lg bg-[#2f6fed] px-2.5 text-2xs font-medium text-white shadow-sm hover:bg-[#285fd0]"
+            className="mr-1 inline-flex h-7 items-center gap-1 rounded-lg bg-[hsl(var(--primary))] px-2.5 text-2xs font-medium text-white shadow-sm hover:bg-[#285fd0]"
           >
             <Plus className="size-3.5" /> New monitor
           </button>
@@ -156,7 +156,7 @@ export function RulesCatalog({
         <div className={cn("flex flex-col", expanded && "h-full")}>
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative min-w-48 flex-1">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -191,7 +191,7 @@ export function RulesCatalog({
             {filtered ? (
               <button
                 type="button"
-                className="text-2xs font-medium text-[#2f6fed] hover:underline"
+                className="text-2xs font-medium text-[hsl(var(--primary))] hover:underline"
                 onClick={() => {
                   setQuery("");
                   onFilter({ dimension: undefined, dataset: undefined, severity: undefined, status: undefined });
@@ -215,10 +215,10 @@ export function RulesCatalog({
             />
           ) : null}
 
-          <div className={cn("mt-3 overflow-auto rounded-xl border border-slate-100 dark:border-border", expanded ? "flex-1" : "max-h-[34rem]")}>
+          <div className={cn("mt-3 overflow-auto rounded-xl border border-border", expanded ? "flex-1" : "max-h-[34rem]")}>
             {groups.length ? (
               <table className="w-full min-w-[60rem] text-left text-xs">
-                <thead className="sticky top-0 z-[1] bg-slate-50/95 text-[10px] uppercase tracking-wide text-slate-500 backdrop-blur dark:bg-muted">
+                <thead className="sticky top-0 z-[1] bg-muted/90 text-[10px] uppercase tracking-wide text-muted-foreground backdrop-blur dark:bg-muted">
                   <tr>
                     {canEdit ? (
                       <th className="w-8 px-3 py-2">
@@ -236,7 +236,7 @@ export function RulesCatalog({
                               return next;
                             })
                           }
-                          className="accent-[#2f6fed]"
+                          className="accent-[hsl(var(--primary))]"
                         />
                       </th>
                     ) : null}
@@ -254,12 +254,12 @@ export function RulesCatalog({
                 {groups.map(({ card, rules }) => {
                   const isCollapsed = collapsed.has(card.key);
                   return (
-                    <tbody key={card.key} className="divide-y divide-slate-100 dark:divide-border">
-                      <tr className="bg-white dark:bg-surface-raised">
+                    <tbody key={card.key} className="divide-y divide-border">
+                      <tr className="bg-surface-raised">
                         <td colSpan={canEdit ? 10 : 8} className="px-3 pb-1.5 pt-3">
                           <button
                             type="button"
-                            className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-foreground"
+                            className="flex items-center gap-2 text-xs font-semibold text-foreground"
                             onClick={() =>
                               setCollapsed((current) => {
                                 const next = new Set(current);
@@ -269,10 +269,10 @@ export function RulesCatalog({
                               })
                             }
                           >
-                            <ChevronDown className={cn("size-3.5 text-slate-400 transition", isCollapsed && "-rotate-90")} />
+                            <ChevronDown className={cn("size-3.5 text-muted-foreground transition", isCollapsed && "-rotate-90")} />
                             <span className="size-2 rounded-sm" style={{ backgroundColor: DIMENSION_COLOUR[card.key] }} />
                             {card.label}
-                            <span className="font-normal text-slate-400">
+                            <span className="font-normal text-muted-foreground">
                               {rules.length} rule{rules.length === 1 ? "" : "s"} · score{" "}
                               <span className="tabular-nums" style={{ color: BAND_COLOUR[card.band] }}>
                                 {formatScore(card.score)}
@@ -343,9 +343,9 @@ function RuleRowView({
     <tr
       onClick={onOpen}
       className={cn(
-        "cursor-pointer transition hover:bg-[#f5f8ff] dark:hover:bg-muted",
-        checked && "bg-[#f1f6ff]",
-        !rule.enabled && "text-slate-400",
+        "cursor-pointer transition hover:bg-[hsl(var(--primary) / 0.08)] dark:hover:bg-muted",
+        checked && "bg-[hsl(var(--primary) / 0.12)]",
+        !rule.enabled && "text-muted-foreground",
       )}
     >
       {canEdit ? (
@@ -355,32 +355,32 @@ function RuleRowView({
             aria-label={`Select ${rule.name}`}
             checked={checked}
             onChange={onCheck}
-            className="accent-[#2f6fed]"
+            className="accent-[hsl(var(--primary))]"
           />
         </td>
       ) : null}
       <td className="max-w-[18rem] px-3 py-2.5">
-        <p className="truncate font-medium text-slate-800 dark:text-foreground">
+        <p className="truncate font-medium text-foreground">
           {rule.name}
           {rule.custom ? <span className="ml-1.5 rounded bg-[#e3ecfd] px-1 py-px text-[9px] font-semibold text-[#2f5fc4]">CUSTOM</span> : null}
         </p>
-        <p className="truncate text-[10px] text-slate-400" title={rule.observed || rule.description}>
+        <p className="truncate text-[10px] text-muted-foreground" title={rule.observed || rule.description}>
           {rule.observed || rule.description}
         </p>
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{DIMENSION_LABEL[rule.dimension]}</td>
-      <td className="max-w-[10rem] truncate px-3 py-2.5 text-slate-600">{rule.datasetLabel}</td>
+      <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{DIMENSION_LABEL[rule.dimension]}</td>
+      <td className="max-w-[10rem] truncate px-3 py-2.5 text-muted-foreground">{rule.datasetLabel}</td>
       <td className="px-3 py-2.5">
         <SeverityChip severity={rule.severity} />
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatWhen(rule.lastRunAt)}</td>
+      <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{formatWhen(rule.lastRunAt)}</td>
       <td className="px-3 py-2.5">
         <PassRate rate={rule.passRate} target={rule.threshold} status={rule.status} />
       </td>
       <td className="whitespace-nowrap px-3 py-2.5">
         <StatusPill status={rule.status} />
       </td>
-      <td className="max-w-[9rem] truncate px-3 py-2.5 text-slate-600">{rule.owner}</td>
+      <td className="max-w-[9rem] truncate px-3 py-2.5 text-muted-foreground">{rule.owner}</td>
       {canEdit ? (
         <td className="px-3 py-2.5">
           <Toggle checked={rule.enabled} disabled={pending} onChange={onToggle} label={`Enable ${rule.name}`} />
@@ -391,14 +391,14 @@ function RuleRowView({
 }
 
 function PassRate({ rate, target, status }: { rate: number | null; target: number; status: RuleStatus }) {
-  if (rate == null) return <span className="text-slate-300">—</span>;
+  if (rate == null) return <span className="text-muted-foreground/50">—</span>;
   const colour = status === "failing" ? TRUST.amber : TRUST.green;
   return (
     <div className="flex items-center gap-2" title={`Target ${target}%`}>
-      <span className="w-12 text-right font-semibold tabular-nums text-slate-700 dark:text-foreground">
+      <span className="w-12 text-right font-semibold tabular-nums text-foreground">
         {rate >= 99.995 ? "100%" : `${rate.toFixed(rate >= 99 ? 2 : 1)}%`}
       </span>
-      <span className="relative h-1.5 w-16 rounded-full bg-slate-100">
+      <span className="relative h-1.5 w-16 rounded-full bg-muted">
         <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.max(2, rate)}%`, backgroundColor: colour }} />
         <span className="absolute -top-0.5 h-2.5 w-px bg-slate-400" style={{ left: `${target}%` }} />
       </span>
@@ -424,7 +424,7 @@ function FilterSelect({
       aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={cn(fieldClass, "mt-0 w-auto min-w-28", value && "border-[#8fb3f5] bg-[#f1f6ff] text-[#2f5fc4]")}
+      className={cn(fieldClass, "mt-0 w-auto min-w-28", value && "border-[#8fb3f5] bg-[hsl(var(--primary) / 0.12)] text-[#2f5fc4]")}
     >
       <option value="">{ALL_LABEL[label] ?? `All ${label.toLowerCase()}s`}</option>
       {options.map((o) => (
@@ -459,7 +459,7 @@ function BulkBar({
   const ready = spec.input == null || (spec.input === "tags" ? tags.length > 0 : value.trim().length > 0);
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#c9dafb] bg-[#f1f6ff] px-3 py-2 dark:border-border dark:bg-muted">
+    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-[hsl(var(--primary) / 0.35)] bg-[hsl(var(--primary) / 0.12)] px-3 py-2 dark:border-border dark:bg-muted">
       <span className="text-xs font-semibold text-[#2f5fc4]">{count} selected</span>
       <select
         aria-label="Bulk action"
@@ -517,11 +517,11 @@ function BulkBar({
         type="button"
         disabled={!ready || pending}
         onClick={() => onApply(action, spec.input && spec.input !== "tags" ? value.trim() : undefined, spec.input === "tags" ? tags : undefined)}
-        className="h-8 rounded-lg bg-[#2f6fed] px-3 text-2xs font-medium text-white shadow-sm disabled:opacity-40"
+        className="h-8 rounded-lg bg-[hsl(var(--primary))] px-3 text-2xs font-medium text-white shadow-sm disabled:opacity-40"
       >
         Apply
       </button>
-      <button type="button" onClick={onClear} className="ml-auto rounded-md p-1 text-slate-400 hover:text-slate-700" aria-label="Clear selection">
+      <button type="button" onClick={onClear} className="ml-auto rounded-md p-1 text-muted-foreground hover:text-foreground" aria-label="Clear selection">
         <X className="size-4" />
       </button>
     </div>

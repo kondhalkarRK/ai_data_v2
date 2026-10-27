@@ -68,7 +68,7 @@ export function TrendChart({ data, className }: { data: CockpitData; className?:
               onClick={() => setVisible((v) => ({ ...v, [s.key]: !v[s.key] }))}
               className={cn(
                 "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium transition",
-                visible[s.key] ? "bg-slate-100 text-slate-700 dark:bg-muted dark:text-foreground" : "text-slate-400",
+                visible[s.key] ? "bg-muted text-foreground dark:bg-muted dark:text-foreground" : "text-muted-foreground",
               )}
             >
               <span
@@ -164,8 +164,8 @@ function TrendSvg({
 
           {ticks.map((t) => (
             <g key={t}>
-              <line x1={margin.left} x2={width - margin.right} y1={yRev(t)} y2={yRev(t)} stroke="#e2e8f0" strokeDasharray={t === 0 ? undefined : "3 4"} />
-              <text x={margin.left - 8} y={yRev(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#94a3b8">
+              <line x1={margin.left} x2={width - margin.right} y1={yRev(t)} y2={yRev(t)} stroke="hsl(var(--chart-grid))" strokeDasharray={t === 0 ? undefined : "3 4"} />
+              <text x={margin.left - 8} y={yRev(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="hsl(var(--chart-axis))">
                 {t === 0 ? "0" : `₹${formatCompact(t)}`}
               </text>
               {visible.units ? (
@@ -184,7 +184,7 @@ function TrendSvg({
 
           {visible.prior
             ? line((p) => p.priorRevenue, yRev).map((d, i) => (
-                <path key={`prior-${i}`} d={d} fill="none" stroke="#94a3b8" strokeWidth={1.4} strokeDasharray="2 4" />
+                <path key={`prior-${i}`} d={d} fill="none" stroke="hsl(var(--chart-axis))" strokeWidth={1.4} strokeDasharray="2 4" />
               ))
             : null}
 
@@ -254,7 +254,7 @@ function TrendSvg({
 
           {hover != null && hovered ? (
             <g pointerEvents="none">
-              <line x1={x(hover)} x2={x(hover)} y1={margin.top} y2={baseline} stroke="#94a3b8" strokeDasharray="3 3" />
+              <line x1={x(hover)} x2={x(hover)} y1={margin.top} y2={baseline} stroke="hsl(var(--chart-axis))" strokeDasharray="3 3" />
               {visible.revenue && hovered.revenue != null ? (
                 <circle cx={x(hover)} cy={yRev(hovered.revenue)} r={4} fill={COCKPIT.blue} stroke="#fff" strokeWidth={1.5} />
               ) : null}
@@ -280,12 +280,12 @@ function TrendSvg({
       ) : null}
       {hovered && hover != null ? (
         <ChartTooltip x={x(hover)} y={margin.top} width={width}>
-          <p className="mb-1 font-semibold text-slate-800 dark:text-foreground">
+          <p className="mb-1 font-semibold text-foreground">
             {formatTrendMonthLabel(hovered.month, hovered.partial)}
             {eventByMonth.get(hovered.month) ? ` · ${eventByMonth.get(hovered.month)!.label}` : ""}
           </p>
           {hovered.partial ? (
-            <p className="mb-1 text-[11px] leading-snug text-slate-500">
+            <p className="mb-1 text-[11px] leading-snug text-muted-foreground">
               This month is still in progress. Revenue and units are month-to-date only (through the latest data
               refresh), not a full calendar month.
             </p>
@@ -308,11 +308,11 @@ function TrendSvg({
 function TooltipRow({ colour, label, value }: { colour: string; label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 py-0.5">
-      <span className="flex items-center gap-1.5 text-slate-500">
+      <span className="flex items-center gap-1.5 text-muted-foreground">
         <span className="size-2 rounded-full" style={{ backgroundColor: colour }} />
         {label}
       </span>
-      <span className="font-semibold tabular-nums text-slate-800 dark:text-foreground">{value}</span>
+      <span className="font-semibold tabular-nums text-foreground">{value}</span>
     </div>
   );
 }

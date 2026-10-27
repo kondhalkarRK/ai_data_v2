@@ -11,6 +11,7 @@ const buttonVariants = cva(
       variant: {
         primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow-card)]",
         secondary: "bg-surface-raised text-foreground border border-border hover:bg-muted",
+        ai: "border border-ai/30 bg-ai/10 text-foreground hover:bg-ai/15",
         ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
         danger: "bg-danger text-danger-foreground hover:bg-danger/90",
         link: "text-primary underline-offset-4 hover:underline",

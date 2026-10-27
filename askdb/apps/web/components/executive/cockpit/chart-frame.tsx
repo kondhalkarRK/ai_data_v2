@@ -6,6 +6,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 
 import { exportCsv, exportSvgPng } from "@/components/executive/cockpit/chart-utils";
+import { interactive, overlay, surface, type as typeScale } from "@/lib/surface";
 import { cn } from "@/lib/utils";
 
 export function ChartFrame({
@@ -50,19 +51,17 @@ export function ChartFrame({
   const card = (
     <section
       className={cn(
-        "flex min-w-0 flex-col rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.08)] dark:border-border dark:bg-surface-raised",
-        expanded && "h-full w-full bg-white dark:bg-surface-raised",
+        "flex min-w-0 flex-col p-5",
+        surface.panelElevated,
+        "rounded-2xl",
+        expanded && "h-full w-full bg-surface-raised",
         !expanded && className,
       )}
     >
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-[15px] font-semibold tracking-tight text-slate-800 dark:text-foreground">
-            {title}
-          </h3>
-          {subtitle ? (
-            <p className="mt-1 truncate text-xs text-slate-500 dark:text-muted-foreground">{subtitle}</p>
-          ) : null}
+          <h3 className={cn("truncate text-[15px]", typeScale.title)}>{title}</h3>
+          {subtitle ? <p className={cn("mt-1 truncate", typeScale.subtitle)}>{subtitle}</p> : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {controls}
@@ -71,7 +70,7 @@ export function ChartFrame({
               <button
                 type="button"
                 aria-label={`Export ${title}`}
-                className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-muted"
+                className={interactive.iconGhost}
               >
                 <Download className="size-3.5" />
               </button>
@@ -80,11 +79,11 @@ export function ChartFrame({
               <DropdownMenu.Content
                 align="end"
                 sideOffset={4}
-                className="z-[70] min-w-36 rounded-lg border border-slate-200 bg-white p-1 text-xs shadow-lg dark:border-border dark:bg-surface-raised"
+                className={overlay.dropdown}
               >
                 {png ? (
                   <DropdownMenu.Item
-                    className="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100 dark:data-[highlighted]:bg-muted"
+                    className={overlay.menuItem}
                     onSelect={() => void exportPng()}
                   >
                     Download PNG
@@ -92,7 +91,7 @@ export function ChartFrame({
                 ) : null}
                 {csv ? (
                   <DropdownMenu.Item
-                    className="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100 dark:data-[highlighted]:bg-muted"
+                    className={overlay.menuItem}
                     onSelect={() => exportCsv(csv(), `${exportName}.csv`)}
                   >
                     Download CSV
@@ -104,7 +103,7 @@ export function ChartFrame({
           <button
             type="button"
             aria-label={expanded ? "Exit full screen" : `Full screen ${title}`}
-            className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-muted"
+            className={interactive.iconGhost}
             onClick={() => setExpanded((v) => !v)}
           >
             {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
@@ -123,7 +122,7 @@ export function ChartFrame({
       <div className={cn("invisible", className)} aria-hidden="true" />
       {createPortal(
         <div
-          className="fixed inset-0 z-[60] flex bg-slate-900/25 p-4 backdrop-blur-sm sm:p-8"
+          className={cn("fixed inset-0 z-[60] flex p-4 sm:p-8", overlay.scrim)}
           role="dialog"
           aria-modal="true"
           aria-label={title}
@@ -150,17 +149,13 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="mr-1 inline-flex rounded-lg bg-slate-100 p-0.5 text-2xs dark:bg-muted">
+    <div className="segmented-control mr-1">
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
-          className={cn(
-            "rounded-md px-2 py-0.5 font-medium transition",
-            value === option.value
-              ? "bg-white text-slate-800 shadow-sm dark:bg-surface-raised dark:text-foreground"
-              : "text-slate-500 hover:text-slate-700",
-          )}
+          data-active={value === option.value ? "true" : "false"}
+          className="rounded-md px-2 py-0.5 font-medium transition"
           onClick={() => onChange(option.value)}
         >
           {option.label}
@@ -185,7 +180,7 @@ export function ChartTooltip({
   const flip = x > width * 0.6;
   return (
     <div
-      className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-2xs shadow-lg backdrop-blur dark:border-border dark:bg-surface-raised/95"
+      className={cn("absolute z-10 min-w-40", overlay.tooltip)}
       style={{
         left: flip ? undefined : x + 14,
         right: flip ? width - x + 14 : undefined,

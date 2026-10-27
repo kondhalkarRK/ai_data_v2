@@ -70,7 +70,7 @@ export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: Sele
 }
 
 function GrowthChip({ growth }: { growth: number | null }) {
-  if (growth == null) return <span className="text-2xs text-slate-400">no prior data</span>;
+  if (growth == null) return <span className="text-2xs text-muted-foreground">no prior data</span>;
   const up = growth >= 0;
   const Icon = up ? ArrowUpRight : ArrowDownRight;
   return (
@@ -114,7 +114,7 @@ function Sparkline({ values, colour }: { values: number[]; colour: string }) {
 }
 
 const cardBase =
-  "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.1)] dark:border-border dark:bg-surface-raised";
+  "relative overflow-hidden rounded-2xl border panel-surface p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.1)] border-border bg-surface-raised";
 
 function KpiCard({
   icon,
@@ -139,7 +139,7 @@ function KpiCard({
     <div
       className={cn(cardBase, featured && "bg-gradient-to-br from-[#eef4ff] via-white to-[#effaf9] dark:from-surface-raised dark:to-surface-raised")}
     >
-      <div className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-slate-500">
+      <div className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
         <span className="icon-well size-6 rounded-md" style={{ backgroundColor: `${accent}14`, color: accent }}>
           {icon}
         </span>
@@ -147,12 +147,12 @@ function KpiCard({
       </div>
       <div className="mt-2 flex items-end justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-2xl font-semibold tracking-tight text-slate-900 tabular-nums dark:text-foreground">
+          <p className="truncate text-2xl font-semibold tracking-tight text-foreground tabular-nums dark:text-foreground">
             {value}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <GrowthChip growth={growth} />
-            <span className="truncate text-2xs text-slate-400">{foot}</span>
+            <span className="truncate text-2xs text-muted-foreground">{foot}</span>
           </div>
         </div>
         {spark ? <Sparkline values={spark} colour={accent} /> : null}
@@ -186,16 +186,16 @@ function LeaderCard({
       className={cn(cardBase, "text-left transition enabled:hover:border-[#8fb3f5] enabled:hover:shadow-md")}
       title={onClick ? `Filter the dashboard to ${name}` : undefined}
     >
-      <div className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-slate-500">
-        <span className="icon-well size-6 rounded-md bg-[#e3ecfd] text-[#2f6fed]">{icon}</span>
+      <div className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="icon-well size-6 rounded-md bg-[#e3ecfd] text-[hsl(var(--primary))]">{icon}</span>
         {label}
       </div>
-      <p className="mt-2 truncate text-2xl font-semibold tracking-tight text-slate-900 dark:text-foreground">
+      <p className="mt-2 truncate text-2xl font-semibold tracking-tight text-foreground">
         {name ?? "—"}
-        {sub ? <span className="ml-1.5 text-xs font-medium text-slate-400">{sub}</span> : null}
+        {sub ? <span className="ml-1.5 text-xs font-medium text-muted-foreground">{sub}</span> : null}
       </p>
-      <p className="mt-1 truncate text-xs font-medium text-[#2f6fed]">{metric ?? ""}</p>
-      <p className="truncate text-2xs text-slate-400">{detail ?? ""}</p>
+      <p className="mt-1 truncate text-xs font-medium text-[hsl(var(--primary))]">{metric ?? ""}</p>
+      <p className="truncate text-2xs text-muted-foreground">{detail ?? ""}</p>
     </button>
   );
 }

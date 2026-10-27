@@ -17,6 +17,7 @@ from app.services.chat.conversation_context import is_contextual_followup
 from app.services.chat.entity_resolver import Resolution
 from app.services.chat.intents import needs_clarification
 from app.services.chat.question_understanding import QuestionPlan, understand_question
+from app.services.chat.plan_coverage import coverage_gaps, sql_covers_plan_metrics
 from app.services.chat.semantic_context import validate_sql_against_plan
 from app.services.chat.semantic_query_planner import (
     SemanticQuery,
@@ -123,13 +124,20 @@ def plan_turn(
         if surprise_sql is not None:
             turn.governed_sql = planned.sql
         else:
+            plan = planned.plan
+            gaps = coverage_gaps(text, plan)
             ok, reason = validate_sql_against_plan(
-                planned.sql, planned.plan, allowed_schema=allowed_schema
+                planned.sql, plan, allowed_schema=allowed_schema
             )
-            if ok:
-                turn.governed_sql = planned.sql
-            else:
+            sql_ok, sql_reason = sql_covers_plan_metrics(plan, planned.sql)
+            if gaps:
+                turn.validation_error = "; ".join(gaps)
+            elif not ok:
                 turn.validation_error = reason or "SQL did not match the question plan"
+            elif not sql_ok:
+                turn.validation_error = sql_reason or "SQL does not cover the planned metrics"
+            else:
+                turn.governed_sql = planned.sql
     return turn
 
 

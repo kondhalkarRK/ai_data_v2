@@ -30,28 +30,28 @@ export function SchemaDriftPanel({ data, className }: { data: DataReliability; c
         }
       />
       {drift.events.length ? (
-        <ol className="relative ml-1.5 space-y-3 border-l border-slate-200 pl-4 dark:border-border">
+        <ol className="relative ml-1.5 space-y-3 border-l border-border pl-4 dark:border-border">
           {drift.events.slice(0, 8).map((e) => (
             <li key={e.id} className="relative">
               <span
                 className="absolute -left-[21px] top-1 grid size-2.5 place-items-center rounded-full ring-2 ring-white dark:ring-surface-raised"
                 style={{ backgroundColor: e.severity === "high" || e.severity === "critical" ? TRUST.amber : TRUST.teal }}
               />
-              <p className="text-xs font-medium text-slate-800 dark:text-foreground">{e.summary}</p>
-              <p className="text-[10px] text-slate-400">
+              <p className="text-xs font-medium text-foreground">{e.summary}</p>
+              <p className="text-[10px] text-muted-foreground">
                 <span className="capitalize">{e.kind.replace(/_/g, " ")}</span>
                 {e.table ? ` · ${e.table}${e.column ? `.${e.column}` : ""}` : ""} · {formatWhen(e.detectedAt)}
               </p>
               {Object.keys(e.impact).length ? (
-                <p className="mt-0.5 text-[11px] text-slate-500">{Object.values(e.impact).slice(0, 2).join(" · ")}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{Object.values(e.impact).slice(0, 2).join(" · ")}</p>
               ) : null}
             </li>
           ))}
         </ol>
       ) : (
-        <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-3 dark:bg-muted">
+        <div className="flex items-center gap-3 rounded-xl bg-muted px-3 py-3 dark:bg-muted">
           <GitCompareArrows className="size-5 shrink-0 text-[#14a3a1]" />
-          <p className="text-[11px] leading-relaxed text-slate-600 dark:text-muted-foreground">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
             {drift.status === "stable"
               ? "No column additions, removals or type changes detected in the last 30 days."
               : drift.status === "not_checked"
@@ -77,7 +77,7 @@ export function EntityChangesPanel({ data, className }: { data: DataReliability;
             : "Entity Catalog integration"
         }
         right={
-          <Link href="/semantic/catalog" className="text-2xs font-medium text-[#2f6fed] hover:underline">
+          <Link href="/semantic/catalog" className="text-2xs font-medium text-[hsl(var(--primary))] hover:underline">
             Open catalog
           </Link>
         }
@@ -95,11 +95,11 @@ export function EntityChangesPanel({ data, className }: { data: DataReliability;
                 onClick={() => setOpen(open === g.key ? null : g.key)}
                 className={cn(
                   "rounded-xl border px-3 py-2 text-left transition enabled:hover:border-[#8fb3f5]",
-                  open === g.key ? "border-[#8fb3f5] bg-[#f1f6ff]" : "border-slate-100 dark:border-border",
+                  open === g.key ? "border-[#8fb3f5] bg-[hsl(var(--primary) / 0.12)]" : "border-border",
                 )}
               >
-                <p className="text-[10px] uppercase tracking-wide text-slate-400">{g.label}</p>
-                <p className={cn("text-lg font-semibold tabular-nums", g.count ? "text-slate-800 dark:text-foreground" : "text-slate-300")}>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{g.label}</p>
+                <p className={cn("text-lg font-semibold tabular-nums", g.count ? "text-foreground" : "text-muted-foreground/50")}>
                   {g.count ? `+${g.count}` : "0"}
                 </p>
               </button>
@@ -121,11 +121,11 @@ export function EntityChangesPanel({ data, className }: { data: DataReliability;
                 ))}
             </ul>
           ) : entities.total ? (
-            <p className="mt-3 text-[11px] text-slate-500">
+            <p className="mt-3 text-[11px] text-muted-foreground">
               {entities.total} new value{entities.total === 1 ? "" : "s"} appeared. Confirm they are expected before they reach executive reports.
             </p>
           ) : (
-            <p className="mt-3 text-[11px] text-slate-500">No new brands, models, dealers or locations in the last 30 days.</p>
+            <p className="mt-3 text-[11px] text-muted-foreground">No new brands, models, dealers or locations in the last 30 days.</p>
           )}
         </>
       )}

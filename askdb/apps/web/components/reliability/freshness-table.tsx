@@ -51,8 +51,8 @@ export function FreshnessTable({
         rows.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[34rem] text-left text-xs">
-              <thead className="text-[10px] uppercase tracking-wide text-slate-500">
-                <tr className="border-b border-slate-100 dark:border-border">
+              <thead className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-border">
                   <th className="py-2 pr-3 font-medium">Dataset</th>
                   <th className="py-2 pr-3 font-medium">Last refresh</th>
                   <th className="py-2 pr-3 font-medium">Expected by</th>
@@ -60,34 +60,34 @@ export function FreshnessTable({
                   <th className="py-2 font-medium">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-border">
+              <tbody className="divide-y divide-border">
                 {rows.map((r) => {
                   const s = STATUS[r.status];
                   return (
                     <tr
                       key={r.dataset}
                       className={cn(
-                        "cursor-pointer transition hover:bg-slate-50 dark:hover:bg-muted",
-                        filters.dataset === r.dataset && "bg-[#f1f6ff]",
+                        "cursor-pointer transition hover:bg-muted",
+                        filters.dataset === r.dataset && "bg-[hsl(var(--primary) / 0.12)]",
                       )}
                       onClick={() => (r.ruleId ? onOpenRule(r.ruleId) : onFilter({ dataset: r.dataset }))}
                     >
                       <td className="py-2 pr-3">
-                        <p className="font-medium text-slate-800 dark:text-foreground">{r.label}</p>
-                        <p className="text-[10px] capitalize text-slate-400">
+                        <p className="font-medium text-foreground">{r.label}</p>
+                        <p className="text-[10px] capitalize text-muted-foreground">
                           {r.cadence}
                           {r.slaHours ? ` · SLA ${formatHours(r.slaHours)}` : ""}
                         </p>
                       </td>
-                      <td className="whitespace-nowrap py-2 pr-3 text-slate-600">{formatWhen(r.lastRefresh)}</td>
-                      <td className="whitespace-nowrap py-2 pr-3 text-slate-600">{formatWhen(r.expectedBy)}</td>
+                      <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">{formatWhen(r.lastRefresh)}</td>
+                      <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">{formatWhen(r.expectedBy)}</td>
                       <td className="whitespace-nowrap py-2 pr-3 tabular-nums">
                         {r.delayHours && r.delayHours > 0 ? (
                           <span style={{ color: r.status === "stale" ? TRUST.coral : TRUST.amberInk }}>
                             {formatHours(r.delayHours)} late
                           </span>
                         ) : (
-                          <span className="text-slate-400">—</span>
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                       <td className="py-2">

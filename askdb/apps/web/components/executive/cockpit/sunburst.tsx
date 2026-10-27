@@ -147,18 +147,18 @@ function SunburstBody({
 
   return (
     <div ref={ref} className="flex h-full w-full flex-col gap-2" style={{ minHeight: height }}>
-      <div className="flex items-center gap-1 text-2xs text-slate-500">
-        <button type="button" disabled={!focusNode || !canReset} className="font-medium enabled:text-[#2f6fed] enabled:hover:underline" onClick={() => onFocus(null)}>
+      <div className="flex items-center gap-1 text-2xs text-muted-foreground">
+        <button type="button" disabled={!focusNode || !canReset} className="font-medium enabled:text-[hsl(var(--primary))] enabled:hover:underline" onClick={() => onFocus(null)}>
           All makes
         </button>
         {focusNode ? (
           <>
             <ChevronRight className="size-3" />
-            <span className="font-semibold text-slate-700 dark:text-foreground">{focusNode.name}</span>
+            <span className="font-semibold text-foreground">{focusNode.name}</span>
             {canReset ? (
               <button
                 type="button"
-                className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#e3ecfd] px-2 py-0.5 font-medium text-[#2f6fed] hover:bg-[#d3e1fc]"
+                className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#e3ecfd] px-2 py-0.5 font-medium text-[hsl(var(--primary))] hover:bg-[#d3e1fc]"
                 onClick={() => onSelect("make", focusNode.name)}
               >
                 <Filter className="size-3" /> Filter dashboard to {focusNode.name}
@@ -206,7 +206,7 @@ function SunburstBody({
               className={focusNode && canReset ? "cursor-pointer" : undefined}
               onClick={() => focusNode && canReset && onFocus(null)}
             />
-            <text x={centre} y={centre - 8} textAnchor="middle" fontSize={10} fill="#94a3b8" pointerEvents="none">
+            <text x={centre} y={centre - 8} textAnchor="middle" fontSize={10} fill="hsl(var(--chart-axis))" pointerEvents="none">
               {focusNode ? focusNode.name : "Total revenue"}
             </text>
             <text x={centre} y={centre + 9} textAnchor="middle" fontSize={14} fontWeight={700} fill={COCKPIT.ink} pointerEvents="none">
@@ -225,7 +225,7 @@ function SunburstBody({
               <li key={node.name}>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-slate-50 dark:hover:bg-muted"
+                  className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-muted"
                   onClick={() => (node.dimension === "make" ? onFocus(node.name) : !/ other models$/.test(node.name) && onSelect("model", node.name))}
                 >
                   <span
@@ -236,8 +236,8 @@ function SunburstBody({
                         : categoryColour(makeIndex.get(node.name) ?? 0),
                     }}
                   />
-                  <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-foreground">{node.name}</span>
-                  <span className="tabular-nums text-slate-500">{formatPct(node.revenue / (levelTotal || 1))}</span>
+                  <span className="min-w-0 flex-1 truncate text-foreground">{node.name}</span>
+                  <span className="tabular-nums text-muted-foreground">{formatPct(node.revenue / (levelTotal || 1))}</span>
                 </button>
               </li>
             ))}
@@ -245,16 +245,16 @@ function SunburstBody({
         ) : null}
         {hover ? (
           <ChartTooltip x={hover.x} y={hover.y} width={size.width}>
-            <p className="font-semibold text-slate-800 dark:text-foreground">{hover.arc.path.join(" › ")}</p>
+            <p className="font-semibold text-foreground">{hover.arc.path.join(" › ")}</p>
             <div className="mt-1 flex justify-between gap-4">
-              <span className="text-slate-500">Revenue</span>
+              <span className="text-muted-foreground">Revenue</span>
               <span className="font-semibold tabular-nums">{formatInr(hover.arc.node.revenue)}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-slate-500">Share of total</span>
+              <span className="text-muted-foreground">Share of total</span>
               <span className="font-semibold tabular-nums">{formatPct(hover.arc.node.revenue / (total || 1))}</span>
             </div>
-            <p className="mt-1 text-[10px] text-slate-400">
+            <p className="mt-1 text-[10px] text-muted-foreground">
               {hover.arc.node.dimension === "make" ? "Click to drill in" : "Click to filter the dashboard"}
             </p>
           </ChartTooltip>

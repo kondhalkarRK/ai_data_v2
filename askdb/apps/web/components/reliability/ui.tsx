@@ -4,33 +4,35 @@ import type * as React from "react";
 
 import { COCKPIT } from "@/components/executive/cockpit/palette";
 import type { Band, DimensionKey, RuleStatus, Severity, Tone } from "@/components/reliability/types";
+import { DIMENSION_CHART } from "@/lib/design";
+import { surface, type as typeScale } from "@/lib/surface";
 import { cn } from "@/lib/utils";
 
-/** Trust palette: soft blue, teal, trust green and executive grey; coral only for real risk. */
+/** Trust palette: aligns with global tokens; hex kept for PNG export paths. */
 export const TRUST = {
   ...COCKPIT,
-  green: "#0f8f7e",
-  greenMist: "#dcf3ee",
-  coral: "#c8574d",
-  coralMist: "#fbecea",
-  amberInk: "#94660f",
+  green: "hsl(var(--success))",
+  greenMist: "color-mix(in oklab, hsl(var(--success)) 12%, hsl(var(--surface-raised)))",
+  coral: "hsl(var(--danger))",
+  coralMist: "color-mix(in oklab, hsl(var(--danger)) 10%, hsl(var(--surface-raised)))",
+  amberInk: "hsl(var(--warning))",
 } as const;
 
 export const BAND_COLOUR: Record<Band, string> = {
   excellent: TRUST.green,
-  good: TRUST.teal,
-  fair: TRUST.amber,
+  good: "hsl(var(--chart-2))",
+  fair: TRUST.amberInk,
   risk: TRUST.coral,
-  unknown: TRUST.greySoft,
+  unknown: "hsl(var(--muted-foreground))",
 };
 
 export const DIMENSION_COLOUR: Record<DimensionKey, string> = {
-  accuracy: "#2f6fed",
-  completeness: "#14a3a1",
-  consistency: "#5b8def",
-  timeliness: "#0e7c86",
-  validity: "#7c9cc9",
-  uniqueness: "#3fbfb5",
+  accuracy: DIMENSION_CHART.accuracy!,
+  completeness: DIMENSION_CHART.completeness!,
+  consistency: DIMENSION_CHART.consistency!,
+  timeliness: DIMENSION_CHART.timeliness!,
+  validity: DIMENSION_CHART.validity!,
+  uniqueness: DIMENSION_CHART.uniqueness!,
 };
 
 export const DIMENSION_LABEL: Record<DimensionKey, string> = {
@@ -45,17 +47,19 @@ export const DIMENSION_LABEL: Record<DimensionKey, string> = {
 export const SEVERITIES: Severity[] = ["critical", "high", "medium", "low"];
 
 const SEVERITY_STYLE: Record<Severity, string> = {
-  critical: "bg-[#fbecea] text-[#a8463d] ring-[#f1cfca]",
-  high: "bg-[#fdf3dc] text-[#94660f] ring-[#f0dfb4]",
-  medium: "bg-[#e3ecfd] text-[#2f5fc4] ring-[#c9dafb]",
-  low: "bg-slate-100 text-slate-600 ring-slate-200",
+  critical:
+    "bg-danger/10 text-danger ring-danger/25 dark:bg-danger/15 dark:text-danger dark:ring-danger/30",
+  high:
+    "bg-warning/12 text-warning-foreground ring-warning/30 dark:bg-warning/10 dark:text-warning dark:ring-warning/25",
+  medium: "bg-primary/10 text-primary ring-primary/25 dark:bg-primary/12 dark:text-primary",
+  low: "bg-muted text-muted-foreground ring-border",
 };
 
 export const SEVERITY_DOT: Record<Severity, string> = {
   critical: TRUST.coral,
   high: TRUST.amber,
-  medium: TRUST.blue,
-  low: TRUST.greySoft,
+  medium: "hsl(var(--primary))",
+  low: "hsl(var(--muted-foreground))",
 };
 
 export function SeverityChip({ severity, className }: { severity: Severity; className?: string }) {
@@ -73,11 +77,11 @@ export function SeverityChip({ severity, className }: { severity: Severity; clas
 }
 
 const STATUS_STYLE: Record<RuleStatus, { label: string; dot: string; text: string }> = {
-  passing: { label: "Passing", dot: TRUST.green, text: "text-[#0f7a6c]" },
-  failing: { label: "Failing", dot: TRUST.coral, text: "text-[#a8463d]" },
-  error: { label: "Not run", dot: TRUST.amber, text: "text-[#94660f]" },
-  no_data: { label: "No data", dot: TRUST.greySoft, text: "text-slate-500" },
-  disabled: { label: "Disabled", dot: "#e2e8f0", text: "text-slate-400" },
+  passing: { label: "Passing", dot: TRUST.green, text: "text-success" },
+  failing: { label: "Failing", dot: TRUST.coral, text: "text-danger" },
+  error: { label: "Not run", dot: TRUST.amber, text: "text-warning dark:text-warning" },
+  no_data: { label: "No data", dot: "hsl(var(--muted-foreground))", text: "text-muted-foreground" },
+  disabled: { label: "Disabled", dot: "hsl(var(--border))", text: "text-muted-foreground/70" },
 };
 
 export function StatusPill({ status }: { status: RuleStatus }) {
@@ -92,13 +96,12 @@ export function StatusPill({ status }: { status: RuleStatus }) {
 
 export const TONE_COLOUR: Record<Tone, string> = {
   positive: TRUST.green,
-  info: TRUST.blue,
+  info: "hsl(var(--primary))",
   warning: TRUST.amber,
   risk: TRUST.coral,
 };
 
-export const cardClass =
-  "rounded-2xl border border-slate-200/70 bg-white/90 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.1)] dark:border-border dark:bg-surface-raised";
+export const cardClass = cn(surface.panelElevated, "rounded-2xl");
 
 export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
   return <section className={cn(cardClass, "p-5", className)}>{children}</section>;
@@ -116,8 +119,8 @@ export function PanelTitle({
   return (
     <header className="mb-4 flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <h3 className="truncate text-[15px] font-semibold tracking-tight text-slate-800 dark:text-foreground">{title}</h3>
-        {subtitle ? <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">{subtitle}</p> : null}
+        <h3 className={cn("truncate text-[15px]", typeScale.title)}>{title}</h3>
+        {subtitle ? <p className={cn("mt-1", typeScale.subtitle)}>{subtitle}</p> : null}
       </div>
       {right ? <div className="flex shrink-0 items-center gap-1">{right}</div> : null}
     </header>
@@ -172,7 +175,14 @@ export function ScoreRing({
   const filled = score == null ? 0 : Math.max(0, Math.min(100, score)) / 100;
   return (
     <svg width={size} height={size} className="shrink-0 -rotate-90" aria-hidden="true">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef2f7" strokeWidth={stroke} />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="hsl(var(--muted))"
+        strokeWidth={stroke}
+      />
       <circle
         cx={size / 2}
         cy={size / 2}
@@ -199,7 +209,7 @@ export function Sparkline({
   height?: number;
 }) {
   const clean = values.filter((v): v is number => v != null);
-  if (clean.length < 2) return <span className="text-2xs text-slate-300">—</span>;
+  if (clean.length < 2) return <span className="text-2xs text-muted-foreground/50">—</span>;
   const max = Math.max(...clean);
   const min = Math.min(...clean);
   const span = max - min || 1;
@@ -216,9 +226,5 @@ export function Sparkline({
 }
 
 export function EmptyNote({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-center text-2xs text-slate-500">
-      {children}
-    </p>
-  );
+  return <p className="empty-state">{children}</p>;
 }

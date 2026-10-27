@@ -65,10 +65,10 @@ export function GeoIntelligence({
 
 function RankedGrid({ items, onPick }: { items: RankedItem[]; onPick: (item: RankedItem) => void }) {
   const max = Math.max(...items.map((i) => i.revenue), 1);
-  if (!items.length) return <p className="py-8 text-center text-xs text-slate-400">No sales in this selection.</p>;
+  if (!items.length) return <p className="py-8 text-center text-xs text-muted-foreground">No sales in this selection.</p>;
   return (
     <div>
-      <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem_3.75rem] gap-2 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+      <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem_3.75rem] gap-2 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         <span>#</span>
         <span>Name</span>
         <span>Revenue</span>
@@ -81,24 +81,24 @@ function RankedGrid({ items, onPick }: { items: RankedItem[]; onPick: (item: Ran
             <button
               type="button"
               onClick={() => onPick(item)}
-              className="grid w-full grid-cols-[1.25rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem_3.75rem] items-center gap-2 rounded-lg px-1 py-1 text-left text-xs transition hover:bg-slate-50 dark:hover:bg-muted"
+              className="grid w-full grid-cols-[1.25rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem_3.75rem] items-center gap-2 rounded-lg px-1 py-1 text-left text-xs transition hover:bg-muted"
             >
-              <span className="text-[10px] font-bold tabular-nums text-slate-400">{i + 1}</span>
+              <span className="text-[10px] font-bold tabular-nums text-muted-foreground">{i + 1}</span>
               <span className="min-w-0">
-                <span className="block truncate font-medium text-slate-800 dark:text-foreground">{item.name}</span>
-                <span className="block truncate text-[10px] text-slate-400">
+                <span className="block truncate font-medium text-foreground">{item.name}</span>
+                <span className="block truncate text-[10px] text-muted-foreground">
                   {[item.detail, item.group].filter((v, idx, arr) => v && arr.indexOf(v) === idx).join(" · ")}
                 </span>
               </span>
               <span className="flex min-w-0 items-center gap-1.5">
-                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-muted">
+                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                   <span className="block h-full rounded-full bg-[#5b8def]" style={{ width: `${(item.revenue / max) * 100}%` }} />
                 </span>
-                <span className="w-16 shrink-0 text-right text-[10px] font-semibold tabular-nums text-slate-600 dark:text-muted-foreground">
+                <span className="w-16 shrink-0 text-right text-[10px] font-semibold tabular-nums text-muted-foreground">
                   {formatInr(item.revenue)}
                 </span>
               </span>
-              <span className="text-right text-[10px] tabular-nums text-slate-500">{formatPct(item.share)}</span>
+              <span className="text-right text-[10px] tabular-nums text-muted-foreground">{formatPct(item.share)}</span>
               <span
                 className="rounded-md px-1.5 py-0.5 text-right text-[10px] font-semibold tabular-nums"
                 style={{
@@ -129,7 +129,7 @@ function HeatGrid({ heat, onPick }: { heat: HeatMatrix; onPick: (zone: string) =
   const maxShare = Math.max(...heat.cells.map((c) => c.share), 0.01);
   return (
     <div>
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         Region × vehicle type · revenue mix
       </p>
       <div
@@ -138,13 +138,13 @@ function HeatGrid({ heat, onPick }: { heat: HeatMatrix; onPick: (zone: string) =
       >
         <span />
         {heat.cols.map((col) => (
-          <span key={col} className="truncate text-center font-semibold text-slate-500">
+          <span key={col} className="truncate text-center font-semibold text-muted-foreground">
             {col}
           </span>
         ))}
         {heat.rows.map((row) => (
           <React.Fragment key={row}>
-            <button type="button" className="truncate text-left font-semibold text-slate-600 hover:text-[#2f6fed] dark:text-muted-foreground" onClick={() => onPick(row)}>
+            <button type="button" className="truncate text-left font-semibold text-muted-foreground hover:text-[hsl(var(--primary))] dark:text-muted-foreground" onClick={() => onPick(row)}>
               {row}
             </button>
             {heat.cols.map((col) => {
@@ -159,7 +159,7 @@ function HeatGrid({ heat, onPick }: { heat: HeatMatrix; onPick: (zone: string) =
                 >
                   {c ? (
                     <>
-                      <span className={cn("font-bold tabular-nums", intensity > 0.55 ? "text-white" : "text-slate-700")}>
+                      <span className={cn("font-bold tabular-nums", intensity > 0.55 ? "text-white" : "text-foreground")}>
                         {formatPct(c.share, false, 0)}
                       </span>
                       <span

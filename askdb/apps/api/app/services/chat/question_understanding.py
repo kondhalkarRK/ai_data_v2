@@ -219,11 +219,19 @@ _DECLINE = re.compile(
 )
 _UP_WORDS = r"(?:increasing|growing|rising|higher|improving|up)"
 _DOWN_WORDS = r"(?:decreasing|declining|falling|lower|dropping|shrinking|down)"
-_METRIC_PHRASE = r"([a-z]+(?:\s+[a-z]+)?)"
+_STABLE_WORDS = r"(?:stable|steady|flat|unchanged|consistent|holding\s+steady)"
+_DIRECTION_WORDS = rf"(?:{_UP_WORDS}|{_DOWN_WORDS}|{_STABLE_WORDS})"
+_METRIC_PHRASE = r"([a-z]+(?:\s+[a-z]+){0,4})"
+_DIVERGENCE_METRIC_FIRST = re.compile(
+    rf"\b(?P<d1>{_DIRECTION_WORDS})\s+(?P<p1>{_METRIC_PHRASE})\s+"
+    rf"(?:but|while|and|with)\s+"
+    rf"(?:(?P<d2>{_DIRECTION_WORDS})\s+)?(?P<p2>{_METRIC_PHRASE})",
+    re.I,
+)
 _DIVERGENCE = re.compile(
-    rf"\b(?P<d1>{_UP_WORDS}|{_DOWN_WORDS})\s+{_METRIC_PHRASE}\s+(?:but|while|and|with|yet)\s+"
-    rf"(?:a\s+|an\s+)?(?:(?P<d2>{_UP_WORDS}|{_DOWN_WORDS})\s+)?{_METRIC_PHRASE}"
-    rf"(?:\s+(?P<d3>{_UP_WORDS}|{_DOWN_WORDS}))?",
+    rf"\b(?P<d1>{_DIRECTION_WORDS})\s+{_METRIC_PHRASE}\s+(?:but|while|and|with|yet)\s+"
+    rf"(?:a\s+|an\s+)?(?:(?P<d2>{_DIRECTION_WORDS})\s+)?{_METRIC_PHRASE}"
+    rf"(?:\s+(?P<d3>{_DIRECTION_WORDS}))?",
     re.I,
 )
 # Policies as a list to rank ("top 10 policies"), not a qualifier ("motor policies premium").
@@ -234,8 +242,8 @@ _POLICY_LIST = re.compile(
     re.I,
 )
 _DIVERGENCE_POST = re.compile(
-    rf"\b{_METRIC_PHRASE}\s+(?P<d1>{_UP_WORDS}|{_DOWN_WORDS})\s+(?:but|while|yet|and|with)\s+"
-    rf"{_METRIC_PHRASE}\s+(?P<d2>{_UP_WORDS}|{_DOWN_WORDS})\b",
+    rf"\b{_METRIC_PHRASE}\s+(?P<d1>{_DIRECTION_WORDS})\s+(?:but|while|yet|and|with)\s+"
+    rf"{_METRIC_PHRASE}\s+(?P<d2>{_DIRECTION_WORDS})\b",
     re.I,
 )
 _METRIC_PHRASES: tuple[tuple[str, str], ...] = (
@@ -254,7 +262,7 @@ _METRIC_PHRASES: tuple[tuple[str, str], ...] = (
 def _metric_from_phrase(phrase: str) -> str | None:
     text = phrase.strip().lower()
     for pattern, metric in _METRIC_PHRASES:
-        if re.match(rf"(?:{pattern})\b", text):
+        if re.search(rf"(?:{pattern})\b", text):
             return metric
     return None
 
@@ -265,7 +273,19 @@ def _parse_divergence(question: str) -> list[tuple[str, str]]:
     def direction(word: str | None) -> str | None:
         if not word:
             return None
-        return "up" if re.fullmatch(_UP_WORDS, word, re.I) else "down"
+        token = word.strip().lower()
+        if re.fullmatch(_STABLE_WORDS, token, re.I):
+            return "flat"
+        return "up" if re.fullmatch(_UP_WORDS, token, re.I) else "down"
+
+    metric_first = _DIVERGENCE_METRIC_FIRST.search(question)
+    if metric_first:
+        first = _metric_from_phrase(metric_first.group("p1") or "")
+        second = _metric_from_phrase(metric_first.group("p2") or "")
+        d1 = direction(metric_first.group("d1"))
+        d2 = direction(metric_first.group("d2"))
+        if second and d1 and d2 and first and first != second:
+            return [(first, d1), (second, d2)]
 
     found = _DIVERGENCE.search(question)
     if found:
@@ -586,6 +606,14 @@ def _ensure_time_axis(plan: QuestionPlan, question: str) -> None:
     plan.dimensions = [*plan.partition_by, *(d for d in dims if d in _TIME_DIMS)]
 
 
+def _resolve_time_grain(plan: QuestionPlan) -> str | None:
+    """Keep an explicit time grain set during divergence / window analysis."""
+    from_dims = next((g for g in _TIME_DIMS if g in plan.dimensions), None)
+    if from_dims:
+        return from_dims
+    return plan.time_grain
+
+
 def _apply_business_shape(plan: QuestionPlan, question: str) -> None:
     """Complete the plan from every part of the question: brand, comparison, period, share."""
     dims = plan.dimensions
@@ -608,7 +636,7 @@ def _apply_business_shape(plan: QuestionPlan, question: str) -> None:
 
     if plan.industry is Industry.INSURANCE:
         _ensure_time_axis(plan, question)
-        plan.time_grain = next((g for g in _TIME_DIMS if g in plan.dimensions), None)
+        plan.time_grain = _resolve_time_grain(plan)
         if plan.analysis == "basic" and plan.dimensions:
             plan.analysis = "breakdown"
         return
@@ -635,7 +663,7 @@ def _apply_business_shape(plan: QuestionPlan, question: str) -> None:
 
     _ensure_time_axis(plan, question)
     dims = plan.dimensions
-    plan.time_grain = next((g for g in _TIME_DIMS if g in dims), None)
+    plan.time_grain = _resolve_time_grain(plan)
     if plan.analysis == "basic" and dims:
         plan.analysis = "breakdown"
     if plan.analysis == "ranking" and plan.intent not in {"comparison"}:
@@ -681,7 +709,11 @@ def _explicit_dimensions(industry: Industry, question: str) -> list[str]:
                     "make",
                     r"\bbrands?\b|\bmakes?\b|\bmanufacturers?\b|\boems?\b|\bcarmakers?\b|\bautomakers?\b",
                 ),
-                ("model", r"\bby\s+model\b|\bmodels?\s+(?:per|within\s+each|in\s+each|for\s+each)\b|\beach\s+model\b"),
+                (
+                    "model",
+                    r"\bmodels?\s+with\b|\bmodels?\s+(?:that|where|showing|having)\b|"
+                    r"\bby\s+model\b|\bmodels?\s+(?:per|within\s+each|in\s+each|for\s+each)\b|\beach\s+model\b",
+                ),
                 ("dealer", r"\bdealers?\b"),
                 ("salesperson", r"\bsalespersons?\b|\bsalespeople\b|\bsales\s*rep\b"),
                 (
@@ -808,8 +840,22 @@ def _enrich_analytical_plan(plan: QuestionPlan, question: str) -> None:
         plan.divergence = divergence
         plan.metric = divergence[0][0]  # type: ignore[assignment]
         plan.intent = "comparison"
+        time_dims = [d for d in dimensions if d in _TIME_DIMS]
         plan.dimensions = [d for d in dimensions if d not in _TIME_DIMS]
-        plan.time_grain = None
+        if _MODEL_WORD.search(question) and "model" not in plan.dimensions:
+            plan.dimensions.insert(0, "model")
+            plan.entity = "vehicle"
+        if time_dims:
+            plan.time_grain = time_dims[0]
+            plan.notes.append(
+                f"Output includes {time_dims[0]} grain; period change is computed within each period bucket."
+            )
+        else:
+            plan.time_grain = None
+        if any(direction == "flat" for _, direction in divergence):
+            plan.notes.append(
+                "Stable metrics use a ±5% period-over-period change band (documented default)."
+            )
         plan.limit = 20
         return
     if _GROWTH_RANK.search(question):

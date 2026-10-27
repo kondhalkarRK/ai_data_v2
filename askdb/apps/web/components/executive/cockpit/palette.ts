@@ -1,3 +1,5 @@
+import { chartColor } from "@/lib/chart-colors";
+
 /**
  * Cockpit palette: soft blue, executive grey and light teal. Concrete colours (not CSS
  * variables) so exported PNGs render identically outside the page.
@@ -38,6 +40,7 @@ export const CATEGORY_COLOURS = [
 ];
 
 export function categoryColour(index: number): string {
+  if (typeof document !== "undefined") return chartColor(index);
   return CATEGORY_COLOURS[index % CATEGORY_COLOURS.length] ?? COCKPIT.blue;
 }
 

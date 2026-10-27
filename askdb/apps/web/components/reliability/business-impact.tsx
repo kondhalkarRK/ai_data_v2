@@ -34,18 +34,18 @@ export function BusinessImpactPanel({
     <Card className={className}>
       <PanelTitle title="Business impact" subtitle="What the open issues mean for decisions, in plain language" />
       <div className="rounded-xl bg-gradient-to-r from-[#eef4ff] to-[#eaf7f3] px-3.5 py-3 dark:from-muted dark:to-muted">
-        <p className="flex items-start gap-2 text-xs font-medium leading-relaxed text-slate-800 dark:text-foreground">
-          <BriefcaseBusiness className="mt-0.5 size-4 shrink-0 text-[#2f6fed]" />
+        <p className="flex items-start gap-2 text-xs font-medium leading-relaxed text-foreground">
+          <BriefcaseBusiness className="mt-0.5 size-4 shrink-0 text-[hsl(var(--primary))]" />
           {impact.headline}
         </p>
         {impact.recordsAffected || impact.valueAtRisk ? (
-          <div className="mt-2 flex gap-4 pl-6 text-[11px] text-slate-500">
+          <div className="mt-2 flex gap-4 pl-6 text-[11px] text-muted-foreground">
             <span>
-              <span className="font-semibold tabular-nums text-slate-700">{formatCount(impact.recordsAffected)}</span> records affected
+              <span className="font-semibold tabular-nums text-foreground">{formatCount(impact.recordsAffected)}</span> records affected
             </span>
             {impact.valueAtRisk ? (
               <span>
-                <span className="font-semibold tabular-nums text-slate-700">{formatInr(impact.valueAtRisk)}</span> value in question
+                <span className="font-semibold tabular-nums text-foreground">{formatInr(impact.valueAtRisk)}</span> value in question
               </span>
             ) : null}
           </div>
@@ -53,8 +53,8 @@ export function BusinessImpactPanel({
       </div>
       <ul className="mt-3 space-y-2.5">
         {items.map((item) => (
-          <li key={item.asset} className="rounded-xl border border-slate-100 px-3 py-2.5 dark:border-border">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-foreground">
+          <li key={item.asset} className="rounded-xl border border-border px-3 py-2.5 dark:border-border">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
               <span className="size-1.5 rounded-full" style={{ backgroundColor: SEVERITY_DOT[item.severity] }} />
               {item.asset}
             </p>
@@ -64,7 +64,7 @@ export function BusinessImpactPanel({
                   <button
                     type="button"
                     onClick={() => item.ruleIds[i] && onOpenRule(item.ruleIds[i]!)}
-                    className="text-left text-[11px] leading-relaxed text-slate-600 hover:text-[#2f6fed] dark:text-muted-foreground"
+                    className="text-left text-[11px] leading-relaxed text-muted-foreground hover:text-[hsl(var(--primary))] dark:text-muted-foreground"
                   >
                     {s}
                   </button>
@@ -74,7 +74,7 @@ export function BusinessImpactPanel({
           </li>
         ))}
         {!items.length ? (
-          <li className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-2xs text-slate-500">
+          <li className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-2xs text-muted-foreground">
             {impact.items.length
               ? "No business impact from the rules in the current filter."
               : "Dashboards, forecasts and reports built on this data can be used with confidence."}

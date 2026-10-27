@@ -71,13 +71,13 @@ export function FilterPane({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 40, opacity: 0 }}
             onClick={() => onOpenChange(true)}
-            className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-xl border border-r-0 border-slate-200 bg-white/95 px-2 py-3 text-2xs font-semibold text-slate-600 shadow-lg backdrop-blur hover:text-[#2f6fed] dark:border-border dark:bg-surface-raised"
+            className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-xl border border-r-0 border-border bg-white/95 px-2 py-3 text-2xs font-semibold text-muted-foreground shadow-lg backdrop-blur hover:text-[hsl(var(--primary))] border-border bg-surface-raised"
             aria-label="Open filters"
           >
             <SlidersHorizontal className="size-4" />
             <span className="[writing-mode:vertical-rl]">Filters</span>
             {count ? (
-              <span className="grid size-5 place-items-center rounded-full bg-[#2f6fed] text-[10px] text-white">{count}</span>
+              <span className="grid size-5 place-items-center rounded-full bg-[hsl(var(--primary))] text-[10px] text-white">{count}</span>
             ) : null}
           </motion.button>
         ) : null}
@@ -90,15 +90,15 @@ export function FilterPane({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 360, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 36 }}
-            className="fixed bottom-4 right-4 top-20 z-50 flex w-[19rem] flex-col rounded-2xl border border-slate-200 bg-white/95 shadow-[0_24px_48px_-16px_rgba(15,23,42,0.25)] backdrop-blur-md dark:border-border dark:bg-surface-raised/95"
+            className="fixed bottom-4 right-4 top-20 z-50 flex w-[19rem] flex-col rounded-2xl border border-border bg-white/95 shadow-[0_24px_48px_-16px_rgba(15,23,42,0.25)] backdrop-blur-md border-border bg-surface-raised/95"
             aria-label="Dashboard filters"
           >
-            <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-border">
+            <header className="flex items-center justify-between border-b border-border px-4 py-3 dark:border-border">
               <div className="flex items-center gap-2">
-                <SlidersHorizontal className="size-4 text-[#2f6fed]" />
-                <h2 className="text-sm font-semibold text-slate-800 dark:text-foreground">Filters</h2>
+                <SlidersHorizontal className="size-4 text-[hsl(var(--primary))]" />
+                <h2 className="text-sm font-semibold text-foreground">Filters</h2>
                 {count ? (
-                  <span className="rounded-full bg-[#e3ecfd] px-1.5 py-0.5 text-[10px] font-semibold text-[#2f6fed]">
+                  <span className="rounded-full bg-[#e3ecfd] px-1.5 py-0.5 text-[10px] font-semibold text-[hsl(var(--primary))]">
                     {count} active
                   </span>
                 ) : null}
@@ -106,7 +106,7 @@ export function FilterPane({
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-muted"
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                 aria-label="Collapse filters"
               >
                 <ChevronRight className="size-4" />
@@ -179,13 +179,13 @@ export function FilterPane({
                 />
                 )}
                 {hideGeography || !filters.city ? null : (
-                  <div className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs dark:bg-muted">
+                  <div className="flex items-center justify-between rounded-lg bg-muted px-2.5 py-1.5 text-xs dark:bg-muted">
                     <span>
-                      <span className="text-slate-500">City</span>{" "}
-                      <span className="font-medium text-slate-800 dark:text-foreground">{filters.city}</span>
+                      <span className="text-muted-foreground">City</span>{" "}
+                      <span className="font-medium text-foreground">{filters.city}</span>
                     </span>
                     <button type="button" aria-label="Clear city" onClick={() => set("city", "")}>
-                      <X className="size-3.5 text-slate-400 hover:text-slate-700" />
+                      <X className="size-3.5 text-muted-foreground hover:text-foreground" />
                     </button>
                   </div>
                 )}
@@ -205,19 +205,19 @@ export function FilterPane({
                 />
               </Group>
             </div>
-            <footer className="flex items-center justify-between border-t border-slate-100 px-4 py-3 dark:border-border">
+            <footer className="flex items-center justify-between border-t border-border px-4 py-3 dark:border-border">
               <button
                 type="button"
                 onClick={onClear}
                 disabled={!count}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40"
               >
                 <RotateCcw className="size-3.5" /> Clear all
               </button>
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="rounded-lg bg-[#2f6fed] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#245fd6]"
+                className="rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#245fd6]"
               >
                 Done
               </button>
@@ -232,7 +232,7 @@ export function FilterPane({
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <fieldset className="space-y-2">
-      <legend className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{title}</legend>
+      <legend className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</legend>
       {children}
     </fieldset>
   );
@@ -267,15 +267,15 @@ function Select({
   }, [grouped, options]);
   return (
     <label htmlFor={id} className="block">
-      <span className="mb-1 block text-2xs font-medium text-slate-500">{label}</span>
+      <span className="mb-1 block text-2xs font-medium text-muted-foreground">{label}</span>
       <select
         id={id}
         value={value ?? ""}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          "h-8 w-full rounded-lg border bg-white px-2 text-xs text-slate-800 outline-none transition focus:border-[#8fb3f5] focus:ring-2 focus:ring-[#e3ecfd] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:bg-surface-raised dark:text-foreground",
-          value ? "border-[#8fb3f5]" : "border-slate-200 dark:border-border",
+          "h-8 w-full rounded-lg border bg-white px-2 text-xs text-foreground outline-none transition focus:border-[#8fb3f5] focus:ring-2 focus:ring-[#e3ecfd] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground dark:bg-surface-raised dark:text-foreground",
+          value ? "border-[#8fb3f5]" : "border-border",
         )}
       >
         <option value="">{placeholder}</option>

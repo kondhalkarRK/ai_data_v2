@@ -38,16 +38,16 @@ export function DimensionCards({
             className={cn(
               cardClass,
               "group flex flex-col p-3.5 text-left transition hover:border-[#8fb3f5] hover:shadow-md",
-              active && "border-[#8fb3f5] ring-2 ring-[#2f6fed]/15",
+              active && "border-[#8fb3f5] ring-2 ring-[hsl(var(--primary))]/15",
               faded && "opacity-60 hover:opacity-100",
             )}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-foreground">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                 <span className="size-2 rounded-sm" style={{ backgroundColor: DIMENSION_COLOUR[d.key] }} />
                 {d.label}
               </span>
-              <span className="text-[10px] tabular-nums text-slate-400">
+              <span className="text-[10px] tabular-nums text-muted-foreground">
                 weight {Math.round(d.effectiveWeight ?? d.weight)}%
               </span>
             </div>
@@ -62,10 +62,10 @@ export function DimensionCards({
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-xl font-semibold tracking-tight text-slate-900 tabular-nums dark:text-foreground">
+                <p className="text-xl font-semibold tracking-tight text-foreground tabular-nums dark:text-foreground">
                   {formatScore(d.score)}
                 </p>
-                <p className="text-2xs text-slate-500">
+                <p className="text-2xs text-muted-foreground">
                   <span className="text-[#0f7a6c]">{d.passing} passing</span>
                   {d.failing ? <span className="text-[#a8463d]"> · {d.failing} failing</span> : null}
                   {d.errored ? <span className="text-[#94660f]"> · {d.errored} not run</span> : null}
@@ -76,16 +76,16 @@ export function DimensionCards({
               <span
                 className={cn(
                   "text-2xs font-medium tabular-nums",
-                  d.delta7d != null && d.delta7d < -0.05 ? "text-[#94660f]" : "text-slate-500",
+                  d.delta7d != null && d.delta7d < -0.05 ? "text-[#94660f]" : "text-muted-foreground",
                 )}
               >
-                {formatDelta(d.delta7d)} <span className="font-normal text-slate-400">7d</span>
+                {formatDelta(d.delta7d)} <span className="font-normal text-muted-foreground">7d</span>
               </span>
               <Sparkline values={d.sparkline} colour={DIMENSION_COLOUR[d.key]} width={76} height={22} />
             </div>
-            <div className="mt-2 border-t border-slate-100 pt-2 text-[10px] text-slate-400 dark:border-border">
+            <div className="mt-2 border-t border-border pt-2 text-[10px] text-muted-foreground dark:border-border">
               {d.topIssue ? (
-                <p className="truncate text-slate-600 dark:text-muted-foreground" title={d.topIssue}>
+                <p className="truncate text-muted-foreground" title={d.topIssue}>
                   {d.topIssue}
                 </p>
               ) : (
@@ -93,7 +93,7 @@ export function DimensionCards({
               )}
               <p className="mt-0.5 flex items-center justify-between">
                 <span>Last failure {d.lastFailureAt ? formatWhen(d.lastFailureAt) : "none recorded"}</span>
-                <ChevronRight className="size-3 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#2f6fed]" />
+                <ChevronRight className="size-3 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-[hsl(var(--primary))]" />
               </p>
             </div>
           </button>

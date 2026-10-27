@@ -121,17 +121,25 @@ export function TrustIndicators({
       <ul className="flex flex-wrap gap-1.5">
         {ALL_SOURCES.map((source) => {
           const used = active.has(source);
+          const aiSource = source === "LLM" || source === "Semantic Layer";
           return (
             <li
               key={source}
               className={cn(
                 "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px]",
-                used
-                  ? "border-emerald-500/25 bg-emerald-500/8 text-foreground"
-                  : "border-border/60 text-muted-foreground/55",
+                used && aiSource
+                  ? "border-ai/35 bg-ai/10 text-foreground"
+                  : used
+                    ? "border-success/30 bg-success/10 text-foreground"
+                    : "border-border/60 text-muted-foreground/55",
               )}
             >
-              {used ? <Check className="size-3 text-emerald-600" aria-hidden="true" /> : null}
+              {used ? (
+                <Check
+                  className={cn("size-3", aiSource ? "text-ai" : "text-success")}
+                  aria-hidden="true"
+                />
+              ) : null}
               {source}
             </li>
           );

@@ -34,7 +34,7 @@ export function ExecutionTimeline({
     return (
       <div
         className={cn(
-          "rounded-xl border border-border/60 bg-muted/20 p-3 dark:bg-background/80",
+          "ai-surface rounded-xl p-3",
           className,
         )}
         role="status"
@@ -69,7 +69,7 @@ export function ExecutionTimeline({
                   {done ? (
                     <Check className="size-3.5 text-success" />
                   ) : active ? (
-                    <Loader2 className="size-3.5 animate-spin text-primary" />
+                    <Loader2 className="size-3.5 animate-spin text-ai" />
                   ) : (
                     <span className="size-1.5 rounded-full bg-border" />
                   )}

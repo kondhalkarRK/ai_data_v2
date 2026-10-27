@@ -18,6 +18,7 @@ from app.services.chat.time_periods import anchor_sql, period_predicate
 
 # Monthly series without a stated period show the latest two years.
 TREND_MONTHS = 24
+_STABLE_CHANGE_PCT = 5.0
 _TIME_GRAINS = frozenset({"month", "quarter", "half", "year"})
 _DATE_COLUMNS = {
     "fact_sales": "sales_date",
@@ -670,7 +671,10 @@ def _compile_period_change(plan: QuestionPlan, pack: Any) -> AnalyticalQuery:
     base_table = metrics[0].table
     if any(spec.table != base_table for spec in metrics):
         raise SemanticCompileError("Compared metrics must come from the same fact table")
-    entity_plan = replace(plan, dimensions=[d for d in plan.dimensions if d not in _TIME_GRAINS])
+    business_dims = [d for d in plan.dimensions if d not in _TIME_GRAINS]
+    if plan.time_grain and plan.time_grain not in business_dims:
+        business_dims = [*business_dims, plan.time_grain]
+    entity_plan = replace(plan, dimensions=business_dims)
     dimensions = _dimension_specs(entity_plan, base_table)
     if not dimensions:
         raise SemanticCompileError("Growth comparison needs a business dimension")
@@ -726,16 +730,22 @@ SELECT compared.*,
 FROM compared"""
     first = metrics[0].alias
     if plan.analysis == "divergence":
-        conditions = [
-            f"current_{spec.alias} {'>' if direction == 'up' else '<'} previous_{spec.alias}"
-            for spec, (_, direction) in zip(metrics, plan.divergence, strict=True)
-        ]
+        conditions: list[str] = []
+        for spec, (_, direction) in zip(metrics, plan.divergence, strict=True):
+            change_col = f"{spec.alias}_change_pct"
+            if direction == "flat":
+                conditions.append(f"ABS({change_col}) <= {_STABLE_CHANGE_PCT}")
+            elif direction == "up":
+                conditions.append(f"current_{spec.alias} > previous_{spec.alias}")
+            else:
+                conditions.append(f"current_{spec.alias} < previous_{spec.alias}")
         sql = (
             f"{head}\nWHERE {' AND '.join(conditions)}\n"
             f"ORDER BY {first}_change_pct DESC\nLIMIT {max(1, min(plan.limit or 20, 100))}"
         )
         moves = " and ".join(
-            f"{spec.alias.replace('_', ' ')} {'up' if direction == 'up' else 'down'}"
+            f"{spec.alias.replace('_', ' ')} "
+            f"{'stable' if direction == 'flat' else 'up' if direction == 'up' else 'down'}"
             for spec, (_, direction) in zip(metrics, plan.divergence, strict=True)
         )
         title = f"{names[0].replace('_', ' ').title()}s with {moves} ({label})"

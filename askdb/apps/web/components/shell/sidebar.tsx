@@ -94,7 +94,7 @@ export function Sidebar({ user }: { user: UserProfile }) {
                         "flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-sm transition-colors",
                         collapsed && "justify-center px-0",
                         active
-                          ? "bg-primary/10 font-medium text-primary"
+                          ? "border border-primary/20 bg-primary/10 font-medium text-primary shadow-[inset_2px_0_0_0_hsl(var(--ai))]"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >

@@ -177,17 +177,17 @@ export function TrustCenter({ industry }: { industry: Industry }) {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#14a3a1]">Executive data reliability center</p>
-          <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-slate-900 dark:text-foreground">
+          <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">
             Data Trust Center
             {data ? (
-              <span className="ml-2 text-sm font-normal text-slate-500">
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
                 {data.dataAsOf ? `data as of ${formatWhen(data.dataAsOf)} · ` : ""}checked {formatWhen(data.computedAt)}
               </span>
             ) : null}
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {center.isFetching && data ? <Loader2 className="size-4 animate-spin text-slate-400" aria-label="Updating" /> : null}
+          {center.isFetching && data ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating" /> : null}
           {canEdit ? (
             <HeaderButton
               onClick={() => {
@@ -222,9 +222,9 @@ export function TrustCenter({ industry }: { industry: Industry }) {
           {chips.map((c) => (
             <span
               key={c.key}
-              className="inline-flex items-center gap-1 rounded-full border border-[#c9dafb] bg-[#f1f6ff] py-0.5 pl-2.5 pr-1 text-2xs text-slate-700"
+              className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--primary) / 0.35)] bg-[hsl(var(--primary) / 0.12)] py-0.5 pl-2.5 pr-1 text-2xs text-foreground"
             >
-              <span className="text-slate-500">{c.label}:</span>
+              <span className="text-muted-foreground">{c.label}:</span>
               <span className="font-semibold capitalize">{c.value}</span>
               <button
                 type="button"
@@ -236,7 +236,7 @@ export function TrustCenter({ industry }: { industry: Industry }) {
               </button>
             </span>
           ))}
-          <button type="button" className="ml-1 text-2xs font-medium text-[#2f6fed] hover:underline" onClick={() => setFilters({})}>
+          <button type="button" className="ml-1 text-2xs font-medium text-[hsl(var(--primary))] hover:underline" onClick={() => setFilters({})}>
             Clear all
           </button>
         </div>
@@ -257,12 +257,12 @@ export function TrustCenter({ industry }: { industry: Industry }) {
       {center.isPending ? (
         <TrustSkeleton />
       ) : center.isError && !data ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm dark:border-border dark:bg-surface-raised">
-          <p className="font-medium text-slate-800 dark:text-foreground">The Data Trust Center could not be loaded.</p>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-2xl border border-border bg-white p-6 text-sm border-border bg-surface-raised">
+          <p className="font-medium text-foreground">The Data Trust Center could not be loaded.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             {(center.error as Error)?.message || "Check that the analytics warehouse is reachable, then retry."}
           </p>
-          <button type="button" className="mt-3 text-xs font-medium text-[#2f6fed] hover:underline" onClick={() => void center.refetch()}>
+          <button type="button" className="mt-3 text-xs font-medium text-[hsl(var(--primary))] hover:underline" onClick={() => void center.refetch()}>
             Retry
           </button>
         </div>
@@ -274,7 +274,7 @@ export function TrustCenter({ industry }: { industry: Industry }) {
             </p>
           ) : null}
           {data.storage === "memory" ? (
-            <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-2xs text-slate-500 dark:border-border dark:bg-muted">
+            <p className="rounded-xl border border-border bg-muted px-3 py-2 text-2xs text-muted-foreground dark:border-border dark:bg-muted">
               Run history and rule changes are being kept in memory because the reliability tables are not migrated yet.
               Run the database migration to keep trend history and monitor edits across restarts.
             </p>
@@ -335,19 +335,19 @@ export function TrustCenter({ industry }: { industry: Industry }) {
             />
           </div>
 
-          <details className="group rounded-2xl border border-slate-200/70 bg-white/60 dark:border-border dark:bg-surface-raised/60">
+          <details className="group rounded-2xl border border-border bg-white/60 border-border bg-surface-raised/60">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
               <span>
-                <span className="block text-[15px] font-semibold tracking-tight text-slate-800 dark:text-foreground">
+                <span className="block text-[15px] font-semibold tracking-tight text-foreground">
                   Monitoring details
                 </span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-muted-foreground">
+                <span className="mt-0.5 block text-xs text-muted-foreground">
                   Schema drift, new business values, scoring method and monitor coverage.
                 </span>
               </span>
-              <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+              <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
             </summary>
-            <div className="space-y-6 border-t border-slate-200/70 p-5 dark:border-border">
+            <div className="space-y-6 border-t border-border p-5 dark:border-border">
               <div className="grid gap-6 lg:grid-cols-2">
                 <SchemaDriftPanel data={data} />
                 <EntityChangesPanel data={data} />
@@ -403,9 +403,9 @@ function TrustSection({
 }) {
   return (
     <section className="space-y-5">
-      <div className="border-b border-slate-200/70 pb-3 dark:border-border">
-        <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-foreground">{title}</h2>
-        <p className="mt-0.5 text-xs text-slate-500 dark:text-muted-foreground">{description}</p>
+      <div className="border-b border-border pb-3 dark:border-border">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
       </div>
       <div className="space-y-6">{children}</div>
     </section>
@@ -431,8 +431,8 @@ function HeaderButton({
       className={cn(
         "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium shadow-sm transition disabled:opacity-50",
         primary
-          ? "border-[#2f6fed] bg-[#2f6fed] text-white hover:bg-[#285fd0]"
-          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-border dark:bg-surface-raised dark:text-foreground",
+          ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white hover:bg-[#285fd0]"
+          : "border-border bg-white text-foreground hover:border-slate-300 hover:bg-muted border-border bg-surface-raised dark:text-foreground",
       )}
     >
       {children}
@@ -453,7 +453,7 @@ function TrustSkeleton() {
           <Skeleton key={i} className="h-[11rem] rounded-2xl" />
         ))}
       </div>
-      <p className="text-center text-2xs text-slate-400">Running data quality checks across the warehouse…</p>
+      <p className="text-center text-2xs text-muted-foreground">Running data quality checks across the warehouse…</p>
     </div>
   );
 }

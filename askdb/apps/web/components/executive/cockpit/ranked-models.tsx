@@ -66,7 +66,7 @@ function Bars({
   onSelect: SelectHandler;
 }) {
   const max = Math.max(...items.map((item) => item[metric]), 1);
-  if (!items.length) return <p className="py-10 text-center text-xs text-slate-400">No model sales in this selection.</p>;
+  if (!items.length) return <p className="py-10 text-center text-xs text-muted-foreground">No model sales in this selection.</p>;
   return (
     <ol className={cn("space-y-1.5", expanded && "space-y-3 text-sm")}>
       {items.map((item, index) => {
@@ -77,22 +77,22 @@ function Bars({
             <button
               type="button"
               onClick={() => onSelect("model", item.name)}
-              className="group grid w-full grid-cols-[1.25rem_minmax(0,7.5rem)_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-slate-50 dark:hover:bg-muted"
+              className="group grid w-full grid-cols-[1.25rem_minmax(0,7.5rem)_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-muted"
               title={`${item.group} ${item.name}: ${formatInr(item.revenue)} · ${formatCount(item.units)} units`}
             >
               <span
                 className={cn(
                   "flex size-5 items-center justify-center rounded-md text-[10px] font-bold tabular-nums",
-                  index < 3 ? "bg-[#2f6fed] text-white" : "bg-slate-100 text-slate-500 dark:bg-muted",
+                  index < 3 ? "bg-[hsl(var(--primary))] text-white" : "bg-muted text-muted-foreground dark:bg-muted",
                 )}
               >
                 {index + 1}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-xs font-semibold text-slate-800 dark:text-foreground">{item.name}</span>
-                <span className="block truncate text-[10px] text-slate-400">{item.group}</span>
+                <span className="block truncate text-xs font-semibold text-foreground">{item.name}</span>
+                <span className="block truncate text-[10px] text-muted-foreground">{item.group}</span>
               </span>
-              <span className="relative h-5 overflow-hidden rounded-md bg-slate-50 dark:bg-muted/50">
+              <span className="relative h-5 overflow-hidden rounded-md bg-muted/50">
                 <span
                   className="absolute inset-y-0 left-0 rounded-md transition-[width] duration-500"
                   style={{
@@ -104,7 +104,7 @@ function Bars({
                   {pct > 28 ? (metric === "revenue" ? formatInr(value) : formatCount(value)) : ""}
                 </span>
                 {pct <= 28 ? (
-                  <span className="absolute inset-y-0 flex items-center text-[10px] font-semibold text-slate-600" style={{ left: `calc(${Math.max(pct, 2)}% + 6px)` }}>
+                  <span className="absolute inset-y-0 flex items-center text-[10px] font-semibold text-muted-foreground" style={{ left: `calc(${Math.max(pct, 2)}% + 6px)` }}>
                     {metric === "revenue" ? formatInr(value) : formatCount(value)}
                   </span>
                 ) : null}
@@ -112,7 +112,7 @@ function Bars({
               <span
                 className={cn(
                   "w-14 text-right text-[10px] font-semibold tabular-nums",
-                  item.growth == null ? "text-slate-400" : item.growth >= 0 ? "text-[#0f8f7e]" : "text-[#c8574d]",
+                  item.growth == null ? "text-muted-foreground" : item.growth >= 0 ? "text-[#0f8f7e]" : "text-[#c8574d]",
                 )}
               >
                 {item.growth == null ? "new" : formatPct(item.growth, true)}

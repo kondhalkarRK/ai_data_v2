@@ -79,12 +79,12 @@ function DatasetCard({
       className={cn(
         cardClass,
         "flex flex-col p-3 shadow-none transition hover:border-[#8fb3f5]",
-        active && "border-[#8fb3f5] ring-2 ring-[#2f6fed]/15",
+        active && "border-[#8fb3f5] ring-2 ring-[hsl(var(--primary))]/15",
         faded && "opacity-60 hover:opacity-100",
       )}
     >
       <button type="button" onClick={onSelect} className="flex items-center gap-3 text-left" title="Filter the page to this dataset">
-        <span className="w-5 text-center text-xs font-semibold tabular-nums text-slate-400">{d.rank ?? "–"}</span>
+        <span className="w-5 text-center text-xs font-semibold tabular-nums text-muted-foreground">{d.rank ?? "–"}</span>
         <div className="relative">
           <ScoreRing score={d.score} band={d.band} size={40} stroke={4} />
           <span
@@ -95,19 +95,19 @@ function DatasetCard({
           </span>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold text-slate-800 dark:text-foreground">{d.label}</p>
-          <p className="truncate text-[10px] capitalize text-slate-400">
+          <p className="truncate text-xs font-semibold text-foreground">{d.label}</p>
+          <p className="truncate text-[10px] capitalize text-muted-foreground">
             {d.domain} · {d.rows == null ? "—" : `${formatCompact(d.rows)} rows`}
           </p>
         </div>
-        <span className="text-sm font-semibold tabular-nums text-slate-700 dark:text-foreground">{formatScore(d.score)}</span>
+        <span className="text-sm font-semibold tabular-nums text-foreground">{formatScore(d.score)}</span>
       </button>
-      <p className={cn("mt-2 truncate text-[11px]", d.topIssue ? "text-[#94660f]" : "text-slate-400")} title={d.topIssue ?? undefined}>
+      <p className={cn("mt-2 truncate text-[11px]", d.topIssue ? "text-[#94660f]" : "text-muted-foreground")} title={d.topIssue ?? undefined}>
         {d.topIssue ?? `${d.passing}/${d.rules} checks passing`}
       </p>
-      <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
+      <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
         <span>Refreshed {formatWhen(d.lastRefresh)}</span>
-        <button type="button" onClick={onOpen} className="font-medium text-[#2f6fed] hover:underline">
+        <button type="button" onClick={onOpen} className="font-medium text-[hsl(var(--primary))] hover:underline">
           Details
         </button>
       </div>

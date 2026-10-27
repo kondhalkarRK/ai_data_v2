@@ -86,7 +86,7 @@ export function TrustGauge({ score, band, size = 208 }: { score: number | null; 
       {[70, 85, 95].map((tick) => {
         const [tx, ty] = polar(cx, cy, r - 19, START + (SWEEP * tick) / 100);
         return (
-          <text key={tick} x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fontSize={9} fill="#94a3b8">
+          <text key={tick} x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fontSize={9} fill="hsl(var(--chart-axis))">
             {tick}
           </text>
         );
@@ -94,7 +94,7 @@ export function TrustGauge({ score, band, size = 208 }: { score: number | null; 
       <text x={cx} y={cy - 2} textAnchor="middle" fontSize={40} fontWeight={600} fill={TRUST.ink}>
         {formatScore(score)}
       </text>
-      <text x={cx} y={cy + 20} textAnchor="middle" fontSize={11} fill="#64748b">
+      <text x={cx} y={cy + 20} textAnchor="middle" fontSize={11} fill="hsl(var(--chart-axis))">
         out of 100
       </text>
     </svg>
@@ -118,7 +118,7 @@ export function TrustHero({
     <div className="grid gap-6 xl:grid-cols-12">
       <Card className="relative overflow-hidden bg-gradient-to-br from-[#eef4ff] via-white to-[#eaf7f3] xl:col-span-4 dark:from-surface-raised dark:to-surface-raised">
         <div className="flex items-center justify-between">
-          <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-slate-500">Enterprise trust score</p>
+          <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Enterprise trust score</p>
           <span
             className="rounded-full px-2.5 py-0.5 text-2xs font-semibold"
             style={{ backgroundColor: `${bandColour}1f`, color: bandColour }}
@@ -129,13 +129,13 @@ export function TrustHero({
         <div className="mt-1 flex flex-col items-center">
           <TrustGauge score={hero.score} band={hero.band} />
           {hero.available ? (
-            <p className="-mt-3 flex items-center gap-1 text-xs text-slate-600">
+            <p className="-mt-3 flex items-center gap-1 text-xs text-muted-foreground">
               <DeltaIcon delta={delta} />
               <span className="font-semibold tabular-nums">{formatDelta(delta)}</span>
-              <span className="text-slate-400">vs 7 days earlier</span>
+              <span className="text-muted-foreground">vs 7 days earlier</span>
             </p>
           ) : (
-            <p className="-mt-2 max-w-xs text-center text-xs text-slate-500">{hero.unavailableReason}</p>
+            <p className="-mt-2 max-w-xs text-center text-xs text-muted-foreground">{hero.unavailableReason}</p>
           )}
         </div>
         <div className="mt-4 grid grid-cols-4 gap-1.5">
@@ -146,14 +146,14 @@ export function TrustHero({
                 key={s.band}
                 className={cn(
                   "rounded-lg px-1.5 py-1 text-center ring-1 ring-inset ring-transparent",
-                  s.band === hero.band && "bg-white ring-slate-200 dark:bg-muted",
+                  s.band === hero.band && "bg-white ring-border dark:bg-muted",
                 )}
               >
-                <p className="flex items-center justify-center gap-1 text-2xs font-medium text-slate-700 dark:text-foreground">
+                <p className="flex items-center justify-center gap-1 text-2xs font-medium text-foreground">
                   <span className="size-1.5 rounded-full" style={{ backgroundColor: BAND_COLOUR[s.band] }} />
                   {s.label}
                 </p>
-                <p className="text-[10px] tabular-nums text-slate-400">{s.range}</p>
+                <p className="text-[10px] tabular-nums text-muted-foreground">{s.range}</p>
               </div>
             ))}
         </div>
@@ -224,17 +224,17 @@ export function TrustHero({
       </div>
 
       <Card className="flex flex-col xl:col-span-3">
-        <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-[#2f6fed]">Executive trust summary</p>
-        <p className="mt-1.5 text-sm font-semibold leading-snug text-slate-800 dark:text-foreground">{summary.headline}</p>
+        <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-[hsl(var(--primary))]">Executive trust summary</p>
+        <p className="mt-1.5 text-sm font-semibold leading-snug text-foreground">{summary.headline}</p>
         <ul className="mt-3 flex-1 space-y-2.5">
           {summary.statements.map((s, i) => (
-            <li key={i} className="flex gap-2 text-xs leading-relaxed text-slate-600 dark:text-muted-foreground">
+            <li key={i} className="flex gap-2 text-xs leading-relaxed text-muted-foreground">
               <span className="mt-1.5 size-1.5 shrink-0 rounded-full" style={{ backgroundColor: TONE_COLOUR[s.tone] }} />
               {s.text}
             </li>
           ))}
         </ul>
-        <p className="mt-3 border-t border-slate-100 pt-2 text-[10px] text-slate-400 dark:border-border">
+        <p className="mt-3 border-t border-border pt-2 text-[10px] text-muted-foreground dark:border-border">
           Checked {formatWhen(data.computedAt)} · {hero.rulesActive} rules in {(data.runDurationMs / 1000).toFixed(1)} s
         </p>
       </Card>
@@ -243,7 +243,7 @@ export function TrustHero({
 }
 
 function DeltaIcon({ delta }: { delta: number | null }) {
-  if (delta == null || Math.abs(delta) < 0.05) return <Minus className="size-3.5 text-slate-400" />;
+  if (delta == null || Math.abs(delta) < 0.05) return <Minus className="size-3.5 text-muted-foreground" />;
   return delta > 0 ? (
     <ArrowUpRight className="size-3.5 text-[#0f8f7e]" />
   ) : (
@@ -274,19 +274,19 @@ function KpiTile({
       onClick={onClick}
       className={cn(cardClass, "group p-3.5 text-left transition hover:border-[#8fb3f5] hover:shadow-md")}
     >
-      <div className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-slate-500">
+      <div className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
         <span className="icon-well size-6 rounded-md" style={{ backgroundColor: `${accent}17`, color: accent }}>
           {icon}
         </span>
         <span className="truncate">{label}</span>
       </div>
       <div className="mt-2 flex items-end justify-between gap-2">
-        <p className="truncate text-2xl font-semibold tracking-tight text-slate-900 tabular-nums dark:text-foreground">
+        <p className="truncate text-2xl font-semibold tracking-tight text-foreground tabular-nums dark:text-foreground">
           {value}
         </p>
         {spark ? <Sparkline values={spark} colour={accent} width={64} height={24} /> : null}
       </div>
-      <p className="mt-0.5 truncate text-2xs text-slate-400">{foot}</p>
+      <p className="mt-0.5 truncate text-2xs text-muted-foreground">{foot}</p>
     </button>
   );
 }

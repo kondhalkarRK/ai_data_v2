@@ -125,18 +125,18 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2f6fed]">Executive KPI analytics</p>
-          <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-slate-900 dark:text-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--primary))]">Executive KPI analytics</p>
+          <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">
             {data ? data.period.label : "Sales performance"}
             {data ? (
-              <span className="ml-2 text-sm font-normal text-slate-500">
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
                 vs {data.period.priorLabel} · data as of {formatDate(data.period.dataAsOf)}
               </span>
             ) : null}
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {cockpit.isFetching && data ? <Loader2 className="size-4 animate-spin text-slate-400" aria-label="Updating" /> : null}
+          {cockpit.isFetching && data ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating" /> : null}
           <HeaderButton onClick={() => setPaneOpen((v) => !v)} active={count > 0}>
             <SlidersHorizontal className="size-3.5" /> Filters{count ? ` (${count})` : ""}
           </HeaderButton>
@@ -159,9 +159,9 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
           {chips.map(([key, value]) => (
             <span
               key={key}
-              className="inline-flex items-center gap-1 rounded-full border border-[#c9dafb] bg-[#f1f6ff] py-0.5 pl-2.5 pr-1 text-2xs text-slate-700"
+              className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--primary) / 0.35)] bg-[hsl(var(--primary) / 0.12)] py-0.5 pl-2.5 pr-1 text-2xs text-foreground"
             >
-              <span className="text-slate-500">{FILTER_LABELS[key]}:</span>
+              <span className="text-muted-foreground">{FILTER_LABELS[key]}:</span>
               <span className="font-semibold">{label(key, value)}</span>
               <button
                 type="button"
@@ -179,7 +179,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
               </button>
             </span>
           ))}
-          <button type="button" className="ml-1 text-2xs font-medium text-[#2f6fed] hover:underline" onClick={() => setFilters({})}>
+          <button type="button" className="ml-1 text-2xs font-medium text-[hsl(var(--primary))] hover:underline" onClick={() => setFilters({})}>
             Clear all
           </button>
         </div>
@@ -188,12 +188,12 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
       {cockpit.isPending ? (
         <CockpitSkeleton />
       ) : cockpit.isError && !data ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm">
-          <p className="font-medium text-slate-800">The KPI cockpit could not be loaded.</p>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-2xl border border-border bg-white p-6 text-sm">
+          <p className="font-medium text-foreground">The KPI cockpit could not be loaded.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             {(cockpit.error as Error)?.message || "Check that the automotive warehouse is loaded, then refresh."}
           </p>
-          <div className="mt-3 flex gap-3 text-xs font-medium text-[#2f6fed]">
+          <div className="mt-3 flex gap-3 text-xs font-medium text-[hsl(var(--primary))]">
             <button type="button" className="hover:underline" onClick={() => void cockpit.refetch()}>
               Retry
             </button>
@@ -206,8 +206,8 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
         </div>
       ) : data?.empty ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-10 text-center">
-          <p className="text-sm font-medium text-slate-700">No sales match this selection.</p>
-          <button type="button" className="mt-2 text-xs font-medium text-[#2f6fed] hover:underline" onClick={() => setFilters({})}>
+          <p className="text-sm font-medium text-foreground">No sales match this selection.</p>
+          <button type="button" className="mt-2 text-xs font-medium text-[hsl(var(--primary))] hover:underline" onClick={() => setFilters({})}>
             Clear filters
           </button>
         </div>
@@ -265,9 +265,9 @@ function CockpitSection({
 }) {
   return (
     <section className="space-y-5">
-      <div className="border-b border-slate-200/70 pb-3 dark:border-border">
-        <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-foreground">{title}</h2>
-        <p className="mt-0.5 text-xs text-slate-500 dark:text-muted-foreground">{description}</p>
+      <div className="border-b border-border pb-3 dark:border-border">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
       </div>
       <div className="space-y-6">{children}</div>
     </section>
@@ -297,8 +297,8 @@ function HeaderButton({
       className={cn(
         "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium shadow-sm transition disabled:opacity-50",
         active
-          ? "border-[#8fb3f5] bg-[#eef4ff] text-[#2f6fed]"
-          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-border dark:bg-surface-raised dark:text-foreground",
+          ? "border-[#8fb3f5] bg-[#eef4ff] text-[hsl(var(--primary))]"
+          : "border-border bg-white text-foreground hover:border-slate-300 hover:bg-muted border-border bg-surface-raised dark:text-foreground",
       )}
     >
       {children}

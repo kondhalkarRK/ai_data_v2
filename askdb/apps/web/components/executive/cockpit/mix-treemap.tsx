@@ -16,7 +16,7 @@ const FUEL_COLOURS: Record<string, string> = {
   CNG: "#9db7f0",
 };
 const FAMILY_COLOURS: Record<string, string> = {
-  SUV: "#2f6fed",
+  SUV: "hsl(var(--primary))",
   Hatchback: "#14a3a1",
   Sedan: "#7c9cc9",
   "MUV / MPV": "#64748b",
@@ -153,7 +153,7 @@ function Treemap({
   const colourByKey = new Map(items.map((item, i) => [item.key, colour(item, i)]));
   return (
     <div>
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
       <div ref={ref} className="relative w-full" style={{ height }}>
         {size.width > 0 ? (
           <svg data-chart width={size.width} height={height} className="block overflow-hidden rounded-lg" role="img" aria-label={title}>
@@ -198,10 +198,10 @@ function Treemap({
         ) : null}
         {hover ? (
           <ChartTooltip x={hover.x} y={hover.y} width={size.width}>
-            <p className="font-semibold text-slate-800 dark:text-foreground">
+            <p className="font-semibold text-foreground">
               {hover.rect.item.name}
               {hover.rect.item.group && hover.rect.item.group !== hover.rect.item.name ? (
-                <span className="font-normal text-slate-400"> · {hover.rect.item.group}</span>
+                <span className="font-normal text-muted-foreground"> · {hover.rect.item.group}</span>
               ) : null}
             </p>
             <Row label="Unit share" value={formatPct(hover.rect.item.share)} />
@@ -218,8 +218,8 @@ function Treemap({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4 py-0.5">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-semibold tabular-nums text-slate-800 dark:text-foreground">{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold tabular-nums text-foreground">{value}</span>
     </div>
   );
 }

@@ -55,7 +55,7 @@ export function PlanBullets({
               ))}
             </div>
             {[plan.targetNote, plan.forecastNote].filter(Boolean).map((note) => (
-              <p key={note} className="flex items-start gap-1.5 text-2xs text-slate-500">
+              <p key={note} className="flex items-start gap-1.5 text-2xs text-muted-foreground">
                 <Info className="mt-px size-3 shrink-0" />
                 {note}
               </p>
@@ -63,7 +63,7 @@ export function PlanBullets({
           </div>
           {plan.byMake.length ? (
             <div>
-              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Target achievement by brand · units
               </p>
               <ul className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
@@ -71,16 +71,16 @@ export function PlanBullets({
                   <li key={m.make}>
                     <button
                       type="button"
-                      className="grid w-full grid-cols-[5.5rem_minmax(3rem,1fr)_2.5rem] items-center gap-2 rounded px-1 py-0.5 text-left text-2xs hover:bg-slate-50 dark:hover:bg-muted"
+                      className="grid w-full grid-cols-[5.5rem_minmax(3rem,1fr)_2.5rem] items-center gap-2 rounded px-1 py-0.5 text-left text-2xs hover:bg-muted"
                       onClick={() => onSelect("make", m.make)}
                       title={`${m.make}: ${formatCount(m.actualUnits)} of ${formatCount(m.targetUnits)} units`}
                     >
-                      <span className="truncate font-medium text-slate-700 dark:text-foreground">{m.make}</span>
+                      <span className="truncate font-medium text-foreground">{m.make}</span>
                       <MiniBullet achievement={m.achievement} />
                       <span
                         className={cn(
                           "text-right font-semibold tabular-nums",
-                          m.achievement >= 1 ? "text-[#0f8f7e]" : m.achievement < 0.9 ? "text-[#c8574d]" : "text-slate-600",
+                          m.achievement >= 1 ? "text-[#0f8f7e]" : m.achievement < 0.9 ? "text-[#c8574d]" : "text-muted-foreground",
                         )}
                       >
                         {formatPct(m.achievement, false, 0)}
@@ -109,7 +109,7 @@ function Bullet({ metric, reference }: { metric: BulletMetric; reference: string
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between gap-2">
-        <span className="text-xs font-semibold text-slate-700 dark:text-foreground">{metric.label}</span>
+        <span className="text-xs font-semibold text-foreground">{metric.label}</span>
         <span className="flex items-baseline gap-2">
           {variance != null ? (
             <span className={cn("text-2xs font-semibold tabular-nums", variance >= 0 ? "text-[#0f8f7e]" : "text-[#c8574d]")}>
@@ -119,7 +119,7 @@ function Bullet({ metric, reference }: { metric: BulletMetric; reference: string
           <span
             className={cn(
               "text-sm font-bold tabular-nums",
-              ach == null ? "text-slate-400" : ach >= 1 ? "text-[#0f8f7e]" : ach < 0.9 ? "text-[#c8574d]" : "text-slate-700",
+              ach == null ? "text-muted-foreground" : ach >= 1 ? "text-[#0f8f7e]" : ach < 0.9 ? "text-[#c8574d]" : "text-foreground",
             )}
           >
             {ach == null ? "n/a" : formatPct(ach, false, 0)}
@@ -143,12 +143,12 @@ function Bullet({ metric, reference }: { metric: BulletMetric; reference: string
           </svg>
         ) : null}
       </div>
-      <div className="mt-1 flex justify-between gap-2 text-2xs text-slate-500">
+      <div className="mt-1 flex justify-between gap-2 text-2xs text-muted-foreground">
         <span>
-          Actual <span className="font-semibold text-slate-700 dark:text-foreground">{fmt(metric.actual)}</span>
+          Actual <span className="font-semibold text-foreground">{fmt(metric.actual)}</span>
         </span>
         <span>
-          {reference} <span className="font-semibold text-slate-700 dark:text-foreground">{fmt(target)}</span>
+          {reference} <span className="font-semibold text-foreground">{fmt(target)}</span>
         </span>
       </div>
     </div>
@@ -158,7 +158,7 @@ function Bullet({ metric, reference }: { metric: BulletMetric; reference: string
 function MiniBullet({ achievement }: { achievement: number }) {
   const pct = Math.min(achievement / 1.25, 1) * 100;
   return (
-    <span className="relative block h-2 rounded-full bg-slate-100 dark:bg-muted">
+    <span className="relative block h-2 rounded-full bg-muted">
       <span
         className="absolute inset-y-0 left-0 rounded-full"
         style={{ width: `${pct}%`, backgroundColor: achievement >= 1 ? COCKPIT.teal : achievement < 0.9 ? "#e3a19a" : COCKPIT.blueSoft }}

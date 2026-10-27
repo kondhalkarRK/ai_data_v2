@@ -170,15 +170,15 @@ function TrendPlot({
         ))}
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={pad.left} x2={pad.left + plotW} y1={y(t)} y2={y(t)} stroke="#eef2f7" />
-            <text x={pad.left - 6} y={y(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#94a3b8">
+            <line x1={pad.left} x2={pad.left + plotW} y1={y(t)} y2={y(t)} stroke="hsl(var(--chart-grid))" />
+            <text x={pad.left - 6} y={y(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="hsl(var(--chart-axis))">
               {Math.round(t)}
             </text>
           </g>
         ))}
         {points.map((p, i) =>
           i % labelEvery === 0 || (i === points.length - 1 && i % labelEvery >= labelEvery * 0.6) ? (
-            <text key={p.date} x={x(i)} y={height - 6} textAnchor="middle" fontSize={10} fill="#94a3b8">
+            <text key={p.date} x={x(i)} y={height - 6} textAnchor="middle" fontSize={10} fill="hsl(var(--chart-axis))">
               {shortDate(p.date)}
             </text>
           ) : null,
@@ -234,10 +234,10 @@ function TrendPlot({
         {last ? (
           <circle cx={x(points.indexOf(last))} cy={y(last.score!)} r={3.5} fill={TRUST.blue} stroke="#fff" strokeWidth={1.5} />
         ) : null}
-        {hovered ? <line x1={x(hover!)} x2={x(hover!)} y1={pad.top} y2={pad.top + plotH} stroke="#cbd5e1" /> : null}
+        {hovered ? <line x1={x(hover!)} x2={x(hover!)} y1={pad.top} y2={pad.top + plotH} stroke="hsl(var(--chart-grid))" /> : null}
       </svg>
 
-      <div className="pointer-events-none absolute right-1 top-0 flex gap-3 text-[10px] text-slate-500">
+      <div className="pointer-events-none absolute right-1 top-0 flex gap-3 text-[10px] text-muted-foreground">
         {(["drop", "incident", "drift"] as const).map((k) => (
           <span key={k} className="flex items-center gap-1">
             <span className="size-2 rounded-full" style={{ backgroundColor: EVENT_STYLE[k].colour }} />
@@ -248,25 +248,25 @@ function TrendPlot({
 
       {hovered ? (
         <ChartTooltip x={x(hover!)} y={hovered.score != null ? y(hovered.score) : pad.top} width={width}>
-          <p className="font-semibold text-slate-800">{shortDate(hovered.date, true)}</p>
-          <p className="mt-0.5 flex justify-between gap-4 text-slate-600">
-            Trust score <span className="font-semibold tabular-nums text-slate-900">{formatScore(hovered.score)}</span>
+          <p className="font-semibold text-foreground">{shortDate(hovered.date, true)}</p>
+          <p className="mt-0.5 flex justify-between gap-4 text-muted-foreground">
+            Trust score <span className="font-semibold tabular-nums text-foreground">{formatScore(hovered.score)}</span>
           </p>
           {dimension ? (
-            <p className="flex justify-between gap-4 text-slate-600">
+            <p className="flex justify-between gap-4 text-muted-foreground">
               {DIMENSION_LABEL[dimension]}
               <span className="font-semibold tabular-nums">{formatScore(hovered.dimensions[dimension] ?? null)}</span>
             </p>
           ) : null}
           {hovered.measured != null ? (
-            <p className="flex justify-between gap-4 text-slate-500">
+            <p className="flex justify-between gap-4 text-muted-foreground">
               Recorded run <span className="tabular-nums">{hovered.measured.toFixed(1)}</span>
             </p>
           ) : null}
           {hoveredEvents.map((e, k) => (
-            <p key={k} className="mt-1 border-t border-slate-100 pt-1" style={{ color: EVENT_STYLE[e.kind].colour }}>
+            <p key={k} className="mt-1 border-t border-border pt-1" style={{ color: EVENT_STYLE[e.kind].colour }}>
               <span className="font-semibold">{EVENT_STYLE[e.kind].label}:</span>{" "}
-              <span className="text-slate-600">{e.title}</span>
+              <span className="text-muted-foreground">{e.title}</span>
             </p>
           ))}
         </ChartTooltip>
@@ -278,7 +278,7 @@ function TrendPlot({
 function EventStrip({ events, onOpenRule }: { events: TrendEvent[]; onOpenRule: (id: string) => void }) {
   const recent = [...events].reverse().slice(0, 4);
   if (!recent.length) {
-    return <p className="mt-2 text-2xs text-slate-400">No quality drops, incidents or schema changes in this window.</p>;
+    return <p className="mt-2 text-2xs text-muted-foreground">No quality drops, incidents or schema changes in this window.</p>;
   }
   return (
     <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
@@ -290,13 +290,13 @@ function EventStrip({ events, onOpenRule }: { events: TrendEvent[]; onOpenRule: 
               type="button"
               disabled={!id}
               onClick={() => id && onOpenRule(id)}
-              className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-2xs transition enabled:hover:bg-slate-50 dark:enabled:hover:bg-muted"
+              className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-2xs transition enabled:hover:bg-muted dark:enabled:hover:bg-muted"
               title={e.detail}
             >
               <span className="mt-1 size-1.5 shrink-0 rounded-full" style={{ backgroundColor: EVENT_STYLE[e.kind].colour }} />
               <span className="min-w-0">
-                <span className="block truncate font-medium text-slate-700 dark:text-foreground">{e.title}</span>
-                <span className="text-slate-400">
+                <span className="block truncate font-medium text-foreground">{e.title}</span>
+                <span className="text-muted-foreground">
                   {EVENT_STYLE[e.kind].label} · {shortDate(e.date)}
                 </span>
               </span>

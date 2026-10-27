@@ -19,51 +19,51 @@ export function MethodologyPanel({ data, className }: { data: DataReliability; c
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
       >
         <span className="flex items-center gap-2">
-          <span className="icon-well size-7 rounded-lg bg-[#e3ecfd] text-[#2f6fed]">
+          <span className="icon-well size-7 rounded-lg bg-[#e3ecfd] text-[hsl(var(--primary))]">
             <Sigma className="size-4" />
           </span>
           <span>
-            <span className="block text-sm font-semibold text-slate-800 dark:text-foreground">DQ score methodology</span>
-            <span className="block text-2xs text-slate-500">How the trust score is calculated, weighted and banded</span>
+            <span className="block text-sm font-semibold text-foreground">DQ score methodology</span>
+            <span className="block text-2xs text-muted-foreground">How the trust score is calculated, weighted and banded</span>
           </span>
         </span>
-        <ChevronDown className={cn("size-4 text-slate-400 transition", open && "rotate-180")} />
+        <ChevronDown className={cn("size-4 text-muted-foreground transition", open && "rotate-180")} />
       </button>
       {open ? (
-        <div className="grid gap-5 border-t border-slate-100 px-4 py-4 lg:grid-cols-3 dark:border-border">
+        <div className="grid gap-5 border-t border-border px-4 py-4 lg:grid-cols-3 dark:border-border">
           <div className="lg:col-span-1">
-            <h4 className="text-2xs font-semibold uppercase tracking-wide text-slate-500">Formula</h4>
-            <p className="mt-1.5 rounded-xl bg-slate-50 px-3 py-2 font-mono text-[11px] leading-relaxed text-slate-700 dark:bg-muted dark:text-foreground">
+            <h4 className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Formula</h4>
+            <p className="mt-1.5 rounded-xl bg-muted px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground dark:bg-muted dark:text-foreground">
               {m.formula}
             </p>
-            <h4 className="mt-4 text-2xs font-semibold uppercase tracking-wide text-slate-500">Severity weight within a dimension</h4>
+            <h4 className="mt-4 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Severity weight within a dimension</h4>
             <div className="mt-1.5 flex gap-1.5">
               {SEVERITIES.map((s) => (
-                <span key={s} className="flex-1 rounded-lg bg-slate-50 px-2 py-1.5 text-center dark:bg-muted">
-                  <span className="block text-[10px] capitalize text-slate-400">{s}</span>
-                  <span className="text-sm font-semibold tabular-nums text-slate-700 dark:text-foreground">×{m.severityWeights[s]}</span>
+                <span key={s} className="flex-1 rounded-lg bg-muted px-2 py-1.5 text-center dark:bg-muted">
+                  <span className="block text-[10px] capitalize text-muted-foreground">{s}</span>
+                  <span className="text-sm font-semibold tabular-nums text-foreground">×{m.severityWeights[s]}</span>
                 </span>
               ))}
             </div>
           </div>
           <div>
-            <h4 className="text-2xs font-semibold uppercase tracking-wide text-slate-500">Dimension weights</h4>
+            <h4 className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Dimension weights</h4>
             <ul className="mt-2 space-y-2">
               {m.dimensions.map((d) => (
                 <li key={d.key} className="text-xs">
                   <div className="flex items-center justify-between">
-                    <span className={cn("text-slate-700 dark:text-foreground", !d.measured && "text-slate-400")}>
+                    <span className={cn("text-foreground", !d.measured && "text-muted-foreground")}>
                       {d.label}
                       {!d.measured ? <span className="ml-1 text-[10px]">(not measured)</span> : null}
                     </span>
-                    <span className="tabular-nums text-slate-500">
+                    <span className="tabular-nums text-muted-foreground">
                       {Math.round(d.weight)}%
                       {d.effectiveWeight != null && Math.abs(d.effectiveWeight - d.weight) > 0.05 ? (
-                        <span className="text-slate-400"> → {d.effectiveWeight.toFixed(1)}%</span>
+                        <span className="text-muted-foreground"> → {d.effectiveWeight.toFixed(1)}%</span>
                       ) : null}
                     </span>
                   </div>
-                  <span className="mt-1 block h-1.5 rounded-full bg-slate-100">
+                  <span className="mt-1 block h-1.5 rounded-full bg-muted">
                     <span
                       className="block h-full rounded-full"
                       style={{ width: `${Math.min(100, d.weight * 2.5)}%`, backgroundColor: DIMENSION_COLOUR[d.key as DimensionKey] }}
@@ -74,22 +74,22 @@ export function MethodologyPanel({ data, className }: { data: DataReliability; c
             </ul>
           </div>
           <div>
-            <h4 className="text-2xs font-semibold uppercase tracking-wide text-slate-500">Trust bands</h4>
+            <h4 className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Trust bands</h4>
             <ul className="mt-2 space-y-1.5">
               {m.bands.map((b, i) => (
-                <li key={b.key} className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs dark:bg-muted">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-foreground">
+                <li key={b.key} className="flex items-center justify-between rounded-lg bg-muted px-2.5 py-1.5 text-xs dark:bg-muted">
+                  <span className="flex items-center gap-1.5 font-medium text-foreground">
                     <span className="size-2 rounded-full" style={{ backgroundColor: BAND_COLOUR[b.key] }} />
                     {b.label}
                   </span>
-                  <span className="tabular-nums text-slate-500">
+                  <span className="tabular-nums text-muted-foreground">
                     {i === 0 ? `${b.min}–100` : b.min === 0 ? `< ${m.bands[i - 1]!.min}` : `${b.min}–${m.bands[i - 1]!.min}`}
                   </span>
                 </li>
               ))}
             </ul>
             {m.notes.length ? (
-              <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-500">
+              <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-muted-foreground">
                 {m.notes.map((n, i) => (
                   <li key={i}>{n}</li>
                 ))}
@@ -116,9 +116,9 @@ export function CapabilitiesPanel({ capabilities, className }: { capabilities: C
         {capabilities.map((c) => {
           const s = CAPABILITY_STYLE[c.status];
           return (
-            <div key={c.key} className="rounded-xl border border-slate-100 px-3 py-2.5 dark:border-border">
+            <div key={c.key} className="rounded-xl border border-border px-3 py-2.5 dark:border-border">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-slate-800 dark:text-foreground">{c.label}</p>
+                <p className="text-xs font-semibold text-foreground">{c.label}</p>
                 <span
                   className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
                   style={{ color: s.colour, backgroundColor: s.bg }}
@@ -127,7 +127,7 @@ export function CapabilitiesPanel({ capabilities, className }: { capabilities: C
                   {s.label}
                 </span>
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{c.detail}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{c.detail}</p>
             </div>
           );
         })}

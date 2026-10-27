@@ -12,7 +12,7 @@ type Level = "state" | "zone";
 type Category = "Leader" | "Average" | "Underperforming";
 
 const CATEGORY_STYLE: Record<Category, { fill: string; stroke: string }> = {
-  Leader: { fill: "#2f6fed", stroke: "#1d4fc4" },
+  Leader: { fill: "hsl(var(--primary))", stroke: "#1d4fc4" },
   Average: { fill: "#8fa6c4", stroke: "#64748b" },
   Underperforming: { fill: "#e3a19a", stroke: "#c8574d" },
 };
@@ -89,7 +89,7 @@ function MatrixSvg({
   const plotted = items.filter((item) => item.growth != null);
   if (!plotted.length) {
     return (
-      <div ref={ref} className="flex h-[268px] items-center justify-center text-xs text-slate-400">
+      <div ref={ref} className="flex h-[268px] items-center justify-center text-xs text-muted-foreground">
         No prior-year data to compare growth for this selection.
       </div>
     );
@@ -120,32 +120,32 @@ function MatrixSvg({
           <rect x={margin.left} y={y(yMid)} width={Math.max(x(xMid) - margin.left, 0)} height={margin.top + innerH - y(yMid)} fill="#fbeeec" opacity={0.6} />
           {xTicks.map((t) => (
             <g key={t}>
-              <line x1={x(t)} x2={x(t)} y1={margin.top} y2={margin.top + innerH} stroke="#eef2f7" />
-              <text x={x(t)} y={height - 18} textAnchor="middle" fontSize={10} fill="#94a3b8">
+              <line x1={x(t)} x2={x(t)} y1={margin.top} y2={margin.top + innerH} stroke="hsl(var(--chart-grid))" />
+              <text x={x(t)} y={height - 18} textAnchor="middle" fontSize={10} fill="hsl(var(--chart-axis))">
                 {formatPct(t, true, 0)}
               </text>
             </g>
           ))}
           {[0, yMax / 2, yMax].map((t) => (
-            <text key={t} x={margin.left - 6} y={y(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#94a3b8">
+            <text key={t} x={margin.left - 6} y={y(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="hsl(var(--chart-axis))">
               {formatPct(t, false, 0)}
             </text>
           ))}
-          <line x1={x(xMid)} x2={x(xMid)} y1={margin.top} y2={margin.top + innerH} stroke="#94a3b8" strokeDasharray="4 4" />
-          <line x1={margin.left} x2={width - margin.right} y1={y(yMid)} y2={y(yMid)} stroke="#94a3b8" strokeDasharray="4 4" />
+          <line x1={x(xMid)} x2={x(xMid)} y1={margin.top} y2={margin.top + innerH} stroke="hsl(var(--chart-axis))" strokeDasharray="4 4" />
+          <line x1={margin.left} x2={width - margin.right} y1={y(yMid)} y2={y(yMid)} stroke="hsl(var(--chart-axis))" strokeDasharray="4 4" />
           <text x={width - margin.right - 4} y={margin.top + 12} textAnchor="end" fontSize={10} fontWeight={700} fill={COCKPIT.blue}>
             LEADERS
           </text>
           <text x={margin.left + 4} y={margin.top + innerH - 6} fontSize={10} fontWeight={700} fill={COCKPIT.negative}>
             UNDERPERFORMING
           </text>
-          <text x={margin.left + 4} y={margin.top + 12} fontSize={10} fontWeight={600} fill="#94a3b8">
+          <text x={margin.left + 4} y={margin.top + 12} fontSize={10} fontWeight={600} fill="hsl(var(--chart-axis))">
             AVERAGE · defend share
           </text>
-          <text x={width - margin.right - 4} y={margin.top + innerH - 6} textAnchor="end" fontSize={10} fontWeight={600} fill="#94a3b8">
+          <text x={width - margin.right - 4} y={margin.top + innerH - 6} textAnchor="end" fontSize={10} fontWeight={600} fill="hsl(var(--chart-axis))">
             AVERAGE · rising
           </text>
-          <text x={margin.left + innerW / 2} y={height - 3} textAnchor="middle" fontSize={10} fill="#64748b">
+          <text x={margin.left + innerW / 2} y={height - 3} textAnchor="middle" fontSize={10} fill="hsl(var(--chart-axis))">
             Revenue growth YoY → (dashed = overall {formatPct(market, true)})
           </text>
           {[...plotted]
@@ -177,9 +177,9 @@ function MatrixSvg({
       ) : null}
       {hover ? (
         <ChartTooltip x={x(hover.growth ?? 0)} y={y(hover.share)} width={width}>
-          <p className="font-semibold text-slate-800 dark:text-foreground">
+          <p className="font-semibold text-foreground">
             {hover.name}
-            {hover.group && hover.group !== hover.name ? <span className="font-normal text-slate-400"> · {hover.group}</span> : null}
+            {hover.group && hover.group !== hover.name ? <span className="font-normal text-muted-foreground"> · {hover.group}</span> : null}
           </p>
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: CATEGORY_STYLE[categorise(hover)].stroke }}>
             {categorise(hover)}
@@ -188,7 +188,7 @@ function MatrixSvg({
           <Row label="Growth" value={formatPct(hover.growth, true)} />
           <Row label="Contribution" value={formatPct(hover.share)} />
           <Row label="Units" value={formatCount(hover.units)} />
-          <p className="mt-1 text-[10px] text-slate-400">Click to filter the dashboard</p>
+          <p className="mt-1 text-[10px] text-muted-foreground">Click to filter the dashboard</p>
         </ChartTooltip>
       ) : null}
     </div>
@@ -198,8 +198,8 @@ function MatrixSvg({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4 py-0.5">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-semibold tabular-nums text-slate-800 dark:text-foreground">{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold tabular-nums text-foreground">{value}</span>
     </div>
   );
 }

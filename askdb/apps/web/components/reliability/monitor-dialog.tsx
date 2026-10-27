@@ -160,15 +160,15 @@ export function MonitorDialog({
             initial={{ y: 12, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 12, opacity: 0 }}
-            className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-border dark:bg-surface-raised"
+            className="w-full max-w-2xl rounded-2xl border border-border bg-white shadow-2xl border-border bg-surface-raised"
           >
-            <header className="flex items-start justify-between border-b border-slate-100 px-5 py-4 dark:border-border">
+            <header className="flex items-start justify-between border-b border-border px-5 py-4 dark:border-border">
               <div>
-                <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-[#2f6fed]">New monitor</p>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-foreground">Create a data quality rule</h2>
-                <p className="text-2xs text-slate-500">It runs with the next check and counts toward the trust score straight away.</p>
+                <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-[hsl(var(--primary))]">New monitor</p>
+                <h2 className="text-base font-semibold text-foreground">Create a data quality rule</h2>
+                <p className="text-2xs text-muted-foreground">It runs with the next check and counts toward the trust score straight away.</p>
               </div>
-              <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Close">
+              <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Close">
                 <X className="size-4" />
               </button>
             </header>
@@ -189,14 +189,14 @@ export function MonitorDialog({
                         "rounded-lg border px-2 py-1.5 text-left text-2xs font-medium transition",
                         kind === k.value
                           ? "border-[#8fb3f5] bg-[#eef4ff] text-[#2f5fc4]"
-                          : "border-slate-200 text-slate-600 hover:border-slate-300 dark:border-border",
+                          : "border-border text-muted-foreground hover:border-border",
                       )}
                     >
                       {k.label}
                     </button>
                   ))}
                 </div>
-                <p className="mt-1 text-[10px] text-slate-400">{kindSpec.hint}</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">{kindSpec.hint}</p>
               </Field>
 
               <Field label="Dataset">
@@ -331,18 +331,18 @@ export function MonitorDialog({
               </Field>
             </div>
 
-            <footer className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 dark:border-border">
-              <p className={cn("text-2xs", error ? "text-[#a8463d]" : "text-slate-400")} role={error ? "alert" : undefined}>
+            <footer className="flex items-center justify-between gap-3 border-t border-border px-5 py-3 dark:border-border">
+              <p className={cn("text-2xs", error ? "text-[#a8463d]" : "text-muted-foreground")} role={error ? "alert" : undefined}>
                 {error ?? (missing.length ? `Still needed: ${missing.join(", ")}.` : "Ready to create.")}
               </p>
               <div className="flex gap-2">
-                <button type="button" onClick={onClose} className="h-8 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                <button type="button" onClick={onClose} className="h-8 rounded-lg border border-border px-3 text-xs font-medium text-foreground hover:bg-muted">
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={missing.length > 0 || pending}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#2f6fed] px-3 text-xs font-medium text-white shadow-sm disabled:opacity-40"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[hsl(var(--primary))] px-3 text-xs font-medium text-white shadow-sm disabled:opacity-40"
                 >
                   {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
                   Create monitor
@@ -358,7 +358,7 @@ export function MonitorDialog({
 
 function Field({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
-    <label className={cn("block text-[11px] font-medium text-slate-500", className)}>
+    <label className={cn("block text-[11px] font-medium text-muted-foreground", className)}>
       {label}
       {children}
     </label>
