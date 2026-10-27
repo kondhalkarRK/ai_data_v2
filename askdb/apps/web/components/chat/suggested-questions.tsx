@@ -22,7 +22,7 @@ export function SuggestedQuestions({
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         Suggested follow-ups
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         {items.map((item) => (
           <Button
             key={item}

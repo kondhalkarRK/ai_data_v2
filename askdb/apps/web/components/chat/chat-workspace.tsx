@@ -10,12 +10,21 @@ import { ResponseCard } from "@/components/chat/response-card";
 import { applyChatSseEvent } from "@/components/chat/sse";
 import type { ChatMessage } from "@/components/chat/types";
 import { ChatQuotaWidget } from "@/components/governance/chat-quota-widget";
+import { SuggestedQuestions } from "@/components/chat/suggested-questions";
+import { ModulePageHeader, ModulePanel } from "@/components/shell/module-chrome";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { myUsageKey, quotaMessage } from "@/hooks/use-my-usage";
 import { useActiveIndustry } from "@/hooks/use-session";
 import { API_BASE_URL, ApiError, apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+
+const STARTER_QUESTIONS = [
+  "Revenue by month",
+  "Top brands by revenue",
+  "Units sold by state",
+  "Loss ratio by line of business",
+];
 
 export function ChatWorkspace() {
   const industry = useActiveIndustry();
@@ -207,33 +216,28 @@ export function ChatWorkspace() {
     [...messages].reverse().find((message) => message.role === "user")?.question ?? "";
 
   return (
-    <div className="flex h-[calc(100dvh-var(--topbar-height)-2rem)] min-h-[420px] flex-col gap-3 lg:h-[calc(100dvh-var(--topbar-height)-3rem)]">
-      <div className="flex shrink-0 items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">AI Chat</h1>
-          <p className="text-xs text-muted-foreground">
-            Grounded NLQ · table, chart, and SQL in one place
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <ChatQuotaWidget />
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            className="gap-1.5"
-            onClick={() => setPanelOpen((value) => !value)}
-            aria-pressed={panelOpen}
-          >
-            {panelOpen ? (
-              <PanelRightClose className="size-3.5" />
-            ) : (
-              <PanelRightOpen className="size-3.5" />
-            )}
-            {panelOpen ? "Hide panel" : "Show panel"}
-          </Button>
-        </div>
-      </div>
+    <div className="module-workspace flex h-[calc(100dvh-var(--topbar-height)-2rem)] min-h-[420px] flex-col gap-4 lg:h-[calc(100dvh-var(--topbar-height)-3rem)]">
+      <ModulePageHeader
+        eyebrow="AI analytics"
+        title="Ask your data"
+        meta="Grounded natural language · SQL, tables, charts, and narration in one workspace"
+        actions={
+          <>
+            <ChatQuotaWidget />
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="gap-1.5"
+              onClick={() => setPanelOpen((value) => !value)}
+              aria-pressed={panelOpen}
+            >
+              {panelOpen ? <PanelRightClose className="size-3.5" /> : <PanelRightOpen className="size-3.5" />}
+              {panelOpen ? "Hide panel" : "Show panel"}
+            </Button>
+          </>
+        }
+      />
 
       <div
         className={cn(
@@ -241,18 +245,23 @@ export function ChatWorkspace() {
           panelOpen ? "lg:grid-cols-[minmax(0,1fr)_280px]" : "grid-cols-1",
         )}
       >
-        <Card className="flex min-h-0 flex-col overflow-hidden">
+        <ModulePanel className="flex min-h-0 flex-col !p-0" padded={false}>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-0 p-0">
-            <div ref={scrollerRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            <div ref={scrollerRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
               {messages.length === 0 ? (
-                <div className="card-supporting border border-dashed border-border/80 px-4 py-8 text-center">
+                <div className="mx-auto max-w-lg space-y-4 py-6 text-center">
                   <p className="text-sm text-muted-foreground">
-                    Try “loss ratio”, “claims by status”, “revenue by month”, “surprise me”, or a
-                    what-if like “what if revenue increased 10%”.
+                    Ask in plain English. Answers are grounded in your semantic layer and validated
+                    before results are shown.
                   </p>
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    Press Ctrl/Cmd+K to jump to glossary terms, the semantic graph, or saved
-                    insights.
+                  <SuggestedQuestions
+                    items={STARTER_QUESTIONS}
+                    disabled={busy}
+                    onSelect={(text) => void runAsk(text)}
+                    className="justify-center"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Ctrl/Cmd+K — glossary, semantic graph, saved questions
                   </p>
                 </div>
               ) : null}
@@ -260,7 +269,7 @@ export function ChatWorkspace() {
                 message.role === "user" ? (
                   <div
                     key={message.id}
-                    className="ml-auto max-w-[85%] rounded-[var(--radius-card)] bg-primary px-4 py-2.5 text-sm text-primary-foreground"
+                    className="chat-user-bubble ml-auto max-w-[min(85%,42rem)] rounded-2xl px-4 py-2.5 text-sm"
                   >
                     {message.question}
                   </div>
@@ -280,7 +289,7 @@ export function ChatWorkspace() {
             </div>
 
             <form
-              className="shrink-0 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur"
+              className="ai-surface shrink-0 border-t border-border/80 px-4 py-3 sm:px-6"
               onSubmit={onSubmit}
             >
               <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -293,27 +302,27 @@ export function ChatWorkspace() {
               </label>
               <div className="flex gap-2">
                 <input
-                  className="h-11 flex-1 rounded-[var(--radius-control)] border border-border bg-background px-3 text-sm outline-none ring-primary/20 focus:ring-2"
+                  className="h-11 flex-1 rounded-[var(--radius-control)] border border-border/80 bg-surface px-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
-                  placeholder="Ask a governed analytics question"
+                  placeholder="Ask a governed analytics question…"
                 />
                 {busy ? (
                   <Button type="button" variant="secondary" onClick={() => void cancelInFlight()}>
                     Cancel
                   </Button>
                 ) : (
-                  <Button type="submit" className="px-5">
+                  <Button type="submit" variant="ai" className="px-5">
                     Ask
                   </Button>
                 )}
               </div>
             </form>
           </CardContent>
-        </Card>
+        </ModulePanel>
 
         {panelOpen ? (
-          <Card className="hidden min-h-0 overflow-hidden lg:flex lg:flex-col">
+          <ModulePanel className="hidden min-h-0 lg:flex lg:flex-col">
             <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto pt-4">
               <CardTitle className="text-sm">How answers stay honest</CardTitle>
               <CardDescription className="text-xs leading-relaxed">
@@ -329,7 +338,7 @@ export function ChatWorkspace() {
                 <p className="rounded-lg bg-muted/50 px-2 py-1.5 text-xs text-foreground">{toast}</p>
               ) : null}
             </CardContent>
-          </Card>
+          </ModulePanel>
         ) : null}
       </div>
 

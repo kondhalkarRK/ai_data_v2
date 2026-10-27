@@ -48,6 +48,7 @@ import * as React from "react";
 import { InsightSummary } from "@/components/chat/insight-summary";
 import { ResultChart, type ChartKind } from "@/components/chat/result-chart";
 import type { InsightDepth, NarrationSections } from "@/components/chat/types";
+import { ModulePageHeader, ModulePanel, ModuleWorkspace } from "@/components/shell/module-chrome";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -419,40 +420,36 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
   const runDisabled = run.isPending || spec.metrics.length === 0 || (settled && blocked);
 
   return (
-    <div className="analytics-builder relative min-h-[70vh]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 -top-6 h-40 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklab,hsl(var(--info))_18%,transparent),transparent_70%)]"
-      />
-
+    <ModuleWorkspace className="analytics-builder relative min-h-[70vh]">
       {flash ? (
-        <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-border/60 bg-surface-raised/95 px-4 py-2 text-sm shadow-lg backdrop-blur">
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-border bg-surface-raised px-4 py-2 text-sm shadow-overlay">
           {flash}
         </div>
       ) : null}
 
-      <section className="relative mb-4 overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-surface-raised via-surface-raised to-info/5 p-4 shadow-[var(--shadow-card)]">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-info">Business analytics</p>
-            <h2 className="mt-1 text-lg font-semibold tracking-tight">Ask in concepts, not tables</h2>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Pick a metric, how to split it and an analysis. Options that don&apos;t fit your
-              selection are explained, and every result comes with a business summary.
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <Link href={ontologyHref} className="text-xs font-medium text-primary hover:underline">
-              Inspect in Ontology →
-            </Link>
-            {caps?.dataAsOf ? (
-              <span className="text-[11px] text-muted-foreground">Data through {caps.dataAsOf}</span>
-            ) : null}
-          </div>
-        </div>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+      <ModulePageHeader
+        eyebrow="Analytics builder"
+        title="Structured analysis workbench"
+        meta={
+          caps?.dataAsOf
+            ? `Compose metrics, dimensions, and filters · Data through ${caps.dataAsOf}`
+            : "Compose metrics, dimensions, filters, and advanced analytics"
+        }
+        actions={
+          <Link href={ontologyHref} className="text-xs font-medium text-primary hover:underline">
+            Inspect in Ontology →
+          </Link>
+        }
+      />
+
+      <ModulePanel className="ai-surface mb-1">
+        <p className="text-xs text-muted-foreground">
+          Describe an analysis in plain language to populate the builder, or configure metrics and
+          dimensions manually.
+        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
-            <Sparkles className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-info" />
+            <Sparkles className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ai" />
             <Input
               value={aiPrompt}
               onChange={(event) => setAiPrompt(event.target.value)}
@@ -460,13 +457,13 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                 if (event.key === "Enter") void handleAssist();
               }}
               placeholder="Try “Top 3 models within each brand” or “Revenue trend last 12 months”"
-              className="h-10 border-border/60 bg-background/70 pl-10"
+              className="h-10 border-border/80 bg-surface pl-10"
               aria-label="AI assisted builder prompt"
             />
           </div>
           <Button
             type="button"
-            variant="secondary"
+            variant="ai"
             className="h-10"
             disabled={assist.isPending || !aiPrompt.trim()}
             onClick={() => void handleAssist()}
@@ -475,7 +472,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
             Populate builder
           </Button>
         </div>
-      </section>
+      </ModulePanel>
 
       <div className="relative grid gap-4 lg:grid-cols-[19rem_minmax(0,1fr)]">
         <aside className="space-y-2 lg:sticky lg:top-3 lg:self-start">
@@ -521,7 +518,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
             })}
           </div>
 
-          <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-3 shadow-sm">
+          <ModulePanel className="!p-3">
             {!caps ? (
               <div className="flex flex-col gap-2 py-6 text-xs text-muted-foreground">
                 {capsQuery.isError ? (
@@ -597,11 +594,11 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                 onChange={(patch) => update((prev) => ({ ...prev, ...patch }))}
               />
             )}
-          </section>
+          </ModulePanel>
         </aside>
 
         <div className="min-w-0 space-y-4">
-          <section className="rounded-2xl border border-border/60 bg-surface-raised/85 p-3 shadow-sm">
+          <ModulePanel className="!p-3">
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex min-w-[220px] flex-1 items-center gap-2 text-[11px] text-muted-foreground">
                 <Calendar className="size-3.5 shrink-0" />
@@ -675,13 +672,13 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                 />
               </div>
             ) : null}
-          </section>
+          </ModulePanel>
 
           {errors.length || warnings.length ? (
             <IssuesPanel errors={errors} warnings={warnings} onFix={handleFix} />
           ) : null}
 
-          <section className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-surface-raised/90 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+          <ModulePanel className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-info">Query summary</p>
               <p className="mt-1 text-sm font-medium leading-snug">{sentence}</p>
@@ -709,7 +706,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
                 <span className="text-center text-[10px] text-muted-foreground">Fix the highlighted issue to run</span>
               ) : null}
             </div>
-          </section>
+          </ModulePanel>
 
           {report?.suggestions.length && spec.metrics.length ? (
             <SuggestionStrip suggestions={report.suggestions} onPick={(s) => void applySuggestion(s)} />
@@ -878,7 +875,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
           </main>
         </div>
       </div>
-    </div>
+    </ModuleWorkspace>
   );
 }
 

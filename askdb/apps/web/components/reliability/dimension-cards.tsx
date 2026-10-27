@@ -37,8 +37,8 @@ export function DimensionCards({
             title={d.question}
             className={cn(
               cardClass,
-              "group flex flex-col p-3.5 text-left transition hover:border-[#8fb3f5] hover:shadow-md",
-              active && "border-[#8fb3f5] ring-2 ring-[hsl(var(--primary))]/15",
+              "group flex flex-col p-3.5 text-left transition hover:border-primary/35 hover:shadow-[var(--shadow-raised)]",
+              active && "border-primary/40 ring-2 ring-primary/15",
               faded && "opacity-60 hover:opacity-100",
             )}
           >
@@ -66,9 +66,9 @@ export function DimensionCards({
                   {formatScore(d.score)}
                 </p>
                 <p className="text-2xs text-muted-foreground">
-                  <span className="text-[#0f7a6c]">{d.passing} passing</span>
-                  {d.failing ? <span className="text-[#a8463d]"> · {d.failing} failing</span> : null}
-                  {d.errored ? <span className="text-[#94660f]"> · {d.errored} not run</span> : null}
+                  <span className="text-success">{d.passing} passing</span>
+                  {d.failing ? <span className="text-danger"> · {d.failing} failing</span> : null}
+                  {d.errored ? <span className="text-warning"> · {d.errored} not run</span> : null}
                 </p>
               </div>
             </div>
@@ -76,7 +76,7 @@ export function DimensionCards({
               <span
                 className={cn(
                   "text-2xs font-medium tabular-nums",
-                  d.delta7d != null && d.delta7d < -0.05 ? "text-[#94660f]" : "text-muted-foreground",
+                  d.delta7d != null && d.delta7d < -0.05 ? "text-warning" : "text-muted-foreground",
                 )}
               >
                 {formatDelta(d.delta7d)} <span className="font-normal text-muted-foreground">7d</span>

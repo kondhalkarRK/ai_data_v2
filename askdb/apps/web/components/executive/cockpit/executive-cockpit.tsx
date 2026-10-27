@@ -2,7 +2,7 @@
 
 import type { Industry } from "@nql/shared-types";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Download, Loader2, RefreshCw, SlidersHorizontal, X } from "lucide-react";
+import { Download, Loader2, RefreshCw, SlidersHorizontal } from "lucide-react";
 import * as React from "react";
 
 import { BubbleMatrix } from "@/components/executive/cockpit/bubble-matrix";
@@ -22,6 +22,14 @@ import type {
   FilterKey,
   SelectHandler,
 } from "@/components/executive/cockpit/types";
+import {
+  ModuleFilterChips,
+  ModulePageHeader,
+  ModuleSection,
+  ModuleStatusBanner,
+  ModuleToolbarButton,
+  ModuleWorkspace,
+} from "@/components/shell/module-chrome";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -121,74 +129,61 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
     );
   };
 
-  return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--primary))]">Executive KPI analytics</p>
-          <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">
-            {data ? data.period.label : "Sales performance"}
-            {data ? (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                vs {data.period.priorLabel} · data as of {formatDate(data.period.dataAsOf)}
-              </span>
-            ) : null}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {cockpit.isFetching && data ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating" /> : null}
-          <HeaderButton onClick={() => setPaneOpen((v) => !v)} active={count > 0}>
-            <SlidersHorizontal className="size-3.5" /> Filters{count ? ` (${count})` : ""}
-          </HeaderButton>
-          <HeaderButton
-            onClick={() => {
-              refreshNext.current = true;
-              void cockpit.refetch();
-            }}
-          >
-            <RefreshCw className={cn("size-3.5", cockpit.isFetching && "animate-spin")} /> Refresh
-          </HeaderButton>
-          <HeaderButton onClick={exportSummary} disabled={!data}>
-            <Download className="size-3.5" /> Export
-          </HeaderButton>
-        </div>
-      </header>
+  const filterChipItems = chips.map(([key, value]) => ({
+    key,
+    label: FILTER_LABELS[key],
+    value: label(key, value),
+  }));
 
-      {chips.length ? (
-        <div className="-mt-1 flex flex-wrap items-center gap-1.5">
-          {chips.map(([key, value]) => (
-            <span
-              key={key}
-              className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--primary) / 0.35)] bg-[hsl(var(--primary) / 0.12)] py-0.5 pl-2.5 pr-1 text-2xs text-foreground"
+  return (
+    <ModuleWorkspace>
+      <ModulePageHeader
+        eyebrow="Executive intelligence"
+        title={data ? data.period.label : "Sales performance"}
+        meta={
+          data
+            ? `Compared to ${data.period.priorLabel} · Data as of ${formatDate(data.period.dataAsOf)}`
+            : "KPI analytics across revenue, volume, and product mix"
+        }
+        actions={
+          <>
+            {cockpit.isFetching && data ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating" />
+            ) : null}
+            <ModuleToolbarButton onClick={() => setPaneOpen((v) => !v)} active={count > 0}>
+              <SlidersHorizontal className="size-3.5" /> Filters{count ? ` (${count})` : ""}
+            </ModuleToolbarButton>
+            <ModuleToolbarButton
+              onClick={() => {
+                refreshNext.current = true;
+                void cockpit.refetch();
+              }}
             >
-              <span className="text-muted-foreground">{FILTER_LABELS[key]}:</span>
-              <span className="font-semibold">{label(key, value)}</span>
-              <button
-                type="button"
-                aria-label={`Remove ${FILTER_LABELS[key]} filter`}
-                className="rounded-full p-0.5 hover:bg-[#dce8fd]"
-                onClick={() =>
-                  setFilters((current) => ({
-                    ...current,
-                    [key]: undefined,
-                    ...(key === "dealer_id" ? { sales_person_id: undefined } : {}),
-                  }))
-                }
-              >
-                <X className="size-3" />
-              </button>
-            </span>
-          ))}
-          <button type="button" className="ml-1 text-2xs font-medium text-[hsl(var(--primary))] hover:underline" onClick={() => setFilters({})}>
-            Clear all
-          </button>
-        </div>
-      ) : null}
+              <RefreshCw className={cn("size-3.5", cockpit.isFetching && "animate-spin")} /> Refresh
+            </ModuleToolbarButton>
+            <ModuleToolbarButton onClick={exportSummary} disabled={!data}>
+              <Download className="size-3.5" /> Export
+            </ModuleToolbarButton>
+          </>
+        }
+      />
+
+      <ModuleFilterChips
+        chips={filterChipItems}
+        onRemove={(key) =>
+          setFilters((current) => ({
+            ...current,
+            [key]: undefined,
+            ...(key === "dealer_id" ? { sales_person_id: undefined } : {}),
+          }))
+        }
+        onClear={() => setFilters({})}
+      />
 
       {cockpit.isPending ? (
         <CockpitSkeleton />
       ) : cockpit.isError && !data ? (
-        <div className="rounded-2xl border border-border bg-white p-6 text-sm">
+        <div className="module-panel p-6 text-sm">
           <p className="font-medium text-foreground">The KPI cockpit could not be loaded.</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {(cockpit.error as Error)?.message || "Check that the automotive warehouse is loaded, then refresh."}
@@ -205,39 +200,45 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
           </div>
         </div>
       ) : data?.empty ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-10 text-center">
+        <div className="empty-state p-10">
           <p className="text-sm font-medium text-foreground">No sales match this selection.</p>
           <button type="button" className="mt-2 text-xs font-medium text-[hsl(var(--primary))] hover:underline" onClick={() => setFilters({})}>
             Clear filters
           </button>
         </div>
       ) : data ? (
-        <div className={cn("space-y-10 transition-opacity", cockpit.isFetching && "opacity-80")}>
+        <div className={cn("space-y-8 transition-opacity", cockpit.isFetching && "opacity-80")}>
           {cockpit.isError ? (
-            <p role="alert" className="rounded-xl border border-[#f0d9a8] bg-[#fdf3dc] px-3 py-2 text-xs text-[#7a5a14]">
+            <ModuleStatusBanner tone="warn">
               Refresh failed. Showing the figures last loaded for this selection.
-            </p>
+            </ModuleStatusBanner>
           ) : null}
           <KpiStrip data={data} onSelect={select} />
 
-          <CockpitSection title="Performance" description="How revenue is trending and which regions lead or lag.">
-            <div className="grid gap-6 xl:grid-cols-12">
+          <ModuleSection
+            title="Performance"
+            description="Revenue and volume trends with regional growth versus the portfolio average."
+          >
+            <div className="grid gap-4 xl:grid-cols-12 xl:gap-5">
               <TrendChart data={data} className="xl:col-span-7" />
               <BubbleMatrix data={data} onSelect={select} className="xl:col-span-5" />
             </div>
-          </CockpitSection>
+          </ModuleSection>
 
-          <CockpitSection title="Product mix" description="Which brands, models and segments drive the business.">
-            <div className="grid gap-6 xl:grid-cols-12">
+          <ModuleSection
+            title="Product mix"
+            description="Brand and model contribution, segment share, and ranked performers."
+          >
+            <div className="grid gap-4 xl:grid-cols-12 xl:gap-5">
               <RevenueSunburst data={data} onSelect={select} className="xl:col-span-5" />
               <RankedModels data={data} onSelect={select} className="xl:col-span-7" />
             </div>
             <SalesMix data={data} onSelect={select} />
-          </CockpitSection>
+          </ModuleSection>
 
-          <CockpitSection title="Regional performance" description="Where growth is coming from across India.">
+          <ModuleSection title="Regional performance" description="State and city contribution with drill-down filters.">
             <GeoIntelligence data={data} onSelect={select} />
-          </CockpitSection>
+          </ModuleSection>
         </div>
       ) : null}
 
@@ -250,60 +251,12 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
         onChange={setFilters}
         onClear={() => setFilters({})}
       />
-    </div>
-  );
-}
-
-function CockpitSection({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-5">
-      <div className="border-b border-border pb-3 dark:border-border">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-      </div>
-      <div className="space-y-6">{children}</div>
-    </section>
+    </ModuleWorkspace>
   );
 }
 
 function pct(value: number | null): number | string {
   return value == null ? "" : +(value * 100).toFixed(2);
-}
-
-function HeaderButton({
-  children,
-  onClick,
-  active = false,
-  disabled = false,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  active?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium shadow-sm transition disabled:opacity-50",
-        active
-          ? "border-[#8fb3f5] bg-[#eef4ff] text-[hsl(var(--primary))]"
-          : "border-border bg-white text-foreground hover:border-slate-300 hover:bg-muted border-border bg-surface-raised dark:text-foreground",
-      )}
-    >
-      {children}
-    </button>
-  );
 }
 
 function CockpitSkeleton() {

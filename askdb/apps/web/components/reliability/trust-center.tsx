@@ -2,7 +2,7 @@
 
 import { type Industry, roleAtLeast } from "@nql/shared-types";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Download, Loader2, Plus, RefreshCw, X } from "lucide-react";
+import { ChevronDown, Download, Loader2, Plus, RefreshCw } from "lucide-react";
 import * as React from "react";
 
 import { exportCsv } from "@/components/executive/cockpit/chart-utils";
@@ -26,6 +26,14 @@ import type {
   TrustFilters,
 } from "@/components/reliability/types";
 import { DIMENSION_LABEL, formatWhen } from "@/components/reliability/ui";
+import {
+  ModuleFilterChips,
+  ModulePageHeader,
+  ModuleSection,
+  ModuleStatusBanner,
+  ModuleToolbarButton,
+  ModuleWorkspace,
+} from "@/components/shell/module-chrome";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/use-session";
 import { ApiError, apiClient } from "@/lib/api-client";
@@ -172,86 +180,65 @@ export function TrustCenter({ industry }: { industry: Industry }) {
     );
   };
 
-  return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#14a3a1]">Executive data reliability center</p>
-          <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">
-            Data Trust Center
-            {data ? (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                {data.dataAsOf ? `data as of ${formatWhen(data.dataAsOf)} · ` : ""}checked {formatWhen(data.computedAt)}
-              </span>
-            ) : null}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {center.isFetching && data ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating" /> : null}
-          {canEdit ? (
-            <HeaderButton
-              onClick={() => {
-                refreshNext.current = true;
-                void center.refetch();
-              }}
-              disabled={center.isFetching}
-            >
-              <RefreshCw className={cn("size-3.5", center.isFetching && "animate-spin")} /> Run checks
-            </HeaderButton>
-          ) : null}
-          <HeaderButton onClick={exportSummary} disabled={!data}>
-            <Download className="size-3.5" /> Export
-          </HeaderButton>
-          {canEdit ? (
-            <HeaderButton
-              primary
-              disabled={!data}
-              onClick={() => {
-                setMonitorError(null);
-                setMonitorOpen(true);
-              }}
-            >
-              <Plus className="size-3.5" /> New monitor
-            </HeaderButton>
-          ) : null}
-        </div>
-      </header>
+  const filterChipItems = chips.map((c) => ({
+    key: c.key,
+    label: c.label,
+    value: c.value,
+  }));
 
-      {chips.length ? (
-        <div className="-mt-1 flex flex-wrap items-center gap-1.5">
-          {chips.map((c) => (
-            <span
-              key={c.key}
-              className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--primary) / 0.35)] bg-[hsl(var(--primary) / 0.12)] py-0.5 pl-2.5 pr-1 text-2xs text-foreground"
-            >
-              <span className="text-muted-foreground">{c.label}:</span>
-              <span className="font-semibold capitalize">{c.value}</span>
-              <button
-                type="button"
-                aria-label={`Remove ${c.label} filter`}
-                className="rounded-full p-0.5 hover:bg-[#dce8fd]"
-                onClick={() => setFilters((current) => ({ ...current, [c.key]: undefined }))}
+  return (
+    <ModuleWorkspace>
+      <ModulePageHeader
+        eyebrow="Data trust & observability"
+        title="Data Trust Center"
+        meta={
+          data
+            ? `${data.dataAsOf ? `Data as of ${formatWhen(data.dataAsOf)} · ` : ""}Last checked ${formatWhen(data.computedAt)}`
+            : "Quality scores, rule results, and actionable issues"
+        }
+        actions={
+          <>
+            {center.isFetching && data ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating" />
+            ) : null}
+            {canEdit ? (
+              <ModuleToolbarButton
+                onClick={() => {
+                  refreshNext.current = true;
+                  void center.refetch();
+                }}
+                disabled={center.isFetching}
               >
-                <X className="size-3" />
-              </button>
-            </span>
-          ))}
-          <button type="button" className="ml-1 text-2xs font-medium text-[hsl(var(--primary))] hover:underline" onClick={() => setFilters({})}>
-            Clear all
-          </button>
-        </div>
-      ) : null}
+                <RefreshCw className={cn("size-3.5", center.isFetching && "animate-spin")} /> Run checks
+              </ModuleToolbarButton>
+            ) : null}
+            <ModuleToolbarButton onClick={exportSummary} disabled={!data}>
+              <Download className="size-3.5" /> Export
+            </ModuleToolbarButton>
+            {canEdit ? (
+              <ModuleToolbarButton
+                primary
+                disabled={!data}
+                onClick={() => {
+                  setMonitorError(null);
+                  setMonitorOpen(true);
+                }}
+              >
+                <Plus className="size-3.5" /> New monitor
+              </ModuleToolbarButton>
+            ) : null}
+          </>
+        }
+      />
+
+      <ModuleFilterChips
+        chips={filterChipItems}
+        onRemove={(key) => setFilters((current) => ({ ...current, [key]: undefined }))}
+        onClear={() => setFilters({})}
+      />
 
       {notice ? (
-        <p
-          role="status"
-          className={cn(
-            "rounded-xl border px-3 py-2 text-xs",
-            notice.tone === "ok" ? "border-[#bfe6dd] bg-[#eef9f6] text-[#0f6b5f]" : "border-[#f0d9a8] bg-[#fdf3dc] text-[#7a5a14]",
-          )}
-        >
-          {notice.text}
-        </p>
+        <ModuleStatusBanner tone={notice.tone === "ok" ? "ok" : "warn"}>{notice.text}</ModuleStatusBanner>
       ) : null}
 
       {center.isPending ? (
@@ -267,11 +254,11 @@ export function TrustCenter({ industry }: { industry: Industry }) {
           </button>
         </div>
       ) : data ? (
-        <div className={cn("space-y-10 transition-opacity", center.isFetching && "opacity-85")}>
+        <div className={cn("space-y-8 transition-opacity", center.isFetching && "opacity-85")}>
           {center.isError ? (
-            <p role="alert" className="rounded-xl border border-[#f0d9a8] bg-[#fdf3dc] px-3 py-2 text-xs text-[#7a5a14]">
+            <ModuleStatusBanner tone="warn">
               The latest check failed to complete. Showing the results from the previous run.
-            </p>
+            </ModuleStatusBanner>
           ) : null}
           {data.storage === "memory" ? (
             <p className="rounded-xl border border-border bg-muted px-3 py-2 text-2xs text-muted-foreground dark:border-border dark:bg-muted">
@@ -282,7 +269,7 @@ export function TrustCenter({ industry }: { industry: Industry }) {
 
           <TrustHero data={data} onFilter={onFilter} onJump={jump} />
 
-          <TrustSection title="Quality by dimension" description="Each dimension's score. Open one to see the rules behind it.">
+          <ModuleSection title="Quality by dimension" description="Scan accuracy through uniqueness. Open a dimension to inspect its rules.">
             <DimensionCards
               dimensions={data.dimensions}
               selected={filters.dimension}
@@ -291,25 +278,25 @@ export function TrustCenter({ industry }: { industry: Industry }) {
             <div id="trust-trend" className="scroll-mt-4">
               <TrustTrendChart data={data} filters={filters} onOpenRule={openRule} />
             </div>
-          </TrustSection>
+          </ModuleSection>
 
-          <TrustSection title="Issues & impact" description="What needs attention and which business numbers it affects.">
+          <ModuleSection title="Issues & impact" description="Failed checks, severity, and the business metrics they affect.">
             <div className="grid gap-6 xl:grid-cols-12">
               <div id="trust-alerts" className="scroll-mt-4 xl:col-span-7">
                 <AlertCenter data={data} filters={filters} onFilter={onFilter} onOpenRule={openRule} className="h-full" />
               </div>
               <BusinessImpactPanel data={data} filters={filters} onOpenRule={openRule} className="xl:col-span-5" />
             </div>
-          </TrustSection>
+          </ModuleSection>
 
-          <TrustSection title="Datasets & freshness" description="How each dataset scores and how recently it was loaded.">
+          <ModuleSection title="Datasets & freshness" description="Dataset scores and load recency — prioritize stale or low-scoring sources.">
             <div className="grid gap-6 xl:grid-cols-12">
               <div id="trust-datasets" className="scroll-mt-4 xl:col-span-7">
                 <DatasetRanking data={data} filters={filters} onFilter={onFilter} onDrill={drill} className="h-full" />
               </div>
               <FreshnessTable data={data} filters={filters} onFilter={onFilter} onOpenRule={openRule} className="xl:col-span-5" />
             </div>
-          </TrustSection>
+          </ModuleSection>
 
           <div id="trust-catalog" className="scroll-mt-4">
             <RulesCatalog
@@ -388,55 +375,7 @@ export function TrustCenter({ industry }: { industry: Industry }) {
           />
         </>
       ) : null}
-    </div>
-  );
-}
-
-function TrustSection({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-5">
-      <div className="border-b border-border pb-3 dark:border-border">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-      </div>
-      <div className="space-y-6">{children}</div>
-    </section>
-  );
-}
-
-function HeaderButton({
-  children,
-  onClick,
-  disabled = false,
-  primary = false,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  primary?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium shadow-sm transition disabled:opacity-50",
-        primary
-          ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white hover:bg-[#285fd0]"
-          : "border-border bg-white text-foreground hover:border-slate-300 hover:bg-muted border-border bg-surface-raised dark:text-foreground",
-      )}
-    >
-      {children}
-    </button>
+    </ModuleWorkspace>
   );
 }
 

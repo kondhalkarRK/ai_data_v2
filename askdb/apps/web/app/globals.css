@@ -513,6 +513,58 @@
     box-shadow: 0 0 0 0 hsl(var(--ai) / 0.35);
     animation: ai-pulse 2.4s ease-in-out infinite;
   }
+
+  /* Premium module shells (Executive, Trust, Chat, Builder) */
+  .module-workspace {
+    margin-inline: auto;
+    max-width: var(--page-max);
+  }
+
+  .module-panel {
+    background-color: hsl(var(--surface-raised));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .module-section + .module-section {
+    margin-top: 2rem;
+    padding-top: 0.25rem;
+  }
+
+  .kpi-card {
+    background-color: hsl(var(--surface-raised));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .kpi-card--featured {
+    border-color: color-mix(in oklab, hsl(var(--primary)) 35%, hsl(var(--border)));
+    box-shadow: var(--shadow-raised);
+  }
+
+  .kpi-card--featured::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    border-radius: var(--radius-card) 0 0 var(--radius-card);
+    background: linear-gradient(180deg, hsl(var(--primary)), hsl(var(--ai)));
+  }
+
+  .chat-user-bubble {
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--muted) / 0.55);
+    color: hsl(var(--foreground));
+  }
+
+  .chat-assistant-panel {
+    background-color: hsl(var(--surface-raised));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
 }
 
 @keyframes ai-pulse {

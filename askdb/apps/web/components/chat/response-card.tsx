@@ -169,19 +169,23 @@ export function ResponseCard({
   const answered = `${(totalMs / 1000).toFixed(1)}s`;
 
   return (
-    <article
-      className={cn(
-        "overflow-hidden rounded-[var(--radius-card)] border border-border/70 bg-background",
-        className,
-      )}
-    >
+    <article className={cn("chat-assistant-panel overflow-hidden", className)}>
       {!meta && message.progress ? (
         <div className="border-b border-border/60 px-4 py-3">
           <ExecutionTimeline progress={message.progress} />
         </div>
       ) : null}
 
-      <div className="space-y-3 px-4 py-4">
+      {meta && !execFailed ? (
+        <div className="border-b border-border/60 bg-muted/20 px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <span className="font-medium text-foreground">{ROUTE_LABEL[route ?? ""] ?? "Analysis"}</span>
+            {totalMs > 0 ? <span className="tabular-nums">Answered in {answered}</span> : null}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="space-y-4 px-4 py-4 sm:px-5">
         {dqFailed ? (
           <ResponseErrorState
             kind="dq"
@@ -214,10 +218,6 @@ export function ResponseCard({
             suggestions={message.followups?.slice(0, 2)}
             onAsk={onAsk}
           />
-        ) : null}
-
-        {route && ROUTE_LABEL[route] ? (
-          <p className="text-[11px] font-medium text-muted-foreground">{ROUTE_LABEL[route]}</p>
         ) : null}
 
         {meta && !execFailed ? <AnswerProvenance meta={meta} /> : null}
@@ -260,8 +260,8 @@ export function ResponseCard({
             <div className="min-h-[160px]">
               {tab === "table" ? (
                 message.columns && message.rows ? (
-                  <div className="overflow-auto rounded-xl border border-border/60">
-                    <table className="min-w-full text-left text-xs">
+                  <div className="data-table-wrap">
+                    <table className="data-table">
                       <thead className="bg-muted/40">
                         <tr>
                           {message.columns.map((column) => (

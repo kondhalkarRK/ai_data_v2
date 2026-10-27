@@ -29,7 +29,7 @@ export function ResponseTabs({
   return (
     <div
       className={cn(
-        "inline-flex max-w-full overflow-x-auto rounded-[var(--radius-control)] border border-border/70 bg-muted/30 p-0.5",
+        "inline-flex max-w-full overflow-x-auto rounded-[var(--radius-control)] border border-border bg-muted/40 p-0.5",
         className,
       )}
       role="tablist"
@@ -46,8 +46,8 @@ export function ResponseTabs({
             className={cn(
               "inline-flex shrink-0 items-center gap-1.5 rounded-[calc(var(--radius-control)-2px)] px-3 py-1.5 text-xs font-medium transition-colors",
               active
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+                ? "border border-primary/25 bg-surface-raised text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
             )}
             onClick={() => onChange(id)}
           >
