@@ -169,23 +169,19 @@ export function ResponseCard({
   const answered = `${(totalMs / 1000).toFixed(1)}s`;
 
   return (
-    <article className={cn("chat-assistant-panel overflow-hidden", className)}>
+    <article
+      className={cn(
+        "overflow-hidden rounded-[var(--radius-card)] border border-border/70 bg-background",
+        className,
+      )}
+    >
       {!meta && message.progress ? (
         <div className="border-b border-border/60 px-4 py-3">
           <ExecutionTimeline progress={message.progress} />
         </div>
       ) : null}
 
-      {meta && !execFailed ? (
-        <div className="border-b border-border/60 bg-muted/20 px-4 py-3 sm:px-5">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
-            <span className="font-medium text-foreground">{ROUTE_LABEL[route ?? ""] ?? "Analysis"}</span>
-            {totalMs > 0 ? <span className="tabular-nums">Answered in {answered}</span> : null}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="space-y-4 px-4 py-4 sm:px-5">
+      <div className="space-y-3 px-4 py-4">
         {dqFailed ? (
           <ResponseErrorState
             kind="dq"
@@ -218,6 +214,10 @@ export function ResponseCard({
             suggestions={message.followups?.slice(0, 2)}
             onAsk={onAsk}
           />
+        ) : null}
+
+        {route && ROUTE_LABEL[route] ? (
+          <p className="text-[11px] font-medium text-muted-foreground">{ROUTE_LABEL[route]}</p>
         ) : null}
 
         {meta && !execFailed ? <AnswerProvenance meta={meta} /> : null}

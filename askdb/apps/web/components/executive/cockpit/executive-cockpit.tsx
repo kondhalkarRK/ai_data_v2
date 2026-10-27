@@ -183,7 +183,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
       {cockpit.isPending ? (
         <CockpitSkeleton />
       ) : cockpit.isError && !data ? (
-        <div className="module-panel p-6 text-sm">
+        <div className="rounded-2xl border border-border bg-surface-raised p-6 text-sm">
           <p className="font-medium text-foreground">The KPI cockpit could not be loaded.</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {(cockpit.error as Error)?.message || "Check that the automotive warehouse is loaded, then refresh."}
@@ -207,7 +207,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
           </button>
         </div>
       ) : data ? (
-        <div className={cn("space-y-8 transition-opacity", cockpit.isFetching && "opacity-80")}>
+        <div className={cn("space-y-10 transition-opacity", cockpit.isFetching && "opacity-80")}>
           {cockpit.isError ? (
             <ModuleStatusBanner tone="warn">
               Refresh failed. Showing the figures last loaded for this selection.
@@ -219,7 +219,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
             title="Performance"
             description="Revenue and volume trends with regional growth versus the portfolio average."
           >
-            <div className="grid gap-4 xl:grid-cols-12 xl:gap-5">
+            <div className="grid gap-6 xl:grid-cols-12">
               <TrendChart data={data} className="xl:col-span-7" />
               <BubbleMatrix data={data} onSelect={select} className="xl:col-span-5" />
             </div>
@@ -229,7 +229,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
             title="Product mix"
             description="Brand and model contribution, segment share, and ranked performers."
           >
-            <div className="grid gap-4 xl:grid-cols-12 xl:gap-5">
+            <div className="grid gap-6 xl:grid-cols-12">
               <RevenueSunburst data={data} onSelect={select} className="xl:col-span-5" />
               <RankedModels data={data} onSelect={select} className="xl:col-span-7" />
             </div>

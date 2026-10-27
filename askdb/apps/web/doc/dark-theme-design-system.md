@@ -41,17 +41,6 @@ All theme values live in `app/globals.css` as HSL custom properties on `:root` a
 - `lib/design.ts` — `CHART_SERIES`, `statusToneClasses`, DQ dimension colours
 - `lib/chart-colors.ts` — runtime series colours + `SVG_CHART` constants
 
-## Module chrome (four core workspaces)
-
-Shared layout primitives live in `components/shell/module-chrome.tsx`:
-
-- `ModuleWorkspace`, `ModulePageHeader`, `ModuleSection`, `ModulePanel`
-- `ModuleToolbarButton`, `ModuleFilterChips`, `ModuleStatusBanner`
-
-Used by **Executive Intelligence** (`executive-cockpit.tsx`), **Data Trust** (`trust-center.tsx`), **AI Chat** (`chat-workspace.tsx`), and **Analytics Builder** (`analytics-builder-shell.tsx`).
-
-CSS helpers: `.module-panel`, `.kpi-card`, `.chat-user-bubble`, `.chat-assistant-panel` in `globals.css`.
-
 ## Module coverage
 
 Styling passes applied to: shell (sidebar/topbar), Executive cockpit charts, Data Trust / reliability, chat (timeline, grounding), semantic galaxy (existing token CSS), and bulk token migration away from `slate-*` / `#2f6fed` literals in `components/` and `app/`.

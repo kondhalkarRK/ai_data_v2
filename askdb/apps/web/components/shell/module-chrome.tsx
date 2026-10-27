@@ -13,7 +13,7 @@ export function ModuleWorkspace({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={cn("module-workspace space-y-6", className)}>{children}</div>;
+  return <div className={cn("space-y-6", className)}>{children}</div>;
 }
 
 export function ModulePageHeader({
@@ -28,11 +28,11 @@ export function ModulePageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border/80 pb-4">
+    <header className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ai">{eyebrow}</p>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{title}</h1>
-        {meta ? <div className="mt-1 text-sm text-muted-foreground">{meta}</div> : null}
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">{eyebrow}</p>
+        <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+        {meta ? <div className="mt-0.5 text-sm text-muted-foreground">{meta}</div> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
@@ -51,12 +51,12 @@ export function ModuleSection({
   id?: string;
 }) {
   return (
-    <section id={id} className="module-section space-y-4 scroll-mt-4">
-      <div className="flex flex-col gap-0.5">
+    <section id={id} className="scroll-mt-4 space-y-5">
+      <div className="border-b border-border pb-3">
         <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
-        {description ? <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">{description}</p> : null}
+        {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
       </div>
-      <div className="space-y-4">{children}</div>
+      <div className="space-y-6">{children}</div>
     </section>
   );
 }
@@ -163,6 +163,14 @@ export function ModulePanel({
   padded?: boolean;
 }) {
   return (
-    <div className={cn("module-panel overflow-hidden", padded && "p-4 sm:p-5", className)}>{children}</div>
+    <div
+      className={cn(
+        "overflow-hidden rounded-2xl border border-border/70 bg-surface-raised shadow-[var(--shadow-card)]",
+        padded && "p-4 sm:p-5",
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }

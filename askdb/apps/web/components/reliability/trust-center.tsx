@@ -254,7 +254,7 @@ export function TrustCenter({ industry }: { industry: Industry }) {
           </button>
         </div>
       ) : data ? (
-        <div className={cn("space-y-8 transition-opacity", center.isFetching && "opacity-85")}>
+        <div className={cn("space-y-10 transition-opacity", center.isFetching && "opacity-85")}>
           {center.isError ? (
             <ModuleStatusBanner tone="warn">
               The latest check failed to complete. Showing the results from the previous run.
