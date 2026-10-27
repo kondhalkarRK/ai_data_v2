@@ -1,3 +1,27 @@
+which all cars has Coral Pink color
+Answered from data
+Answered in 0.5s
+High confidence
+
+Dataset Trust: 99% (Excellent)
+Grounded on
+
+Semantic Layer
+Business Glossary
+KPI Definition
+LLM
+Schema
+Data Quality Check
+Understood as: revenue · by month · colour name: Coral Pink
+
+revenue interpreted as SUM(total_sales)
+
+Joins: fact_sales · fact_sales → dim_color
+
+Filters: Colour = Coral Pink
+
+
+
 Questions that tend to hit the LLM (decision.path = llm_reasoning, stage llm)
 These use complex analysis (moving average, growth, top-N per group, divergence, etc.) so with llm_first the backend calls generate_validated_sql even when a governed query exists.
 
