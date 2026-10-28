@@ -29,6 +29,11 @@ class QueryProfile:
     explain_plan: str | None = None
     cache_hit: bool = False
     history_id: str | None = None
+    route: str | None = None
+    route_source: str | None = None
+    llm_model: str | None = None
+    tokens_estimated: bool = False
+    llm_latency_ms: int = 0
 
     def finish(self) -> None:
         self.ended_at = time.time()

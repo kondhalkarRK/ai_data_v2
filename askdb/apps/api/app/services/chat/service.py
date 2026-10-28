@@ -9,6 +9,7 @@ import time
 import uuid
 from asyncio import Event
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -25,14 +26,31 @@ from app.models.user import User
 from app.semantic.service import SemanticService
 from app.services.catalog import EntityCatalogService
 from app.services.chat.clarification import (
+    Clarification,
     interpretation,
     plan_suggestions,
     recovery_for_failure,
     resolution_notes,
 )
 from app.services.chat.conversation_context import is_contextual_followup, plan_state
+from app.services.chat.follow_up_guard import data_vocabulary_hit, follow_up_guard_allows_sql
+from app.services.chat.message_classifier import (
+    template_general_chat,
+    template_out_of_scope_live,
+    template_unsupported,
+)
+from app.services.chat.non_data_handlers import (
+    LlmReply,
+    app_help_reply,
+    definition_from_metadata,
+    general_chat_reply,
+    general_knowledge_reply,
+    no_documents_reply,
+)
+from app.services.chat.pre_plan import early_route, plan_with_rewrites, run_pre_plan
 from app.services.chat.conversation_memory import (
     analytical_expired,
+    append_general_chat,
     append_recent_turn,
     assert_memory_scope,
     build_analytical_context,
@@ -71,6 +89,7 @@ from app.services.chat.intents import (
     suggested_followups,
 )
 from app.services.chat.llm_assist import (
+    classify_and_resolve,
     generate_validated_sql,
     interpret_question,
     interpretation_vocabulary,
@@ -125,6 +144,19 @@ def _worth_reinterpreting(turn: TurnPlan) -> bool:
     if turn.clarify_reason in {"needs_clarification", "unresolved"}:
         return True
     return turn.clarification is None and not turn.governed_sql
+
+
+def _force_clarification(turn: TurnPlan, message: str) -> TurnPlan:
+    """Ask instead of guessing; keeps any options the planner already offered."""
+    options = list(turn.clarification.options) if turn.clarification else []
+    return replace(
+        turn,
+        clarification=Clarification(
+            kind="clarify", title="Need detail", message=message, options=options
+        ),
+        clarify_reason=turn.clarify_reason or "needs_clarification",
+        governed_sql=None,
+    )
 
 
 def _needs_clarification() -> Confidence:
@@ -530,17 +562,179 @@ class ChatService:
                 },
             )
 
-        if is_out_of_bounds(question, self._industry):
-            yield _sse("badge", {"path": "out_of_bounds", "label": "Out of scope"})
-            async for frame in finish_without_sql(
-                path="out_of_bounds",
-                narrative=(
-                    f"I can only answer governed {self._industry.value} analytics questions. "
-                    "Try asking about a business metric in the available data."
-                ),
-            ):
-                yield frame
-            return
+        async def record_reply(reply: LlmReply) -> None:
+            if not reply.used_llm:
+                return
+            profile.llm_calls += 1
+            profile.prompt_tokens += reply.prompt_tokens
+            profile.completion_tokens += reply.completion_tokens
+            profile.llm_model = reply.model
+            profile.tokens_estimated = profile.tokens_estimated or reply.tokens_estimated
+            profile.llm_latency_ms += reply.latency_ms
+            timings.llm_generation_ms += reply.latency_ms
+            await self._record_usage(reply.model, reply.prompt_tokens, reply.completion_tokens)
+
+        def log_route(route: str, source: str) -> None:
+            profile.route, profile.route_source = route, source
+            logger.info(
+                "chat_route route=%s source=%s llm_calls=%d prompt_tokens=%d "
+                "completion_tokens=%d tokens_estimated=%s llm_latency_ms=%d",
+                route,
+                source,
+                profile.llm_calls,
+                profile.prompt_tokens,
+                profile.completion_tokens,
+                profile.tokens_estimated,
+                profile.llm_latency_ms,
+            )
+
+        async def answer_from_documents(reason: str) -> AsyncIterator[str]:
+            knowledge = KnowledgeService(self._settings, self._industry)
+            documents = knowledge.list_documents()
+            if not documents:
+                async for frame in finish_without_sql(
+                    path="knowledge", narrative=no_documents_reply()
+                ):
+                    yield frame
+                return
+            completed_steps.extend(
+                step for step in ("rewrite", "intent", "ambiguity") if step not in completed_steps
+            )
+            yield _progress("narration", completed_steps, slow=maybe_slow())
+            try:
+                citations = knowledge.search(
+                    question,
+                    top_k=min(5, self._settings.rag_top_k),
+                    user_id=str(self._user.id),
+                )
+            except Exception:
+                logger.debug("Knowledge search failed", exc_info=True)
+                citations = []
+            for citation in citations:
+                yield _sse("citation", _citation_payload(citation))
+            narrative = knowledge_narrative(citations)
+            insights = build_insights(narrative=narrative, columns=[], rows=[], path="knowledge")
+            followups: list[str] = []
+            for doc in documents:
+                for item in doc.get("suggestedQuestions") or []:
+                    if item not in followups:
+                        followups.append(str(item))
+                if len(followups) >= 4:
+                    break
+            if not followups:
+                followups = suggested_followups(self._industry, "knowledge")
+            yield _sse(
+                "meta",
+                {
+                    "groundedOn": [],
+                    "ambiguityFlag": False,
+                    "validationStatus": "skipped",
+                    "rowCount": 0,
+                    "executionTimeMs": 0,
+                    "sourceDatabase": "Knowledge base",
+                    "dataAsOf": None,
+                    "timings": timings.to_dict(),
+                    "queryMeta": extract_query_meta(None).to_dict(),
+                    "insights": insights,
+                    "anomalies": [],
+                    "alternateInterpretations": [],
+                    "cacheHit": False,
+                    "route": "knowledge",
+                    "routeReason": reason,
+                },
+            )
+            for token in narrative.split():
+                yield _sse("token", {"token": token + " "})
+            history.status = "completed"
+            history.row_count = 0
+            history.trust_score = 0
+            history.trust_breakdown = {"path": "knowledge", "route": "knowledge"}
+            history.latency_ms = int((time.perf_counter() - started) * 1000)
+            await self._app.flush()
+            profile.path = "knowledge"
+            profile.timings = timings.to_dict()
+            PROFILER.record(profile)
+            yield _sse("followups", {"items": followups})
+            yield _sse(
+                "done",
+                {
+                    "historyId": str(history_id),
+                    "conversationId": str(conversation.id),
+                    "latencyMs": history.latency_ms,
+                    "trustScore": 0,
+                    "ambiguityFlag": False,
+                    "route": "knowledge",
+                },
+            )
+
+        early = early_route(
+            industry=self._industry,
+            message=question,
+            scope=self._region_scope,
+            router_enabled=self._settings.chat_router_enabled,
+        )
+        if early is not None:
+            stop = early.stop
+            log_route(stop or "unknown", "rules")
+            if stop == "general_chat":
+                reply = await general_chat_reply(
+                    self._settings,
+                    industry=self._industry,
+                    question=question,
+                    reason=early.stop_detail,
+                    last_turn_failed=await self._last_turn_failed(conversation.id, history_id),
+                )
+                await record_reply(reply)
+                append_general_chat(
+                    session_memory, role="assistant", text=reply.text, settings=self._settings
+                )
+                await self._save_session_memory(conversation, session_memory)
+                async for frame in finish_without_sql(path="general_chat", narrative=reply.text):
+                    yield frame
+                return
+            if stop == "unsupported":
+                async for frame in finish_without_sql(
+                    path="unsupported", narrative=template_unsupported()
+                ):
+                    yield frame
+                return
+            if stop == "out_of_scope_live":
+                async for frame in finish_without_sql(
+                    path="out_of_scope_live", narrative=template_out_of_scope_live()
+                ):
+                    yield frame
+                return
+            if stop == "document_query":
+                async for frame in answer_from_documents("document cue"):
+                    yield frame
+                return
+            if stop == "app_help":
+                try:
+                    help_pack = await self._semantic.get_pack(self._industry)
+                except Exception:
+                    logger.warning("Semantic pack unavailable for app help", exc_info=True)
+                    help_pack = None
+                narrative = app_help_reply(
+                    question,
+                    industry=self._industry,
+                    pack=help_pack,
+                    allowed_schema=build_allowed_schema(help_pack),
+                    scope=self._region_scope,
+                )
+                async for frame in finish_without_sql(path="app_help", narrative=narrative):
+                    yield frame
+                return
+            if stop == "legacy_out_of_bounds":
+                yield _sse("badge", {"path": "out_of_bounds", "label": "Out of scope"})
+                async for frame in finish_without_sql(
+                    path="out_of_bounds",
+                    narrative=(
+                        f"I can only answer governed {self._industry.value} analytics questions. "
+                        "Try asking about a business metric in the available data."
+                    ),
+                ):
+                    yield frame
+                return
 
         try:
             semantic_pack = await self._semantic.get_pack(self._industry)
@@ -565,42 +759,72 @@ class ChatService:
         resolver = resolver_for(value_dictionary, semantic_pack)
         llm_ready = llm_configured(self._settings)
 
-        prior_sql: str | None = None
-        prior_state: dict[str, Any] | None = None
-        follow_status = follow_up_context_status(session_memory, question, self._settings)
-        if follow_status == "expired" and is_contextual_followup(question):
-            msg = (
-                "That follow-up refers to an earlier question, but that context "
-                "has expired. Please ask your full question again."
+        hist_prior = (
+            await self._prior_state(conversation.id, history_id)
+            if not session_memory.analytical
+            else None
+        )
+
+        def _follow_up_guard(**kwargs: Any) -> tuple[bool, str | None]:
+            if not self._settings.chat_follow_up_guard_enabled:
+                return True, None
+            return follow_up_guard_allows_sql(
+                question=kwargs["question"],
+                session_memory=kwargs["session_memory"],
+                settings=self._settings,
+                prior_state=kwargs["prior_state"],
+                snapshot=value_dictionary,
+                pack=semantic_pack,
             )
-            await self._save_session_memory(conversation, session_memory)
-            async for frame in finish_without_sql(
-                path="clarification",
-                narrative=msg,
-                event="clarification",
-                payload={
-                    "kind": "clarify",
-                    "title": "Context expired",
-                    "message": msg,
-                    "historyId": str(history_id),
-                },
-                ambiguity=True,
-            ):
+
+        pre = run_pre_plan(
+            industry=self._industry,
+            message=question,
+            settings=self._settings,
+            scope=self._region_scope,
+            session_memory=session_memory,
+            prior_state=hist_prior,
+            router_enabled=self._settings.chat_router_enabled,
+            data_vocabulary=lambda text: data_vocabulary_hit(text, value_dictionary, semantic_pack),
+            follow_up_guard_check=_follow_up_guard,
+            skip_early=True,
+        )
+        if pre.stop == "general_knowledge":
+            log_route("general_knowledge", "rules")
+            reply = await general_knowledge_reply(
+                self._settings, industry=self._industry, question=question
+            )
+            await record_reply(reply)
+            async for frame in finish_without_sql(path="general_knowledge", narrative=reply.text):
                 yield frame
             return
-        if follow_status == "active":
-            ok, scope_reason = revalidate_stored_plan_for_scope(
-                session_memory,
-                self._industry,
-                question,
-                self._region_scope,
-            )
-            if not ok:
+        if not pre.proceed:
+            if pre.stop == "memory_expired":
+                msg = (
+                    "That follow-up refers to an earlier question, but that context "
+                    "has expired. Please ask your full question again."
+                )
+                await self._save_session_memory(conversation, session_memory)
+                async for frame in finish_without_sql(
+                    path="clarification",
+                    narrative=msg,
+                    event="clarification",
+                    payload={
+                        "kind": "clarify",
+                        "title": "Context expired",
+                        "message": msg,
+                        "historyId": str(history_id),
+                    },
+                    ambiguity=True,
+                ):
+                    yield frame
+                return
+            if pre.stop == "scope_denied":
                 try:
                     await deny_if_out_of_scope(
                         self._app,
                         self._region_scope,
-                        attempted=scope_reason or "region scope",
+                        attempted=pre.stop_detail or "region scope",
                         action="AI Chat follow-up",
                     )
                 except Exception as exc:
@@ -619,39 +843,33 @@ class ChatService:
                     ):
                         yield frame
                     return
-            prior_state = plan_state_from_memory(session_memory)
-        elif not session_memory.analytical:
-            prior_state = await self._prior_state(conversation.id, history_id)
-            if prior_state and is_contextual_followup(question):
-                ok, scope_reason = revalidate_prior_state_for_scope(
-                    self._industry,
-                    prior_state,
-                    question,
-                    self._region_scope,
-                )
-                if not ok:
-                    try:
-                        await deny_if_out_of_scope(
-                            self._app,
-                            self._region_scope,
-                            attempted=scope_reason or "region scope",
-                            action="AI Chat follow-up",
-                        )
-                    except Exception as exc:
-                        narrative = getattr(exc, "message", None) or str(exc)
-                        async for frame in finish_without_sql(
-                            path="denied",
-                            narrative=narrative,
-                            event="clarification",
-                            payload={
-                                "kind": "denied",
-                                "title": "Access denied",
-                                "message": narrative,
-                                "historyId": str(history_id),
-                            },
-                        ):
-                            yield frame
-                        return
+        if pre.follow_up_guard_blocked:
+            log_route("clarification", "follow_up_guard")
+            msg = (
+                "I'm not sure how that follow-up relates to your data question. "
+                "Try naming a metric, region, or time period from your dataset."
+            )
+            async for frame in finish_without_sql(
+                path="clarification",
+                narrative=msg,
+                event="clarification",
+                payload={
+                    "kind": "clarify",
+                    "title": "Need detail",
+                    "message": msg,
+                    "historyId": str(history_id),
+                },
+                ambiguity=True,
+            ):
+                yield frame
+            return
+
+        prior_sql: str | None = None
+        prior_state = pre.prior_state
+        question = pre.question
+        follow_up_interpretation = pre.interpretation if prior_state else None
+        if follow_up_interpretation:
+            yield _sse("stage", {"stage": "interpretation", "message": follow_up_interpretation})
 
         surprise_sql = None
         if is_surprise_me(question):
@@ -664,16 +882,33 @@ class ChatService:
         # Spell correction -> rewrite -> resolver (exact, synonym, fuzzy, alias,
         # glossary) -> intent -> planner -> governed SQL -> plan validation.
         semantic_t0 = time.perf_counter()
-        turn = plan_turn(
-            self._industry,
+        planned = plan_with_rewrites(
+            lambda text: plan_turn(
+                self._industry,
+                text,
+                snapshot=value_dictionary,
+                pack=semantic_pack,
+                allowed_schema=allowed_schema,
+                prior_sql=prior_sql,
+                prior_state=prior_state,
+                surprise_sql=surprise_sql,
+            ),
             question,
-            snapshot=value_dictionary,
-            pack=semantic_pack,
-            allowed_schema=allowed_schema,
-            prior_sql=prior_sql,
-            prior_state=prior_state,
-            surprise_sql=surprise_sql,
+            enabled=self._settings.chat_question_rewrites_enabled,
         )
+        turn = planned.turn
+        reinterpreted: str | None = None
+        if planned.planned_question != question:
+            reinterpreted = planned.planned_question
+            logger.info("nlq_rewritten question=%r as=%r", question[:180], reinterpreted)
+        if planned.definition_term:
+            definition = definition_from_metadata(
+                planned.definition_term, semantic_pack, self._industry
+            )
+            yield _sse(
+                "definition",
+                {"term": planned.definition_term, "text": definition, "source": "semantic_layer"},
+            )
         if turn.clarify_reason == "unresolved" and turn.resolution.unresolved:
             refreshed = await self._discover_unknown_values(
                 [item.text for item in turn.resolution.unresolved]
@@ -692,8 +927,108 @@ class ChatService:
                     prior_state=prior_state,
                     surprise_sql=surprise_sql,
                 )
-        reinterpreted: str | None = None
-        if llm_ready and self._settings.nlq_llm_interpretation and _worth_reinterpreting(turn):
+        if (
+            llm_ready
+            and self._settings.nlq_llm_interpretation
+            and self._settings.chat_structured_classifier_enabled
+            and _worth_reinterpreting(turn)
+        ):
+            yield _sse("stage", {"stage": "llm_classify"})
+            llm_t0 = time.perf_counter()
+            outcome = await classify_and_resolve(
+                settings=self._settings,
+                industry=self._industry,
+                question=turn.question,
+                vocabulary=interpretation_vocabulary(self._industry, resolver),
+                previous_question=(
+                    session_memory.analytical.previous_question
+                    if session_memory.analytical and prior_state
+                    else None
+                ),
+                model_override=model_override,
+            )
+            await record_reply(
+                LlmReply(
+                    text="",
+                    model=outcome.model,
+                    prompt_tokens=outcome.prompt_tokens,
+                    completion_tokens=outcome.completion_tokens,
+                    latency_ms=int((time.perf_counter() - llm_t0) * 1000),
+                    used_llm=True,
+                )
+            )
+            profile.route_source = "llm_classifier"
+            verdict = outcome.verdict
+            logger.info(
+                "chat_llm_classifier intent=%s failure=%s",
+                verdict.intent if verdict else None,
+                outcome.failure,
+            )
+            if verdict is None:
+                turn = _force_clarification(
+                    turn,
+                    "I couldn't work out what you're asking for. Could you name the metric "
+                    "and the period you need?",
+                )
+            elif verdict.needs_clarification or verdict.intent == "CLARIFICATION":
+                turn = _force_clarification(
+                    turn,
+                    verdict.clarification_question
+                    or "Could you say which metric and period you mean?",
+                )
+            elif verdict.intent in {"DATA_QUERY", "DATA_FOLLOW_UP"}:
+                restated = (verdict.resolved_question or "").strip()
+                second = plan_turn(
+                    self._industry,
+                    restated,
+                    snapshot=value_dictionary,
+                    pack=semantic_pack,
+                    allowed_schema=allowed_schema,
+                    prior_sql=prior_sql,
+                    prior_state=prior_state if verdict.intent == "DATA_FOLLOW_UP" else None,
+                )
+                if second.clarification is None and second.governed_sql:
+                    logger.info("nlq_reinterpreted question=%r as=%r", question[:180], restated)
+                    turn, reinterpreted = second, restated
+                else:
+                    turn = _force_clarification(
+                        turn,
+                        turn.clarification.message
+                        if turn.clarification
+                        else "I couldn't map that to a governed metric. Which metric do you mean?",
+                    )
+            else:
+                log_route(verdict.intent.lower(), "llm_classifier")
+                if verdict.intent == "DOCUMENT_QUERY":
+                    async for frame in answer_from_documents("llm classifier"):
+                        yield frame
+                    return
+                if verdict.intent == "GENERAL_KNOWLEDGE":
+                    reply = await general_knowledge_reply(
+                        self._settings, industry=self._industry, question=question
+                    )
+                    await record_reply(reply)
+                    narrative = reply.text
+                elif verdict.intent == "APP_HELP":
+                    narrative = app_help_reply(
+                        question,
+                        industry=self._industry,
+                        pack=semantic_pack,
+                        allowed_schema=allowed_schema,
+                        scope=self._region_scope,
+                    )
+                elif verdict.intent == "GENERAL_CHAT":
+                    narrative = template_general_chat("default")
+                elif verdict.intent == "OUT_OF_SCOPE_LIVE":
+                    narrative = template_out_of_scope_live()
+                else:
+                    narrative = template_unsupported()
+                async for frame in finish_without_sql(
+                    path=verdict.intent.lower(), narrative=narrative
+                ):
+                    yield frame
+                return
+        elif llm_ready and self._settings.nlq_llm_interpretation and _worth_reinterpreting(turn):
             # Last step before asking the user: let the AI restate the question in
             # governed vocabulary, then plan the restatement deterministically.
             yield _sse("stage", {"stage": "llm_interpret"})
@@ -788,81 +1123,11 @@ class ChatService:
         )
 
         if decision.route == "knowledge":
-            completed_steps.extend(
-                step for step in ("rewrite", "intent", "ambiguity") if step not in completed_steps
-            )
-            yield _progress("narration", completed_steps, slow=maybe_slow())
-            try:
-                citations = knowledge_service.search(
-                    question,
-                    top_k=min(5, self._settings.rag_top_k),
-                    user_id=str(self._user.id),
-                )
-            except Exception:
-                logger.debug("Knowledge search failed", exc_info=True)
-                citations = []
-            for citation in citations:
-                yield _sse("citation", _citation_payload(citation))
-            narrative = knowledge_narrative(citations)
-            insights = build_insights(
-                narrative=narrative,
-                columns=[],
-                rows=[],
-                path="knowledge",
-            )
-            followups: list[str] = []
-            for doc in knowledge_service.list_documents():
-                for item in doc.get("suggestedQuestions") or []:
-                    if item not in followups:
-                        followups.append(str(item))
-                if len(followups) >= 4:
-                    break
-            if not followups:
-                followups = suggested_followups(self._industry, "knowledge")
-            yield _sse(
-                "meta",
-                {
-                    "groundedOn": [],
-                    "ambiguityFlag": False,
-                    "validationStatus": "skipped",
-                    "rowCount": 0,
-                    "executionTimeMs": 0,
-                    "sourceDatabase": "Knowledge base",
-                    "dataAsOf": None,
-                    "timings": timings.to_dict(),
-                    "queryMeta": extract_query_meta(None).to_dict(),
-                    "insights": insights,
-                    "anomalies": [],
-                    "alternateInterpretations": [],
-                    "cacheHit": False,
-                    "route": "knowledge",
-                    "routeReason": decision.reason,
-                },
-            )
-            for token in narrative.split():
-                yield _sse("token", {"token": token + " "})
-            history.status = "completed"
-            history.row_count = 0
-            history.trust_score = 0
-            history.trust_breakdown = {"path": "knowledge", "route": "knowledge"}
-            history.latency_ms = int((time.perf_counter() - started) * 1000)
-            await self._app.flush()
-            profile.path = "knowledge"
-            profile.timings = timings.to_dict()
-            PROFILER.record(profile)
-            yield _sse("followups", {"items": followups})
-            yield _sse(
-                "done",
-                {
-                    "historyId": str(history_id),
-                    "conversationId": str(conversation.id),
-                    "latencyMs": history.latency_ms,
-                    "trustScore": 0,
-                    "ambiguityFlag": False,
-                    "route": "knowledge",
-                },
-            )
+            log_route("knowledge", "query_router")
+            async for frame in answer_from_documents(decision.reason):
+                yield frame
             return
+        log_route("data", profile.route_source or "planner")
 
         if await cancelled():
             yield _sse("cancelled", {"historyId": str(history_id)})
@@ -992,6 +1257,8 @@ class ChatService:
         notes = [*turn.spelling_notes, *resolution_notes(turn.resolution)]
         if reinterpreted:
             notes.insert(0, f"I read this as \u201c{reinterpreted}\u201d.")
+        if follow_up_interpretation and turn.contextual:
+            notes.insert(0, f"{follow_up_interpretation}.")
         if turn.validation_error:
             logger.warning("Governed SQL failed plan validation: %s", turn.validation_error)
 
@@ -1725,6 +1992,27 @@ class ChatService:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def _last_turn_failed(
+        self, conversation_id: uuid.UUID, current_history_id: uuid.UUID
+    ) -> bool:
+        """True when the previous answer errored, asked to clarify or returned no rows."""
+        result = await self._app.execute(
+            select(QueryHistory.status, QueryHistory.row_count, QueryHistory.trust_breakdown)
+            .where(QueryHistory.user_id == self._user.id)
+            .where(QueryHistory.conversation_id == conversation_id)
+            .where(QueryHistory.id != current_history_id)
+            .order_by(QueryHistory.created_at.desc())
+            .limit(1)
+        )
+        row = result.first()
+        if row is None:
+            return False
+        status, row_count, breakdown = row
+        path = (breakdown or {}).get("path") if isinstance(breakdown, dict) else None
+        if status != "completed" or path in {"clarification", "recovery", "denied"}:
+            return True
+        return bool((breakdown or {}).get("queryState")) and not row_count
 
     async def _prior_state(
         self, conversation_id: uuid.UUID, current_history_id: uuid.UUID

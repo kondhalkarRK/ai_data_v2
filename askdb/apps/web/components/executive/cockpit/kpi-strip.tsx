@@ -139,7 +139,8 @@ function KpiCard({
     <div
       className={cn(
         cardBase,
-        featured && "bg-gradient-to-br from-primary/8 via-surface-raised to-surface-raised dark:from-surface-raised dark:to-surface-raised",
+        featured &&
+          "bg-gradient-to-br from-primary/10 via-surface-raised to-teal/5 dark:from-primary/15 dark:via-surface-raised dark:to-accent/10",
       )}
     >
       <div className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">

@@ -1012,7 +1012,9 @@ function GeoHeatmap({
                 type="button"
                 title={`${cell.label}: ${cell.formatted} ${unit}`}
                 className="rounded-xl border border-border/50 p-3 text-left transition hover:ring-2 hover:ring-primary/40"
-                style={{ backgroundColor: `color-mix(in oklab, var(--info, #38bdf8) ${Math.round(intensity * 55)}%, transparent)` }}
+                style={{
+                  backgroundColor: `hsl(var(--info) / ${(0.14 + intensity * 0.55).toFixed(2)})`,
+                }}
                 onClick={() => onSelect(cell.id)}
               >
                 <p className="truncate text-sm font-semibold">{cell.label}</p>

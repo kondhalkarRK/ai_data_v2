@@ -7,7 +7,8 @@ Canonical FROZEN snapshot (do not overwrite — use --csv baseline_latest.csv fo
 Does not execute SQL or call LLMs.
 
 ChatService order mirrored per message:
-  forbidden_zones (optional simulate_region_zones) -> is_out_of_bounds -> plan_turn
+  region guard (forbidden_zones) -> message classifier (optional) -> memory expiry
+  -> follow-up guard (optional) -> plan_turn
   Blocked messages never update ThreadState.
 
 Predicted-label mapping (message + pipeline signals only; never reads case label):
@@ -57,17 +58,26 @@ if str(API_ROOT) not in sys.path:
 if str(EVAL_DIR) not in sys.path:
     sys.path.insert(0, str(EVAL_DIR))
 
-from app.core.config import Industry, get_settings  # noqa: E402
+from app.core.config import Industry, Settings, get_settings  # noqa: E402
 from app.semantic.service import SemanticService  # noqa: E402
-from app.services.chat.conversation_context import plan_state  # noqa: E402
+from app.services.chat.conversation_context import is_contextual_followup, plan_state  # noqa: E402
+from app.services.chat.conversation_memory import build_analytical_context, ResultMeta  # noqa: E402
 from app.services.chat.decision_engine import decide_route  # noqa: E402
-from app.services.chat.intents import is_out_of_bounds  # noqa: E402
+from app.services.chat.follow_up_guard import (  # noqa: E402
+    data_vocabulary_hit,
+    follow_up_guard_allows_sql,
+)
 from app.services.chat.pipeline import plan_turn  # noqa: E402
 from app.services.chat.plan_coverage import coverage_gaps  # noqa: E402
+from app.services.chat.pre_plan import (  # noqa: E402
+    plan_with_rewrites,
+    run_pre_plan,
+    synthetic_memory,
+)
 from app.services.chat.query_router import route_question  # noqa: E402
 from app.services.chat.semantic_context import build_allowed_schema  # noqa: E402
 from app.services.chat.value_dictionary import ValueDictionarySnapshot  # noqa: E402
-from app.services.security.region_scope import RegionScope, forbidden_zones  # noqa: E402
+from app.services.security.region_scope import RegionScope  # noqa: E402
 from seed_values import seed_values_for_industry  # noqa: E402
 
 EVAL_FILE = EVAL_DIR / "chat_routing_eval.yaml"
@@ -100,6 +110,7 @@ HARNESS LIMITATIONS
 class ThreadState:
     prior_sql: str | None = None
     prior_state: dict[str, Any] | None = None
+    memory: Any = None  # SessionMemory, built lazily
 
 
 @dataclass
@@ -157,6 +168,28 @@ def predict_label(
     """Map pipeline signals to eval vocabulary (see module docstring)."""
     if handling == "region_forbidden":
         return "UNSUPPORTED"
+    if handling == "memory_expired":
+        return "CLARIFICATION"
+    if handling == "scope_denied":
+        return "UNSUPPORTED"
+    if handling == "general_chat":
+        return "GENERAL_CHAT"
+    if handling == "unsupported":
+        return "UNSUPPORTED"
+    if handling == "out_of_scope_live":
+        return "OUT_OF_SCOPE_LIVE"
+    if handling == "follow_up_guard":
+        return "CLARIFICATION"
+    if handling == "app_help":
+        return "APP_HELP"
+    if handling == "document_query":
+        return "DOCUMENT_QUERY"
+    if handling == "general_knowledge":
+        return "GENERAL_KNOWLEDGE"
+    if handling == "classifier_clarify":
+        return "CLARIFICATION"
+    if handling == "legacy_out_of_bounds":
+        return "OUT_OF_SCOPE_LIVE" if _LIVE_EXTERNAL.search(message) else "UNSUPPORTED"
     if handling == "out_of_bounds":
         return "OUT_OF_SCOPE_LIVE" if _LIVE_EXTERNAL.search(message) else "UNSUPPORTED"
     if handling == "clarification":
@@ -174,22 +207,57 @@ def predict_label(
     return "UNROUTED"
 
 
-def _guard_message(
-    message: str,
+def _thread_memory(thread: ThreadState) -> Any:
+    if thread.memory is None:
+        thread.memory = synthetic_memory(prior_state=thread.prior_state)
+    return thread.memory
+
+
+def _scope(region_zones: list[str] | None) -> RegionScope:
+    if region_zones:
+        return RegionScope(unrestricted=False, zones=tuple(region_zones))
+    return RegionScope.all_regions()
+
+
+def _apply_pre_plan(
     industry: Industry,
+    message: str,
+    thread: ThreadState,
+    *,
     region_zones: list[str] | None,
+    settings: Settings,
+    router_enabled: bool,
+    guard_enabled: bool,
 ) -> tuple[str, str] | None:
-    """Return (handling, detail) when the message must not reach plan_turn."""
-    scope = (
-        RegionScope(unrestricted=False, zones=tuple(region_zones))
-        if region_zones
-        else RegionScope.all_regions()
+    snapshot, pack, _allowed = _context(industry)
+    memory = _thread_memory(thread)
+
+    def _guard_check(**kwargs: Any) -> tuple[bool, str | None]:
+        return follow_up_guard_allows_sql(
+            question=kwargs["question"],
+            session_memory=kwargs["session_memory"],
+            settings=settings,
+            prior_state=kwargs["prior_state"],
+            snapshot=snapshot,
+            pack=pack,
+        )
+
+    outcome = run_pre_plan(
+        industry=industry,
+        message=message,
+        settings=settings,
+        scope=_scope(region_zones),
+        session_memory=memory,
+        prior_state=thread.prior_state,
+        router_enabled=router_enabled,
+        data_vocabulary=lambda text: data_vocabulary_hit(text, snapshot, pack),
+        follow_up_guard_check=_guard_check if guard_enabled else None,
     )
-    blocked = forbidden_zones(message, scope)
-    if blocked:
-        return "region_forbidden", f"blocked zones: {', '.join(blocked)}"
-    if is_out_of_bounds(message, industry):
-        return "out_of_bounds", "intents.is_out_of_bounds"
+    if outcome.follow_up_guard_blocked:
+        return "follow_up_guard", outcome.stop_detail or "no semantic anchor"
+    if not outcome.proceed:
+        return outcome.stop or "unsupported", outcome.stop_detail
+    thread.prior_state = outcome.prior_state
     return None
 
 
@@ -199,21 +267,38 @@ def _run_plan_turn(
     thread: ThreadState,
     *,
     region_zones: list[str] | None,
+    settings: Settings,
+    router_enabled: bool,
+    guard_enabled: bool,
+    rewrites_enabled: bool = False,
 ) -> tuple[Any | None, str, str]:
-    guard = _guard_message(message, industry, region_zones)
-    if guard is not None:
-        return None, guard[0], guard[1]
-
-    snapshot, pack, allowed = _context(industry)
-    turn = plan_turn(
+    blocked = _apply_pre_plan(
         industry,
         message,
-        snapshot=snapshot,
-        pack=pack,
-        allowed_schema=allowed,
-        prior_sql=thread.prior_sql,
-        prior_state=thread.prior_state,
+        thread,
+        region_zones=region_zones,
+        settings=settings,
+        router_enabled=router_enabled,
+        guard_enabled=guard_enabled,
     )
+    if blocked is not None:
+        return None, blocked[0], blocked[1]
+
+    snapshot, pack, allowed = _context(industry)
+    planned = plan_with_rewrites(
+        lambda text: plan_turn(
+            industry,
+            text,
+            snapshot=snapshot,
+            pack=pack,
+            allowed_schema=allowed,
+            prior_sql=thread.prior_sql,
+            prior_state=thread.prior_state,
+        ),
+        message.strip(),
+        enabled=rewrites_enabled,
+    )
+    turn = planned.turn
     if turn.clarification is not None:
         reason = turn.clarify_reason or "clarify"
         detail = reason
@@ -225,12 +310,23 @@ def _run_plan_turn(
     elif turn.governed_sql:
         handling = "governed_sql"
         detail = turn.planned.path if turn.planned else "template"
+        if planned.planned_question != message.strip():
+            detail += f" | rewritten: {planned.planned_question[:60]}"
+        if planned.definition_term:
+            detail += f" | definition: {planned.definition_term}"
     else:
         handling, detail = "no_governed_sql", "would_need_llm_or_clarify"
 
     if turn.governed_sql and turn.plan:
         thread.prior_sql = turn.governed_sql
         thread.prior_state = plan_state(turn.plan)
+        memory = _thread_memory(thread)
+        memory.analytical = build_analytical_context(
+            plan=turn.plan,
+            question=message,
+            result_meta=ResultMeta(row_count=1, column_names=()),
+            prior=memory.analytical,
+        )
     return turn, handling, detail
 
 
@@ -284,7 +380,22 @@ def _row_from_turn(
     if (
         turn is not None
         and turn.clarification is None
-        and handling not in {"region_forbidden", "out_of_bounds"}
+        and handling
+        not in {
+            "region_forbidden",
+            "memory_expired",
+            "scope_denied",
+            "general_chat",
+            "unsupported",
+            "out_of_scope_live",
+            "follow_up_guard",
+            "legacy_out_of_bounds",
+            "out_of_bounds",
+            "app_help",
+            "document_query",
+            "general_knowledge",
+            "classifier_clarify",
+        }
     ):
         chat = route_question(message, plan, has_documents=has_documents)
         chat_route = chat.route
@@ -332,7 +443,24 @@ def _row_from_turn(
     )
 
 
-def replay_case(case: dict[str, Any]) -> ReplayRow:
+def replay_case(
+    case: dict[str, Any],
+    *,
+    settings: Settings | None = None,
+    router_enabled: bool | None = None,
+    guard_enabled: bool | None = None,
+    rewrites_enabled: bool | None = None,
+) -> ReplayRow:
+    settings = settings or get_settings()
+    rewrites_enabled = (
+        settings.chat_question_rewrites_enabled if rewrites_enabled is None else rewrites_enabled
+    )
+    router_enabled = (
+        settings.chat_router_enabled if router_enabled is None else router_enabled
+    )
+    guard_enabled = (
+        settings.chat_follow_up_guard_enabled if guard_enabled is None else guard_enabled
+    )
     industry = Industry(case["industry"])
     has_documents = bool(case.get("has_documents", False))
     region_zones = case.get("simulate_region_zones")
@@ -341,19 +469,26 @@ def replay_case(case: dict[str, Any]) -> ReplayRow:
     for prior in case.get("prior_turns") or []:
         prior_msg = str(prior["message"])
         prior_zones = prior.get("simulate_region_zones", region_zones)
-        guard = _guard_message(prior_msg, industry, prior_zones)
-        if guard is not None:
+        blocked = _apply_pre_plan(
+            industry,
+            prior_msg,
+            thread,
+            region_zones=prior_zones,
+            settings=settings,
+            router_enabled=router_enabled,
+            guard_enabled=guard_enabled,
+        )
+        if blocked is not None:
             continue
-        _run_plan_turn(industry, prior_msg, thread, region_zones=prior_zones)
-
-    guard = _guard_message(str(case["message"]), industry, region_zones)
-    if guard is not None:
-        return _row_from_turn(
-            case=case,
-            turn=None,
-            handling=guard[0],
-            detail=guard[1],
-            has_documents=has_documents,
+        _run_plan_turn(
+            industry,
+            prior_msg,
+            thread,
+            region_zones=prior_zones,
+            settings=settings,
+            router_enabled=router_enabled,
+            guard_enabled=guard_enabled,
+            rewrites_enabled=rewrites_enabled,
         )
 
     turn, handling, detail = _run_plan_turn(
@@ -361,6 +496,10 @@ def replay_case(case: dict[str, Any]) -> ReplayRow:
         str(case["message"]),
         thread,
         region_zones=region_zones,
+        settings=settings,
+        router_enabled=router_enabled,
+        guard_enabled=guard_enabled,
+        rewrites_enabled=rewrites_enabled,
     )
     return _row_from_turn(
         case=case,
@@ -519,10 +658,38 @@ def main() -> int:
         default=None,
         help="Exit 1 if Stage 0 overall accuracy is below this fraction",
     )
+    parser.add_argument(
+        "--router-enabled",
+        action="store_true",
+        help="Enable message classifier in harness (default: settings.chat_router_enabled)",
+    )
+    parser.add_argument(
+        "--follow-up-guard",
+        action="store_true",
+        help="Enable follow-up guard in harness",
+    )
+    parser.add_argument(
+        "--question-rewrites",
+        action="store_true",
+        help="Enable compound split and why/explain strip retry (Stage E)",
+    )
     args = parser.parse_args()
 
+    settings = get_settings()
+    router = args.router_enabled or settings.chat_router_enabled
+    guard = args.follow_up_guard
+
     cases = load_cases(args.suite)
-    rows = [replay_case(case) for case in cases]
+    rows = [
+        replay_case(
+            case,
+            settings=settings,
+            router_enabled=router,
+            guard_enabled=guard,
+            rewrites_enabled=args.question_rewrites,
+        )
+        for case in cases
+    ]
     s0 = stage0_rows(rows)
     metrics = compute_metrics(s0)
     stage1_rows = [r for r in rows if r.expected_stage == "1"]

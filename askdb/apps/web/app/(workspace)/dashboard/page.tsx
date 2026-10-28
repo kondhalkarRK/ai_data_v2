@@ -262,8 +262,7 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-border/60 bg-surface-raised/90 p-4 shadow-sm">
-                <h2 className="mb-3 text-sm font-semibold tracking-tight">Business Health</h2>
+              <div className="space-y-3">
                 <BusinessHealthPanel health={data.health} />
                 <div className="mt-3">
                   {trustSnapshot.data?.available && trustSnapshot.data.score != null ? (

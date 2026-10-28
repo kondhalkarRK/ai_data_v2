@@ -175,7 +175,7 @@ function SunburstBody({
                 key={arc.path.join("/")}
                 d={arcPath(arc)}
                 fill={arc.colour}
-                stroke="#fff"
+                stroke="hsl(var(--surface-raised))"
                 strokeWidth={1}
                 opacity={hover && !hover.arc.path.every((p, i) => arc.path[i] === p) && !arc.path.every((p, i) => hover.arc.path[i] === p) ? 0.45 : 1}
                 className="cursor-pointer transition-opacity"
@@ -202,7 +202,7 @@ function SunburstBody({
               cx={centre}
               cy={centre}
               r={rings[0]! * R - 2}
-              fill="#fff"
+              fill="hsl(var(--surface-raised))"
               className={focusNode && canReset ? "cursor-pointer" : undefined}
               onClick={() => focusNode && canReset && onFocus(null)}
             />

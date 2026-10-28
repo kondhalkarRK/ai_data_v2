@@ -302,6 +302,7 @@ async def complete_text(
     user: str,
     max_tokens: int = 200,
     model_override: str | None = None,
+    temperature: float = 0.0,
 ) -> LlmResult:
     """One short non-SQL completion (question interpretation). Never retried."""
     model = (model_override or "").strip() or active_llm(settings).model
@@ -318,7 +319,7 @@ async def complete_text(
         system=system,
         question=user,
         timeout=float(settings.nlq_llm_timeout_seconds),
-        temperature=0.0,
+        temperature=temperature,
         max_tokens=max_tokens,
     )
     if result.content:

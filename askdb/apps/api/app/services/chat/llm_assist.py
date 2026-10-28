@@ -16,11 +16,13 @@ import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from app.core.config import Industry, Settings
 from app.services.chat.question_understanding import QuestionPlan, filter_predicate
-from app.services.llm import complete_chat, complete_text
+from app.services.llm import active_llm, complete_chat, complete_text
 
 _FORMULA: dict[str, str] = {
     "revenue": "SUM(fact_sales.total_sales)",
@@ -244,3 +246,103 @@ async def interpret_question(
         if isinstance(value, str) and value.strip() and value.strip() != question.strip():
             rewritten = value.strip()[:240]
     return rewritten, result.prompt_tokens, result.completion_tokens
+
+
+ClassifierIntent = Literal[
+    "DATA_QUERY",
+    "DATA_FOLLOW_UP",
+    "CLARIFICATION",
+    "GENERAL_CHAT",
+    "GENERAL_KNOWLEDGE",
+    "APP_HELP",
+    "DOCUMENT_QUERY",
+    "UNSUPPORTED",
+    "OUT_OF_SCOPE_LIVE",
+]
+
+
+class ClassifierVerdict(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    intent: ClassifierIntent
+    resolved_question: str | None = Field(default=None, max_length=300)
+    needs_clarification: bool
+    clarification_question: str | None = Field(default=None, max_length=300)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> ClassifierVerdict:
+        if self.needs_clarification and not (self.clarification_question or "").strip():
+            raise ValueError("needs_clarification requires clarification_question")
+        if (
+            self.intent in {"DATA_QUERY", "DATA_FOLLOW_UP"}
+            and not self.needs_clarification
+            and not (self.resolved_question or "").strip()
+        ):
+            raise ValueError("data intents require resolved_question")
+        return self
+
+
+@dataclass(slots=True)
+class ClassifierOutcome:
+    verdict: ClassifierVerdict | None
+    model: str
+    prompt_tokens: int
+    completion_tokens: int
+    failure: str | None = None
+
+
+async def classify_and_resolve(
+    *,
+    settings: Settings,
+    industry: Industry,
+    question: str,
+    vocabulary: str,
+    previous_question: str | None = None,
+    model_override: str | None = None,
+) -> ClassifierOutcome:
+    """One structured call: intent + governed restatement. Replaces ``interpret_question``.
+
+    Any timeout, provider error or JSON that fails validation returns ``verdict=None``;
+    the caller must then ask the user to clarify rather than guess.
+    """
+    context = f"Previous data question: {previous_question}\n" if previous_question else ""
+    system = (
+        f"You route messages for a governed {industry.value} analytics assistant. Return ONLY "
+        "a JSON object with keys intent, resolved_question, needs_clarification, "
+        "clarification_question.\n"
+        "intent is one of DATA_QUERY, DATA_FOLLOW_UP, CLARIFICATION, GENERAL_CHAT, "
+        "GENERAL_KNOWLEDGE, APP_HELP, DOCUMENT_QUERY, UNSUPPORTED, OUT_OF_SCOPE_LIVE.\n"
+        "For DATA_QUERY or DATA_FOLLOW_UP, resolved_question restates the request as one short "
+        "question using ONLY the metrics, dimensions and values listed; keep every brand, "
+        "place, period and filter the user gave and never invent one. If the request cannot "
+        "be expressed with this vocabulary or is ambiguous, set needs_clarification true and "
+        "write one short clarification_question. Never answer the question yourself.\n\n"
+        f"{context}{vocabulary}"
+    )
+    model = (
+        (model_override or "").strip()
+        or (settings.chat_classifier_model or "").strip()
+        or active_llm(settings).model
+    )
+    result = await complete_text(
+        settings=settings,
+        system=system,
+        user=question,
+        max_tokens=settings.chat_classifier_max_completion_tokens,
+        model_override=model,
+    )
+    tokens = (result.prompt_tokens, result.completion_tokens)
+    if result.timed_out:
+        return ClassifierOutcome(None, model, *tokens, failure="timeout")
+    # complete_text reuses the SQL client, which flags every non-SQL reply as an error;
+    # only a missing body is a real failure here.
+    if result.circuit_open or not (result.content or "").strip():
+        return ClassifierOutcome(None, model, *tokens, failure="error")
+    found = _JSON.search(result.content or "")
+    if found is None:
+        return ClassifierOutcome(None, model, *tokens, failure="invalid_json")
+    try:
+        verdict = ClassifierVerdict.model_validate(json.loads(found.group(0)))
+    except (ValueError, ValidationError):
+        return ClassifierOutcome(None, model, *tokens, failure="invalid_json")
+    return ClassifierOutcome(verdict, model, *tokens)

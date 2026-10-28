@@ -30,10 +30,10 @@ export function BusinessHealthPanel({ health }: { health: BusinessHealth }) {
   const offset = circumference * (1 - Math.min(100, Math.max(0, score)) / 100);
 
   return (
-    <div className="card-primary overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-border/70 bg-gradient-to-br from-primary/5 via-surface-raised to-surface-raised shadow-[var(--shadow-card)]">
       <button
         type="button"
-        className="flex w-full items-center gap-5 px-5 py-5 text-left"
+        className="flex w-full items-center gap-5 px-4 py-4 text-left"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >

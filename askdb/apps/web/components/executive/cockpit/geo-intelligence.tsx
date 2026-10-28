@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { ChartFrame, Segmented } from "@/components/executive/cockpit/chart-frame";
 import { formatInr, formatPct } from "@/components/executive/cockpit/format";
-import { COCKPIT, growthColour, tint } from "@/components/executive/cockpit/palette";
+import { COCKPIT, growthColour, heatEmptyFill, heatFill } from "@/components/executive/cockpit/palette";
 import type { CockpitData, FilterKey, HeatMatrix, RankedItem, SelectHandler } from "@/components/executive/cockpit/types";
 import { cn } from "@/lib/utils";
 
@@ -154,7 +154,7 @@ function HeatGrid({ heat, onPick }: { heat: HeatMatrix; onPick: (zone: string) =
                 <div
                   key={col}
                   className="flex h-10 flex-col items-center justify-center rounded-md"
-                  style={{ backgroundColor: c ? tint(COCKPIT.blue, 0.92 - intensity * 0.62) : "#f8fafc" }}
+                  style={{ backgroundColor: c ? heatFill(intensity) : heatEmptyFill }}
                   title={c ? `${row} · ${col}: ${formatInr(c.revenue)} (${formatPct(c.share)} of region), ${formatPct(c.growth, true)} YoY` : undefined}
                 >
                   {c ? (

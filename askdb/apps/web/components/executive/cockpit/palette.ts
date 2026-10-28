@@ -65,3 +65,14 @@ export function growthColour(growth: number | null, max = 0.25): string {
 export function toneColour(tone: "positive" | "negative" | "neutral"): string {
   return tone === "positive" ? COCKPIT.positive : tone === "negative" ? COCKPIT.negative : COCKPIT.grey;
 }
+
+/** Theme-aware heat / intensity fills (use in inline styles). */
+export function heatFill(intensity: number, hue: "primary" | "info" = "primary"): string {
+  const t = Math.max(0, Math.min(1, intensity));
+  const alpha = (0.12 + t * 0.58).toFixed(2);
+  return hue === "info"
+    ? `hsl(var(--info) / ${alpha})`
+    : `hsl(var(--chart-1) / ${alpha})`;
+}
+
+export const heatEmptyFill = "hsl(var(--muted) / 0.35)";

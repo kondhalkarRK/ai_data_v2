@@ -116,8 +116,42 @@ function MatrixSvg({
     <div ref={ref} className="relative w-full" style={{ height: expanded ? "100%" : height }}>
       {width > 0 ? (
         <svg data-chart width={width} height={height} className="block" role="img" aria-label="Regional performance matrix">
-          <rect x={x(xMid)} y={margin.top} width={Math.max(width - margin.right - x(xMid), 0)} height={y(yMid) - margin.top} fill={COCKPIT.blueMist} opacity={0.6} />
-          <rect x={margin.left} y={y(yMid)} width={Math.max(x(xMid) - margin.left, 0)} height={margin.top + innerH - y(yMid)} fill="#fbeeec" opacity={0.6} />
+          <rect
+            x={margin.left}
+            y={margin.top}
+            width={innerW}
+            height={innerH}
+            rx={8}
+            fill="hsl(var(--surface-sunken) / 0.45)"
+          />
+          <rect
+            x={x(xMid)}
+            y={margin.top}
+            width={Math.max(width - margin.right - x(xMid), 0)}
+            height={y(yMid) - margin.top}
+            fill="hsl(var(--chart-1) / 0.12)"
+          />
+          <rect
+            x={margin.left}
+            y={margin.top}
+            width={Math.max(x(xMid) - margin.left, 0)}
+            height={y(yMid) - margin.top}
+            fill="hsl(var(--chart-2) / 0.1)"
+          />
+          <rect
+            x={x(xMid)}
+            y={y(yMid)}
+            width={Math.max(width - margin.right - x(xMid), 0)}
+            height={margin.top + innerH - y(yMid)}
+            fill="hsl(var(--chart-4) / 0.1)"
+          />
+          <rect
+            x={margin.left}
+            y={y(yMid)}
+            width={Math.max(x(xMid) - margin.left, 0)}
+            height={margin.top + innerH - y(yMid)}
+            fill="hsl(var(--danger) / 0.1)"
+          />
           {xTicks.map((t) => (
             <g key={t}>
               <line x1={x(t)} x2={x(t)} y1={margin.top} y2={margin.top + innerH} stroke="hsl(var(--chart-grid))" />

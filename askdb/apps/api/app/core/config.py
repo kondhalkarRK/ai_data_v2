@@ -137,6 +137,13 @@ class Settings(BaseSettings):
     chat_analytical_context_max_turns: int = Field(default=8, ge=1, le=50)
     chat_analytical_context_ttl_seconds: int = Field(default=1800, ge=60, le=86_400)
     chat_recent_turns_window: int = Field(default=6, ge=1, le=30)
+    chat_router_enabled: bool = Field(default=False)
+    chat_follow_up_guard_enabled: bool = Field(default=True)
+    chat_general_max_completion_tokens: int = Field(default=120, ge=32, le=512)
+    chat_classifier_max_completion_tokens: int = Field(default=200, ge=64, le=512)
+    chat_classifier_model: str = ""
+    chat_structured_classifier_enabled: bool = Field(default=False)
+    chat_question_rewrites_enabled: bool = Field(default=True)
 
     # --- mongo / qdrant ----------------------------------------------------
     mongodb_uri: str = "mongodb://localhost:27017"
