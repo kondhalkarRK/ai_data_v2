@@ -1,0 +1,32 @@
+HARNESS LIMITATIONS
+-------------------
+- Seed value dictionary only (not live catalog/warehouse distinct values).
+- No LLM calls (interpret_question, generate_validated_sql) and no SQL execution.
+- No KnowledgeService document search; has_documents only affects route_question().
+- Region cases use forbidden_zones() text guard; full RBAC/RLS apply at execution time.
+- predicted_label reflects current planner + router heuristics, not Stage 1+ behavior.
+
+Overall accuracy: 54/81 (66.7%)
+
+Per-label accuracy:
+  APP_HELP: 0/8 (0.0%)
+  CLARIFICATION: 7/7 (100.0%)
+  DATA_FOLLOW_UP: 10/10 (100.0%)
+  DATA_QUERY: 29/33 (87.9%)
+  DOCUMENT_QUERY: 1/3 (33.3%)
+  GENERAL_CHAT: 0/7 (0.0%)
+  GENERAL_KNOWLEDGE: 0/3 (0.0%)
+  OUT_OF_SCOPE_LIVE: 3/3 (100.0%)
+  UNSUPPORTED: 4/7 (57.1%)
+
+Confusion matrix (expected -> predicted counts):
+expected \ predicted  CLARIFICATION     DATA_FOLLOW_UP    DATA_QUERY        DOCUMENT_QUERY    OUT_OF_SCOPE_LIVE UNSUPPORTED       
+APP_HELP              7                 0                 1                 0                 0                 0                 
+CLARIFICATION         7                 0                 0                 0                 0                 0                 
+DATA_FOLLOW_UP        0                 10                0                 0                 0                 0                 
+DATA_QUERY            4                 0                 29                0                 0                 0                 
+DOCUMENT_QUERY        2                 0                 0                 1                 0                 0                 
+GENERAL_CHAT          6                 1                 0                 0                 0                 0                 
+GENERAL_KNOWLEDGE     3                 0                 0                 0                 0                 0                 
+OUT_OF_SCOPE_LIVE     0                 0                 0                 0                 3                 0                 
+UNSUPPORTED           2                 0                 1                 0                 0                 4                 

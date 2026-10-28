@@ -1,0 +1,54 @@
+HARNESS LIMITATIONS
+-------------------
+- Seed value dictionary only (not live catalog/warehouse distinct values).
+- No LLM calls (interpret_question, generate_validated_sql) and no SQL execution.
+- No KnowledgeService document search; has_documents only affects route_question().
+- Region cases use forbidden_zones() text guard; full RBAC/RLS apply at execution time.
+- predicted_label reflects current planner + router heuristics, not Stage 1+ behavior.
+
+=== Stage 0 baseline (excludes expected_stage: 1) ===
+Overall accuracy: 53/79 (67.1%)
+
+Per-label recall / precision (tp / support, tp / predicted_as):
+  APP_HELP: recall 0/9 (0.0%) | precision 0/0 (n/a)
+  CLARIFICATION: recall 8/8 (100.0%) | precision 8/31 (25.8%)
+  DATA_FOLLOW_UP: recall 10/10 (100.0%) | precision 10/11 (90.9%)
+  DATA_QUERY: recall 29/31 (93.5%) | precision 29/31 (93.5%)
+  DOCUMENT_QUERY: recall 0/3 (0.0%) | precision 0/0 (n/a)
+  GENERAL_CHAT: recall 0/7 (0.0%) | precision 0/0 (n/a)
+  GENERAL_KNOWLEDGE: recall 0/2 (0.0%) | precision 0/0 (n/a)
+  OUT_OF_SCOPE_LIVE: recall 3/3 (100.0%) | precision 3/3 (100.0%)
+  UNSUPPORTED: recall 3/6 (50.0%) | precision 3/3 (100.0%)
+
+Confusion matrix (expected -> predicted counts):
+expected \ predicted  CLARIFICATION       DATA_FOLLOW_UP      DATA_QUERY          OUT_OF_SCOPE_LIVE   UNSUPPORTED         
+APP_HELP              8                   0                   1                   0                   0                   
+CLARIFICATION         8                   0                   0                   0                   0                   
+DATA_FOLLOW_UP        0                   10                  0                   0                   0                   
+DATA_QUERY            2                   0                   29                  0                   0                   
+DOCUMENT_QUERY        3                   0                   0                   0                   0                   
+GENERAL_CHAT          6                   1                   0                   0                   0                   
+GENERAL_KNOWLEDGE     2                   0                   0                   0                   0                   
+OUT_OF_SCOPE_LIVE     0                   0                   0                   3                   0                   
+UNSUPPORTED           2                   0                   1                   0                   3                   
+
+=== Deferred to Stage 1 (excluded from accuracy) ===
+  cl-comp-01: expected=DATA_QUERY predicted=CLARIFICATION match=false
+  rbac-01: expected=UNSUPPORTED predicted=UNSUPPORTED match=true
+
+=== Compare to previous ===
+Previous: tests\chat_routing_eval\results\baseline_stage0.csv
+
+Fixed (0): none
+Regressed (0): none
+
+Per-label recall delta (current - previous):
+  APP_HELP: 0.0% -> 0.0% (+0.0%)
+  CLARIFICATION: 100.0% -> 100.0% (+0.0%)
+  DATA_FOLLOW_UP: 100.0% -> 100.0% (+0.0%)
+  DATA_QUERY: 93.5% -> 93.5% (+0.0%)
+  DOCUMENT_QUERY: 0.0% -> 0.0% (+0.0%)
+  GENERAL_CHAT: 0.0% -> 0.0% (+0.0%)
+  GENERAL_KNOWLEDGE: 0.0% -> 0.0% (+0.0%)
+  OUT_OF_SCOPE_LIVE: 100.0% -> 100.0% (+0.0%)
+  UNSUPPORTED: 50.0% -> 50.0% (+0.0%)

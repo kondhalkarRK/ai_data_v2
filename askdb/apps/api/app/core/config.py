@@ -133,6 +133,11 @@ class Settings(BaseSettings):
     llm_fallback_model: str = ""
     query_cache_ttl_seconds: int = Field(default=300, ge=30, le=3600)
 
+    # --- chat session memory (analytical context + pending clarification) ---
+    chat_analytical_context_max_turns: int = Field(default=8, ge=1, le=50)
+    chat_analytical_context_ttl_seconds: int = Field(default=1800, ge=60, le=86_400)
+    chat_recent_turns_window: int = Field(default=6, ge=1, le=30)
+
     # --- mongo / qdrant ----------------------------------------------------
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_database: str = "nql_insight"

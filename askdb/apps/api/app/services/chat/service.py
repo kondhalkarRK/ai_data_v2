@@ -30,7 +30,26 @@ from app.services.chat.clarification import (
     recovery_for_failure,
     resolution_notes,
 )
-from app.services.chat.conversation_context import plan_state
+from app.services.chat.conversation_context import is_contextual_followup, plan_state
+from app.services.chat.conversation_memory import (
+    analytical_expired,
+    append_recent_turn,
+    assert_memory_scope,
+    build_analytical_context,
+    clear_pending,
+    empty_memory,
+    follow_up_context_status,
+    is_refresh_request,
+    plan_state_from_memory,
+    revalidate_prior_state_for_scope,
+    revalidate_plan_for_scope,
+    revalidate_stored_plan_for_scope,
+    resolve_incoming_message,
+    ResultMeta,
+    SessionMemory,
+    session_memory_storage_error,
+    set_pending_clarification,
+)
 from app.services.chat.decision_engine import (
     Confidence,
     assess_confidence,
@@ -242,6 +261,7 @@ class ChatService:
         self._schema_used = False
         self.last_profile: QueryProfile | None = None
         self.last_history: QueryHistory | None = None
+        self.session_memory_persisted: bool = True
 
     def _cache_scope(self) -> str:
         governed = active_llm(self._settings)
@@ -331,6 +351,13 @@ class ChatService:
         yield _progress("rewrite", completed_steps)
 
         conversation = await self._ensure_conversation(conversation_id, question)
+        session_memory = await self._load_session_memory(conversation.id)
+        raw_question = question
+        question, _completed_pending = resolve_incoming_message(session_memory, question)
+        bypass_query_cache = is_refresh_request(raw_question) or is_refresh_request(question)
+        append_recent_turn(
+            session_memory, role="user", text=question, settings=self._settings
+        )
         history = await self._create_running_history(history_id, conversation.id, question)
         self.last_history = history
         await self._app.flush()
@@ -540,9 +567,91 @@ class ChatService:
 
         prior_sql: str | None = None
         prior_state: dict[str, Any] | None = None
-        if conversation_id is not None:
-            prior_sql = await self._prior_sql(conversation.id, history_id)
+        follow_status = follow_up_context_status(session_memory, question, self._settings)
+        if follow_status == "expired" and is_contextual_followup(question):
+            msg = (
+                "That follow-up refers to an earlier question, but that context "
+                "has expired. Please ask your full question again."
+            )
+            await self._save_session_memory(conversation, session_memory)
+            async for frame in finish_without_sql(
+                path="clarification",
+                narrative=msg,
+                event="clarification",
+                payload={
+                    "kind": "clarify",
+                    "title": "Context expired",
+                    "message": msg,
+                    "historyId": str(history_id),
+                },
+                ambiguity=True,
+            ):
+                yield frame
+            return
+        if follow_status == "active":
+            ok, scope_reason = revalidate_stored_plan_for_scope(
+                session_memory,
+                self._industry,
+                question,
+                self._region_scope,
+            )
+            if not ok:
+                try:
+                    await deny_if_out_of_scope(
+                        self._app,
+                        self._region_scope,
+                        attempted=scope_reason or "region scope",
+                        action="AI Chat follow-up",
+                    )
+                except Exception as exc:
+                    narrative = getattr(exc, "message", None) or str(exc)
+                    await self._save_session_memory(conversation, session_memory)
+                    async for frame in finish_without_sql(
+                        path="denied",
+                        narrative=narrative,
+                        event="clarification",
+                        payload={
+                            "kind": "denied",
+                            "title": "Access denied",
+                            "message": narrative,
+                            "historyId": str(history_id),
+                        },
+                    ):
+                        yield frame
+                    return
+            prior_state = plan_state_from_memory(session_memory)
+        elif not session_memory.analytical:
             prior_state = await self._prior_state(conversation.id, history_id)
+            if prior_state and is_contextual_followup(question):
+                ok, scope_reason = revalidate_prior_state_for_scope(
+                    self._industry,
+                    prior_state,
+                    question,
+                    self._region_scope,
+                )
+                if not ok:
+                    try:
+                        await deny_if_out_of_scope(
+                            self._app,
+                            self._region_scope,
+                            attempted=scope_reason or "region scope",
+                            action="AI Chat follow-up",
+                        )
+                    except Exception as exc:
+                        narrative = getattr(exc, "message", None) or str(exc)
+                        async for frame in finish_without_sql(
+                            path="denied",
+                            narrative=narrative,
+                            event="clarification",
+                            payload={
+                                "kind": "denied",
+                                "title": "Access denied",
+                                "message": narrative,
+                                "historyId": str(history_id),
+                            },
+                        ):
+                            yield frame
+                        return
 
         surprise_sql = None
         if is_surprise_me(question):
@@ -639,6 +748,13 @@ class ChatService:
         if turn.clarification is not None or plan is None:
             clar = turn.clarification
             assert clar is not None
+            set_pending_clarification(
+                session_memory,
+                original_question=question,
+                clarifies=clar.message,
+                options=clar.options,
+            )
+            await self._save_session_memory(conversation, session_memory)
             options = clar.options or interpretation_options(
                 plan, industry=self._industry, question=question
             )
@@ -757,12 +873,14 @@ class ChatService:
 
         data_as_of_hint = await self._industry_data_as_of()
 
-        cached = QUERY_CACHE.get(
-            industry=self._industry.value,
-            question=question,
-            current_data_as_of=data_as_of_hint,
-            scope=self._cache_scope(),
-        )
+        cached = None
+        if not bypass_query_cache:
+            cached = QUERY_CACHE.get(
+                industry=self._industry.value,
+                question=question,
+                current_data_as_of=data_as_of_hint,
+                scope=self._cache_scope(),
+            )
         if cached is not None:
             profile.cache_hit = True
             profile.path = cached.path
@@ -1105,6 +1223,35 @@ class ChatService:
                 completed_steps.append("repair")
             yield _progress("execute", completed_steps, slow=maybe_slow())
 
+            if plan is not None:
+                ok_scope, scope_reason = revalidate_plan_for_scope(
+                    plan, question, self._region_scope
+                )
+                if not ok_scope:
+                    try:
+                        await deny_if_out_of_scope(
+                            self._app,
+                            self._region_scope,
+                            attempted=scope_reason or "region scope",
+                            action="AI Chat query",
+                        )
+                    except Exception as exc:
+                        narrative = getattr(exc, "message", None) or str(exc)
+                        await self._save_session_memory(conversation, session_memory)
+                        async for frame in finish_without_sql(
+                            path="denied",
+                            narrative=narrative,
+                            event="clarification",
+                            payload={
+                                "kind": "denied",
+                                "title": "Access denied",
+                                "message": narrative,
+                                "historyId": str(history_id),
+                            },
+                        ):
+                            yield frame
+                        return
+
             yield _sse(
                 "sql",
                 {
@@ -1331,6 +1478,20 @@ class ChatService:
         history.status = "completed"
         await self._app.flush()
 
+        if plan is not None and sql_text and validation_status == "passed":
+            ok_scope, _ = revalidate_plan_for_scope(plan, question, self._region_scope)
+            if ok_scope:
+                session_memory.analytical = build_analytical_context(
+                    plan=plan,
+                    question=question,
+                    result_meta=ResultMeta(
+                        row_count=len(rows),
+                        column_names=tuple(columns),
+                    ),
+                    prior=session_memory.analytical,
+                )
+        await self._save_session_memory(conversation, session_memory)
+
         scoped = (
             plan_suggestions(plan, industry=self._industry, question=question, limit=3)
             if plan.filters
@@ -1500,6 +1661,56 @@ class ChatService:
         )
         await self._app.flush()
         return bool(getattr(result, "rowcount", 0))
+
+    async def _load_session_memory(self, conversation_id: uuid.UUID) -> SessionMemory:
+        self.session_memory_persisted = True
+        try:
+            result = await self._app.execute(
+                select(Conversation.session_memory)
+                .where(Conversation.id == conversation_id)
+                .where(Conversation.user_id == self._user.id)
+            )
+            raw = result.scalar_one_or_none()
+        except Exception as exc:
+            if session_memory_storage_error(exc):
+                logger.warning(
+                    "conversations.session_memory unavailable; in-request memory only (%s)",
+                    exc,
+                )
+                self.session_memory_persisted = False
+                return empty_memory(user_id=self._user.id, conversation_id=conversation_id)
+            raise
+        memory = (
+            SessionMemory.from_dict(raw)
+            if isinstance(raw, dict)
+            else empty_memory(user_id=self._user.id, conversation_id=conversation_id)
+        )
+        if memory is None:
+            memory = empty_memory(user_id=self._user.id, conversation_id=conversation_id)
+        assert_memory_scope(
+            memory, user_id=self._user.id, conversation_id=conversation_id
+        )
+        return memory
+
+    async def _save_session_memory(
+        self, conversation: Conversation, memory: SessionMemory
+    ) -> None:
+        if not self.session_memory_persisted:
+            return
+        assert_memory_scope(
+            memory, user_id=self._user.id, conversation_id=conversation.id
+        )
+        try:
+            conversation.session_memory = memory.to_dict()
+            await self._app.flush()
+        except Exception as exc:
+            if session_memory_storage_error(exc):
+                logger.warning(
+                    "Could not persist session_memory; continuing without cross-request memory"
+                )
+                self.session_memory_persisted = False
+                return
+            raise
 
     async def _prior_sql(
         self, conversation_id: uuid.UUID, current_history_id: uuid.UUID

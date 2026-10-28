@@ -40,6 +40,7 @@ class Conversation(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+    session_memory: Mapped[dict[str, Any] | None] = mapped_column(JsonDocument, nullable=True)
 
 
 class QueryHistory(Base):
