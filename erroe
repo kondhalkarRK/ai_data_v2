@@ -1,3 +1,108 @@
+These steps use PowerShell, matching Cursor's paths. The error was `password authentication failed for user "askdb_app"`, so the first job is making the database URL and the Postgres user agree.
+
+## 1. Find the database URL the app uses
+
+```powershell
+cd askdb\apps\api
+Select-String -Path .env, app\core\config.py -Pattern "app_database_url" -CaseSensitive:$false
+```
+
+Note the user, password, host, port and database name in that URL. The default seems to be `askdb_app@localhost:5432`. If a `.env` file sets `APP_DATABASE_URL`, that value wins over the default.
+
+## 2. Make sure Postgres is running and the user's password matches
+
+```powershell
+psql -U postgres -h localhost -p 5432
+```
+
+Then, inside `psql`, replace the names and password with the ones from step 1:
+
+```sql
+\du                                   -- does askdb_app exist?
+\l                                    -- does the database exist?
+ALTER USER askdb_app WITH PASSWORD 'your_dev_password';
+-- if the user or database is missing:
+-- CREATE USER askdb_app WITH PASSWORD 'your_dev_password';
+-- CREATE DATABASE askdb_app OWNER askdb_app;
+\q
+```
+
+Use a local dev password and keep it out of git.
+
+## 3. Point the app at it
+
+```powershell
+$env:APP_DATABASE_URL = "postgresql://askdb_app:your_dev_password@localhost:5432/askdb_app"
+```
+
+Match whatever driver prefix your existing config uses, for example `postgresql+psycopg://`. Check how `config.py` writes it.
+
+## 4. Back up first
+
+```powershell
+pg_dump -U askdb_app -h localhost -d askdb_app -F c -f backup_before_0010.dump
+```
+
+## 5. Check where Alembic is now
+
+```powershell
+.\.venv\Scripts\alembic -x target=app current
+```
+
+It should show `0009_user_region_access`. If it shows something else or nothing, stop and send me the output.
+
+## 6. Apply, then test the downgrade
+
+```powershell
+.\.venv\Scripts\alembic -x target=app upgrade 0010_conversation_session_memory
+.\.venv\Scripts\alembic -x target=app downgrade 0009_user_region_access
+.\.venv\Scripts\alembic -x target=app upgrade 0010_conversation_session_memory
+```
+
+This proves the migration runs, rolls back, and runs again cleanly.
+
+## 7. Verify the column exists
+
+```powershell
+psql -U askdb_app -h localhost -d askdb_app -c "\d conversations"
+```
+
+You should see `session_memory | jsonb`.
+
+## 8. Check it works end to end
+
+Start the app locally and ask a question, then ask "What about South?" in the same conversation. Then check that memory was saved:
+
+```powershell
+psql -U askdb_app -h localhost -d askdb_app -c "SELECT id, session_memory IS NOT NULL AS has_memory FROM conversations ORDER BY updated_at DESC LIMIT 3;"
+```
+
+If `updated_at` isn't a column name in your schema, drop the `ORDER BY` clause. `has_memory` should be true for the conversation you just used, and you can spot-check that the JSON contains plan state and no SQL or rows.
+
+## If something fails
+- **Password error again:** step 2 and step 3 don't match, or a `.env` file is overriding your variable.
+- **`alembic current` shows a different revision:** don't force anything. Send me the output.
+- **Wrong database:** run `\conninfo` in `psql` to confirm what you're connected to.
+
+Only run this against a local dev database. Don't apply it to a shared or production database until the later stages pass and you've reviewed them.
+
+==========
+
+cd askdb\apps\api
+$env:APP_DATABASE_URL = "<your-local-dev-url>"   # if you override settings
+.\.venv\Scripts\alembic -x target=app upgrade 0010_conversation_session_memory
+.\.venv\Scripts\alembic -x target=app downgrade 0009_user_region_access
+.\.venv\Scripts\alembic -x target=app upgrade 0010_conversation_session_memory
+
+
+
+
+Use the full path (from apps/api):
+
+python tests/chat_routing_eval/run_baseline.py --compare tests/chat_routing_eval/results/baseline_stage0.csv
+
+
+
 which all cars has Coral Pink color
 Answered from data
 Answered in 0.5s
