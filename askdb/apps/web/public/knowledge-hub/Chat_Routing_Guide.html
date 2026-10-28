@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ask Me — Chat routing &amp; conversation guide</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b1220;
+        --panel: #121a2b;
+        --panel2: #0f1626;
+        --ink: #f4f7fb;
+        --mute: #9aa8bc;
+        --line: #243049;
+        --accent: #5b8def;
+        --teal: #14a3a1;
+        --ok: #0f9d6e;
+        --warn: #d69e2e;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f6f8fc;
+          --panel: #fff;
+          --panel2: #f0f4fa;
+          --ink: #122033;
+          --mute: #5b6b80;
+          --line: #e2e8f4;
+          --accent: #2563eb;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 16px/1.55 system-ui, -apple-system, Segoe UI, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      header {
+        padding: 2.5rem 1.25rem 1.5rem;
+        max-width: 920px;
+        margin: 0 auto;
+      }
+      header p { color: var(--mute); max-width: 44rem; }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        max-width: 920px;
+        margin: 0 auto 2rem;
+        padding: 0 1.25rem;
+      }
+      nav a {
+        color: var(--accent);
+        text-decoration: none;
+        font-size: 0.85rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 0.3rem 0.75rem;
+        background: var(--panel);
+      }
+      main { max-width: 920px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 1.25rem 1.4rem;
+        margin-bottom: 1rem;
+      }
+      h2 { margin: 0 0 0.6rem; font-size: 1.15rem; }
+      h3 { margin: 1.2rem 0 0.4rem; font-size: 0.95rem; color: var(--accent); }
+      p, li { color: var(--mute); }
+      strong { color: var(--ink); font-weight: 600; }
+      code {
+        font-size: 0.88em;
+        background: var(--panel2);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.1em 0.35em;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+        margin: 0.75rem 0;
+      }
+      th, td {
+        border: 1px solid var(--line);
+        padding: 0.45rem 0.6rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: var(--panel2); color: var(--ink); }
+      td { color: var(--mute); }
+      .flow {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        margin: 1rem 0;
+        font-size: 0.82rem;
+      }
+      .flow-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 0.35rem;
+      }
+      .node {
+        flex: 1 1 140px;
+        background: var(--panel2);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 0.5rem 0.65rem;
+        color: var(--mute);
+      }
+      .node b { display: block; color: var(--ink); font-size: 0.78rem; margin-bottom: 0.15rem; }
+      .node.data b { color: var(--teal); }
+      .node.stop b { color: var(--warn); }
+      .arrow {
+        align-self: center;
+        color: var(--accent);
+        font-weight: 700;
+        padding: 0 0.15rem;
+      }
+      .pill {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        border-radius: 999px;
+        padding: 0.15rem 0.5rem;
+        margin-right: 0.35rem;
+        border: 1px solid var(--line);
+        background: var(--panel2);
+        color: var(--accent);
+      }
+      .pill.sql { color: var(--teal); }
+      .pill.chat { color: var(--ok); }
+      .pill.no { color: var(--warn); }
+      .example { font-style: italic; color: var(--ink); opacity: 0.92; }
+      .compare {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: 1fr 1fr;
+      }
+      @media (max-width: 640px) {
+        .compare { grid-template-columns: 1fr; }
+      }
+      .compare div {
+        background: var(--panel2);
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        padding: 0.75rem 0.9rem;
+      }
+      .compare h4 { margin: 0 0 0.4rem; font-size: 0.9rem; }
+      footer {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 0 1.25rem 2rem;
+        font-size: 0.8rem;
+        color: var(--mute);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <p style="letter-spacing: 0.14em; text-transform: uppercase; font-size: 12px; color: var(--accent); margin: 0 0 0.4rem">
+        Ask Me · Chat pipeline
+      </p>
+      <h1 style="margin: 0 0 0.5rem">How routing &amp; conversation work now</h1>
+      <p>
+        This guide reflects the current backend path in
+        <code>ChatService.ask_stream</code>,
+        <code>pre_plan.py</code>,
+        <code>message_classifier.py</code>,
+        <code>conversation_memory.py</code>, and the eval harness
+        (<code>chat_routing_eval.yaml</code>). It is not a generic ChatGPT clone: answers about
+        <strong>your numbers</strong> always go through the semantic layer and SQL guardrails.
+      </p>
+      <p style="font-size: 0.9rem; margin-top: 0.75rem">
+        Generated from implementation as of the Stages A–F chat routing work. Open this file locally in a browser.
+      </p>
+    </header>
+
+    <nav>
+      <a href="#chatgpt-like">Like ChatGPT?</a>
+      <a href="#flags">Feature flags</a>
+      <a href="#pipeline">Routing pipeline</a>
+      <a href="#routes">Question types</a>
+      <a href="#memory">Conversation memory</a>
+      <a href="#followups">Follow-ups</a>
+      <a href="#examples">Example threads</a>
+      <a href="#limits">Limits</a>
+    </nav>
+
+    <main>
+      <section id="chatgpt-like">
+        <h2>Is it like a ChatGPT conversation?</h2>
+        <div class="compare">
+          <div>
+            <h4>Similar to ChatGPT</h4>
+            <ul>
+              <li>One <strong>conversation</strong> keeps context across turns (same <code>conversationId</code>).</li>
+              <li>Short replies after a data answer: <span class="example">“What about South?”</span>, <span class="example">“Break it down by month”</span>.</li>
+              <li>Greetings, thanks, and light chitchat get a brief reply without running SQL.</li>
+              <li>General knowledge (e.g. capitals) can get a short LLM answer with a clear “not from your data” note.</li>
+              <li>Clarification when the system is unsure instead of inventing metrics or regions.</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Not like ChatGPT</h4>
+            <ul>
+              <li>No free-form answers about <strong>your</strong> revenue, claims, or KPIs without validated SQL.</li>
+              <li>No live web (weather, crypto, sports scores).</li>
+              <li>No deleting data, other users’ history, or bypassing instructions.</li>
+              <li>Region-scoped users only see data their RBAC allows.</li>
+              <li>Memory for analytics expires (TTL and turn cap); unrelated questions do not silently reuse an old query.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="flags">
+        <h2>Configuration (what is on in production by default)</h2>
+        <table>
+          <thead>
+            <tr><th>Setting</th><th>Default</th><th>Effect</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>chat_router_enabled</code></td>
+              <td><strong>false</strong></td>
+              <td>Rule classifier runs in <strong>shadow</strong> only (logs route; does not change behavior). Set true to enable greetings, app help, document cues, etc. before planning.</td>
+            </tr>
+            <tr>
+              <td><code>chat_follow_up_guard_enabled</code></td>
+              <td><strong>true</strong></td>
+              <td>Short follow-ups must name a real value, metric, date, or operation—or the app asks for clarification instead of reusing SQL.</td>
+            </tr>
+            <tr>
+              <td><code>chat_question_rewrites_enabled</code></td>
+              <td><strong>true</strong></td>
+              <td>Strips leading “why did / explain / what drove” for planning; splits “Explain X and show …” into data + glossary definition.</td>
+            </tr>
+            <tr>
+              <td><code>chat_structured_classifier_enabled</code></td>
+              <td><strong>false</strong></td>
+              <td>Optional single LLM JSON call (intent + restated question) when deterministic planning would clarify; falls back to clarification on error.</td>
+            </tr>
+            <tr>
+              <td><code>chat_analytical_context_ttl_seconds</code></td>
+              <td>1800 (30 min)</td>
+              <td>After this, contextual follow-ups prompt you to ask the full question again.</td>
+            </tr>
+            <tr>
+              <td><code>chat_analytical_context_max_turns</code></td>
+              <td>8</td>
+              <td>Maximum chained data follow-ups on one analytical context.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="pipeline">
+        <h2>End-to-end routing pipeline</h2>
+        <p>Every message in a conversation follows this order (see <code>run_pre_plan</code> + <code>plan_turn</code>):</p>
+
+        <div class="flow">
+          <div class="flow-row">
+            <div class="node"><b>1. Region guard</b>Forbidden zone names in text → access denied (RBAC).</div>
+            <span class="arrow">→</span>
+            <div class="node"><b>2. Early classifier</b>If router on: greeting, thanks, unsafe, live external, app help, documents—<em>no schema load</em>.</div>
+          </div>
+          <div class="flow-row">
+            <div class="node"><b>3. Pack + values</b>Semantic pack and value dictionary loaded for governed vocabulary.</div>
+            <span class="arrow">→</span>
+            <div class="node"><b>4. General knowledge</b>If router on: “What is …” with no data words → LLM (disclaimer), no SQL.</div>
+          </div>
+          <div class="flow-row">
+            <div class="node"><b>5. Memory</b>Refresh clears stale context; expiry blocks old follow-ups; scope revalidates filters.</div>
+            <span class="arrow">→</span>
+            <div class="node"><b>6. Follow-up guard</b>Short messages need anchor (South, by month, last year, top 5…).</div>
+          </div>
+          <div class="flow-row">
+            <div class="node data"><b>7. plan_turn</b>Spell check → entity resolve → intent → governed SQL template.</div>
+            <span class="arrow">→</span>
+            <div class="node"><b>8. Rewrites</b>Why/explain strip; compound “explain X and show …” → plan data half + definition event.</div>
+          </div>
+          <div class="flow-row">
+            <div class="node"><b>9. Optional LLM</b>Structured classifier or legacy <code>interpret_question</code> only if plan would clarify.</div>
+            <span class="arrow">→</span>
+            <div class="node data"><b>10. Execute</b>Validated SQL, narrative, charts—or clarification / recovery.</div>
+          </div>
+        </div>
+
+        <p style="margin-top: 0.75rem">
+          After a successful data answer, <code>SessionMemory.analytical</code> stores a
+          <strong>validated plan</strong> (metric, dimensions, filters)—not free-text PII—for the next turn.
+        </p>
+      </section>
+
+      <section id="routes">
+        <h2>What kinds of questions are supported?</h2>
+        <p>Eval labels in <code>chat_routing_eval.yaml</code> map to user-visible behavior:</p>
+
+        <h3><span class="pill sql">DATA_QUERY</span> Governed analytics (main path)</h3>
+        <ul>
+          <li>Metrics and dimensions from the semantic layer: revenue, units, premium, loss ratio, by region, month, dealer, product, etc.</li>
+          <li>Examples: <span class="example">“Revenue by region”</span>, <span class="example">“Top 5 dealers in Mumbai by units”</span>, <span class="example">“Loss ratio by month”</span>.</li>
+          <li>Unresolved brands/regions → clarification options, not guessed SQL.</li>
+        </ul>
+
+        <h3><span class="pill sql">DATA_FOLLOW_UP</span> Conversational drill-down</h3>
+        <ul>
+          <li>Requires active analytical memory and a valid anchor (see Follow-ups).</li>
+          <li>Examples: <span class="example">“What about South?”</span>, <span class="example">“Break it down by month”</span>, <span class="example">“Bottom 5 instead”</span>, <span class="example">“Last year?”</span>, <span class="example">“Add Delhi”</span>, <span class="example">“Same for revenue”</span>.</li>
+          <li>UI may show interpretation: e.g. “Showing revenue for South”.</li>
+        </ul>
+
+        <h3><span class="pill chat">GENERAL_CHAT</span> Small talk (router on)</h3>
+        <ul>
+          <li>Hello, thanks, jokes, non-data chitchat (e.g. dinner)—brief LLM or template; no SQL.</li>
+          <li>After a failed or empty data turn, jokes are suppressed.</li>
+        </ul>
+
+        <h3><span class="pill chat">APP_HELP</span> Product &amp; semantic layer help</h3>
+        <ul>
+          <li>What tables/metrics/KPIs exist, what loss ratio means <em>in this app</em>, how to ask about premium vs earned premium.</li>
+          <li>Answers from pack + glossary only; missing terms are stated honestly.</li>
+        </ul>
+
+        <h3><span class="pill chat">GENERAL_KNOWLEDGE</span> World facts (router on)</h3>
+        <ul>
+          <li>Opener like “Explain …” / “What is the capital of …” with <strong>no</strong> governed data vocabulary.</li>
+          <li>LLM with strict prompt: never imply a database check.</li>
+        </ul>
+
+        <h3><span class="pill chat">DOCUMENT_QUERY</span> Uploaded documents</h3>
+        <ul>
+          <li>Phrases like summarize report, policy document, uploaded file → knowledge search if documents exist; otherwise a clear “no documents” message.</li>
+        </ul>
+
+        <h3><span class="pill no">OUT_OF_SCOPE_LIVE</span> External / live feeds</h3>
+        <ul>
+          <li>Weather, crypto, sports, elections, stock prices → polite refusal.</li>
+        </ul>
+
+        <h3><span class="pill no">UNSUPPORTED</span> Unsafe or out of policy</h3>
+        <ul>
+          <li>Delete/drop table, other users’ chat, prompt injection, regions outside semantic allow-list (<code>is_out_of_bounds</code>).</li>
+        </ul>
+
+        <h3><span class="pill">CLARIFICATION</span> Need more detail</h3>
+        <ul>
+          <li>Ambiguous metric (“Show sales”), vague follow-up (“What about it?”), guard blocked, plan validation failed, or LLM classifier timeout.</li>
+        </ul>
+      </section>
+
+      <section id="memory">
+        <h2>Conversation memory (multi-turn)</h2>
+        <p>Stored per user + conversation in <code>conversations.session_memory</code> (JSON):</p>
+        <table>
+          <thead>
+            <tr><th>Memory slice</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Analytical context</strong></td>
+              <td>Last successful plan: metric, dimensions, filters, time grain, validated plan JSON. Powers follow-ups and RBAC revalidation.</td>
+            </tr>
+            <tr>
+              <td><strong>Recent turns</strong></td>
+              <td>Short rolling transcript for UX (not used to invent SQL).</td>
+            </tr>
+            <tr>
+              <td><strong>General chat turns</strong></td>
+              <td>Optional small-talk history when router handles greetings via LLM.</td>
+            </tr>
+            <tr>
+              <td><strong>Pending clarification</strong></td>
+              <td>If you were asked “Revenue or units?”, your next short reply completes the original question.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          <strong>Refresh</strong> phrases (e.g. “refresh”, “reload”, “update the numbers”) bypass query cache and start fresh analytical context.
+          <strong>Unrelated</strong> long questions do not inherit the prior SQL plan unless they look like follow-ups.
+        </p>
+      </section>
+
+      <section id="followups">
+        <h2>Follow-up guard (when it runs SQL vs asks you)</h2>
+        <p>With guard enabled, a short message reuses the prior plan only if it includes at least one of:</p>
+        <ul>
+          <li>A <strong>known value</strong> (e.g. South, Mumbai, a claim status from the value dictionary).</li>
+          <li>A <strong>metric / dimension / glossary</strong> term from the industry semantic pack.</li>
+          <li>A <strong>date phrase</strong> (last year, Q3, by quarter, YTD, month names).</li>
+          <li>An <strong>operation</strong>: break down, top/bottom N, add/include, same for, compare, only X, instead.</li>
+        </ul>
+        <p>
+          <span class="example">“What about dinner?”</span> after a data answer → <strong>GENERAL_CHAT</strong> (router) or clarification (guard), not SQL.
+          Values valid only in another industry (e.g. insurance “Repudiated” in automotive) do <strong>not</strong> anchor a follow-up.
+        </p>
+      </section>
+
+      <section id="examples">
+        <h2>Example conversation threads</h2>
+
+        <h3>Thread A — Data drill-down (ChatGPT-style, governed)</h3>
+        <ol>
+          <li><strong>You:</strong> <span class="example">Revenue by region</span> → DATA_QUERY, SQL + chart.</li>
+          <li><strong>You:</strong> <span class="example">What about South?</span> → DATA_FOLLOW_UP, same metric, filter South.</li>
+          <li><strong>You:</strong> <span class="example">Break it down by month</span> → DATA_FOLLOW_UP, adds time grain.</li>
+          <li><strong>You:</strong> <span class="example">Thanks</span> → GENERAL_CHAT, no SQL.</li>
+        </ol>
+
+        <h3>Thread B — Help + data (router on)</h3>
+        <ol>
+          <li><strong>You:</strong> <span class="example">What metrics are available in Ask DB?</span> → APP_HELP from semantic pack.</li>
+          <li><strong>You:</strong> <span class="example">Show me total revenue last month</span> → DATA_QUERY.</li>
+        </ol>
+
+        <h3>Thread C — Clarification instead of guessing</h3>
+        <ol>
+          <li><strong>You:</strong> <span class="example">Show sales</span> → CLARIFICATION (metric ambiguous).</li>
+          <li><strong>You:</strong> <span class="example">Revenue</span> → pending clarification merged → DATA_QUERY.</li>
+        </ol>
+
+        <h3>Thread D — Why question with rewrite</h3>
+        <ol>
+          <li><strong>You:</strong> <span class="example">Why did revenue drop in the West region?</span> → rewriter may plan <span class="example">revenue drop in the West region</span> → DATA_QUERY if vocabulary resolves.</li>
+        </ol>
+      </section>
+
+      <section id="limits">
+        <h2>Limits &amp; honesty</h2>
+        <ul>
+          <li>Router off (default): behavior matches legacy path for most analytics; shadow logs show what would have routed.</li>
+          <li>Compound questions with undefined terms (e.g. “Explain churn and show last quarter” when churn is not in the insurance glossary) may still clarify rather than invent a metric.</li>
+          <li>Streaming is token-by-token from completed LLM text for chat/knowledge paths; true token streaming from the provider is not wired everywhere.</li>
+          <li>Eval harness: 78/79 routing labels with router + guard + rewrites; full accuracy depends on enabling the same flags in production.</li>
+        </ul>
+        <p>
+          Code references:
+          <code>app/services/chat/service.py</code>,
+          <code>message_classifier.py</code>,
+          <code>pre_plan.py</code>,
+          <code>follow_up_guard.py</code>,
+          <code>non_data_handlers.py</code>,
+          <code>llm_assist.classify_and_resolve</code>,
+          <code>tests/chat_routing_eval/chat_routing_eval.yaml</code>.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      Ask Me · Chat routing guide · Aligns with governed NLQ pipeline; not a substitute for your org’s data dictionary or RBAC policy.
+    </footer>
+  </body>
+</html>
