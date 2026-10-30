@@ -126,7 +126,7 @@ async def test_no_joke_after_failed_turn(memory_chat) -> None:
 @pytest.mark.asyncio
 async def test_general_knowledge_prompt_forbids_data_claims(memory_chat) -> None:
     service, conv, _ = memory_chat
-    _router_on(service)
+    service._settings = Settings(chat_router_enabled=True, chat_general_knowledge_enabled=True)
     llm = _llm("Paris is the capital of France.")
     with (
         patch("app.services.chat.non_data_handlers.complete_text", llm),

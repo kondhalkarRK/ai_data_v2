@@ -140,7 +140,37 @@ export interface ChartPayload {
   anomalies?: AnomalyMarker[];
 }
 
+export type ResultShape =
+  | "empty"
+  | "single_value"
+  | "time_series"
+  | "ranking"
+  | "comparison"
+  | "breakdown"
+  | "table";
+
+/**
+ * Deterministic description of the executed result, built by the API from the returned rows
+ * (same formatting as the narration). The New Chat UI renders only what is in here.
+ */
+export interface ResultProfile {
+  shape: ResultShape;
+  rowCount: number;
+  labelColumns: string[];
+  measures: Array<{
+    column: string;
+    label: string;
+    kind: "currency" | "percent" | "number";
+    scalePercent?: boolean;
+  }>;
+  preview: Array<{ label: string | null; values: Array<{ column: string; text: string | null }> }>;
+  previewTruncated: boolean;
+  chartSuitable: boolean;
+  mayBeTruncated: boolean;
+}
+
 export interface ResponseMeta {
+  resultProfile?: ResultProfile | null;
   groundedOn: GroundedSource[];
   ambiguityFlag: boolean;
   validationStatus: ValidationStatus;

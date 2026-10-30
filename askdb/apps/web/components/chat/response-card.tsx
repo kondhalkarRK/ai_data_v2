@@ -55,6 +55,7 @@ export function ResponseCard({
   onRetry,
   onAction,
   className,
+  initialTab = "table",
 }: {
   message: ChatMessage;
   busy?: boolean;
@@ -62,8 +63,10 @@ export function ResponseCard({
   onRetry?: () => void;
   onAction: (key: ActionKey, message: ChatMessage) => void;
   className?: string;
+  /** Tab shown first; Classic never passes this, so it keeps opening on the table. */
+  initialTab?: ResponseTab;
 }) {
-  const [tab, setTab] = React.useState<ResponseTab>("table");
+  const [tab, setTab] = React.useState<ResponseTab>(initialTab);
   const [insightDepth, setInsightDepth] = React.useState<InsightDepth>("executive");
   const meta = message.meta;
   const route = message.route || meta?.route;

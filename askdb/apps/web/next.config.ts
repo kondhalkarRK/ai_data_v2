@@ -32,6 +32,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
 
+  // Optional New Chat experience. Off by default; Classic is the only UI when false.
+  env: {
+    NEXT_PUBLIC_ASK_ME_NEW_CHAT_UI_ENABLED:
+      process.env.NEXT_PUBLIC_ASK_ME_NEW_CHAT_UI_ENABLED ??
+      process.env.ASK_ME_NEW_CHAT_UI_ENABLED ??
+      "false",
+  },
+
   typescript: {
     ignoreBuildErrors: false,
   },

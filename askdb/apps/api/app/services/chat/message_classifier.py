@@ -35,6 +35,16 @@ _NON_DATA_CHITCHAT = re.compile(
     re.I,
 )
 
+# Programming / developer-help cues. Deliberately excludes "sql": SQL-shaped asks are routed
+# to the governed NLQ path, never to open-ended code help.
+_OFF_TOPIC_PROGRAMMING = re.compile(
+    r"\b(python|javascript|typescript|golang|java|php|django|flask|node\.?js|reactjs|"
+    r"kubernetes|dockerfile|regex|leetcode|stack\s*overflow|linked\s+list|"
+    r"write\s+(?:me\s+)?(?:an?\s+)?(?:function|script|program|code)|"
+    r"debug\s+(?:my|this)\s+code|code\s+snippet)\b",
+    re.I,
+)
+
 _UNSUPPORTED = re.compile(
     r"\b("
     r"delete\s+(?:all|from)|drop\s+table|truncate\s+table|"
@@ -157,6 +167,8 @@ def _rule_classify(
         return MessageClassification(MessageRoute.GENERAL_CHAT, "joke_request")
     if _NON_DATA_CHITCHAT.search(q):
         return MessageClassification(MessageRoute.GENERAL_CHAT, "non_data_chitchat")
+    if _OFF_TOPIC_PROGRAMMING.search(q):
+        return MessageClassification(MessageRoute.GENERAL_KNOWLEDGE, "off_topic_programming")
     if _APP_HELP.search(q):
         return MessageClassification(MessageRoute.APP_HELP, "app_help_phrasing")
     if any(cue in ql for cue in DOCUMENT_CUES):
@@ -179,6 +191,19 @@ def template_general_chat(reason: str) -> str:
     if reason == "greeting":
         return "Hello! Ask me a governed analytics question about your industry data."
     return "Happy to chat briefly, but I'm best at governed analytics questions about your data."
+
+
+def template_scope_declined(industry: Industry) -> str:
+    examples = (
+        "claims by status or premium by month"
+        if industry is Industry.INSURANCE
+        else "units sold by state or revenue by month"
+    )
+    return (
+        "Ask Me is built for your business data and analytics, so I can't help with general "
+        "knowledge or programming questions. I'm happy to help with something like "
+        f"\u201c{examples}\u201d."
+    )
 
 
 def template_unsupported() -> str:

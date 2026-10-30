@@ -38,8 +38,10 @@ from app.services.chat.message_classifier import (
     rule_route_interrupts_analytical_context,
     template_general_chat,
     template_out_of_scope_live,
+    template_scope_declined,
     template_unsupported,
 )
+from app.services.chat.narration import describe_result
 from app.services.chat.non_data_handlers import (
     LlmReply,
     app_help_reply,
@@ -309,6 +311,30 @@ class ChatService:
             "configuredProvider": governed.provider,
             "configuredModel": governed.model,
         }
+
+    def _result_profile(
+        self, columns: list[str], rows: list[dict[str, Any]], plan: Any
+    ) -> dict[str, Any] | None:
+        """Presentation hints from the executed result; never blocks or alters the answer."""
+        try:
+            return describe_result(
+                columns,
+                rows,
+                intent=getattr(plan, "intent", None),
+                analysis=getattr(plan, "analysis", None),
+                row_limit=self._settings.nlq_default_result_limit,
+            )
+        except Exception:
+            logger.debug("result profile unavailable", exc_info=True)
+            return None
+
+    async def _general_knowledge_reply(self, question: str) -> LlmReply:
+        """Open-domain questions are out of scope unless explicitly enabled; no LLM, no SQL."""
+        if self._settings.chat_general_knowledge_enabled:
+            return await general_knowledge_reply(
+                self._settings, industry=self._industry, question=question
+            )
+        return LlmReply(template_scope_declined(self._industry))
 
     async def _recover_analytics(self) -> None:
         """Clear an aborted Postgres transaction so later statements can run.
@@ -705,6 +731,14 @@ class ChatService:
                 ):
                     yield frame
                 return
+            if stop == "general_knowledge":
+                reply = await self._general_knowledge_reply(question)
+                await record_reply(reply)
+                async for frame in finish_without_sql(
+                    path="general_knowledge", narrative=reply.text
+                ):
+                    yield frame
+                return
             if stop == "document_query":
                 async for frame in answer_from_documents("document cue"):
                     yield frame
@@ -793,9 +827,7 @@ class ChatService:
         )
         if pre.stop == "general_knowledge":
             log_route("general_knowledge", "rules")
-            reply = await general_knowledge_reply(
-                self._settings, industry=self._industry, question=question
-            )
+            reply = await self._general_knowledge_reply(question)
             await record_reply(reply)
             async for frame in finish_without_sql(path="general_knowledge", narrative=reply.text):
                 yield frame
@@ -1006,9 +1038,7 @@ class ChatService:
                         yield frame
                     return
                 if verdict.intent == "GENERAL_KNOWLEDGE":
-                    reply = await general_knowledge_reply(
-                        self._settings, industry=self._industry, question=question
-                    )
+                    reply = await self._general_knowledge_reply(question)
                     await record_reply(reply)
                     narrative = reply.text
                 elif verdict.intent == "APP_HELP":
@@ -1734,6 +1764,7 @@ class ChatService:
             "timings": timings.to_dict(),
             "queryMeta": query_meta.to_dict(),
             "insights": insights,
+            "resultProfile": self._result_profile(columns, rows, plan),
             "anomalies": detect_anomalies(columns, rows) if rows else [],
             "alternateInterpretations": alternate_interpretations,
             "queryPlan": planned.trace(),

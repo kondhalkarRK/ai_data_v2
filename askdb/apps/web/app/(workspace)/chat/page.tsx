@@ -2,13 +2,13 @@
 
 import { Suspense } from "react";
 
-import { ChatWorkspace } from "@/components/chat/chat-workspace";
+import { ChatModeShell } from "@/components/chat/chat-mode-shell";
 import { LoadingState } from "@/components/loading/loading-state";
 
 export default function ChatPage() {
   return (
     <Suspense fallback={<LoadingState title="Opening chat" size="lg" />}>
-      <ChatWorkspace />
+      <ChatModeShell />
     </Suspense>
   );
 }

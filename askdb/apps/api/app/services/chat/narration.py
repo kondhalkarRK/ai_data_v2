@@ -124,6 +124,98 @@ def narrate(columns: list[str], rows: list[dict[str, Any]]) -> Narration | None:
     return _ranking(points, label_col, primary, measures[1:], rows, seed)
 
 
+ResultShape = Literal[
+    "empty", "single_value", "time_series", "ranking", "comparison", "breakdown", "table"
+]
+
+
+def describe_result(
+    columns: list[str],
+    rows: list[dict[str, Any]],
+    *,
+    intent: str | None = None,
+    analysis: str | None = None,
+    row_limit: int | None = None,
+    preview: int = 5,
+    max_measures: int = 3,
+) -> dict[str, Any]:
+    """Shape and display hints for the UI, derived only from the executed result.
+
+    Reuses the narration engine's own measure/time detection and number formatting so the
+    compact answer, the narration and the table agree. ``intent``/``analysis`` come from the
+    semantic plan and only refine ranking vs comparison vs breakdown; they never add numbers.
+    """
+    n = len(rows)
+    profile: dict[str, Any] = {
+        "shape": "empty",
+        "rowCount": n,
+        "labelColumns": [],
+        "measures": [],
+        "preview": [],
+        "previewTruncated": False,
+        "chartSuitable": False,
+        "mayBeTruncated": bool(row_limit and n >= row_limit),
+    }
+    if not columns or n == 0:
+        return profile
+
+    measures = _measures(columns, rows)
+    measure_cols = {m.column for m in measures}
+    labels = [c for c in columns if c not in measure_cols]
+    shown = measures[:max_measures]
+    profile["labelColumns"] = labels
+    profile["measures"] = [
+        {"column": m.column, "label": m.label, "kind": m.kind, "scalePercent": m.scale_percent}
+        for m in shown
+    ]
+
+    def row_label(row: dict[str, Any]) -> str:
+        parts = [_label(row.get(c)) for c in labels[:3] if row.get(c) is not None]
+        return " \u00b7 ".join(parts)
+
+    def row_values(row: dict[str, Any]) -> list[dict[str, str | None]]:
+        out: list[dict[str, str | None]] = []
+        for m in shown:
+            value = _num(row.get(m.column))
+            out.append({"column": m.column, "text": m.fmt(value) if value is not None else None})
+        return out
+
+    if not measures:
+        shape: ResultShape = "table"
+    elif n == 1 or not labels:
+        shape = "single_value" if n == 1 else "table"
+    else:
+        points = _points(rows, labels[0], measures[0].column)
+        if len(points) < 2:
+            shape = "single_value" if n == 1 else "table"
+        elif _is_time(labels[0], points):
+            shape = "time_series"
+        elif "compar" in (analysis or "").lower() or "compar" in (intent or "").lower():
+            shape = "comparison"
+        elif (intent or "").lower() == "ranking" or (analysis or "").lower() == "ranking":
+            shape = "ranking"
+        else:
+            shape = "breakdown"
+
+    chosen = rows
+    if shape == "time_series" and n > preview:
+        ordered = rows
+        if all(_ISO_PERIOD.match(_label(r.get(labels[0]))) for r in rows):
+            ordered = sorted(rows, key=lambda r: _label(r.get(labels[0])))
+        chosen = ordered[-preview:]
+    else:
+        chosen = rows[:preview]
+    profile["shape"] = shape
+    profile["previewTruncated"] = n > len(chosen)
+    profile["preview"] = [
+        {"label": row_label(r) or None, "values": row_values(r)} for r in chosen
+    ]
+    profile["chartSuitable"] = shape in {"time_series", "ranking", "comparison", "breakdown"} and bool(
+        measures
+    )
+    return profile
+
+
 # Shapes ------------------------------------------------------------------------------
 
 
