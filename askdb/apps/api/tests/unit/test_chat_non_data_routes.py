@@ -53,10 +53,10 @@ def ins_pack():
 
 
 @pytest.mark.asyncio
-async def test_greeting_uses_llm_without_schema_or_sql(memory_chat) -> None:
+async def test_greeting_uses_template_without_schema_sql_or_llm(memory_chat) -> None:
     service, conv, _ = memory_chat
-    _router_on(service)
-    llm = _llm("Hi! Ask me anything about your automotive data.")
+    assert service._settings.chat_router_enabled is True
+    llm = _llm("should not be called")
     with (
         patch("app.services.chat.non_data_handlers.complete_text", llm),
         patch("app.services.chat.service.get_value_dictionary", new_callable=AsyncMock) as gv,
@@ -64,27 +64,24 @@ async def test_greeting_uses_llm_without_schema_or_sql(memory_chat) -> None:
     ):
         events = await _collect_stream(service, "Hello", conv.id)
 
-    assert _narrative(events) == "Hi! Ask me anything about your automotive data."
+    assert "governed analytics question" in _narrative(events).lower()
     plan.assert_not_called()
     gv.assert_not_called()
     service._semantic.get_pack.assert_not_called()
-    assert llm.await_count == 1
-    assert llm.await_args.kwargs["max_tokens"] == service._settings.chat_general_max_completion_tokens
-    assert service.usage_llm_steps == 1
-    assert (service.usage_prompt_tokens, service.usage_completion_tokens) == (40, 12)
+    llm.assert_not_called()
+    assert service.usage_llm_steps == 0
     assert service.last_profile.route == "general_chat"
     assert service.last_profile.route_source == "rules"
-    assert service.last_profile.tokens_estimated is False
 
 
 @pytest.mark.asyncio
 async def test_reply_kept_despite_client_empty_sql_flag(memory_chat) -> None:
     service, conv, _ = memory_chat
     _router_on(service)
-    llm = _llm("Hello there!", error="Invalid model response (empty SQL)")
+    llm = _llm("Why did the KPI cross the road?", error="Invalid model response (empty SQL)")
     with patch("app.services.chat.non_data_handlers.complete_text", llm):
-        events = await _collect_stream(service, "Hello", conv.id)
-    assert _narrative(events) == "Hello there!"
+        events = await _collect_stream(service, "Tell me a joke", conv.id)
+    assert _narrative(events) == "Why did the KPI cross the road?"
 
 
 @pytest.mark.asyncio

@@ -104,6 +104,8 @@ async def general_chat_reply(
             "Let's get your data question sorted first. Try rephrasing it or pick a "
             "suggested question."
         )
+    if reason in {"greeting", "thanks"}:
+        return LlmReply(template_general_chat(reason))
     reply = await _llm(
         settings,
         system=_GENERAL_CHAT_SYSTEM.format(industry=industry.value),

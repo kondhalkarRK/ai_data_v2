@@ -89,6 +89,24 @@ class MessageClassification:
     applied: bool = True
 
 
+_NON_ANALYTIC_ROUTES = frozenset(
+    {
+        MessageRoute.GENERAL_CHAT,
+        MessageRoute.UNSUPPORTED,
+        MessageRoute.OUT_OF_SCOPE_LIVE,
+        MessageRoute.APP_HELP,
+        MessageRoute.DOCUMENT_QUERY,
+        MessageRoute.GENERAL_KNOWLEDGE,
+    }
+)
+
+
+def rule_route_interrupts_analytical_context(question: str, industry: Industry) -> bool:
+    """True when rules classify the message as non-analytic (greeting, chitchat, etc.)."""
+    decision = classify_message(question, industry, enabled=True)
+    return decision.route in _NON_ANALYTIC_ROUTES
+
+
 def classify_message(
     question: str,
     industry: Industry,

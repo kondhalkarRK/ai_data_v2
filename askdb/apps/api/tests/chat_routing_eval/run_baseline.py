@@ -240,6 +240,7 @@ def _apply_pre_plan(
             prior_state=kwargs["prior_state"],
             snapshot=snapshot,
             pack=pack,
+            industry=industry,
         )
 
     outcome = run_pre_plan(

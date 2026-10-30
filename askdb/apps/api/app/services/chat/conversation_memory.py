@@ -21,8 +21,13 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from app.core.config import Industry, Settings
-from app.services.chat.conversation_context import plan_state, state_to_plan
+from app.services.chat.conversation_context import (
+    is_contextual_followup,
+    plan_state,
+    state_to_plan,
+)
 from app.services.chat.intents import is_followup
+from app.services.chat.message_classifier import rule_route_interrupts_analytical_context
 from app.services.chat.question_understanding import QuestionPlan
 from app.services.security.region_scope import RegionScope, forbidden_zones
 
@@ -220,20 +225,18 @@ def follow_up_context_status(
     question: str,
     settings: Settings,
     *,
+    industry: Industry,
     now: datetime | None = None,
 ) -> FollowUpContext:
     if memory.analytical is None:
         return "none"
-    if not is_followup(question) and not _looks_like_short_followup(question):
+    if rule_route_interrupts_analytical_context(question, industry):
+        return "none"
+    if not is_followup(question) and not is_contextual_followup(question):
         return "none"
     if analytical_expired(memory, settings, now=now):
         return "expired"
     return "active"
-
-
-def _looks_like_short_followup(question: str) -> bool:
-    words = (question or "").split()
-    return len(words) <= 8
 
 
 def plan_state_from_memory(memory: SessionMemory) -> dict[str, Any] | None:

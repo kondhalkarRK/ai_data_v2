@@ -255,7 +255,7 @@ async def test_greeting_makes_no_classifier_call(memory_chat) -> None:
     ):
         await _collect_stream(service, "Hello", conv.id)
     cls.assert_not_called()
-    assert chat_llm.await_count == 1
+    chat_llm.assert_not_called()
 
 
 @pytest.mark.asyncio

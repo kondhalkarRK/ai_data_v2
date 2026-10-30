@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.core.config import Settings
+from app.core.config import Industry, Settings
 from app.services.chat.conversation_context import is_contextual_followup
 from app.services.chat.conversation_memory import SessionMemory, follow_up_context_status
 from app.services.chat.intents import is_followup
@@ -89,10 +89,14 @@ def needs_guard(
     session_memory: SessionMemory,
     settings: Settings,
     prior_state: dict[str, Any] | None,
+    *,
+    industry: Industry,
 ) -> bool:
     if not prior_state:
         return False
-    status = follow_up_context_status(session_memory, question, settings)
+    status = follow_up_context_status(
+        session_memory, question, settings, industry=industry
+    )
     if status == "active":
         return True
     return is_contextual_followup(question) or is_followup(question)
@@ -106,10 +110,11 @@ def follow_up_guard_allows_sql(
     prior_state: dict[str, Any] | None,
     snapshot: ValueDictionarySnapshot,
     pack: Any | None,
+    industry: Industry,
 ) -> tuple[bool, str | None]:
     """Return (allowed, interpretation). Long, self-contained questions are not guarded."""
     q = (question or "").strip()
-    if not needs_guard(q, session_memory, settings, prior_state):
+    if not needs_guard(q, session_memory, settings, prior_state, industry=industry):
         return True, None
     if len(q.split()) > 8:
         return True, None

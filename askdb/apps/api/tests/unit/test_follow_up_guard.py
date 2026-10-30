@@ -61,6 +61,7 @@ def _check(question: str, automotive) -> tuple[bool, str | None]:
         prior_state=_PRIOR,
         snapshot=snapshot,
         pack=pack,
+        industry=Industry.AUTOMOTIVE,
     )
 
 
@@ -98,5 +99,6 @@ def test_no_prior_context_is_not_guarded(automotive) -> None:
         prior_state=None,
         snapshot=snapshot,
         pack=pack,
+        industry=Industry.AUTOMOTIVE,
     )
     assert allowed

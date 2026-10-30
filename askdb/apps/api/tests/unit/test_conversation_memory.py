@@ -84,7 +84,10 @@ def test_analytical_context_expires_by_turn_count() -> None:
     )
     mem.analytical.turn_counter = 3
     assert analytical_expired(mem, settings) is True
-    assert follow_up_context_status(mem, "What about South?", settings) == "expired"
+    assert (
+        follow_up_context_status(mem, "What about South?", settings, industry=Industry.AUTOMOTIVE)
+        == "expired"
+    )
 
 
 def test_analytical_context_expires_by_ttl() -> None:
@@ -156,6 +159,25 @@ def test_refresh_explicit_cues_only() -> None:
     assert not is_refresh_request("latest")
 
 
+def test_greeting_does_not_activate_follow_up_context() -> None:
+    settings = _settings()
+    mem = empty_memory(user_id=uuid.uuid4(), conversation_id=uuid.uuid4())
+    mem.analytical = build_analytical_context(
+        plan=_sample_plan(),
+        question="Show revenue for North",
+        result_meta=ResultMeta(),
+        prior=None,
+    )
+    assert (
+        follow_up_context_status(mem, "Hey there!", settings, industry=Industry.AUTOMOTIVE)
+        == "none"
+    )
+    assert (
+        follow_up_context_status(mem, "What about dinner?", settings, industry=Industry.AUTOMOTIVE)
+        == "none"
+    )
+
+
 def test_latest_quarter_follow_up_keeps_context() -> None:
     settings = _settings()
     mem = empty_memory(user_id=uuid.uuid4(), conversation_id=uuid.uuid4())
@@ -166,7 +188,10 @@ def test_latest_quarter_follow_up_keeps_context() -> None:
         prior=None,
     )
     assert not is_refresh_request("revenue for the latest quarter")
-    assert follow_up_context_status(mem, "What about South?", settings) == "active"
+    assert (
+        follow_up_context_status(mem, "What about South?", settings, industry=Industry.AUTOMOTIVE)
+        == "active"
+    )
 
 
 def test_recent_turns_window_truncates() -> None:

@@ -35,6 +35,7 @@ from app.services.chat.clarification import (
 from app.services.chat.conversation_context import is_contextual_followup, plan_state
 from app.services.chat.follow_up_guard import data_vocabulary_hit, follow_up_guard_allows_sql
 from app.services.chat.message_classifier import (
+    rule_route_interrupts_analytical_context,
     template_general_chat,
     template_out_of_scope_live,
     template_unsupported,
@@ -775,6 +776,7 @@ class ChatService:
                 prior_state=kwargs["prior_state"],
                 snapshot=value_dictionary,
                 pack=semantic_pack,
+                industry=self._industry,
             )
 
         pre = run_pre_plan(
@@ -1018,7 +1020,24 @@ class ChatService:
                         scope=self._region_scope,
                     )
                 elif verdict.intent == "GENERAL_CHAT":
-                    narrative = template_general_chat("default")
+                    reply = await general_chat_reply(
+                        self._settings,
+                        industry=self._industry,
+                        question=question,
+                        reason="default",
+                        last_turn_failed=await self._last_turn_failed(
+                            conversation.id, history_id
+                        ),
+                    )
+                    await record_reply(reply)
+                    append_general_chat(
+                        session_memory,
+                        role="assistant",
+                        text=reply.text,
+                        settings=self._settings,
+                    )
+                    await self._save_session_memory(conversation, session_memory)
+                    narrative = reply.text
                 elif verdict.intent == "OUT_OF_SCOPE_LIVE":
                     narrative = template_out_of_scope_live()
                 else:
@@ -1028,7 +1047,12 @@ class ChatService:
                 ):
                     yield frame
                 return
-        elif llm_ready and self._settings.nlq_llm_interpretation and _worth_reinterpreting(turn):
+        elif (
+            llm_ready
+            and self._settings.nlq_llm_interpretation
+            and _worth_reinterpreting(turn)
+            and not rule_route_interrupts_analytical_context(question, self._industry)
+        ):
             # Last step before asking the user: let the AI restate the question in
             # governed vocabulary, then plan the restatement deterministically.
             yield _sse("stage", {"stage": "llm_interpret"})

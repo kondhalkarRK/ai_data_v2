@@ -144,7 +144,9 @@ def run_pre_plan(
                 classification=classification,
             )
 
-    follow_status = follow_up_context_status(session_memory, question, settings)
+    follow_status = follow_up_context_status(
+        session_memory, question, settings, industry=industry
+    )
     if follow_status == "expired" and is_contextual_followup(question):
         return PrePlanOutcome(
             proceed=False,
