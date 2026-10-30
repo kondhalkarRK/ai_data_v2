@@ -6,7 +6,8 @@
  * terms, so it works for any metric or dimension in the semantic model.
  */
 
-import type { ChatMessage, ResponseTab } from "@/components/chat/types";
+import type { ChatMessage, ResponseTab, ResultProfile } from "@/components/chat/types";
+import type { ChartKind } from "@/components/chat/result-chart";
 
 /** Set `ASK_ME_NEW_CHAT_UI_ENABLED=true` (mapped to NEXT_PUBLIC_ in next.config.ts). */
 export const NEW_CHAT_UI_ENABLED =
@@ -77,4 +78,94 @@ export function analysisTab(
   if (requested === "chart") return chartSuitable ? "chart" : "table";
   if (requested) return requested;
   return chartSuitable ? "chart" : "table";
+}
+
+/**
+ * How to embed visuals under a successful data answer. Driven only by `resultProfile`
+ * (and row count), never by business question text.
+ */
+export type InlineLayout =
+  | "kpi"
+  | "kpi_group"
+  | "trend_chart"
+  | "comparison_chart"
+  | "ranked_list"
+  | "table_preview"
+  | "summary_only";
+
+export type InlinePresentation = {
+  layout: InlineLayout;
+  /** Embed ResultChart when true (same rows as View Analysis). */
+  showChart: boolean;
+  chartKind: ChartKind;
+  /** Side-by-side chart + list/KPI on wide screens when both are useful. */
+  sideBySide: boolean;
+};
+
+const INLINE_CHART_ROW_CAP = 48;
+
+export function inlinePresentation(profile: ResultProfile | null | undefined): InlinePresentation {
+  if (!profile || profile.shape === "empty" || profile.rowCount === 0) {
+    return { layout: "summary_only", showChart: false, chartKind: "bar", sideBySide: false };
+  }
+
+  const measures = profile.measures.length;
+  const large = profile.rowCount > 12 || profile.mayBeTruncated;
+
+  if (profile.shape === "single_value") {
+    return {
+      layout: measures > 1 ? "kpi_group" : "kpi",
+      showChart: false,
+      chartKind: "bar",
+      sideBySide: false,
+    };
+  }
+
+  if (profile.shape === "time_series" && profile.chartSuitable) {
+    return {
+      layout: "trend_chart",
+      showChart: true,
+      chartKind: "line",
+      sideBySide: false,
+    };
+  }
+
+  if (profile.shape === "comparison" && profile.chartSuitable) {
+    return {
+      layout: "comparison_chart",
+      showChart: !large || profile.rowCount <= INLINE_CHART_ROW_CAP,
+      chartKind: "bar",
+      sideBySide: !large && profile.rowCount <= 8,
+    };
+  }
+
+  if (profile.shape === "ranking") {
+    return {
+      layout: "ranked_list",
+      showChart: Boolean(profile.chartSuitable) && profile.rowCount <= 12,
+      chartKind: "bar",
+      sideBySide: Boolean(profile.chartSuitable) && profile.rowCount <= 8,
+    };
+  }
+
+  if (profile.shape === "breakdown" && profile.chartSuitable) {
+    const few = profile.rowCount <= 8;
+    return {
+      layout: few ? "comparison_chart" : large ? "table_preview" : "comparison_chart",
+      showChart: profile.rowCount <= INLINE_CHART_ROW_CAP && !large,
+      chartKind: few && profile.rowCount <= 6 ? "pie" : "bar",
+      sideBySide: few,
+    };
+  }
+
+  if (profile.shape === "table" || !profile.measures.length) {
+    return { layout: "table_preview", showChart: false, chartKind: "bar", sideBySide: false };
+  }
+
+  return {
+    layout: large ? "table_preview" : "ranked_list",
+    showChart: false,
+    chartKind: "bar",
+    sideBySide: false,
+  };
 }

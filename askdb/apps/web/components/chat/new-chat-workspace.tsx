@@ -44,13 +44,13 @@ export function NewChatWorkspace() {
       </div>
 
       <div ref={scrollerRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-2 pb-6">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-2 pb-6 sm:px-3">
           {messages.length === 0 ? (
             <div className="space-y-4 py-16 text-center">
               <h1 className="text-2xl font-semibold tracking-tight">Ask Me</h1>
               <p className="text-sm text-muted-foreground">
-                Ask about your business data. You get a short answer first, and can open the full
-                analysis when you want it.
+                Ask about your business data. Answers appear as conversation with KPIs, charts, and
+                ranked lists when the result supports them — open full analysis anytime.
               </p>
               <SuggestedQuestions
                 items={starters}
@@ -85,7 +85,7 @@ export function NewChatWorkspace() {
       </div>
 
       <form
-        className="mx-auto w-full max-w-3xl shrink-0 border-t border-border/60 bg-background/95 px-2 py-3 backdrop-blur"
+        className="mx-auto w-full max-w-4xl shrink-0 border-t border-border/60 bg-background/95 px-2 py-3 backdrop-blur sm:px-3"
         onSubmit={onSubmit}
       >
         <div className="flex gap-2">

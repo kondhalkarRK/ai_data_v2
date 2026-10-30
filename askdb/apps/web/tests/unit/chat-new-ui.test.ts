@@ -6,6 +6,7 @@ import {
   assistantView,
   CHAT_MODE_STORAGE_KEY,
   detectAnalysisRequest,
+  inlinePresentation,
   readStoredChatMode,
 } from "@/lib/chat-new-ui";
 
@@ -98,6 +99,49 @@ describe("analysisTab", () => {
     expect(analysisTab(dataMessage(), "sql")).toBe("sql");
     expect(analysisTab(dataMessage(), "table")).toBe("table");
     expect(analysisTab(dataMessage(), "narration")).toBe("narration");
+  });
+});
+
+describe("inlinePresentation", () => {
+  it("maps shapes to conversational layouts without inventing numbers", () => {
+    expect(inlinePresentation(profile({ shape: "single_value", chartSuitable: false })).layout).toBe(
+      "kpi",
+    );
+    expect(
+      inlinePresentation(
+        profile({
+          shape: "single_value",
+          chartSuitable: false,
+          measures: [
+            { column: "a", label: "a", kind: "number" },
+            { column: "b", label: "b", kind: "number" },
+          ],
+        }),
+      ).layout,
+    ).toBe("kpi_group");
+    expect(inlinePresentation(profile({ shape: "time_series" }))).toMatchObject({
+      layout: "trend_chart",
+      showChart: true,
+      chartKind: "line",
+    });
+    expect(inlinePresentation(profile({ shape: "ranking", rowCount: 5 }))).toMatchObject({
+      layout: "ranked_list",
+      showChart: true,
+      sideBySide: true,
+    });
+    expect(inlinePresentation(profile({ shape: "breakdown", rowCount: 4 }))).toMatchObject({
+      layout: "comparison_chart",
+      showChart: true,
+    });
+    expect(
+      inlinePresentation(profile({ shape: "table", chartSuitable: false, measures: [] })).layout,
+    ).toBe("table_preview");
+    expect(
+      inlinePresentation(
+        profile({ shape: "breakdown", rowCount: 200, mayBeTruncated: true, chartSuitable: true }),
+      ),
+    ).toMatchObject({ layout: "table_preview", showChart: false });
+    expect(inlinePresentation(null).layout).toBe("summary_only");
   });
 });
 
