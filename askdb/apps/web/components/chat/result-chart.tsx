@@ -39,8 +39,6 @@ export function ResultChart({
   className,
   initialType = "bar",
   hideTypeSelect = false,
-  /** Inline chat embedding: chart only, no axis / type controls. */
-  compact = false,
 }: {
   xKey: string;
   yKey: string;
@@ -51,7 +49,6 @@ export function ResultChart({
   className?: string;
   initialType?: ChartKind;
   hideTypeSelect?: boolean;
-  compact?: boolean;
 }) {
   const keys = React.useMemo(() => {
     if (columns?.length) return columns;
@@ -111,45 +108,41 @@ export function ResultChart({
         <p className="text-sm font-semibold tracking-tight">
           {multi ? seriesKeys.map(prettyKey).join(" vs ") : prettyKey(yKey)} by {prettyKey(xKey)}
         </p>
-        {compact ? null : (
-          <p className="text-[10px] text-muted-foreground">Hover a point for exact values</p>
+        <p className="text-[10px] text-muted-foreground">Hover a point for exact values</p>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <FieldSelect
+          id="chart-x"
+          label="X Axis"
+          value={xKey}
+          options={keys}
+          onChange={setXKey}
+        />
+        <FieldSelect
+          id="chart-y"
+          label="Y Axis"
+          value={multi ? ALL_SERIES : yKey}
+          options={[
+            ...(seriesKeys.length > 1 ? [ALL_SERIES] : []),
+            ...(numericKeys.length ? numericKeys : keys),
+          ]}
+          labels={{ [ALL_SERIES]: "All series" }}
+          onChange={(value) => {
+            setShowAll(value === ALL_SERIES);
+            if (value !== ALL_SERIES) setYKey(value);
+          }}
+        />
+        {hideTypeSelect ? null : (
+          <FieldSelect
+            id="chart-type"
+            label="Chart Type"
+            value={chartType}
+            options={CHART_KINDS.map((item) => item.id)}
+            labels={Object.fromEntries(CHART_KINDS.map((item) => [item.id, item.label]))}
+            onChange={(value) => setChartType(value as ChartKind)}
+          />
         )}
       </div>
-      {compact ? null : (
-        <div className="flex flex-wrap items-end gap-2">
-          <FieldSelect
-            id="chart-x"
-            label="X Axis"
-            value={xKey}
-            options={keys}
-            onChange={setXKey}
-          />
-          <FieldSelect
-            id="chart-y"
-            label="Y Axis"
-            value={multi ? ALL_SERIES : yKey}
-            options={[
-              ...(seriesKeys.length > 1 ? [ALL_SERIES] : []),
-              ...(numericKeys.length ? numericKeys : keys),
-            ]}
-            labels={{ [ALL_SERIES]: "All series" }}
-            onChange={(value) => {
-              setShowAll(value === ALL_SERIES);
-              if (value !== ALL_SERIES) setYKey(value);
-            }}
-          />
-          {hideTypeSelect ? null : (
-            <FieldSelect
-              id="chart-type"
-              label="Chart Type"
-              value={chartType}
-              options={CHART_KINDS.map((item) => item.id)}
-              labels={Object.fromEntries(CHART_KINDS.map((item) => [item.id, item.label]))}
-              onChange={(value) => setChartType(value as ChartKind)}
-            />
-          )}
-        </div>
-      )}
 
       {multi ? (
         <MultiSeriesChart
