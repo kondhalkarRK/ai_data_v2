@@ -1,1 +1,99 @@
-python-3.11
+
+
+what are data, how much data is created daily
+trend from 2015,
+streaming data
+source of data
+ 
+=====
+
+come picture of big data, so to deal with this we have came many big data platfroms
+
+==============================
+
+Befoing moving to Databricks let see spark, bcz databricks is spark architure
+databrick defination
+
+================================
+
+
+what is spark,
+what problem does it solve
+spark is computing engine not storage engine
+
+
+structed data, semi, unstrude data
+what is big data
+what is 3v's ,what is use of this V, if this 3 V come we called on big data
+
+problem with big data
+1.stroage
+2.proccessing  1. cpu 2. ram
+
+come up with options
+1. monolithic option
+2. distributed approch
+
+monolithic - vertical scaling , limitation
+distributed - horizontal scaling
+
+diff monolithic vs distributed
+
+
+========================== hadoop vs spark
+
+miscoption on hadoop
+hadoop is not database
+spark proccess data in ram hadoop does not 
+above are miscoption
+
+topic 
+
+hadoop - write data to disk and again read from disk
+spark - spark do compution on memory
+hadoop - map reduce (diagram with explation)
+
+spark - how proccessing work (diagram with explmation)
+
+hadoop - batch processing
+spark - batch as well streaming data
+
+========================== eco sytem
+spark eco system with diagram
+high level api
+low levle api
+spark core
+spark engine
+
+rdd/dataframr
+
+=============== spark architure
+
+master, salve (diagram with detailed explain) 
+explanation in simple term, how master salve work
+master node, worker node,
+what is executor
+what is clster simple example
+cluster manger
+
+cuslter size 1- master, 10 -salve (8 core, 16gb ram)
+what is resrouce manger, how it works
+how worked node, exute the code using executor
+
+pyspark wrapper metho, jvm method
+java wrapper
+
+
+==============================
+
+databricks articture
+
+with detailed explanation with diagram
+
+what is control plan, data plane
+where data stroed
+whihc all controlled by databricks
+
+
+
+
