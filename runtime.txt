@@ -1,4 +1,74 @@
+Traditional RAG is implemented through Phases 1–10 on top of approved Phase 0. Summary below.
 
+Architecture implemented
+Layer	Implementation
+Flag
+ASK_ME_RAG_ENABLED (default false); mutations → 403 rag_disabled
+Metadata
+PostgreSQL (knowledge_documents, chunks, ACL, ingest jobs)
+Blobs
+Private local paths under server-generated keys; Azure hook reserved
+Vectors
+Qdrant with provider/model/dimension-aware collections
+Embeddings
+sentence_transformers or openai_compatible (no hash when RAG on)
+Jobs
+Durable PG queue, leases, SKIP LOCKED, retries, idempotency
+Worker
+In-process POC + python -m app.rag.worker
+ACL
+Central search_authorized; admin does not bypass chat ACL; region fail-closed
+Chat
+Grounded LLM for knowledge; hybrid = SQL + citations (no second RAG LLM)
+UI
+Knowledge Hub gated by capabilities.ragEnabled + Admin mutations
+Phase-wise summary
+Schema/repos — migration 0011_knowledge_documents.py, ORM + KnowledgeDocumentRepository
+Storage — validation (type/MIME/ext/size/traversal), immutable originals
+Embeddings/Qdrant — identity verification, batched embed, upsert/query/delete/verify
+Jobs/worker — claim/lease/recover + in-process/CLI worker
+Pipeline — upload → job → extract/chunk/embed/index/verify → INDEXED; atomic supersede
+ACL — one authorized retrieval path for Hub/chat/hybrid
+Chat — grounded answers + document follow-up via existing 30‑min memory TTL
+UI/API — status/retry/filter; Admin-only mutations when RAG on
+Backfill — python -m app.rag.backfill --industry …
+Ops/docs — /ready checks for Qdrant + embeddings; docs/traditional-rag.md
+Key files
+Created: app/models/knowledge.py, app/repositories/knowledge_documents.py, app/rag/{storage,embeddings,qdrant_index,chunking,generation,acl,job_processor,worker,backfill}.py, migrations/versions/0011_knowledge_documents.py, tests/test_traditional_rag.py, docs/traditional-rag.md
+
+Updated: config.py, knowledge service/routes, chat/service.py, conversation_memory.py, main.py, system.py readiness, Knowledge Hub page, .env.example, Phase 0 deps
+
+Setup
+
+# apps/api
+alembic upgrade head
+# askdb/.env
+ASK_ME_RAG_ENABLED=true
+RAG_EMBEDDING_PROVIDER=sentence_transformers   # or openai_compatible
+RAG_EMBEDDING_MODEL=all-MiniLM-L6-v2
+# ensure Qdrant is up; install optional: pip install -e ".[rag]" (+ sentence-transformers if needed)
+If the remote embedding API returns 1536 dims, set RAG_EMBEDDING_DIMENSION=1536 (or leave 0 to auto-detect). A separate compatible collection is used — vectors are never forced into a 384 collection.
+
+Tests executed (actual)
+Suite	Result
+tests/test_rag_feature_flag.py
+passed
+tests/test_traditional_rag.py
+13 passed (upload→index, ACL, region fail-closed, delete exclusion, supersede, no hash when RAG on, unauthorized text blocked)
+tests/unit/test_chat_non_data_routes.py
+passed
+tests/test_knowledge_meta.py, test_query_router.py, test_prompt_injection.py, test_chat_response_meta.py
+passed
+E2E coverage in CI used FakeEmbeddingClient + in-memory FakeQdrant (no live Qdrant/LLM in this environment). Apply migration and run against real Qdrant + chosen embedding provider before production cutover.
+
+Known gaps / production readiness
+Live Qdrant + real embedding provider smoke test still required on your stack
+Azure Blob backend not implemented (local only; interface ready)
+Deleted originals retained for POC (RAG_RETAIN_DELETED_FILES)
+Legacy backfill optional until cutover
+Multi-worker load / long-lease soak not run here
+Acceptance with flag off: legacy Hub/chat preserved; mutations 403.
+Acceptance with flag on (code path): Admin upload → blob → durable job → embed → Qdrant verify → INDEXED → ACL-filtered search/chat with grounded citations
 
 what are data, how much data is created daily
 trend from 2015,
