@@ -52,6 +52,7 @@ from app.services.chat.non_data_handlers import (
 )
 from app.services.chat.pre_plan import early_route, plan_with_rewrites, run_pre_plan
 from app.services.chat.conversation_memory import (
+    DocumentContext,
     analytical_expired,
     append_general_chat,
     append_recent_turn,
@@ -71,6 +72,8 @@ from app.services.chat.conversation_memory import (
     session_memory_storage_error,
     set_pending_clarification,
 )
+from app.rag.feature import rag_enabled
+from app.rag.generation import grounded_document_reply
 from app.services.chat.decision_engine import (
     Confidence,
     assess_confidence,
@@ -616,8 +619,17 @@ class ChatService:
             )
 
         async def answer_from_documents(reason: str) -> AsyncIterator[str]:
-            knowledge = KnowledgeService(self._settings, self._industry)
-            documents = knowledge.list_documents()
+            knowledge = KnowledgeService(
+                self._settings,
+                self._industry,
+                session=self._app if rag_enabled(self._settings) else None,
+            )
+            if rag_enabled(self._settings):
+                documents = await knowledge.list_documents_authorized(
+                    user=self._user, region_scope=self._region_scope
+                )
+            else:
+                documents = knowledge.list_documents()
             if not documents:
                 async for frame in finish_without_sql(
                     path="knowledge", narrative=no_documents_reply()
@@ -629,17 +641,48 @@ class ChatService:
             )
             yield _progress("narration", completed_steps, slow=maybe_slow())
             try:
-                citations = knowledge.search(
+                citations = await knowledge.search_authorized(
                     question,
+                    user=self._user,
+                    region_scope=self._region_scope,
                     top_k=min(5, self._settings.rag_top_k),
-                    user_id=str(self._user.id),
                 )
             except Exception:
                 logger.debug("Knowledge search failed", exc_info=True)
                 citations = []
             for citation in citations:
                 yield _sse("citation", _citation_payload(citation))
-            narrative = knowledge_narrative(citations)
+            doc_followup = ""
+            if session_memory.document is not None:
+                age = (
+                    datetime.now(UTC) - session_memory.document.updated_at
+                ).total_seconds()
+                if age <= self._settings.chat_analytical_context_ttl_seconds:
+                    doc_followup = (
+                        f"Prior question: {session_memory.document.question}\n"
+                        f"Prior summary: {session_memory.document.summary}"
+                    )
+            if rag_enabled(self._settings):
+                reply = await grounded_document_reply(
+                    self._settings,
+                    question=question,
+                    passages=citations,
+                    conversation_context=doc_followup or None,
+                )
+                narrative = reply.text
+                if reply.used_llm:
+                    await record_reply(reply)
+            else:
+                narrative = knowledge_narrative(citations)
+            session_memory.document = DocumentContext(
+                question=question,
+                summary=narrative[:500],
+                citation_titles=tuple(
+                    dict.fromkeys(str(c.title) for c in citations if getattr(c, "title", None))
+                ),
+                updated_at=datetime.now(UTC),
+            )
+            await self._save_session_memory(conversation, session_memory)
             insights = build_insights(narrative=narrative, columns=[], rows=[], path="knowledge")
             followups: list[str] = []
             for doc in documents:
@@ -653,7 +696,7 @@ class ChatService:
             yield _sse(
                 "meta",
                 {
-                    "groundedOn": [],
+                    "groundedOn": ["documents"] if citations else [],
                     "ambiguityFlag": False,
                     "validationStatus": "skipped",
                     "rowCount": 0,
@@ -1680,10 +1723,16 @@ class ChatService:
         try:
             citations = []
             if decision.route == "hybrid":
-                citations = KnowledgeService(self._settings, self._industry).search(
+                knowledge = KnowledgeService(
+                    self._settings,
+                    self._industry,
+                    session=self._app if rag_enabled(self._settings) else None,
+                )
+                citations = await knowledge.search_authorized(
                     question,
+                    user=self._user,
+                    region_scope=self._region_scope,
                     top_k=min(2, self._settings.rag_top_k),
-                    user_id=str(self._user.id),
                     entities=plan_entities(plan),
                 )
                 for citation in citations:

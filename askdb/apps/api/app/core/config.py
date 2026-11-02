@@ -183,12 +183,39 @@ class Settings(BaseSettings):
     llm_catalog_path: str = ""
 
     # --- rag ---------------------------------------------------------------
+    # When false (default): legacy Knowledge Hub read/search and hash-based chat retrieval;
+    # document upload/replace/reindex/delete return 403 rag_disabled.
+    ask_me_rag_enabled: bool = Field(default=False)
     upload_max_bytes: int = Field(default=26_214_400, ge=1)
     upload_allowed_extensions: CsvList
     rag_chunk_max_chars: int = Field(default=1400, ge=200)
     rag_chunk_min_chars: int = Field(default=40, ge=1)
     rag_chunk_overlap_chars: int = Field(default=180, ge=0)
     rag_top_k: int = Field(default=6, ge=1, le=50)
+    # Real embedding providers for the Traditional RAG path (never hash when RAG is on).
+    rag_embedding_provider: Literal["openai_compatible", "sentence_transformers"] = (
+        "sentence_transformers"
+    )
+    rag_embedding_model: str = "all-MiniLM-L6-v2"
+    # 0 = verify from the provider at runtime and pick a compatible Qdrant collection.
+    rag_embedding_dimension: int = Field(default=0, ge=0)
+    rag_embedding_base_url: str = ""
+    rag_embedding_api_key: SecretStr = SecretStr("")
+    rag_embedding_batch_size: int = Field(default=32, ge=1, le=256)
+    rag_qdrant_collection_prefix: str = "askme_rag"
+    # server = remote/local Qdrant HTTP (needs Docker/binary). local = embedded disk
+    # store via qdrant-client (no Docker). memory = ephemeral embedded store.
+    rag_qdrant_mode: Literal["server", "local", "memory"] = "server"
+    # Used when rag_qdrant_mode=local. Empty → apps/api/data/qdrant_local
+    rag_qdrant_path: str = ""
+    rag_storage_backend: Literal["local", "azure_blob"] = "local"
+    rag_storage_root: str = ""
+    rag_retain_deleted_files: bool = True
+    rag_worker_in_process: bool = True
+    rag_worker_poll_seconds: float = Field(default=2.0, ge=0.5, le=60.0)
+    rag_job_lease_seconds: int = Field(default=120, ge=30, le=3600)
+    rag_job_max_attempts: int = Field(default=5, ge=1, le=20)
+    rag_job_backoff_seconds: int = Field(default=15, ge=1, le=600)
 
     # --- web retrieval -----------------------------------------------------
     web_retrieval_enabled: bool = False

@@ -73,9 +73,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if settings.catalog_refresh_on_startup
         else None
     )
+    rag_worker = None
+    if settings.ask_me_rag_enabled and settings.rag_worker_in_process:
+        from app.rag.worker import RagWorker
+
+        rag_worker = RagWorker(settings, registry)
+        app.state.rag_worker = rag_worker
+        await rag_worker.start_background()
+        logger.info("in-process RAG worker started")
     try:
         yield
     finally:
+        if rag_worker is not None:
+            await rag_worker.stop()
         if warmup is not None and not warmup.done():
             warmup.cancel()
             with suppress(asyncio.CancelledError):

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileUp, Play, Search, Sparkles, Upload } from "lucide-react";
 import Link from "next/link";
@@ -9,7 +9,7 @@ import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
-import { useActiveIndustry } from "@/hooks/use-session";
+import { useActiveIndustry, useSession } from "@/hooks/use-session";
 import { API_BASE_URL, apiClient } from "@/lib/api-client";
 
 interface KnowledgeDoc {
@@ -22,6 +22,11 @@ interface KnowledgeDoc {
   version?: number;
   collection?: string;
   suggestedQuestions?: string[];
+  status?: string;
+  statusMessage?: string | null;
+  byteSize?: number;
+  uploaderUserId?: string | null;
+  isActive?: boolean;
 }
 
 interface Citation {
@@ -57,25 +62,44 @@ const SAMPLE_DOCS = [
 
 const DEMO_STEPS = [
   "1. Upload a policy, FAQ, or report (PDF, Word, or text).",
-  "2. Wait until chunks appear — that means the document is searchable.",
+  "2. Wait until status is INDEXED — that means the document is searchable.",
   "3. Search here, or ask the same question in AI Chat.",
 ];
 
+function formatBytes(size?: number) {
+  if (!size || size <= 0) return null;
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function KnowledgePage() {
   const industry = useActiveIndustry();
+  const { data: user } = useSession();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("claims settlement");
   const [hits, setHits] = useState<Citation[]>([]);
   const [webRetrieval, setWebRetrieval] = useState(false);
   const [collection, setCollection] = useState<string>("general");
   const [searchCollection, setSearchCollection] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [guideOpen, setGuideOpen] = useState(true);
   const fileInputId = "knowledge-upload-input";
 
+  const ragEnabled = Boolean(user?.capabilities?.ragEnabled);
+  const isAdmin = user?.role === "admin";
+  const canMutate = ragEnabled && isAdmin;
+
   const docs = useQuery({
-    queryKey: ["documents", industry],
+    queryKey: ["documents", industry, ragEnabled],
     queryFn: () => apiClient.get<KnowledgeDoc[]>("/api/v1/documents", { industry }),
   });
+
+  const visibleDocs = useMemo(() => {
+    const rows = docs.data ?? [];
+    if (!statusFilter) return rows;
+    return rows.filter((doc) => (doc.status || "").toUpperCase() === statusFilter);
+  }, [docs.data, statusFilter]);
 
   const upload = useMutation({
     mutationFn: async (file: File) => {
@@ -94,7 +118,12 @@ export default function KnowledgePage() {
         body,
       });
       if (!response.ok) {
-        throw new Error(`Upload failed (${response.status})`);
+        const payload = await response.json().catch(() => null);
+        const message =
+          payload?.error?.message ||
+          payload?.error?.code ||
+          `Upload failed (${response.status})`;
+        throw new Error(message);
       }
       return (await response.json()) as KnowledgeDoc;
     },
@@ -104,6 +133,12 @@ export default function KnowledgePage() {
   const remove = useMutation({
     mutationFn: (documentId: string) =>
       apiClient.delete<{ status: string }>(`/api/v1/documents/${documentId}`, { industry }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", industry] }),
+  });
+
+  const retry = useMutation({
+    mutationFn: (documentId: string) =>
+      apiClient.post<KnowledgeDoc>(`/api/v1/documents/${documentId}/retry`, {}, { industry }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", industry] }),
   });
 
@@ -155,13 +190,22 @@ export default function KnowledgePage() {
               <Play className="size-3.5" />
               Try Demo
             </Button>
-            <Button type="button" size="sm" onClick={() => document.getElementById(fileInputId)?.click()}>
-              <Upload className="size-3.5" />
-              Upload document
-            </Button>
+            {canMutate ? (
+              <Button type="button" size="sm" onClick={() => document.getElementById(fileInputId)?.click()}>
+                <Upload className="size-3.5" />
+                Upload document
+              </Button>
+            ) : null}
           </div>
         }
       />
+
+      {!ragEnabled ? (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Traditional RAG mutations are disabled. Browse and search the legacy library; uploads require
+          ASK_ME_RAG_ENABLED.
+        </p>
+      ) : null}
 
       {guideOpen ? (
         <Card className="mb-4 border-info/30 bg-info/5">
@@ -186,7 +230,7 @@ export default function KnowledgePage() {
               ))}
             </ol>
             <p className="text-xs text-muted-foreground">
-              Guided walkthrough: upload → chunks appear → search or{" "}
+              Guided walkthrough: upload → indexed → search or{" "}
               <Link href="/chat" className="font-medium text-primary hover:underline">
                 ask in AI Chat
               </Link>
@@ -204,100 +248,128 @@ export default function KnowledgePage() {
                 <CardTitle className="text-sm">Library</CardTitle>
                 <CardDescription>Industry-scoped documents with chunking and citations.</CardDescription>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                disabled={reindex.isPending}
-                onClick={() => reindex.mutate()}
-              >
-                Reindex
-              </Button>
-            </div>
-
-            <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4">
-              <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                <FileUp className="size-4" />
-                Upload / ingest
-              </p>
-              <input
-                id={fileInputId}
-                type="file"
-                className="sr-only"
-                accept=".txt,.md,.html,.csv,.pdf,.docx"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) upload.mutate(file);
-                  event.target.value = "";
-                }}
-              />
-              <div className="flex flex-wrap gap-2">
+              {canMutate ? (
                 <Button
                   type="button"
                   size="sm"
-                  onClick={() => document.getElementById(fileInputId)?.click()}
-                  disabled={upload.isPending}
+                  variant="secondary"
+                  disabled={reindex.isPending}
+                  onClick={() => reindex.mutate()}
                 >
-                  <Upload className="size-3.5" />
-                  {upload.isPending ? "Uploading…" : "Choose file"}
+                  Reindex
                 </Button>
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  Collection
-                  <select
-                    className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                    value={collection}
-                    onChange={(event) => setCollection(event.target.value)}
-                  >
-                    {COLLECTIONS.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              {upload.isError ? (
-                <p className="mt-2 text-xs text-danger">{(upload.error as Error).message}</p>
-              ) : (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Text, Markdown, HTML, CSV, PDF, DOCX. This is the onboarding path: file → chunks →
-                  searchable.
-                </p>
-              )}
+              ) : null}
             </div>
 
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Sample documents
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {SAMPLE_DOCS.map((sample) => (
+            {canMutate ? (
+              <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4">
+                <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                  <FileUp className="size-4" />
+                  Upload / ingest
+                </p>
+                <input
+                  id={fileInputId}
+                  type="file"
+                  className="sr-only"
+                  accept=".txt,.md,.html,.pdf,.docx"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) upload.mutate(file);
+                    event.target.value = "";
+                  }}
+                />
+                <div className="flex flex-wrap gap-2">
                   <Button
-                    key={sample.title}
                     type="button"
                     size="sm"
-                    variant="secondary"
-                    onClick={() => uploadSample(sample)}
+                    onClick={() => document.getElementById(fileInputId)?.click()}
+                    disabled={upload.isPending}
                   >
-                    <Sparkles className="size-3.5" />
-                    {sample.title}
+                    <Upload className="size-3.5" />
+                    {upload.isPending ? "Uploading…" : "Choose file"}
                   </Button>
-                ))}
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    Collection
+                    <select
+                      className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                      value={collection}
+                      onChange={(event) => setCollection(event.target.value)}
+                    >
+                      {COLLECTIONS.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {upload.isError ? (
+                  <p className="mt-2 text-xs text-danger">{(upload.error as Error).message}</p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    PDF, DOCX, TXT, MD, HTML. Upload queues a durable job: extract → chunk → embed →
+                    verify.
+                  </p>
+                )}
               </div>
-            </div>
+            ) : null}
+
+            {canMutate ? (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Sample documents
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SAMPLE_DOCS.map((sample) => (
+                    <Button
+                      key={sample.title}
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => uploadSample(sample)}
+                    >
+                      <Sparkles className="size-3.5" />
+                      {sample.title}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {ragEnabled ? (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                Status
+                <select
+                  className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="INDEXED">INDEXED</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="FAILED">FAILED</option>
+                  {isAdmin ? <option value="SUPERSEDED">SUPERSEDED</option> : null}
+                </select>
+              </label>
+            ) : null}
 
             {docs.isPending ? <LoadingState size="sm" title="Loading documents" /> : null}
             <ul className="space-y-2 text-sm">
-              {(docs.data ?? []).map((doc) => (
+              {visibleDocs.map((doc) => (
                 <li key={doc.id} className="rounded-md border border-border px-3 py-2">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-medium">{doc.title}</p>
                       <CardDescription>
-                        {doc.collection ?? "general"} · {doc.chunkCount} chunks
+                        {doc.collection ?? "general"}
+                        {doc.status ? ` · ${doc.status}` : ""} · {doc.chunkCount} chunks
                         {doc.version != null ? ` · v${doc.version}` : ""}
+                        {formatBytes(doc.byteSize) ? ` · ${formatBytes(doc.byteSize)}` : ""}
                         {doc.deduped ? " · deduped" : ""} · {new Date(doc.createdAt).toLocaleString()}
                       </CardDescription>
+                      {doc.statusMessage ? (
+                        <p className="mt-1 text-2xs text-danger">{doc.statusMessage}</p>
+                      ) : null}
                       {doc.suggestedQuestions?.length ? (
                         <ul className="mt-1 list-disc pl-4 text-2xs text-muted-foreground">
                           {doc.suggestedQuestions.slice(0, 3).map((item) => (
@@ -306,9 +378,23 @@ export default function KnowledgePage() {
                         </ul>
                       ) : null}
                     </div>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => remove.mutate(doc.id)}>
-                      Delete
-                    </Button>
+                    {canMutate ? (
+                      <div className="flex flex-col gap-1">
+                        {doc.status === "FAILED" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => retry.mutate(doc.id)}
+                          >
+                            Retry
+                          </Button>
+                        ) : null}
+                        <Button type="button" size="sm" variant="ghost" onClick={() => remove.mutate(doc.id)}>
+                          Delete
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               ))}

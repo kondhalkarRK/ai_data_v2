@@ -62,7 +62,7 @@ def _session_response(
         persistent=persistent,
     )
     return SessionResponse(
-        user=user_profile(tokens.user, scope),
+        user=user_profile(tokens.user, scope, settings=settings),
         csrf_token=tokens.csrf_token,
         access_expires_at=tokens.access_expires_at,
     )
@@ -145,9 +145,11 @@ async def logout(
 
 @router.get("/me", response_model=UserProfile, summary="Current user profile")
 async def me(
-    user: CurrentUser, session: Annotated[AsyncSession, Depends(get_app_session)]
+    user: CurrentUser,
+    settings: SettingsDep,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
 ) -> UserProfile:
-    return user_profile(user, await load_region_scope(session, user))
+    return user_profile(user, await load_region_scope(session, user), settings=settings)
 
 
 @router.get("/me/usage", summary="The caller's AI usage for the current week")
@@ -164,11 +166,14 @@ async def my_usage(
     summary="Update the caller's default industry",
 )
 async def update_preferences(
-    payload: UpdatePreferencesRequest, user: CurrentUser, service: ServiceDep
+    payload: UpdatePreferencesRequest,
+    user: CurrentUser,
+    service: ServiceDep,
+    settings: SettingsDep,
 ) -> UserProfile:
     await service.users.set_default_industry(user, payload.default_industry)
     scope = await load_region_scope(service._session, user)
-    return user_profile(user, scope)
+    return user_profile(user, scope, settings=settings)
 
 
 @router.post(

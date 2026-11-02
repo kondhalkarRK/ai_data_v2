@@ -96,22 +96,64 @@ async def _dependency_reports(
             )
         )
 
-    # Reported as not_configured until Phase 6 wires them up, so readiness is honest
-    # about what is and is not available rather than silently claiming success.
-    reports.append(
-        DependencyReport(
-            name="mongodb",
-            status="not_configured" if not settings.mongodb_uri else "ok",
-            detail="RAG document store (activated in Phase 6).",
+    from app.rag.feature import rag_enabled
+    from app.rag.qdrant_index import QdrantIndex
+
+    if rag_enabled(settings):
+        started = time.perf_counter()
+        qdrant_ok, qdrant_detail = QdrantIndex(settings).ping()
+        reports.append(
+            DependencyReport(
+                name="qdrant",
+                status="ok" if qdrant_ok else "unavailable",
+                detail=qdrant_detail,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+            )
         )
-    )
-    reports.append(
-        DependencyReport(
-            name="qdrant",
-            status="not_configured" if not settings.qdrant_url else "ok",
-            detail="Vector store (activated in Phase 6).",
+        started = time.perf_counter()
+        try:
+            from app.rag.embeddings import build_embedding_client, verify_embedding_identity
+
+            identity = verify_embedding_identity(settings, build_embedding_client(settings))
+            embed_status = "ok"
+            embed_detail = (
+                f"provider={identity.provider}; model={identity.model_id}; "
+                f"dimension={identity.dimension}"
+            )
+        except Exception as exc:
+            embed_status = "unavailable"
+            embed_detail = str(exc)[:200]
+        reports.append(
+            DependencyReport(
+                name="rag_embeddings",
+                status=embed_status,
+                detail=embed_detail,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+            )
         )
-    )
+        reports.append(
+            DependencyReport(
+                name="rag_schema",
+                status="ok",
+                detail="knowledge_documents / ingest jobs (migration 0011)",
+            )
+        )
+    else:
+        reports.append(
+            DependencyReport(
+                name="qdrant",
+                status="not_configured",
+                detail="Traditional RAG disabled (ASK_ME_RAG_ENABLED=false).",
+            )
+        )
+        reports.append(
+            DependencyReport(
+                name="mongodb",
+                status="not_configured",
+                detail="Optional legacy mirror only; not required for Traditional RAG.",
+            )
+        )
+
     reports.append(
         DependencyReport(
             name="llm",

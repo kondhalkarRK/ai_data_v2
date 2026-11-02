@@ -8,7 +8,8 @@ from datetime import datetime
 from pydantic import EmailStr, Field, field_validator, model_validator
 
 from app.auth.passwords import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
-from app.core.config import Industry
+from app.core.config import Industry, Settings, get_settings
+from app.rag.feature import rag_enabled
 from app.models.enums import Role
 from app.models.user import User, weekly_limits
 from app.schemas.common import ApiModel
@@ -43,6 +44,12 @@ class RegionAccess(ApiModel):
     hide_region_filter: bool = False
 
 
+class UserCapabilities(ApiModel):
+    """Safe, non-secret feature flags for the web client."""
+
+    rag_enabled: bool = False
+
+
 class UserProfile(ApiModel):
     id: uuid.UUID
     username: str
@@ -57,6 +64,7 @@ class UserProfile(ApiModel):
     last_login_at: datetime | None = None
     created_at: datetime
     region_access: RegionAccess = Field(default_factory=RegionAccess)
+    capabilities: UserCapabilities = Field(default_factory=UserCapabilities)
 
     @model_validator(mode="after")
     def _effective_limits(self) -> UserProfile:
@@ -66,8 +74,15 @@ class UserProfile(ApiModel):
         return self
 
 
-def user_profile(user: User, scope: RegionScope | None = None) -> UserProfile:
+def user_profile(
+    user: User,
+    scope: RegionScope | None = None,
+    *,
+    settings: Settings | None = None,
+) -> UserProfile:
     profile = UserProfile.model_validate(user)
+    resolved = settings or get_settings()
+    profile.capabilities = UserCapabilities(rag_enabled=rag_enabled(resolved))
     if scope is None:
         return profile
     payload = scope.to_api()

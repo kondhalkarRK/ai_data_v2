@@ -22,6 +22,7 @@ from app.core.exceptions import (
     DependencyUnavailableError,
     ValidationError,
 )
+from app.rag.feature import require_rag_mutations
 from app.db.session import DatabaseRegistry
 from app.models.enums import Role
 from app.models.user import User
@@ -55,8 +56,10 @@ async def _bypass_user(session: AsyncSession) -> User:
     return any_user
 
 
-def get_app_settings() -> Settings:
-    return get_settings()
+def get_app_settings(request: Request) -> Settings:
+    """Per-app Settings (supports create_app(custom) in tests and ASGI transports)."""
+    state_settings: Settings | None = getattr(request.app.state, "settings", None)
+    return state_settings or get_settings()
 
 
 def get_registry(request: Request) -> DatabaseRegistry:
@@ -193,6 +196,17 @@ def require_role(
 
 RequireUser = Annotated[User, Depends(require_role(Role.USER))]
 RequireAdmin = Annotated[User, Depends(require_role(Role.ADMIN))]
+AppSession = Annotated[AsyncSession, Depends(get_app_session)]
+
+
+async def require_rag_mutations_enabled(
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> None:
+    """Block document upload/reindex/delete when ASK_ME_RAG_ENABLED is false."""
+    require_rag_mutations(settings)
+
+
+RequireRagMutations = Annotated[None, Depends(require_rag_mutations_enabled)]
 
 
 def resolve_industry(

@@ -198,6 +198,7 @@ async def test_document_query_without_documents(memory_chat) -> None:
     _router_on(service)
     knowledge = MagicMock()
     knowledge.list_documents.return_value = []
+    knowledge.search_authorized = AsyncMock(return_value=[])
     with (
         patch("app.services.chat.service.KnowledgeService", return_value=knowledge),
         patch("app.services.chat.service.plan_turn") as plan,
@@ -206,7 +207,7 @@ async def test_document_query_without_documents(memory_chat) -> None:
             service, "Summarize key findings from the uploaded report on claims", conv.id
         )
     plan.assert_not_called()
-    knowledge.search.assert_not_called()
+    knowledge.search_authorized.assert_not_called()
     assert "No documents have been uploaded" in _narrative(events)
 
 
@@ -216,16 +217,19 @@ async def test_document_query_with_documents_uses_knowledge_search(memory_chat) 
     _router_on(service)
     knowledge = MagicMock()
     knowledge.list_documents.return_value = [{"id": "d1", "suggestedQuestions": []}]
-    knowledge.search.return_value = []
+    knowledge.search_authorized = AsyncMock(return_value=[])
     with (
         patch("app.services.chat.service.KnowledgeService", return_value=knowledge),
         patch("app.services.chat.service.plan_turn") as plan,
+        patch("app.services.chat.service.rag_enabled", return_value=False),
+        patch("app.services.chat.service.grounded_document_reply", new_callable=AsyncMock) as grounded,
     ):
         await _collect_stream(
             service, "What does the policy document say about fraud exclusions?", conv.id
         )
     plan.assert_not_called()
-    knowledge.search.assert_called_once()
+    knowledge.search_authorized.assert_called_once()
+    grounded.assert_not_called()
 
 
 # ── Stage C at the service level ─────────────────────────────────────────────

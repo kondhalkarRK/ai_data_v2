@@ -63,6 +63,14 @@ class AuthorizationError(NqlError):
     message = "You do not have permission to perform this action."
 
 
+class RagDisabledError(NqlError):
+    """Document RAG ingestion and mutation are turned off (ASK_ME_RAG_ENABLED=false)."""
+
+    status_code = 403
+    code = "rag_disabled"
+    message = "Document RAG is disabled. Enable ASK_ME_RAG_ENABLED to upload or manage documents."
+
+
 class CsrfError(NqlError):
     status_code = 403
     code = "csrf_failed"

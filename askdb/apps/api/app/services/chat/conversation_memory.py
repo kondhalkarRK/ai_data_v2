@@ -147,11 +147,43 @@ class PendingClarification:
 
 
 @dataclass(slots=True)
+class DocumentContext:
+    """Last authorized document evidence for follow-ups (same TTL as analytical)."""
+
+    question: str
+    summary: str
+    citation_titles: tuple[str, ...]
+    updated_at: datetime
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "question": self.question,
+            "summary": self.summary,
+            "citationTitles": list(self.citation_titles),
+            "updatedAt": self.updated_at.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> DocumentContext | None:
+        if not raw:
+            return None
+        return cls(
+            question=str(raw.get("question") or ""),
+            summary=str(raw.get("summary") or ""),
+            citation_titles=tuple(str(t) for t in (raw.get("citationTitles") or [])),
+            updated_at=datetime.fromisoformat(raw["updatedAt"])
+            if raw.get("updatedAt")
+            else datetime.now(UTC),
+        )
+
+
+@dataclass(slots=True)
 class SessionMemory:
     version: int
     user_id: str
     conversation_id: str
     analytical: AnalyticalContext | None = None
+    document: DocumentContext | None = None
     general_chat_turns: tuple[dict[str, str], ...] = ()
     recent_turns: tuple[dict[str, str], ...] = ()
     pending: PendingClarification | None = None
@@ -162,6 +194,7 @@ class SessionMemory:
             "userId": self.user_id,
             "conversationId": self.conversation_id,
             "analytical": self.analytical.to_dict() if self.analytical else None,
+            "document": self.document.to_dict() if self.document else None,
             "generalChatTurns": list(self.general_chat_turns),
             "recentTurns": list(self.recent_turns),
             "pending": self.pending.to_dict() if self.pending else None,
@@ -178,6 +211,7 @@ class SessionMemory:
             analytical=AnalyticalContext.from_dict(raw["analytical"])
             if raw.get("analytical")
             else None,
+            document=DocumentContext.from_dict(raw.get("document") or raw.get("lastDocumentContext")),
             general_chat_turns=tuple(dict(t) for t in (raw.get("generalChatTurns") or [])),
             recent_turns=tuple(dict(t) for t in (raw.get("recentTurns") or [])),
             pending=PendingClarification.from_dict(raw["pending"]) if raw.get("pending") else None,

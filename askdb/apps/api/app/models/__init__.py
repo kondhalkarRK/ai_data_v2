@@ -10,6 +10,17 @@ from app.models.base import Base
 from app.models.catalog import CatalogChange, CatalogColumn, CatalogRefresh, CatalogValue
 from app.models.enums import AuthEventType, ExecutionMode, Role
 from app.models.governance import AdminAudit, AppSetting, LoginAudit
+from app.models.knowledge import (
+    KnowledgeAclPrincipal,
+    KnowledgeDocument,
+    KnowledgeDocumentAcl,
+    KnowledgeDocumentChunk,
+    KnowledgeDocumentStatus,
+    KnowledgeIngestJob,
+    KnowledgeJobStatus,
+    KnowledgeJobType,
+    KnowledgeVisibility,
+)
 from app.models.refresh_token import RefreshToken
 from app.models.region_access import UserRegionAccess
 from app.models.reliability import DqRuleRun, DqRuleSetting, DqScoreSnapshot
@@ -30,6 +41,15 @@ __all__ = [
     "DqRuleSetting",
     "DqScoreSnapshot",
     "ExecutionMode",
+    "KnowledgeAclPrincipal",
+    "KnowledgeDocument",
+    "KnowledgeDocumentAcl",
+    "KnowledgeDocumentChunk",
+    "KnowledgeDocumentStatus",
+    "KnowledgeIngestJob",
+    "KnowledgeJobStatus",
+    "KnowledgeJobType",
+    "KnowledgeVisibility",
     "LlmUsage",
     "LoginAudit",
     "QueryHistory",

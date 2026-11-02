@@ -43,6 +43,11 @@ export interface RegionAccess {
   hideRegionFilter: boolean;
 }
 
+/** Safe feature flags from GET /auth/me (backend-sourced). */
+export interface UserCapabilities {
+  ragEnabled: boolean;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -58,6 +63,7 @@ export interface UserProfile {
   lastLoginAt: string | null;
   createdAt: string;
   regionAccess: RegionAccess;
+  capabilities?: UserCapabilities;
 }
 
 /** `GET /auth/me/usage` — the caller's AI usage since Monday 00:00 UTC. */
