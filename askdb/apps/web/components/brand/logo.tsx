@@ -22,11 +22,13 @@ type LogoSize = "sm" | "md" | "lg";
 const MARK_PIXELS: Record<LogoSize, number> = { sm: 22, md: 28, lg: 44 };
 
 function useResolvedDark(): boolean {
-  const { resolvedTheme } = useTheme();
+  const { resolvedTheme, theme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
   if (!mounted) return false;
-  return resolvedTheme === "dark";
+  // Dark mark for Dark + AI signature themes (both use deep navy surfaces).
+  const active = resolvedTheme ?? theme;
+  return active === "dark" || active === "ai";
 }
 
 interface LogoMarkProps {

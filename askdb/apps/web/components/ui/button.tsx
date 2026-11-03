@@ -5,13 +5,15 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] font-medium transition-colors duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow-card)]",
-        secondary: "bg-surface-raised text-foreground border border-border hover:bg-muted",
-        ai: "border border-ai/30 bg-ai/10 text-foreground hover:bg-ai/15",
+        primary:
+          "bg-primary text-primary-foreground shadow-[var(--shadow-card)] hover:bg-primary/90",
+        secondary:
+          "border border-border bg-surface-raised text-foreground hover:bg-muted",
+        ai: "border border-ai/35 bg-ai/12 text-foreground shadow-[var(--shadow-card)] hover:bg-ai/18",
         ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
         danger: "bg-danger text-danger-foreground hover:bg-danger/90",
         link: "text-primary underline-offset-4 hover:underline",

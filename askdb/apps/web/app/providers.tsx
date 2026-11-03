@@ -31,6 +31,13 @@ function createQueryClient(): QueryClient {
   });
 }
 
+/** Maps next-themes values to <html> classes (AI uses .theme-ai to avoid clashing with --ai). */
+const THEME_CLASS_MAP = {
+  light: "light",
+  dark: "dark",
+  ai: "theme-ai",
+} as const;
+
 export function Providers({ children }: { children: React.ReactNode }) {
   // useState rather than a module singleton: in the App Router a shared client would
   // leak cached data between users during server rendering.
@@ -40,9 +47,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider
         attribute="class"
-        // Light is the default per spec section 9; dark is fully supported.
         defaultTheme="light"
-        enableSystem
+        themes={["light", "dark", "ai"]}
+        value={THEME_CLASS_MAP}
+        enableSystem={false}
         // Transitions on a theme swap cause a visible repaint; disabling them is what
         // keeps the toggle inside the 50 ms budget.
         disableTransitionOnChange

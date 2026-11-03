@@ -194,7 +194,7 @@ function ImpactList({ rules }: { rules: RuleRow[] }) {
   return (
     <ul className="space-y-2">
       {items.map((r) => (
-        <li key={r.id} className="rounded-xl border border-[#f0dfb4] bg-[#fffaf0] px-3 py-2 text-xs leading-relaxed text-foreground">
+        <li key={r.id} className="rounded-[var(--radius-control)] border border-warning/35 bg-warning/10 px-3 py-2 text-xs leading-relaxed text-foreground">
           {r.impact}
           {r.assets.length ? (
             <span className="mt-1 block text-[10px] text-muted-foreground">Affects {r.assets.join(", ")}</span>
@@ -367,7 +367,7 @@ function RuleDetail({
         <SeverityChip severity={rule.severity} />
         <StatusPill status={rule.status} />
         {rule.custom ? (
-          <span className="rounded-full bg-[#e3ecfd] px-2 py-0.5 text-2xs font-medium text-[#2f5fc4]">Custom monitor</span>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-medium text-primary">Custom monitor</span>
         ) : null}
       </div>
       <h2 className="mt-2 text-lg font-semibold text-foreground">{rule.name}</h2>
@@ -409,7 +409,7 @@ function RuleDetail({
 
       <Block title="Business impact">
         {rule.status === "failing" && rule.impact ? (
-          <p className="rounded-xl border border-[#f0dfb4] bg-[#fffaf0] px-3 py-2 text-xs leading-relaxed text-foreground">{rule.impact}</p>
+          <p className="rounded-[var(--radius-control)] border border-warning/35 bg-warning/10 px-3 py-2 text-xs leading-relaxed text-foreground">{rule.impact}</p>
         ) : (
           <EmptyNote>Within target: no downstream impact right now.</EmptyNote>
         )}
@@ -519,7 +519,7 @@ function RuleDetail({
                 type="button"
                 disabled={pending}
                 onClick={() => onDelete(rule.id)}
-                className="inline-flex items-center gap-1.5 justify-self-start text-2xs font-medium text-[#a8463d] hover:underline disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 justify-self-start text-2xs font-medium text-danger hover:underline disabled:opacity-50"
               >
                 <Trash2 className="size-3.5" /> Delete this monitor
               </button>
@@ -575,7 +575,7 @@ function DatasetView({
         />
       </div>
       {ds.topIssue ? (
-        <p className="mt-3 rounded-xl border border-[#f0dfb4] bg-[#fffaf0] px-3 py-2 text-xs text-foreground">{ds.topIssue}</p>
+        <p className="mt-3 rounded-[var(--radius-control)] border border-warning/35 bg-warning/10 px-3 py-2 text-xs text-foreground">{ds.topIssue}</p>
       ) : null}
       {ds.assets.length ? <p className="mt-2 text-[11px] text-muted-foreground">Feeds: {ds.assets.join(", ")}</p> : null}
       <Block title="Business impact">

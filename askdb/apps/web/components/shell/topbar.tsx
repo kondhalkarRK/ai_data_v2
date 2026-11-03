@@ -22,7 +22,7 @@ export function Topbar() {
   const regionAccess = useRegionAccess();
 
   return (
-    <header className="sticky top-0 z-20 flex h-[var(--topbar-height)] shrink-0 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur">
+    <header className="sticky top-0 z-20 flex h-[var(--topbar-height)] shrink-0 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
       {collapsed ? (
         <Button
           variant="ghost"
@@ -47,9 +47,9 @@ export function Topbar() {
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] px-3 py-1.5 text-sm transition-colors",
+                    "flex items-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] px-3 py-1.5 text-sm transition-colors duration-150",
                     active
-                      ? "bg-muted font-medium text-foreground"
+                      ? "nav-item-active font-medium"
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                   )}
                 >

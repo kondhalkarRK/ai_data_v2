@@ -28,11 +28,13 @@ export function ModulePageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-3">
+    <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border/70 pb-4">
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">{eyebrow}</p>
-        <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">{title}</h1>
-        {meta ? <div className="mt-0.5 text-sm text-muted-foreground">{meta}</div> : null}
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+          {eyebrow}
+        </p>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+        {meta ? <div className="mt-1 text-sm text-muted-foreground">{meta}</div> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>

@@ -11,12 +11,12 @@ export default function LoginPage() {
   return (
     <main
       id="main-content"
-      className="flex min-h-dvh items-center justify-center bg-surface-sunken p-6"
+      className="aurora-shell flex min-h-dvh items-center justify-center p-6"
     >
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm animate-[fade-in_220ms_ease-out]">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <Logo size="lg" withTagline />
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             Ask your data anything — grounded in your semantic layer.
           </p>
         </div>

@@ -224,7 +224,7 @@ export default function KnowledgePage() {
             </div>
             <ol className="grid gap-2 text-sm sm:grid-cols-3">
               {DEMO_STEPS.map((step) => (
-                <li key={step} className="rounded-xl border border-border/60 bg-background px-3 py-2">
+                <li key={step} className="rounded-[var(--radius-control)] border border-border/60 bg-surface-raised px-3 py-2">
                   {step}
                 </li>
               ))}
@@ -262,7 +262,7 @@ export default function KnowledgePage() {
             </div>
 
             {canMutate ? (
-              <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4">
+              <div className="rounded-[var(--radius-card)] border border-dashed border-primary/40 bg-primary/5 p-4 transition-colors duration-150 hover:bg-primary/[0.07]">
                 <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
                   <FileUp className="size-4" />
                   Upload / ingest

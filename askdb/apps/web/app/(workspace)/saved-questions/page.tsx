@@ -51,13 +51,13 @@ export default function SavedQuestionsPage() {
         <CardContent className="pt-4">
           <form className="grid gap-2 md:grid-cols-[1fr_2fr_auto]" onSubmit={onSubmit}>
             <input
-              className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              className="h-9 rounded-[var(--radius-control)] border border-border bg-background px-3 text-sm outline-none transition-shadow duration-150 focus:ring-2 focus:ring-primary/20"
               placeholder="Title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
             />
             <input
-              className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              className="h-9 rounded-[var(--radius-control)] border border-border bg-background px-3 text-sm outline-none transition-shadow duration-150 focus:ring-2 focus:ring-primary/20"
               placeholder="Question"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}

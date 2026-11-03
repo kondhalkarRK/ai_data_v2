@@ -46,7 +46,7 @@ export default function QueryHistoryPage() {
                   {new Date(row.createdAt).toLocaleString()}
                 </CardDescription>
                 {row.sqlText ? (
-                  <pre className="mt-2 overflow-auto rounded bg-muted/40 p-2 font-mono text-2xs">
+                  <pre className="mt-2 overflow-auto rounded-[var(--radius-control)] border border-border/50 bg-surface-sunken/60 p-2 font-mono text-2xs">
                     {row.sqlText}
                   </pre>
                 ) : null}

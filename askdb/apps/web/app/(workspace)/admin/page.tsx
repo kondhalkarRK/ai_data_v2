@@ -55,7 +55,7 @@ function AdminCenter() {
       <div
         role="tablist"
         aria-label="Admin Center sections"
-        className="mb-6 flex flex-wrap gap-1 border-b border-border/70"
+        className="mb-6 flex flex-wrap gap-1 rounded-[var(--radius-control)] border border-border/60 bg-surface-raised/80 p-1"
       >
         {TABS.map((tab) => {
           const Icon = tab.icon;
@@ -68,10 +68,10 @@ function AdminCenter() {
               aria-selected={selected}
               onClick={() => router.replace(`${pathname}?tab=${tab.id}`, { scroll: false })}
               className={cn(
-                "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors",
+                "inline-flex items-center gap-1.5 rounded-[calc(var(--radius-control)-2px)] px-3 py-2 text-sm transition-[color,background-color,box-shadow] duration-150",
                 selected
-                  ? "border-primary font-medium text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                  ? "bg-background font-medium text-foreground shadow-[var(--shadow-card)]"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
               )}
             >
               <Icon className="size-4" aria-hidden="true" />

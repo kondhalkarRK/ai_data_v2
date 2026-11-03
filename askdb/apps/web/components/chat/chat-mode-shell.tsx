@@ -52,7 +52,7 @@ export function ChatModeShell({ enabled = NEW_CHAT_UI_ENABLED }: { enabled?: boo
       <div
         role="group"
         aria-label="Chat experience"
-        className="absolute left-1/2 top-0 z-10 flex -translate-x-1/2 rounded-full border border-border/70 bg-background p-0.5 text-xs shadow-sm"
+        className="absolute left-1/2 top-0 z-10 flex -translate-x-1/2 rounded-full border border-border/70 bg-surface-raised/95 p-0.5 text-xs shadow-[var(--shadow-card)] backdrop-blur-sm"
       >
         {OPTIONS.map((option) => (
           <button
@@ -61,9 +61,9 @@ export function ChatModeShell({ enabled = NEW_CHAT_UI_ENABLED }: { enabled?: boo
             aria-pressed={mode === option.value}
             onClick={() => choose(option.value)}
             className={cn(
-              "rounded-full px-3 py-1 font-medium transition-colors",
+              "rounded-full px-3 py-1 font-medium transition-colors duration-150",
               mode === option.value
-                ? "bg-primary text-primary-foreground"
+                ? "bg-primary text-primary-foreground shadow-[var(--shadow-card)]"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

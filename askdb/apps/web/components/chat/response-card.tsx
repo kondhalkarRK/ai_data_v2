@@ -129,7 +129,7 @@ export function ResponseCard({
     return (
       <div
         className={cn(
-          "space-y-3 rounded-2xl border border-border/70 bg-background p-4 shadow-sm",
+          "space-y-3 rounded-[var(--radius-card)] border border-border/70 bg-card p-4 shadow-[var(--shadow-card)]",
           className,
         )}
       >
@@ -174,7 +174,7 @@ export function ResponseCard({
   return (
     <article
       className={cn(
-        "overflow-hidden rounded-[var(--radius-card)] border border-border/70 bg-background",
+        "overflow-hidden rounded-[var(--radius-card)] border border-border/70 bg-card shadow-[var(--shadow-card)]",
         className,
       )}
     >

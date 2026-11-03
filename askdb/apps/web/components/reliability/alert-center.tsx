@@ -108,7 +108,7 @@ function SeverityTab({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs font-medium transition",
         active
-          ? "border-[#8fb3f5] bg-[#eef4ff] text-[#2f5fc4]"
+          ? "border-primary/40 bg-primary/10 text-primary"
           : "border-border bg-white text-muted-foreground hover:border-slate-300 border-border bg-surface-raised",
       )}
     >

@@ -188,7 +188,7 @@ export function MonitorDialog({
                       className={cn(
                         "rounded-lg border px-2 py-1.5 text-left text-2xs font-medium transition",
                         kind === k.value
-                          ? "border-[#8fb3f5] bg-[#eef4ff] text-[#2f5fc4]"
+                          ? "border-primary/40 bg-primary/10 text-primary"
                           : "border-border text-muted-foreground hover:border-border",
                       )}
                     >
@@ -332,7 +332,7 @@ export function MonitorDialog({
             </div>
 
             <footer className="flex items-center justify-between gap-3 border-t border-border px-5 py-3 dark:border-border">
-              <p className={cn("text-2xs", error ? "text-[#a8463d]" : "text-muted-foreground")} role={error ? "alert" : undefined}>
+              <p className={cn("text-2xs", error ? "text-danger" : "text-muted-foreground")} role={error ? "alert" : undefined}>
                 {error ?? (missing.length ? `Still needed: ${missing.join(", ")}.` : "Ready to create.")}
               </p>
               <div className="flex gap-2">

@@ -256,7 +256,7 @@ export function ChatWorkspace() {
                 message.role === "user" ? (
                   <div
                     key={message.id}
-                    className="ml-auto max-w-[85%] rounded-[var(--radius-card)] bg-primary px-4 py-2.5 text-sm text-primary-foreground"
+                    className="ml-auto max-w-[85%] rounded-[var(--radius-card)] bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-card)]"
                   >
                     {message.question}
                   </div>
@@ -276,7 +276,7 @@ export function ChatWorkspace() {
             </div>
 
             <form
-              className="shrink-0 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur"
+              className="shrink-0 border-t border-border/60 bg-surface-raised/90 px-4 py-3 backdrop-blur-md"
               onSubmit={onSubmit}
             >
               <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -289,7 +289,7 @@ export function ChatWorkspace() {
               </label>
               <div className="flex gap-2">
                 <input
-                  className="h-11 flex-1 rounded-[var(--radius-control)] border border-border bg-background px-3 text-sm outline-none ring-primary/20 focus:ring-2"
+                  className="h-11 flex-1 rounded-[var(--radius-control)] border border-border bg-background px-3 text-sm outline-none transition-shadow duration-150 ring-primary/20 focus:ring-2"
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
                   placeholder="Ask a governed analytics question"

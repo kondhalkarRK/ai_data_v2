@@ -92,11 +92,11 @@ export function Sidebar({ user }: { user: UserProfile }) {
                       aria-current={active ? "page" : undefined}
                       title={collapsed ? item.label : item.description}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-sm transition-colors",
+                        "relative flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-sm transition-colors duration-150",
                         collapsed && "justify-center px-0",
                         active
-                          ? "border border-primary/20 bg-primary/10 font-medium text-primary shadow-[inset_2px_0_0_0_hsl(var(--ai))]"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          ? "nav-item-active font-medium shadow-[inset_2px_0_0_0_hsl(var(--primary))]"
+                          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                       )}
                     >
                       <Icon className="size-4 shrink-0" aria-hidden="true" />

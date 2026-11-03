@@ -1,6 +1,6 @@
 "use client";
 
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sparkles, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import * as React from "react";
 
@@ -10,13 +10,13 @@ import { cn } from "@/lib/utils";
 const OPTIONS = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Monitor },
+  { value: "ai", label: "AI", icon: Sparkles },
 ] as const;
 
 const subscribeToNothing = () => () => undefined;
 
 /**
- * Theme switch.
+ * Theme switch — Light / Dark / AI signature.
  *
  * The change is a class swap on <html>, so nothing re-renders and no request is made —
  * which is how the sub-50 ms target in spec section 19 is met.
@@ -40,7 +40,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       role="radiogroup"
       aria-label="Colour theme"
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-full border border-border bg-surface-sunken p-0.5",
+        "inline-flex items-center gap-0.5 rounded-full border border-border bg-surface-sunken p-0.5 transition-colors duration-150",
         className,
       )}
     >
@@ -56,8 +56,9 @@ export function ThemeToggle({ className }: { className?: string }) {
             size="icon-sm"
             onClick={() => setTheme(value)}
             className={cn(
-              "rounded-full transition-colors",
+              "rounded-full transition-colors duration-150",
               selected && "bg-surface-raised text-foreground shadow-[var(--shadow-card)]",
+              selected && value === "ai" && "text-primary",
             )}
           >
             <Icon />

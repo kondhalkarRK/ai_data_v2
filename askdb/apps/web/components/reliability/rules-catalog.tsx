@@ -127,7 +127,7 @@ export function RulesCatalog({
           <button
             type="button"
             onClick={onCreate}
-            className="mr-1 inline-flex h-7 items-center gap-1 rounded-lg bg-[hsl(var(--primary))] px-2.5 text-2xs font-medium text-white shadow-sm hover:bg-[#285fd0]"
+            className="mr-1 inline-flex h-7 items-center gap-1 rounded-lg bg-primary px-2.5 text-2xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
           >
             <Plus className="size-3.5" /> New monitor
           </button>
@@ -362,7 +362,7 @@ function RuleRowView({
       <td className="max-w-[18rem] px-3 py-2.5">
         <p className="truncate font-medium text-foreground">
           {rule.name}
-          {rule.custom ? <span className="ml-1.5 rounded bg-[#e3ecfd] px-1 py-px text-[9px] font-semibold text-[#2f5fc4]">CUSTOM</span> : null}
+          {rule.custom ? <span className="ml-1.5 rounded bg-primary/10 px-1 py-px text-[9px] font-semibold text-primary">CUSTOM</span> : null}
         </p>
         <p className="truncate text-[10px] text-muted-foreground" title={rule.observed || rule.description}>
           {rule.observed || rule.description}
@@ -424,7 +424,7 @@ function FilterSelect({
       aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={cn(fieldClass, "mt-0 w-auto min-w-28", value && "border-[#8fb3f5] bg-[hsl(var(--primary) / 0.12)] text-[#2f5fc4]")}
+      className={cn(fieldClass, "mt-0 w-auto min-w-28", value && "border-primary/40 bg-primary/12 text-primary")}
     >
       <option value="">{ALL_LABEL[label] ?? `All ${label.toLowerCase()}s`}</option>
       {options.map((o) => (
@@ -460,7 +460,7 @@ function BulkBar({
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-[hsl(var(--primary) / 0.35)] bg-[hsl(var(--primary) / 0.12)] px-3 py-2 dark:border-border dark:bg-muted">
-      <span className="text-xs font-semibold text-[#2f5fc4]">{count} selected</span>
+      <span className="text-xs font-semibold text-primary">{count} selected</span>
       <select
         aria-label="Bulk action"
         value={action}

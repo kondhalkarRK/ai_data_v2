@@ -244,7 +244,7 @@ export function TrustCenter({ industry }: { industry: Industry }) {
       {center.isPending ? (
         <TrustSkeleton />
       ) : center.isError && !data ? (
-        <div className="rounded-2xl border border-border bg-white p-6 text-sm border-border bg-surface-raised">
+        <div className="rounded-[var(--radius-card)] border border-border bg-surface-raised p-6 text-sm shadow-[var(--shadow-card)]">
           <p className="font-medium text-foreground">The Data Trust Center could not be loaded.</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {(center.error as Error)?.message || "Check that the analytics warehouse is reachable, then retry."}
@@ -261,7 +261,7 @@ export function TrustCenter({ industry }: { industry: Industry }) {
             </ModuleStatusBanner>
           ) : null}
           {data.storage === "memory" ? (
-            <p className="rounded-xl border border-border bg-muted px-3 py-2 text-2xs text-muted-foreground dark:border-border dark:bg-muted">
+            <p className="rounded-[var(--radius-control)] border border-border bg-muted px-3 py-2 text-2xs text-muted-foreground">
               Run history and rule changes are being kept in memory because the reliability tables are not migrated yet.
               Run the database migration to keep trend history and monitor edits across restarts.
             </p>
@@ -322,8 +322,8 @@ export function TrustCenter({ industry }: { industry: Industry }) {
             />
           </div>
 
-          <details className="group rounded-2xl border border-border bg-white/60 border-border bg-surface-raised/60">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <details className="group rounded-[var(--radius-card)] border border-border bg-surface-raised/60 shadow-[var(--shadow-card)]">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 transition-colors duration-150 hover:bg-muted/30 [&::-webkit-details-marker]:hidden">
               <span>
                 <span className="block text-[15px] font-semibold tracking-tight text-foreground">
                   Monitoring details
@@ -332,9 +332,9 @@ export function TrustCenter({ industry }: { industry: Industry }) {
                   Schema drift, new business values, scoring method and monitor coverage.
                 </span>
               </span>
-              <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-open:rotate-180" />
             </summary>
-            <div className="space-y-6 border-t border-border p-5 dark:border-border">
+            <div className="space-y-6 border-t border-border p-5">
               <div className="grid gap-6 lg:grid-cols-2">
                 <SchemaDriftPanel data={data} />
                 <EntityChangesPanel data={data} />

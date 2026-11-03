@@ -151,8 +151,8 @@ function AtlasTabs({
             aria-selected={active}
             className={cn(
               compact
-                ? "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium"
-                : "flex h-14 items-center justify-center gap-2 rounded-2xl border text-sm font-semibold shadow-sm",
+                ? "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors duration-150"
+                : "flex h-14 items-center justify-center gap-2 rounded-[var(--radius-card)] border text-sm font-semibold shadow-[var(--shadow-card)] transition-colors duration-150",
               active
                 ? "border-primary/45 bg-primary/10 text-foreground"
                 : "border-border/60 bg-surface-raised/80 text-muted-foreground hover:bg-muted/40",

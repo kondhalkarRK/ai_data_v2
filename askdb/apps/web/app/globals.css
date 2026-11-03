@@ -2,40 +2,39 @@
 @import "@xyflow/react/dist/style.css";
 
 /*
- * NQL Insight design tokens.
+ * Ask Me design tokens — Light, Dark, and signature AI themes.
  *
  * Theme switching is a class on <html> that swaps CSS custom properties. Nothing
- * re-renders, which is what keeps the toggle under the 50 ms budget in spec section 19.
+ * re-renders, which keeps the toggle under the 50 ms budget.
  *
- * Hue values carry over from the legacy config/themes.py so the product still looks
- * like itself: light primary #2563eb, success #0f9d6e, dark surface #07111f.
+ * Classes: (none / light) = Light, .dark = Dark, .theme-ai = AI signature.
+ * Tailwind `dark:` utilities also match .theme-ai so existing dark: styles work.
  */
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *, .theme-ai, .theme-ai *));
+@custom-variant theme-ai (&:where(.theme-ai, .theme-ai *));
 
 :root {
-  --ai: 199 89% 48%;
+  /* Light — clean enterprise SaaS (#F7F9FC / #3867E8) */
+  --ai: 221 78% 56%;
   --ai-foreground: 0 0% 100%;
-  --ai-muted: 214 90% 96%;
-  --chart-grid: 214 25% 90%;
-  --chart-axis: 215 16% 45%;
-  --overlay: 213 27% 15%;
+  --ai-muted: 221 70% 96%;
+  --chart-grid: 214 22% 90%;
+  --chart-axis: 215 14% 48%;
+  --overlay: 220 28% 14%;
 
-  /* Surfaces */
-  --background: 0 0% 100%;
-  --surface: 210 25% 98%;
+  --background: 220 33% 97%;
+  --surface: 220 33% 97%;
   --surface-raised: 0 0% 100%;
-  --surface-sunken: 210 20% 96%;
+  --surface-sunken: 216 28% 95%;
 
-  /* Text */
-  --foreground: 213 27% 15%;
-  --muted: 210 20% 96%;
-  --muted-foreground: 215 16% 45%;
+  --foreground: 222 35% 14%;
+  --muted: 216 28% 95%;
+  --muted-foreground: 215 14% 48%;
 
-  /* Brand and intent */
-  --primary: 221 83% 53%;
+  --primary: 221 78% 56%;
   --primary-foreground: 0 0% 100%;
-  --accent: 258 90% 66%;
+  --accent: 234 55% 62%;
   --accent-foreground: 0 0% 100%;
   --success: 162 84% 33%;
   --success-foreground: 0 0% 100%;
@@ -49,58 +48,59 @@
   --orange: 21 90% 48%;
   --orange-foreground: 0 0% 100%;
 
-  /* Chrome */
-  --border: 214 25% 90%;
-  --input: 214 25% 90%;
-  --ring: 221 83% 53%;
-  --sidebar: 213 30% 99%;
-  --sidebar-border: 214 25% 91%;
+  --border: 214 22% 90%;
+  --input: 214 22% 90%;
+  --ring: 221 78% 56%;
+  --sidebar: 0 0% 100%;
+  --sidebar-border: 214 22% 91%;
 
-  /* Charts — Phase 7 global palette: Blue / Teal / Green / Orange / Purple / muted */
-  --chart-1: 221 83% 53%;
+  /* Charts unchanged contract — light series */
+  --chart-1: 221 78% 56%;
   --chart-2: 173 80% 32%;
   --chart-3: 162 84% 33%;
   --chart-4: 21 90% 48%;
-  --chart-5: 258 90% 66%;
+  --chart-5: 234 55% 62%;
   --chart-6: 215 16% 55%;
 
-  /* Shape — primary surfaces slightly tighter than generic soft cards */
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
 
-  /* Elevation hierarchy (Phase 17) */
-  --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06);
-  --shadow-raised: 0 4px 12px -2px rgb(16 24 40 / 0.08), 0 2px 6px -2px rgb(16 24 40 / 0.05);
-  --shadow-overlay: 0 16px 40px -8px rgb(16 24 40 / 0.18);
+  --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.05);
+  --shadow-raised: 0 4px 14px -2px rgb(16 24 40 / 0.07), 0 2px 6px -2px rgb(16 24 40 / 0.04);
+  --shadow-overlay: 0 16px 40px -8px rgb(16 24 40 / 0.16);
   --shadow-none: 0 0 #0000;
 
-  /* Layout */
   --sidebar-width: 15rem;
   --sidebar-width-collapsed: 3.75rem;
   --topbar-height: 3.5rem;
   --page-max: 80rem;
   --section-gap: 1.5rem;
+
+  --nav-active-bg: 221 78% 56% / 0.08;
+  --nav-active-fg: 221 78% 42%;
+  --aurora-a: 221 78% 56%;
+  --aurora-b: 234 55% 62%;
+  --aurora-c: 192 72% 48%;
 }
 
 .dark {
-  /* Midnight charcoal base — distinct surface ladder, not flat black */
-  --background: 222 47% 6%;
-  --surface: 220 42% 9%;
-  --surface-raised: 218 38% 12%;
-  --surface-sunken: 222 44% 7%;
+  /* Dark — premium navy (#0B1120 / #5689F5) */
+  --background: 222 48% 8%;
+  --surface: 220 42% 11%;
+  --surface-raised: 218 38% 14%;
+  --surface-sunken: 222 44% 9%;
 
-  --foreground: 210 40% 96%;
+  --foreground: 214 40% 94%;
   --muted: 217 32% 16%;
-  --muted-foreground: 215 18% 62%;
+  --muted-foreground: 214 18% 65%;
 
-  /* Restrained electric blue + cyan for interactive / AI affordances */
-  --primary: 214 88% 62%;
+  --primary: 217 88% 65%;
   --primary-foreground: 222 47% 8%;
-  --accent: 192 82% 52%;
+  --accent: 192 72% 52%;
   --accent-foreground: 222 47% 8%;
-  --ai: 192 82% 52%;
+  --ai: 192 72% 52%;
   --ai-foreground: 222 47% 8%;
-  --ai-muted: 214 55% 18%;
+  --ai-muted: 214 45% 18%;
   --success: 158 64% 67%;
   --success-foreground: 222 47% 11%;
   --warning: 45 96% 74%;
@@ -113,27 +113,93 @@
   --orange: 24 95% 68%;
   --orange-foreground: 222 47% 11%;
 
-  --border: 217 28% 20%;
-  --input: 217 28% 20%;
-  --ring: 214 88% 62%;
-  --sidebar: 222 44% 7%;
-  --sidebar-border: 217 28% 17%;
+  --border: 215 28% 22%;
+  --input: 215 28% 22%;
+  --ring: 217 88% 65%;
+  --sidebar: 222 44% 9%;
+  --sidebar-border: 215 28% 18%;
 
-  --chart-1: 214 88% 62%;
+  --chart-1: 217 88% 65%;
   --chart-2: 192 72% 48%;
   --chart-3: 158 58% 52%;
   --chart-4: 28 88% 58%;
   --chart-5: 258 72% 68%;
   --chart-6: 215 16% 48%;
 
-  --chart-grid: 217 28% 20%;
-  --chart-axis: 215 18% 55%;
-  --overlay: 222 47% 4%;
+  --chart-grid: 215 28% 22%;
+  --chart-axis: 214 18% 58%;
+  --overlay: 222 48% 4%;
 
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --shadow-raised: 0 4px 14px -2px rgb(0 0 0 / 0.5);
   --shadow-overlay: 0 16px 44px -8px rgb(0 0 0 / 0.65);
   --shadow-none: 0 0 #0000;
+
+  --nav-active-bg: 217 88% 65% / 0.12;
+  --nav-active-fg: 217 88% 78%;
+  --aurora-a: 217 88% 65%;
+  --aurora-b: 192 72% 52%;
+  --aurora-c: 258 72% 68%;
+}
+
+.theme-ai {
+  /* AI signature — deep indigo with violet/cyan accents (#090D1B / #7668F5) */
+  --background: 228 48% 7%;
+  --surface: 224 42% 11%;
+  --surface-raised: 222 38% 14%;
+  --surface-sunken: 228 44% 9%;
+
+  --foreground: 226 45% 96%;
+  --muted: 224 32% 16%;
+  --muted-foreground: 220 18% 68%;
+
+  --primary: 246 88% 68%;
+  --primary-foreground: 228 48% 8%;
+  --accent: 268 76% 68%;
+  --accent-foreground: 228 48% 8%;
+  --ai: 192 72% 57%;
+  --ai-foreground: 228 48% 8%;
+  --ai-muted: 230 40% 18%;
+  --success: 158 64% 67%;
+  --success-foreground: 228 48% 10%;
+  --warning: 45 96% 74%;
+  --warning-foreground: 228 48% 10%;
+  --danger: 0 91% 80%;
+  --danger-foreground: 228 48% 10%;
+  --info: 214 88% 64%;
+  --teal: 192 72% 52%;
+  --teal-foreground: 228 48% 10%;
+  --orange: 24 95% 68%;
+  --orange-foreground: 228 48% 10%;
+
+  --border: 222 30% 24%;
+  --input: 222 30% 24%;
+  --ring: 246 88% 68%;
+  --sidebar: 228 44% 8%;
+  --sidebar-border: 222 30% 18%;
+
+  /* Chart tokens match Dark — do not redesign chart colours */
+  --chart-1: 217 88% 65%;
+  --chart-2: 192 72% 48%;
+  --chart-3: 158 58% 52%;
+  --chart-4: 28 88% 58%;
+  --chart-5: 258 72% 68%;
+  --chart-6: 215 16% 48%;
+
+  --chart-grid: 222 30% 24%;
+  --chart-axis: 220 18% 60%;
+  --overlay: 228 48% 3%;
+
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.45);
+  --shadow-raised: 0 6px 18px -4px rgb(80 60 180 / 0.18), 0 2px 8px -2px rgb(0 0 0 / 0.45);
+  --shadow-overlay: 0 18px 48px -10px rgb(0 0 0 / 0.7);
+  --shadow-none: 0 0 #0000;
+
+  --nav-active-bg: 246 88% 68% / 0.14;
+  --nav-active-fg: 246 88% 82%;
+  --aurora-a: 246 88% 68%;
+  --aurora-b: 268 76% 68%;
+  --aurora-c: 192 72% 57%;
 }
 
 @theme inline {
@@ -316,10 +382,12 @@
       linear-gradient(180deg, hsl(var(--surface-raised) / 0.9), hsl(var(--background) / 0.4));
   }
 
-  .dark .hero-ambient {
+  .dark .hero-ambient,
+  .theme-ai .hero-ambient {
     background:
-      radial-gradient(ellipse 70% 55% at 12% 18%, hsl(var(--primary) / 0.22), transparent 60%),
-      radial-gradient(ellipse 55% 45% at 88% 12%, hsl(var(--accent) / 0.16), transparent 55%),
+      radial-gradient(ellipse 70% 55% at 12% 18%, hsl(var(--aurora-a) / 0.22), transparent 60%),
+      radial-gradient(ellipse 55% 45% at 88% 12%, hsl(var(--aurora-b) / 0.16), transparent 55%),
+      radial-gradient(ellipse 50% 40% at 70% 85%, hsl(var(--aurora-c) / 0.12), transparent 55%),
       linear-gradient(180deg, hsl(var(--surface) / 0.55), transparent 70%);
   }
 
@@ -327,9 +395,22 @@
     background-color: hsl(var(--surface-raised) / 0.92);
   }
 
-  .dark .hero-demo-surface {
+  .dark .hero-demo-surface,
+  .theme-ai .hero-demo-surface {
     background-color: hsl(var(--surface-raised) / 0.75);
     box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04);
+  }
+
+  .aurora-shell {
+    background:
+      radial-gradient(ellipse 55% 40% at 0% 0%, hsl(var(--aurora-a) / 0.12), transparent 55%),
+      radial-gradient(ellipse 45% 35% at 100% 0%, hsl(var(--aurora-b) / 0.1), transparent 50%),
+      hsl(var(--background));
+  }
+
+  .nav-item-active {
+    background-color: hsl(var(--nav-active-bg));
+    color: hsl(var(--nav-active-fg));
   }
   /* Card visual weight hierarchy — most UI should be secondary/supporting */
   .card-surface {
@@ -489,9 +570,22 @@
     border-radius: var(--radius-card);
     border: 1px dashed hsl(var(--border));
     background-color: hsl(var(--muted) / 0.35);
-    padding: 1rem 0.75rem;
+    padding: 1.25rem 1rem;
     text-align: center;
     font-size: var(--text-2xs);
+    color: hsl(var(--muted-foreground));
+  }
+
+  .badge-soft {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 999px;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--muted) / 0.55);
+    padding: 0.125rem 0.5rem;
+    font-size: var(--text-2xs);
+    font-weight: 500;
     color: hsl(var(--muted-foreground));
   }
 
@@ -525,12 +619,14 @@
   }
 }
 
-/* React Flow — match workspace surfaces in dark mode */
-.dark .react-flow__minimap {
+/* React Flow — match workspace surfaces in dark / AI themes */
+.dark .react-flow__minimap,
+.theme-ai .react-flow__minimap {
   background-color: hsl(var(--surface-raised));
 }
 
-.dark .react-flow__edge-path {
+.dark .react-flow__edge-path,
+.theme-ai .react-flow__edge-path {
   stroke: color-mix(in oklab, hsl(var(--muted-foreground)) 55%, transparent);
 }
 

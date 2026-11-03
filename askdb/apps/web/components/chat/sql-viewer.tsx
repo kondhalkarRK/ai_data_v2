@@ -123,7 +123,7 @@ export function SQLViewer({
       </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-border/70 bg-[#0f1419] text-[#e7ecf3] shadow-sm dark:border-white/10">
+      <div className="overflow-hidden rounded-[var(--radius-card)] border border-border/70 bg-[hsl(222_28%_9%)] text-[hsl(210_20%_92%)] shadow-[var(--shadow-card)] theme-ai:bg-[hsl(250_35%_8%)]">
         <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/55">SQL</p>
           <div className="flex gap-1">

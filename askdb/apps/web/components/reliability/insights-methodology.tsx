@@ -19,7 +19,7 @@ export function MethodologyPanel({ data, className }: { data: DataReliability; c
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
       >
         <span className="flex items-center gap-2">
-          <span className="icon-well size-7 rounded-lg bg-[#e3ecfd] text-[hsl(var(--primary))]">
+          <span className="icon-well size-7 rounded-lg bg-primary/10 text-primary">
             <Sigma className="size-4" />
           </span>
           <span>
