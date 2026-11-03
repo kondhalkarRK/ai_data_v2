@@ -55,7 +55,7 @@ function AdminCenter() {
       <div
         role="tablist"
         aria-label="Admin Center sections"
-        className="mb-6 flex flex-wrap gap-1 rounded-[var(--radius-control)] border border-border/60 bg-surface-raised/80 p-1"
+        className="mb-6 flex flex-wrap gap-1 rounded-[var(--radius-card)] border border-border/60 bg-muted/40 p-1"
       >
         {TABS.map((tab) => {
           const Icon = tab.icon;

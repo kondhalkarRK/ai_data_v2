@@ -208,9 +208,9 @@ export function ChatWorkspace() {
 
   return (
     <div className="flex h-[calc(100dvh-var(--topbar-height)-2rem)] min-h-[420px] flex-col gap-3 lg:h-[calc(100dvh-var(--topbar-height)-3rem)]">
-      <div className="flex shrink-0 items-center justify-between gap-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 pb-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight">AI Chat</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">AI Chat</h1>
           <p className="text-xs text-muted-foreground">
             Grounded NLQ · table, chart, and SQL in one place
           </p>
@@ -241,12 +241,13 @@ export function ChatWorkspace() {
           <CardContent className="flex min-h-0 flex-1 flex-col gap-0 p-0">
             <div ref={scrollerRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
               {messages.length === 0 ? (
-                <div className="card-supporting border border-dashed border-border/80 px-4 py-8 text-center">
-                  <p className="text-sm text-muted-foreground">
+                <div className="chat-empty-state rounded-[var(--radius-card)] border border-dashed border-border/80 px-5 py-10 text-center">
+                  <p className="text-sm font-medium text-foreground">Ask a governed analytics question</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Try “loss ratio”, “claims by status”, “revenue by month”, “surprise me”, or a
                     what-if like “what if revenue increased 10%”.
                   </p>
-                  <p className="mt-2 text-[11px] text-muted-foreground">
+                  <p className="mt-3 text-[11px] text-muted-foreground">
                     Press Ctrl/Cmd+K to jump to glossary terms, the semantic graph, or saved
                     insights.
                   </p>
@@ -276,7 +277,7 @@ export function ChatWorkspace() {
             </div>
 
             <form
-              className="shrink-0 border-t border-border/60 bg-surface-raised/90 px-4 py-3 backdrop-blur-md"
+              className="chat-composer shrink-0 border-t border-border/60 bg-surface-raised px-4 py-3"
               onSubmit={onSubmit}
             >
               <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">

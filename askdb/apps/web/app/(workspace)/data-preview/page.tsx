@@ -88,9 +88,9 @@ export default function DataPreviewPage() {
                   type="button"
                   onClick={() => setSelected(table.name)}
                   className={cn(
-                    "flex w-full flex-col rounded-[var(--radius-control)] px-2.5 py-2 text-left text-sm transition-colors",
+                    "flex w-full flex-col rounded-[var(--radius-control)] px-2.5 py-2 text-left text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/60",
                     activeTable === table.name
-                      ? "bg-primary/10 text-foreground"
+                      ? "bg-primary/10 font-medium text-foreground"
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                   )}
                 >

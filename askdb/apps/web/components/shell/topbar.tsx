@@ -22,7 +22,7 @@ export function Topbar() {
   const regionAccess = useRegionAccess();
 
   return (
-    <header className="sticky top-0 z-20 flex h-[var(--topbar-height)] shrink-0 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
+    <header className="app-topbar sticky top-0 z-20 flex h-[var(--topbar-height)] shrink-0 items-center gap-3 border-b border-border px-4">
       {collapsed ? (
         <Button
           variant="ghost"
@@ -38,7 +38,7 @@ export function Topbar() {
       {/* Main workspace tabs. Real links, so they are bookmarkable and the back button
           behaves — the legacy Streamlit tabs were neither. */}
       <nav aria-label="Workspace" className="min-w-0 flex-1">
-        <ul className="flex items-center gap-1 overflow-x-auto">
+        <ul className="flex items-center gap-0.5 overflow-x-auto">
           {MAIN_TABS.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
@@ -47,14 +47,15 @@ export function Topbar() {
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] px-3 py-1.5 text-sm transition-colors duration-150",
+                    "flex items-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] px-3 py-1.5 text-sm outline-none transition-[color,background-color] duration-150",
+                    "focus-visible:ring-2 focus-visible:ring-ring/60",
                     active
                       ? "nav-item-active font-medium"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                      : "text-muted-foreground hover:bg-muted/55 hover:text-foreground",
                   )}
                 >
                   <Icon className="size-4" aria-hidden="true" />
-                  {label}
+                  <span className="hidden sm:inline">{label}</span>
                 </Link>
               </li>
             );

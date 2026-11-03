@@ -10,6 +10,8 @@ export const surface = {
   cardSecondary: "card-secondary",
   supporting: "card-supporting",
   ai: "ai-surface",
+  /** Glass only paints under AI (--glass-blur); Dark stays opaque charcoal. */
+  glass: "glass-panel",
 } as const;
 
 export const type = {
@@ -36,11 +38,11 @@ export const overlay = {
   menuItem:
     "cursor-pointer rounded px-2 py-1.5 outline-none transition-colors duration-150 data-[highlighted]:bg-muted",
   tooltip:
-    "pointer-events-none rounded-lg border border-border bg-surface-raised/95 px-3 py-2 text-2xs shadow-overlay backdrop-blur-sm",
+    "pointer-events-none rounded-[var(--radius-control)] border border-border bg-surface-raised px-3 py-2 text-2xs shadow-overlay",
 } as const;
 
 export const motion = {
   hover: "transition-colors duration-150",
   press: "transition-transform duration-150 active:scale-[0.98]",
-  enter: "animate-[fade-in_200ms_ease-out]",
+  enter: "motion-enter",
 } as const;

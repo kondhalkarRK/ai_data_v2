@@ -119,7 +119,7 @@ export function CommandPalette() {
   }, {});
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/35 p-4 pt-[12vh] backdrop-blur-[2px]">
+    <div className="overlay-scrim fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
       <button
         type="button"
         className="absolute inset-0 cursor-default"
@@ -130,7 +130,7 @@ export function CommandPalette() {
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
-        className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+        className="relative z-10 w-full max-w-lg overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface-raised shadow-[var(--shadow-overlay)] animate-[fade-in_180ms_ease-out]"
       >
         <div className="flex items-center gap-2 border-b border-border px-3">
           <input
@@ -138,12 +138,12 @@ export function CommandPalette() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Jump to a business term, graph node, or saved insight…"
-            className="h-12 flex-1 bg-transparent text-sm outline-none"
+            className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             aria-label="Command search"
           />
           <button
             type="button"
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+            className="rounded-[var(--radius-control)] p-1 text-muted-foreground outline-none transition-colors duration-150 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60"
             onClick={() => setOpen(false)}
             aria-label="Close"
           >

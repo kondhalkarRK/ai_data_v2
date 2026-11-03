@@ -59,13 +59,13 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-card)] border border-dashed border-border/80 bg-surface/60 px-4 py-8 text-center",
+        "empty-state rounded-[var(--radius-card)] border border-dashed border-border/80 bg-surface/60 px-5 py-10 text-center",
         className,
       )}
     >
       <p className="text-sm font-medium text-foreground">{title}</p>
-      {detail ? <p className="mt-1 text-sm text-muted-foreground">{detail}</p> : null}
-      {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
+      {detail ? <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{detail}</p> : null}
+      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   );
 }

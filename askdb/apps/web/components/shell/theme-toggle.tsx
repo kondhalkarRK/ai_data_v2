@@ -58,7 +58,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             className={cn(
               "rounded-full transition-colors duration-150",
               selected && "bg-surface-raised text-foreground shadow-[var(--shadow-card)]",
-              selected && value === "ai" && "text-primary",
+              selected && value === "ai" && "text-primary ring-1 ring-primary/40",
             )}
           >
             <Icon />

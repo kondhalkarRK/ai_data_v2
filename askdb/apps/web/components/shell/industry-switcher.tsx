@@ -78,7 +78,7 @@ export function IndustrySwitcher() {
         <ul
           role="listbox"
           aria-label="Industry"
-          className="absolute right-0 z-30 mt-1.5 w-52 overflow-hidden rounded-[var(--radius-card)] border border-border bg-popover p-1 shadow-[var(--shadow-overlay)]"
+          className="absolute right-0 z-30 mt-1.5 w-52 overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface-raised p-1 shadow-[var(--shadow-overlay)] animate-[fade-in_180ms_ease-out]"
         >
           {INDUSTRIES.map(({ value, label, icon: Icon }) => {
             const selected = value === active;

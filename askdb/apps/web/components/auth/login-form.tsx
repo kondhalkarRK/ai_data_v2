@@ -47,7 +47,7 @@ export function LoginForm() {
   const failed = login.isError;
 
   return (
-    <Card>
+    <Card className="glass-panel shadow-[var(--shadow-raised)]">
       <CardContent className="pt-5">
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="space-y-1.5">

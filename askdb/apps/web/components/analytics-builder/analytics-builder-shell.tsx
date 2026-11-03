@@ -713,7 +713,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
           ) : null}
 
           <main className="space-y-3">
-            <div className="rounded-2xl border border-border/60 bg-surface-raised/80 p-4 shadow-[var(--shadow-card)] backdrop-blur">
+            <div className="rounded-[var(--radius-card)] border border-border/60 bg-surface-raised p-4 shadow-[var(--shadow-card)]">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="text-base font-semibold tracking-tight">{result?.title ?? "Chart / table preview"}</h3>
@@ -855,7 +855,7 @@ export function AnalyticsBuilderShell({ pack }: { pack: SemanticPackResponse }) 
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border/60 bg-surface-raised/70">
+            <div className="rounded-[var(--radius-card)] border border-border/60 bg-surface-raised">
               <button
                 type="button"
                 className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium"
@@ -950,7 +950,7 @@ function SuggestionStrip({
   onPick: (suggestion: AnalyticsSuggestion) => void;
 }) {
   return (
-    <section className="rounded-2xl border border-border/60 bg-surface-raised/70 px-3 py-2.5">
+    <section className="rounded-[var(--radius-card)] border border-border/60 bg-surface-raised px-3 py-2.5">
       <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         <Lightbulb className="size-3.5 text-info" />
         Suggested analyses
@@ -1794,7 +1794,7 @@ function SavedList({
   loading: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-border/60 bg-surface-raised/70 p-4">
+    <section className="rounded-[var(--radius-card)] border border-border/60 bg-surface-raised p-4">
       <h3 className="text-sm font-semibold">Saved analyses</h3>
       <p className="mb-3 text-[11px] text-muted-foreground">Definitions only; reopening re-runs against the latest data.</p>
       {loading ? (

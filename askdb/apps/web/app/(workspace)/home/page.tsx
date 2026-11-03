@@ -42,7 +42,7 @@ export default function HomePage() {
               {FEATURE_CHIPS.map((chip) => (
                 <li
                   key={chip}
-                  className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur-sm"
+                  className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] text-muted-foreground"
                 >
                   {chip}
                 </li>

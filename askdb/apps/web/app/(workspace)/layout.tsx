@@ -98,10 +98,10 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
           className={
             presenterMode
               ? "aurora-shell min-h-0 min-w-0 flex-1 overflow-auto p-6 lg:p-10"
-              : "aurora-shell min-h-0 min-w-0 flex-1 overflow-auto p-4 lg:p-6"
+              : "aurora-shell min-h-0 min-w-0 flex-1 overflow-auto p-4 sm:p-5 lg:p-6"
           }
         >
-          <div className="animate-[fade-in_200ms_ease-out]">{children}</div>
+          <div className="motion-enter">{children}</div>
         </main>
       </div>
       <CommandPalette />

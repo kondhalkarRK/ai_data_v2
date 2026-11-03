@@ -192,7 +192,7 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <div className="min-w-0 space-y-6">
-              <section className="rounded-2xl border border-border/60 bg-surface-raised/80 p-5 shadow-sm">
+              <section className="rounded-[var(--radius-card)] border border-border/60 bg-surface-raised p-5 shadow-[var(--shadow-card)]">
                 <div className="mb-3">
                   <h2 className="text-base font-semibold tracking-tight">Progressive explorer</h2>
                   <p className="text-xs text-muted-foreground">
@@ -210,7 +210,7 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
                 />
               </section>
 
-              <section className="rounded-2xl border border-border/60 bg-surface-raised/80 p-5 shadow-sm">
+              <section className="rounded-[var(--radius-card)] border border-border/60 bg-surface-raised p-5 shadow-[var(--shadow-card)]">
                 <h2 className="mb-4 text-base font-semibold tracking-tight">AI Intelligence</h2>
                 <AiIntelligenceSection
                   insights={data.insights}
@@ -220,7 +220,7 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
             </div>
 
             <aside className="space-y-6 xl:sticky xl:top-4 xl:self-start">
-              <div className="rounded-2xl border border-border/60 bg-surface-raised/90 p-4 shadow-sm">
+              <div className="rounded-[var(--radius-card)] border border-border/60 bg-surface-raised p-4 shadow-[var(--shadow-card)]">
                 <h2 className="text-sm font-semibold tracking-tight">Period & filters</h2>
                 <p className="mt-1 mb-3 text-[11px] text-muted-foreground">
                   Year window and line of business. Region focus follows the heatmap.

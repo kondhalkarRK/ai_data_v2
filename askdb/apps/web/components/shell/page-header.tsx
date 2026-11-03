@@ -13,12 +13,14 @@ export function PageHeader({ title, description, actions, className }: PageHeade
   return (
     <div
       className={cn(
-        "mb-6 flex items-start justify-between gap-4 border-b border-border/70 pb-5",
+        "mb-6 flex items-start justify-between gap-4 border-b border-border/60 pb-5",
         className,
       )}
     >
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
+        <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground sm:text-2xl">
+          {title}
+        </h1>
         {description ? (
           <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             {description}

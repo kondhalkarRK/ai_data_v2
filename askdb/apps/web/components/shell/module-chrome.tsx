@@ -28,13 +28,15 @@ export function ModulePageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border/70 pb-4">
+    <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border/60 pb-4">
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
           {eyebrow}
         </p>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{title}</h1>
-        {meta ? <div className="mt-1 text-sm text-muted-foreground">{meta}</div> : null}
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-[1.35rem]">
+          {title}
+        </h1>
+        {meta ? <div className="mt-1.5 text-sm text-muted-foreground">{meta}</div> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
@@ -84,9 +86,10 @@ export function ModuleToolbarButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition disabled:opacity-50",
+        "inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-xs font-medium outline-none transition-[color,background-color,border-color,box-shadow] duration-150 disabled:opacity-50",
+        "focus-visible:ring-2 focus-visible:ring-ring/60",
         primary
-          ? "border-primary/40 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+          ? "border-primary/40 bg-primary text-primary-foreground shadow-[var(--shadow-card)] hover:bg-primary/90"
           : active
             ? "border-primary/35 bg-primary/10 text-primary"
             : "border-border bg-surface-raised text-foreground hover:bg-muted",
@@ -144,7 +147,7 @@ export function ModuleStatusBanner({
     <p
       role={tone === "warn" ? "alert" : "status"}
       className={cn(
-        "rounded-xl border px-3 py-2 text-xs",
+        "rounded-[var(--radius-control)] border px-3 py-2 text-xs",
         tone === "ok" && "border-success/30 bg-success/8 text-foreground",
         tone === "warn" && "border-warning/35 bg-warning/10 text-warning-foreground dark:text-warning",
         tone === "info" && "border-border bg-muted/50 text-muted-foreground",
@@ -167,7 +170,7 @@ export function ModulePanel({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-2xl border border-border/70 bg-surface-raised shadow-[var(--shadow-card)]",
+        "overflow-hidden rounded-[var(--radius-card)] border border-border/70 bg-surface-raised shadow-[var(--shadow-card)]",
         padded && "p-4 sm:p-5",
         className,
       )}
