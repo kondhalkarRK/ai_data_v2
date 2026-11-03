@@ -13,9 +13,27 @@ import {
 } from "lucide-react";
 import * as React from "react";
 
+import { formatCount, formatInr, formatPct } from "@/components/executive/cockpit/format";
 import type { ExecKpiCard } from "@/components/executive/types";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import { EmptyState } from "@/components/ui/status-pill";
 import { cn } from "@/lib/utils";
+
+function formatKpiAnim(n: number, card: ExecKpiCard): string {
+  const fmt = (card.format || "").toLowerCase();
+  if (fmt.includes("percent") || card.formatted.includes("%")) {
+    // Values may already be 0–1 ratios or 0–100; match final string shape.
+    if (Math.abs(card.value ?? 0) <= 1.5 && card.formatted.includes("%")) {
+      return formatPct(n);
+    }
+    return `${n.toFixed(1)}%`;
+  }
+  if (fmt.includes("currency") || fmt.includes("money") || card.formatted.includes("₹")) {
+    return formatInr(n);
+  }
+  if (fmt === "text") return card.formatted;
+  return formatCount(n);
+}
 
 const KPI_ICONS: LucideIcon[] = [CircleDollarSign, Gauge, Percent, Car, Shield, Activity];
 
@@ -74,14 +92,28 @@ export function KpiCardsGrid({
                 </span>
               ) : null}
             </div>
-            <p
-              className={cn(
-                "mt-2 font-semibold tracking-tight tabular-nums text-foreground",
-                presenterMode ? "text-3xl" : featured ? "text-3xl" : "text-2xl",
-              )}
-            >
-              {card.formatted}
-            </p>
+            {card.value != null && card.format !== "text" ? (
+              <AnimatedNumber
+                value={card.value}
+                format={(n) =>
+                  Math.abs(n - card.value!) < 1e-6 ? card.formatted : formatKpiAnim(n, card)
+                }
+                className={cn(
+                  "kpi-metric mt-2 block font-semibold tracking-tight text-foreground",
+                  presenterMode ? "text-3xl" : featured ? "text-3xl" : "text-2xl",
+                )}
+                as="p"
+              />
+            ) : (
+              <p
+                className={cn(
+                  "kpi-metric mt-2 font-semibold tracking-tight tabular-nums text-foreground",
+                  presenterMode ? "text-3xl" : featured ? "text-3xl" : "text-2xl",
+                )}
+              >
+                {card.formatted}
+              </p>
+            )}
             {card.delta != null ? (
               <p
                 className={cn(

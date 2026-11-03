@@ -13,6 +13,7 @@ import {
   ScoreRing,
   Sparkline,
 } from "@/components/reliability/ui";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import { cn } from "@/lib/utils";
 
 export function DimensionCards({
@@ -62,9 +63,13 @@ export function DimensionCards({
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-xl font-semibold tracking-tight text-foreground tabular-nums dark:text-foreground">
-                  {formatScore(d.score)}
-                </p>
+                <AnimatedNumber
+                  value={d.score}
+                  decimals={1}
+                  format={(n) => formatScore(n)}
+                  className="kpi-metric block text-xl font-semibold tracking-tight text-foreground"
+                  as="p"
+                />
                 <p className="text-2xs text-muted-foreground">
                   <span className="text-success">{d.passing} passing</span>
                   {d.failing ? <span className="text-danger"> · {d.failing} failing</span> : null}

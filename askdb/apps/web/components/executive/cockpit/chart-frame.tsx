@@ -6,6 +6,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 
 import { exportCsv, exportSvgPng } from "@/components/executive/cockpit/chart-utils";
+import { useChartThemeKey } from "@/hooks/use-chart-theme-key";
 import { interactive, overlay, surface, type as typeScale } from "@/lib/surface";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ export function ChartFrame({
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const bodyRef = React.useRef<HTMLDivElement>(null);
+  const themeKey = useChartThemeKey();
 
   React.useEffect(() => {
     if (!expanded) return;
@@ -111,7 +113,7 @@ export function ChartFrame({
         </div>
       </header>
       <div ref={bodyRef} className={cn("relative min-h-0 flex-1", bodyClassName)}>
-        {children(expanded)}
+        <React.Fragment key={themeKey}>{children(expanded)}</React.Fragment>
       </div>
     </section>
   );

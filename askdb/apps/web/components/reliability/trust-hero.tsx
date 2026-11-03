@@ -11,7 +11,7 @@ import {
   ShieldAlert,
   Sparkles,
 } from "lucide-react";
-import type * as React from "react";
+import * as React from "react";
 
 import { formatCount } from "@/components/executive/cockpit/format";
 import type { Band, DataReliability, TrustFilters } from "@/components/reliability/types";
@@ -26,6 +26,7 @@ import {
   TONE_COLOUR,
   TRUST,
 } from "@/components/reliability/ui";
+import { useCountUp } from "@/hooks/use-count-up";
 import { cn } from "@/lib/utils";
 
 const START = 150;
@@ -54,50 +55,68 @@ export function TrustGauge({ score, band, size = 208 }: { score: number | null; 
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 14;
-  const value = score == null ? 0 : Math.max(0, Math.min(100, score));
+  const { display, ref } = useCountUp(score, { duration: 1100, decimals: 1 });
+  const value = score == null ? 0 : Math.max(0, Math.min(100, display));
   const [mx, my] = polar(cx, cy, r, START + (SWEEP * value) / 100);
   const colour = BAND_COLOUR[band];
   return (
-    <svg
-      width={size}
-      height={size * 0.82}
-      viewBox={`0 0 ${size} ${size * 0.82}`}
-      data-chart
-      role="img"
-      aria-label={score == null ? "Trust score not available" : `Trust score ${score.toFixed(1)} of 100`}
-    >
-      {BAND_SEGMENTS.map((s) => (
-        <path
-          key={s.band}
-          d={arc(cx, cy, r, s.from + (s.from ? 0.6 : 0), s.to - (s.to < 100 ? 0.6 : 0))}
-          fill="none"
-          stroke={BAND_COLOUR[s.band]}
-          strokeOpacity={0.16}
-          strokeWidth={12}
-          strokeLinecap="butt"
-        />
-      ))}
-      {score != null ? (
-        <>
-          <path d={arc(cx, cy, r, 0, value)} fill="none" stroke={colour} strokeWidth={12} strokeLinecap="round" />
-          <circle cx={mx} cy={my} r={7.5} fill="#fff" stroke={colour} strokeWidth={3} />
-        </>
-      ) : null}
-      {[70, 85, 95].map((tick) => {
-        const [tx, ty] = polar(cx, cy, r - 19, START + (SWEEP * tick) / 100);
-        return (
-          <text key={tick} x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fontSize={9} fill="hsl(var(--chart-axis))">
-            {tick}
-          </text>
-        );
-      })}
-      <text x={cx} y={cy - 2} textAnchor="middle" fontSize={40} fontWeight={600} fill={TRUST.ink}>
-        {formatScore(score)}
-      </text>
-      <text x={cx} y={cy + 20} textAnchor="middle" fontSize={11} fill="hsl(var(--chart-axis))">
-        out of 100
-      </text>
-    </svg>
+    <div ref={ref as React.RefObject<HTMLDivElement>} className="relative">
+      <svg
+        width={size}
+        height={size * 0.82}
+        viewBox={`0 0 ${size} ${size * 0.82}`}
+        data-chart
+        role="img"
+        aria-label={score == null ? "Trust score not available" : `Trust score ${score.toFixed(1)} of 100`}
+      >
+        {BAND_SEGMENTS.map((s) => (
+          <path
+            key={s.band}
+            d={arc(cx, cy, r, s.from + (s.from ? 0.6 : 0), s.to - (s.to < 100 ? 0.6 : 0))}
+            fill="none"
+            stroke={BAND_COLOUR[s.band]}
+            strokeOpacity={0.16}
+            strokeWidth={12}
+            strokeLinecap="butt"
+          />
+        ))}
+        {score != null ? (
+          <>
+            <path
+              d={arc(cx, cy, r, 0, value)}
+              fill="none"
+              stroke={colour}
+              strokeWidth={12}
+              strokeLinecap="round"
+              className="transition-[d] duration-75"
+            />
+            <circle cx={mx} cy={my} r={7.5} fill="hsl(var(--surface-raised))" stroke={colour} strokeWidth={3} />
+          </>
+        ) : null}
+        {[70, 85, 95].map((tick) => {
+          const [tx, ty] = polar(cx, cy, r - 19, START + (SWEEP * tick) / 100);
+          return (
+            <text
+              key={tick}
+              x={tx}
+              y={ty}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={9}
+              fill="hsl(var(--chart-axis))"
+            >
+              {tick}
+            </text>
+          );
+        })}
+        <text x={cx} y={cy - 2} textAnchor="middle" fontSize={40} fontWeight={600} fill="hsl(var(--foreground))">
+          {formatScore(score == null ? null : display)}
+        </text>
+        <text x={cx} y={cy + 20} textAnchor="middle" fontSize={11} fill="hsl(var(--chart-axis))">
+          out of 100
+        </text>
+      </svg>
+    </div>
   );
 }
 
@@ -116,7 +135,7 @@ export function TrustHero({
   const bandColour = BAND_COLOUR[hero.band];
   return (
     <div className="grid gap-6 xl:grid-cols-12">
-      <Card className="relative overflow-hidden bg-gradient-to-br from-[#eef4ff] via-white to-[#eaf7f3] xl:col-span-4 dark:from-surface-raised dark:to-surface-raised">
+      <Card className="relative overflow-hidden bg-gradient-to-br from-primary/8 via-surface-raised to-ai/5 xl:col-span-4">
         <div className="flex items-center justify-between">
           <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Enterprise trust score</p>
           <span

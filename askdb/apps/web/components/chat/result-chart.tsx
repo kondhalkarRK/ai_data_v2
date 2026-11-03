@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import type { AnomalyMarker } from "@/components/chat/types";
+import { useChartThemeKey } from "@/hooks/use-chart-theme-key";
 import { CHART_SERIES } from "@/lib/design";
 import { formatChatCell } from "@/lib/format-chat-cell";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ export function ResultChart({
   );
   const [showAll, setShowAll] = React.useState(true);
   const multi = showAll && seriesKeys.length > 1 && chartType !== "pie";
+  const themeKey = useChartThemeKey();
 
   React.useEffect(() => {
     if (keys.includes(initialX)) setXKey(initialX);
@@ -103,7 +105,7 @@ export function ResultChart({
   }
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-3", className)} data-chart-theme={themeKey}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold tracking-tight">
           {multi ? seriesKeys.map(prettyKey).join(" vs ") : prettyKey(yKey)} by {prettyKey(xKey)}
@@ -144,26 +146,28 @@ export function ResultChart({
         )}
       </div>
 
-      {multi ? (
-        <MultiSeriesChart
-          rows={rows.slice(0, 48)}
-          xKey={xKey}
-          seriesKeys={seriesKeys}
-          chartType={chartType as Exclude<ChartKind, "pie">}
-        />
-      ) : chartType === "pie" ? (
-        <PieChart points={points} hover={hover} setHover={setHover} yKey={yKey} />
-      ) : (
-        <CartesianChart
-          points={points}
-          chartType={chartType}
-          hover={hover}
-          setHover={setHover}
-          xKey={xKey}
-          yKey={yKey}
-          anomalies={anomalies}
-        />
-      )}
+      <React.Fragment key={themeKey}>
+        {multi ? (
+          <MultiSeriesChart
+            rows={rows.slice(0, 48)}
+            xKey={xKey}
+            seriesKeys={seriesKeys}
+            chartType={chartType as Exclude<ChartKind, "pie">}
+          />
+        ) : chartType === "pie" ? (
+          <PieChart points={points} hover={hover} setHover={setHover} yKey={yKey} />
+        ) : (
+          <CartesianChart
+            points={points}
+            chartType={chartType}
+            hover={hover}
+            setHover={setHover}
+            xKey={xKey}
+            yKey={yKey}
+            anomalies={anomalies}
+          />
+        )}
+      </React.Fragment>
     </div>
   );
 }

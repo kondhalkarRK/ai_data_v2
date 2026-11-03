@@ -89,135 +89,134 @@
 
 .dark {
   /*
-   * Dark — Midnight Professional
-   * Neutral charcoal/slate, muted steel blue (#6B8CC8). No aurora, violet, cyan glow, or glass.
+   * Dark — Midnight Professional (navy charcoal)
+   * Deep navy surfaces, cyan/steel accents. No violet aurora / glass (distinct from AI).
    */
-  --background: 215 15% 9%; /* #12151A */
-  --surface: 216 16% 11%; /* #171A20 */
-  --surface-raised: 215 16% 14%; /* #1E232B */
-  --surface-sunken: 220 18% 7%; /* #0E1014 */
+  --background: 220 55% 5%; /* ~#050b18 */
+  --surface: 215 40% 8%;
+  --surface-raised: 215 32% 11%;
+  --surface-sunken: 220 50% 4%;
 
-  --foreground: 210 12% 92%; /* #E8EAED */
-  --muted: 215 12% 16%;
-  --muted-foreground: 210 10% 68%; /* ~#9AA3AE family — AA on charcoal */
+  --foreground: 210 20% 96%;
+  --muted: 215 22% 14%;
+  --muted-foreground: 210 14% 68%;
 
-  --primary: 214 45% 60%; /* #6B8CC8 muted steel blue */
-  --primary-foreground: 215 15% 9%;
-  --accent: 210 29% 50%; /* #5B7FA6 muted blue */
-  --accent-foreground: 210 12% 96%;
-  --ai: 214 45% 60%; /* accent role only — same steel family, not cyan */
-  --ai-foreground: 215 15% 9%;
-  --ai-muted: 215 14% 18%;
-  --success: 152 45% 48%;
-  --success-foreground: 210 12% 96%;
-  --warning: 38 85% 55%;
-  --warning-foreground: 30 40% 12%;
-  --danger: 0 72% 62%;
-  --danger-foreground: 210 12% 96%;
-  --info: 214 45% 60%;
-  --teal: 185 25% 42%;
-  --teal-foreground: 210 12% 96%;
-  --orange: 24 80% 55%;
-  --orange-foreground: 30 40% 12%;
+  --primary: 199 90% 55%; /* electric cyan-blue */
+  --primary-foreground: 220 55% 6%;
+  --accent: 8 85% 62%; /* soft coral accent */
+  --accent-foreground: 210 20% 98%;
+  --ai: 189 85% 48%;
+  --ai-foreground: 220 55% 6%;
+  --ai-muted: 200 30% 16%;
+  --success: 160 60% 48%;
+  --success-foreground: 210 20% 98%;
+  --warning: 38 90% 58%;
+  --warning-foreground: 30 40% 10%;
+  --danger: 0 78% 62%;
+  --danger-foreground: 210 20% 98%;
+  --info: 199 90% 55%;
+  --teal: 174 70% 42%;
+  --teal-foreground: 210 20% 98%;
+  --orange: 24 90% 58%;
+  --orange-foreground: 30 40% 10%;
 
-  --border: 210 15% 19%; /* #2A3038 */
-  --input: 210 15% 19%;
-  --ring: 214 45% 60%;
-  --sidebar: 215 16% 9%; /* #14171C */
-  --sidebar-border: 210 12% 16%;
+  --border: 215 25% 18%;
+  --input: 215 25% 18%;
+  --ring: 199 90% 55%;
+  --sidebar: 220 50% 5%;
+  --sidebar-border: 215 22% 14%;
 
-  /* Chart series — preserved (do not redesign charts) */
-  --chart-1: 217 88% 65%;
-  --chart-2: 192 72% 48%;
-  --chart-3: 158 58% 52%;
-  --chart-4: 28 88% 58%;
-  --chart-5: 258 72% 68%;
-  --chart-6: 215 16% 48%;
+  /* Dark chart series — cyan / coral / teal neon on navy */
+  --chart-1: 199 90% 55%;
+  --chart-2: 8 85% 62%;
+  --chart-3: 174 70% 48%;
+  --chart-4: 32 95% 58%;
+  --chart-5: 217 88% 68%;
+  --chart-6: 210 16% 55%;
 
-  --chart-grid: 215 28% 22%;
-  --chart-axis: 214 18% 58%;
-  --overlay: 215 15% 4%;
+  --chart-grid: 215 22% 18%;
+  --chart-axis: 210 14% 58%;
+  --overlay: 220 55% 3%;
 
-  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.45);
-  --shadow-raised: 0 4px 14px -2px rgb(0 0 0 / 0.55);
-  --shadow-overlay: 0 16px 44px -8px rgb(0 0 0 / 0.7);
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.5), 0 0 0 1px hsl(215 25% 18% / 0.8);
+  --shadow-raised: 0 8px 28px -8px rgb(0 0 0 / 0.65), 0 0 24px -12px hsl(199 90% 55% / 0.12);
+  --shadow-overlay: 0 18px 48px -10px rgb(0 0 0 / 0.75);
   --shadow-none: 0 0 #0000;
 
-  --nav-active-bg: 214 45% 60% / 0.14;
-  --nav-active-fg: 214 45% 78%;
-  /* Aurora disabled — tokens unused; CSS gates zero opacity for .dark */
-  --aurora-a: 215 10% 20%;
-  --aurora-b: 215 10% 20%;
-  --aurora-c: 215 10% 20%;
+  --nav-active-bg: 199 90% 55% / 0.14;
+  --nav-active-fg: 199 90% 78%;
+  --aurora-a: 199 90% 55%;
+  --aurora-b: 174 70% 48%;
+  --aurora-c: 8 85% 62%;
   --aurora-opacity: 0;
   --glass-blur: 0px;
-  --glass-tint: 0;
+  --glass-tint: 1;
 }
 
 .theme-ai {
   /*
    * AI — Aurora Intelligence
-   * Midnight indigo foundation, violet surfaces, violet + cyan accents, selective aurora/glass.
+   * Midnight indigo, glass cards, violet + cyan neon, selective aurora.
    */
-  --background: 255 48% 5%; /* #0A0714 */
-  --surface: 252 38% 9%; /* #120E22 */
-  --surface-raised: 250 38% 13%; /* #1A1530 */
-  --surface-sunken: 255 50% 3%; /* #070510 */
+  --background: 250 55% 5%; /* deep indigo */
+  --surface: 252 42% 9%;
+  --surface-raised: 250 40% 13%;
+  --surface-sunken: 255 50% 3%;
 
-  --foreground: 250 33% 95%; /* #F0EEF8 */
-  --muted: 252 28% 16%;
-  --muted-foreground: 255 20% 72%; /* violet-grey — AA on indigo */
+  --foreground: 250 40% 96%;
+  --muted: 252 30% 15%;
+  --muted-foreground: 255 22% 72%;
 
-  --primary: 247 100% 74%; /* #8B7CFF */
+  --primary: 247 100% 72%; /* violet */
   --primary-foreground: 255 48% 8%;
-  --accent: 280 95% 75%; /* #C084FC */
+  --accent: 280 95% 72%;
   --accent-foreground: 255 48% 8%;
-  --ai: 189 94% 53%; /* cyan highlight #22D3EE family */
+  --ai: 189 94% 53%; /* cyan */
   --ai-foreground: 255 48% 6%;
-  --ai-muted: 250 35% 18%;
-  --success: 158 64% 55%;
+  --ai-muted: 250 40% 18%;
+  --success: 152 70% 52%;
   --success-foreground: 255 48% 8%;
   --warning: 45 96% 68%;
   --warning-foreground: 255 48% 8%;
-  --danger: 0 91% 72%;
+  --danger: 0 91% 70%;
   --danger-foreground: 255 48% 8%;
-  --info: 214 88% 68%;
+  --info: 214 90% 68%;
   --teal: 189 94% 53%;
   --teal-foreground: 255 48% 6%;
   --orange: 24 95% 68%;
   --orange-foreground: 255 48% 8%;
 
-  --border: 248 33% 24%; /* #2E2850 */
-  --input: 248 33% 22%;
-  --ring: 247 100% 74%;
-  --sidebar: 255 48% 6%; /* #0C0918 */
-  --sidebar-border: 248 30% 18%;
+  --border: 255 35% 28%;
+  --input: 252 32% 22%;
+  --ring: 247 100% 72%;
+  --sidebar: 255 50% 5%;
+  --sidebar-border: 255 32% 18%;
 
-  /* Chart tokens match Dark — do not redesign chart colours */
-  --chart-1: 217 88% 65%;
-  --chart-2: 192 72% 48%;
-  --chart-3: 158 58% 52%;
-  --chart-4: 28 88% 58%;
-  --chart-5: 258 72% 68%;
-  --chart-6: 215 16% 48%;
+  /* AI chart series — violet / cyan / magenta neon spectrum */
+  --chart-1: 247 100% 72%;
+  --chart-2: 189 94% 53%;
+  --chart-3: 300 85% 68%;
+  --chart-4: 152 70% 52%;
+  --chart-5: 214 90% 68%;
+  --chart-6: 32 95% 60%;
 
-  --chart-grid: 215 28% 22%;
-  --chart-axis: 214 18% 58%;
-  --overlay: 255 48% 3%;
+  --chart-grid: 252 28% 20%;
+  --chart-axis: 255 18% 62%;
+  --overlay: 255 50% 3%;
 
-  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.45), 0 0 0 1px hsl(248 33% 24% / 0.35);
-  --shadow-raised: 0 8px 24px -6px rgb(90 60 200 / 0.28), 0 2px 8px -2px rgb(0 0 0 / 0.5);
-  --shadow-overlay: 0 20px 52px -12px rgb(0 0 0 / 0.75), 0 0 40px -16px rgb(120 80 255 / 0.2);
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.45), 0 0 0 1px hsl(255 35% 28% / 0.55);
+  --shadow-raised: 0 10px 32px -8px rgb(90 50 220 / 0.35), 0 0 28px -10px hsl(189 94% 53% / 0.18);
+  --shadow-overlay: 0 22px 56px -12px rgb(0 0 0 / 0.78), 0 0 48px -16px rgb(120 80 255 / 0.28);
   --shadow-none: 0 0 #0000;
 
-  --nav-active-bg: 247 100% 74% / 0.16;
-  --nav-active-fg: 247 100% 86%;
-  --aurora-a: 247 100% 74%;
-  --aurora-b: 280 95% 75%;
+  --nav-active-bg: 247 100% 72% / 0.18;
+  --nav-active-fg: 247 100% 88%;
+  --aurora-a: 247 100% 72%;
+  --aurora-b: 280 95% 72%;
   --aurora-c: 189 94% 53%;
   --aurora-opacity: 1;
-  --glass-blur: 12px;
-  --glass-tint: 0.72;
+  --glass-blur: 14px;
+  --glass-tint: 0.68;
 }
 
 @theme inline {
@@ -554,6 +553,13 @@
     box-shadow: var(--shadow-card);
   }
 
+  .theme-ai .card-surface,
+  .theme-ai .card-primary,
+  .theme-ai .card-secondary {
+    background-color: hsl(var(--surface-raised) / var(--glass-tint));
+    backdrop-filter: blur(var(--glass-blur));
+  }
+
   .card-primary {
     background-color: hsl(var(--surface-raised));
     border: 1px solid hsl(var(--border));
@@ -566,6 +572,10 @@
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-none);
+  }
+
+  .kpi-metric {
+    letter-spacing: -0.02em;
   }
 
   .card-supporting {

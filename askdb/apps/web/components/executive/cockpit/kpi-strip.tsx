@@ -5,8 +5,8 @@ import type * as React from "react";
 
 import { monotonePath } from "@/components/executive/cockpit/chart-utils";
 import { formatCount, formatInr, formatPct, formatPts } from "@/components/executive/cockpit/format";
-import { COCKPIT } from "@/components/executive/cockpit/palette";
 import type { CockpitData, SelectHandler } from "@/components/executive/cockpit/types";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import { cn } from "@/lib/utils";
 
 export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: SelectHandler }) {
@@ -18,29 +18,32 @@ export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: Sele
       <KpiCard
         icon={<IndianRupee className="size-4" />}
         label="Total Revenue"
-        value={formatInr(kpis.revenue.value)}
+        numeric={kpis.revenue.value}
+        formatValue={formatInr}
         growth={kpis.revenue.growth}
         foot={compare}
         spark={history.map((p) => p.revenue ?? 0)}
-        accent={COCKPIT.blue}
+        accent="hsl(var(--chart-1))"
         featured
       />
       <KpiCard
         icon={<Package className="size-4" />}
         label="Units Sold"
-        value={formatCount(kpis.units.value)}
+        numeric={kpis.units.value}
+        formatValue={formatCount}
         growth={kpis.units.growth}
         foot={compare}
         spark={history.map((p) => p.units ?? 0)}
-        accent={COCKPIT.teal}
+        accent="hsl(var(--chart-3))"
       />
       <KpiCard
         icon={<ShoppingCart className="size-4" />}
         label="Total Orders"
-        value={formatCount(kpis.orders.value)}
+        numeric={kpis.orders.value}
+        formatValue={formatCount}
         growth={kpis.orders.growth}
         foot={`Avg price ${formatInr(kpis.avgPrice.value)} (${formatPct(kpis.avgPrice.growth, true)})`}
-        accent={COCKPIT.grey}
+        accent="hsl(var(--muted-foreground))"
       />
       <LeaderCard
         icon={<Car className="size-4" />}
@@ -119,7 +122,8 @@ const cardBase =
 function KpiCard({
   icon,
   label,
-  value,
+  numeric,
+  formatValue,
   growth,
   foot,
   spark,
@@ -128,7 +132,8 @@ function KpiCard({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  numeric: number | null;
+  formatValue: (n: number | null | undefined) => string;
   growth: number | null;
   foot: string;
   spark?: number[];
@@ -144,14 +149,25 @@ function KpiCard({
       )}
     >
       <div className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-        <span className="icon-well size-6 rounded-md" style={{ backgroundColor: `${accent}14`, color: accent }}>
+        <span
+          className="icon-well size-6 rounded-md"
+          style={{
+            backgroundColor: `color-mix(in oklab, ${accent} 14%, transparent)`,
+            color: accent,
+          }}
+        >
           {icon}
         </span>
         {label}
       </div>
       <div className="mt-2 flex items-end justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-2xl font-semibold tracking-tight text-foreground tabular-nums">{value}</p>
+          <AnimatedNumber
+            value={numeric}
+            format={(n) => formatValue(n)}
+            className="kpi-metric block truncate text-2xl font-semibold tracking-tight text-foreground"
+            as="p"
+          />
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <GrowthChip growth={growth} />
             <span className="truncate text-2xs text-muted-foreground">{foot}</span>
