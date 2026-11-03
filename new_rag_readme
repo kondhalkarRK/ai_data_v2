@@ -1,0 +1,89 @@
+**Diagnosis: RAG is not fully wired, and the stack is not running.** That matches a browser/API “socket” / connection failure.
+
+### What’s wrong right now
+
+| Check | Result |
+|---|---|
+| API `http://127.0.0.1:8000` | **Down** (connection refused) |
+| Web `http://127.0.0.1:3000` | **Down** (timeout) |
+| Qdrant `http://127.0.0.1:6333` | **Down** (timeout) |
+| `ASK_ME_RAG_ENABLED` in `.env` | Was **missing** → defaulted to `false` |
+| `RAG_QDRANT_MODE` | Was **missing** → defaulted to **`server`** → tries `localhost:6333` → **socket / connection errors** if Qdrant isn’t up |
+| `qdrant-client` / `sentence-transformers` / `pypdf` in API venv | **Not installed** |
+
+The UI “not handling correctly” is mostly the frontend failing to reach the API (session/chat/knowledge all hang or error). Separately, enabling RAG without packages + with `server` mode causes Qdrant socket errors on ingest/search.
+
+I updated `askdb/.env` for **office-laptop / no-Docker** RAG:
+
+- `ASK_ME_RAG_ENABLED=true`
+- `RAG_QDRANT_MODE=local` (embedded disk store — **no Docker**)
+- embedding + worker settings
+
+---
+
+### Setup steps (do in order)
+
+**1. Install RAG Python packages** (one-time; first embed download ~90MB):
+
+```powershell
+cd E:\ai_data_rag\ai_data_v2\askdb\apps\api
+.\.venv\Scripts\Activate.ps1
+pip install -e ".[rag]"
+pip install "sentence-transformers>=3,<4"
+python -c "import qdrant_client, pypdf, sentence_transformers; print('ok')"
+```
+
+**2. Migrate knowledge tables:**
+
+```powershell
+cd E:\ai_data_rag\ai_data_v2\askdb\apps\api
+.\.venv\Scripts\Activate.ps1
+alembic upgrade head
+```
+
+**3. Confirm `.env` (already patched)** — under RAG you should see:
+
+```env
+ASK_ME_RAG_ENABLED=true
+RAG_EMBEDDING_PROVIDER=sentence_transformers
+RAG_EMBEDDING_MODEL=all-MiniLM-L6-v2
+RAG_QDRANT_MODE=local
+RAG_WORKER_IN_PROCESS=true
+```
+
+Postgres must already be running (same as normal Ask Me). **You do not need Docker Qdrant** with `local` mode.
+
+**4. Start the app:**
+
+```powershell
+cd E:\ai_data_rag\ai_data_v2\askdb
+.\scripts\dev.ps1
+```
+
+Or start API + web separately, then open `http://localhost:3000`.
+
+**5. Smoke-check:**
+
+```powershell
+# API health / RAG readiness
+Invoke-WebRequest http://127.0.0.1:8000/ready -UseBasicParsing
+```
+
+In the UI (admin): Knowledge Hub → upload from  
+`askdb\samples\rag-test\`  
+(`automotive_warranty_rebate_policy.pdf`, `automotive_dealer_performance_q3.md`)  
+Wait until status is **INDEXED**, then ask in Chat / Hub search.
+
+---
+
+### If you still see “socket” errors
+
+1. **API not running** → browser shows fetch/network/socket-style failures. Fix: start `dev.ps1` / uvicorn first.  
+2. **`RAG_QDRANT_MODE=server` without Qdrant** → API hangs/errors talking to `:6333`. Fix: keep `local`, or run Docker Qdrant and set `server`.  
+3. **Packages missing** → import/dependency errors on first RAG call. Fix: step 1.  
+4. **Two API processes with `local` mode** → file lock on `apps/api/data/qdrant_local`. Fix: only one API process.  
+5. **Migration not applied** → jobs/docs tables missing. Fix: `alembic upgrade head`.
+
+---
+
+I can run the `pip install` + migration for you next if you want that done in this session.
