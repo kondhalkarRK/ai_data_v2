@@ -74,6 +74,7 @@ class OpenAICompatibleEmbeddingClient:
         api_key: str,
         expected_dimension: int | None = None,
         timeout_seconds: float = 60.0,
+        verify: bool | str = True,
     ) -> None:
         if not base_url.strip():
             raise ValidationError("RAG_EMBEDDING_BASE_URL is required for openai_compatible.")
@@ -83,6 +84,7 @@ class OpenAICompatibleEmbeddingClient:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._timeout = timeout_seconds
+        self._verify = verify
         probe = self.embed_texts(["dimension-probe"])
         self._dimension = len(probe[0])
         if expected_dimension and expected_dimension != self._dimension:
@@ -107,7 +109,7 @@ class OpenAICompatibleEmbeddingClient:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        with httpx.Client(timeout=self._timeout) as client:
+        with httpx.Client(timeout=self._timeout, verify=self._verify) as client:
             response = client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
@@ -165,6 +167,7 @@ def build_embedding_client(settings: Settings) -> EmbeddingClient:
         api_key=api_key,
         expected_dimension=expected,
         timeout_seconds=float(settings.llm_timeout_seconds),
+        verify=settings.httpx_verify,
     )
 
 
