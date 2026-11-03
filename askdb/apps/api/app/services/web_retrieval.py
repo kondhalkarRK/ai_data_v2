@@ -59,7 +59,11 @@ class WebRetrievalService:
         validate_web_url(url, self._settings.web_retrieval_allowlist)
         timeout = httpx.Timeout(self._settings.web_retrieval_timeout_seconds)
         async with (
-            httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client,
+            httpx.AsyncClient(
+                timeout=timeout,
+                follow_redirects=False,
+                verify=self._settings.httpx_verify,
+            ) as client,
             client.stream("GET", url) as response,
         ):
             response.raise_for_status()

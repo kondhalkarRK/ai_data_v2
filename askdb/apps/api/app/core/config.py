@@ -89,6 +89,11 @@ class Settings(BaseSettings):
     rate_limit_login_per_minute: int = Field(default=5, ge=1)
     rate_limit_api_per_minute: int = Field(default=120, ge=1)
 
+    # Optional TLS override for providers behind a corporate proxy or self-signed CA.
+    # Default is secure verification. Use SSL_VERIFY=false only for local dev.
+    ssl_verify: bool = True
+    ssl_cert_file: str = ""
+
     # TEMPORARY local testing only. When true, API routes skip JWT/CSRF and act as the
     # first active admin. Refused in production. Pair with NEXT_PUBLIC_AUTH_BYPASS on web.
     auth_bypass: bool = False
@@ -299,6 +304,13 @@ class Settings(BaseSettings):
             raise ValueError("DB_POOL_MAX_SIZE must be >= DB_POOL_MIN_SIZE")
 
         return self
+
+    @property
+    def httpx_verify(self) -> bool | str:
+        cert_file = self.ssl_cert_file.strip()
+        if cert_file:
+            return cert_file
+        return self.ssl_verify
 
     @property
     def is_production(self) -> bool:

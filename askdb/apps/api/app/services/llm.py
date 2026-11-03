@@ -139,7 +139,7 @@ async def _one_completion(
         model,
     )
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=timeout, verify=settings.httpx_verify) as client:
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             body = response.json()
