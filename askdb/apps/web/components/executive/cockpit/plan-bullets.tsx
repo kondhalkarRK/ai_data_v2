@@ -80,7 +80,7 @@ export function PlanBullets({
                       <span
                         className={cn(
                           "text-right font-semibold tabular-nums",
-                          m.achievement >= 1 ? "text-[#0f8f7e]" : m.achievement < 0.9 ? "text-[#c8574d]" : "text-muted-foreground",
+                          m.achievement >= 1 ? "text-[#0f8f7e] theme-ai:text-success" : m.achievement < 0.9 ? "text-[#c8574d] theme-ai:text-danger" : "text-muted-foreground",
                         )}
                       >
                         {formatPct(m.achievement, false, 0)}
@@ -112,14 +112,14 @@ function Bullet({ metric, reference }: { metric: BulletMetric; reference: string
         <span className="text-xs font-semibold text-foreground">{metric.label}</span>
         <span className="flex items-baseline gap-2">
           {variance != null ? (
-            <span className={cn("text-2xs font-semibold tabular-nums", variance >= 0 ? "text-[#0f8f7e]" : "text-[#c8574d]")}>
+            <span className={cn("text-2xs font-semibold tabular-nums", variance >= 0 ? "text-[#0f8f7e] theme-ai:text-success" : "text-[#c8574d] theme-ai:text-danger")}>
               {variance >= 0 ? "▲" : "▼"} {fmt(Math.abs(variance))}
             </span>
           ) : null}
           <span
             className={cn(
               "text-sm font-bold tabular-nums",
-              ach == null ? "text-muted-foreground" : ach >= 1 ? "text-[#0f8f7e]" : ach < 0.9 ? "text-[#c8574d]" : "text-foreground",
+              ach == null ? "text-muted-foreground" : ach >= 1 ? "text-[#0f8f7e] theme-ai:text-success" : ach < 0.9 ? "text-[#c8574d] theme-ai:text-danger" : "text-foreground",
             )}
           >
             {ach == null ? "n/a" : formatPct(ach, false, 0)}
@@ -131,14 +131,14 @@ function Bullet({ metric, reference }: { metric: BulletMetric; reference: string
           <svg data-chart width={w} height={24} role="img" aria-label={metric.label}>
             {target ? (
               <>
-                <rect x={0} y={2} width={px(target * 0.8)} height={20} rx={4} fill="#e2e8f0" />
-                <rect x={px(target * 0.8)} y={2} width={px(target * 0.2)} height={20} fill="#edf1f6" />
-                <rect x={px(target)} y={2} width={Math.max(w - px(target), 0)} height={20} fill="#f6f8fb" />
+                <rect x={0} y={2} width={px(target * 0.8)} height={20} rx={4} fill="var(--ai-paint-e2e8f0, #e2e8f0)" />
+                <rect x={px(target * 0.8)} y={2} width={px(target * 0.2)} height={20} fill="var(--ai-paint-edf1f6, #edf1f6)" />
+                <rect x={px(target)} y={2} width={Math.max(w - px(target), 0)} height={20} fill="var(--ai-paint-f6f8fb, #f6f8fb)" />
               </>
             ) : (
-              <rect x={0} y={2} width={w} height={20} rx={4} fill="#f1f5f9" />
+              <rect x={0} y={2} width={w} height={20} rx={4} fill="var(--ai-paint-f1f5f9, #f1f5f9)" />
             )}
-            <rect x={0} y={8} width={px(metric.actual)} height={8} rx={4} fill={ach != null && ach < 0.9 ? "#7c9cc9" : COCKPIT.blue} />
+            <rect x={0} y={8} width={px(metric.actual)} height={8} rx={4} fill={ach != null && ach < 0.9 ? "var(--ai-paint-7c9cc9, #7c9cc9)" : COCKPIT.blue} />
             {target ? <rect x={px(target) - 1.5} y={0} width={3} height={24} rx={1} fill={COCKPIT.ink} /> : null}
           </svg>
         ) : null}
@@ -161,7 +161,7 @@ function MiniBullet({ achievement }: { achievement: number }) {
     <span className="relative block h-2 rounded-full bg-muted">
       <span
         className="absolute inset-y-0 left-0 rounded-full"
-        style={{ width: `${pct}%`, backgroundColor: achievement >= 1 ? COCKPIT.teal : achievement < 0.9 ? "#e3a19a" : COCKPIT.blueSoft }}
+        style={{ width: `${pct}%`, backgroundColor: achievement >= 1 ? COCKPIT.teal : achievement < 0.9 ? "var(--ai-paint-e3a19a, #e3a19a)" : COCKPIT.blueSoft }}
       />
       <span className="absolute -inset-y-0.5 w-0.5 rounded bg-slate-700" style={{ left: `${100 / 1.25}%` }} />
     </span>

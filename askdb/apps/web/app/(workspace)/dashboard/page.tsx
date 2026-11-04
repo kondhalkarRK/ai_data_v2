@@ -70,6 +70,8 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
 
   const bundle = useQuery({
     queryKey: ["executive-intelligence", industry, qs],
+    // Keep the current industry's values visible while a new filter window loads.
+    placeholderData: (previous, query) => query?.queryKey[1] === industry ? previous : undefined,
     queryFn: async () => {
       const refresh = forceRefresh ? "&refresh=true" : "";
       const data = await apiClient.get<ExecutiveIntelligence>(

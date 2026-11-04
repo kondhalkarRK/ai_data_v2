@@ -220,14 +220,14 @@ function TrendSvg({
             ? points.map((p, i) =>
                 p.peak && p.revenue != null ? (
                   <g key={`peak-${p.month}`}>
-                    <circle cx={x(i)} cy={yRev(p.revenue)} r={4} fill="#fff" stroke={COCKPIT.blue} strokeWidth={2} />
+                    <circle cx={x(i)} cy={yRev(p.revenue)} r={4} fill="var(--ai-paint-fff, #fff)" stroke={COCKPIT.blue} strokeWidth={2} />
                     <text x={x(i)} y={yRev(p.revenue) - 9} textAnchor="middle" fontSize={9.5} fontWeight={600} fill={COCKPIT.ink}>
                       Peak {formatInr(p.revenue)}
                     </text>
                   </g>
                 ) : p.partial && p.revenue != null ? (
                   <g key={`mtd-${p.month}`}>
-                    <circle cx={x(i)} cy={yRev(p.revenue)} r={3.5} fill="#fff" stroke={COCKPIT.blue} strokeWidth={1.5} strokeDasharray="2 2" />
+                    <circle cx={x(i)} cy={yRev(p.revenue)} r={3.5} fill="var(--ai-paint-fff, #fff)" stroke={COCKPIT.blue} strokeWidth={1.5} strokeDasharray="2 2" />
                     <text x={x(i)} y={yRev(p.revenue) - 8} textAnchor="middle" fontSize={8.5} fontWeight={600} fill={COCKPIT.blue}>
                       MTD
                     </text>
@@ -245,7 +245,7 @@ function TrendSvg({
                 textAnchor="middle"
                 fontSize={p.partial ? 8.5 : 10}
                 fontWeight={p.partial ? 600 : 400}
-                fill={p.partial ? COCKPIT.blue : "#94a3b8"}
+                fill={p.partial ? COCKPIT.blue : "var(--ai-paint-94a3b8, #94a3b8)"}
               >
                 {p.partial ? formatTrendMonthLabel(p.month, true) : formatMonth(p.month)}
               </text>
@@ -256,10 +256,10 @@ function TrendSvg({
             <g pointerEvents="none">
               <line x1={x(hover)} x2={x(hover)} y1={margin.top} y2={baseline} stroke="hsl(var(--chart-axis))" strokeDasharray="3 3" />
               {visible.revenue && hovered.revenue != null ? (
-                <circle cx={x(hover)} cy={yRev(hovered.revenue)} r={4} fill={COCKPIT.blue} stroke="#fff" strokeWidth={1.5} />
+                <circle cx={x(hover)} cy={yRev(hovered.revenue)} r={4} fill={COCKPIT.blue} stroke="var(--ai-paint-fff, #fff)" strokeWidth={1.5} />
               ) : null}
               {visible.units && hovered.units != null ? (
-                <circle cx={x(hover)} cy={yUnits(hovered.units)} r={3.5} fill={COCKPIT.teal} stroke="#fff" strokeWidth={1.5} />
+                <circle cx={x(hover)} cy={yUnits(hovered.units)} r={3.5} fill={COCKPIT.teal} stroke="var(--ai-paint-fff, #fff)" strokeWidth={1.5} />
               ) : null}
             </g>
           ) : null}
@@ -297,7 +297,7 @@ function TrendSvg({
           />
           <TooltipRow colour={COCKPIT.teal} label="Units" value={formatCount(hovered.units)} />
           {hovered.revenue != null && hovered.priorRevenue ? (
-            <TooltipRow colour="#94a3b8" label="YoY" value={formatPct(hovered.revenue / hovered.priorRevenue - 1, true)} />
+            <TooltipRow colour="var(--ai-paint-94a3b8, #94a3b8)" label="YoY" value={formatPct(hovered.revenue / hovered.priorRevenue - 1, true)} />
           ) : null}
         </ChartTooltip>
       ) : null}

@@ -94,6 +94,8 @@ const STYLE_PROPS = [
   "font-weight",
   "text-anchor",
   "dominant-baseline",
+  "stop-color",
+  "stop-opacity",
 ] as const;
 
 function download(href: string, filename: string): void {
@@ -138,7 +140,11 @@ export async function exportSvgPng(svg: SVGSVGElement, filename: string): Promis
     canvas.height = rect.height * scale;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = document.documentElement.classList.contains("theme-ai")
+      ? getComputedStyle(svg).getPropertyValue("--surface-raised").trim()
+        ? `hsl(${getComputedStyle(svg).getPropertyValue("--surface-raised").trim()})`
+        : "#181923"
+      : "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.scale(scale, scale);
     ctx.drawImage(image, 0, 0, rect.width, rect.height);

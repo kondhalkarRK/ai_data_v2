@@ -107,10 +107,10 @@ function RankedGrid({ items, onPick }: { items: RankedItem[]; onPick: (item: Ran
                     item.growth == null
                       ? COCKPIT.grey
                       : Math.abs(item.growth) > 0.125
-                        ? "#ffffff"
+                        ? "var(--ai-paint-ffffff, #ffffff)"
                         : item.growth >= 0
-                          ? "#0b5f54"
-                          : "#8f3a33",
+                          ? "var(--ai-paint-0b5f54, #0b5f54)"
+                          : "var(--ai-paint-8f3a33, #8f3a33)",
                 }}
               >
                 {item.growth == null ? "new" : formatPct(item.growth, true)}

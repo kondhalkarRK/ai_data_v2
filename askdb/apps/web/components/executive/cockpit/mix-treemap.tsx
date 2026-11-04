@@ -9,17 +9,17 @@ import { COCKPIT, tint } from "@/components/executive/cockpit/palette";
 import type { CockpitData, FilterKey, RankedItem, SelectHandler } from "@/components/executive/cockpit/types";
 
 const FUEL_COLOURS: Record<string, string> = {
-  Petrol: "#5b8def",
-  Diesel: "#7c8ba1",
-  Electric: "#14a3a1",
-  Hybrid: "#5fc4bb",
-  CNG: "#9db7f0",
+  Petrol: "var(--ai-paint-5b8def, #5b8def)",
+  Diesel: "var(--ai-paint-7c8ba1, #7c8ba1)",
+  Electric: "var(--ai-paint-14a3a1, #14a3a1)",
+  Hybrid: "var(--ai-paint-5fc4bb, #5fc4bb)",
+  CNG: "var(--ai-paint-9db7f0, #9db7f0)",
 };
 const FAMILY_COLOURS: Record<string, string> = {
   SUV: "hsl(var(--primary))",
-  Hatchback: "#14a3a1",
-  Sedan: "#7c9cc9",
-  "MUV / MPV": "#64748b",
+  Hatchback: "var(--ai-paint-14a3a1, #14a3a1)",
+  Sedan: "var(--ai-paint-7c9cc9, #7c9cc9)",
+  "MUV / MPV": "var(--ai-paint-64748b, #64748b)",
 };
 
 interface Rect {
@@ -175,17 +175,17 @@ function Treemap({
                 >
                   <rect x={r.x + 1} y={r.y + 1} width={Math.max(r.w - 2, 0)} height={Math.max(r.h - 2, 0)} rx={6} fill={fill} opacity={hover && hover.rect.item.key !== r.item.key ? 0.7 : 1} />
                   {tiny ? (
-                    <text x={r.x + 8} y={r.y + 15} fontSize={10.5} fontWeight={600} fill="#fff" pointerEvents="none">
+                    <text x={r.x + 8} y={r.y + 15} fontSize={10.5} fontWeight={600} fill="var(--ai-paint-fff, #fff)" pointerEvents="none">
                       {fit(r.item.name, r.w - 14, 10.5)}
                     </text>
                   ) : null}
                   {roomy ? (
                     <>
-                      <text x={r.x + 8} y={r.y + 31} fontSize={13} fontWeight={700} fill="#fff" pointerEvents="none">
+                      <text x={r.x + 8} y={r.y + 31} fontSize={13} fontWeight={700} fill="var(--ai-paint-fff, #fff)" pointerEvents="none">
                         {formatPct(r.item.share)}
                       </text>
                       {delta != null && r.h > 50 ? (
-                        <text x={r.x + 8} y={r.y + 45} fontSize={9.5} fill="#fff" opacity={0.85} pointerEvents="none">
+                        <text x={r.x + 8} y={r.y + 45} fontSize={9.5} fill="var(--ai-paint-fff, #fff)" opacity={0.85} pointerEvents="none">
                           {formatPts(delta)}
                         </text>
                       ) : null}

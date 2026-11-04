@@ -156,22 +156,22 @@
 .theme-ai {
   /*
    * AI — Aurora Intelligence
-   * Midnight indigo, glass cards, violet + cyan neon, selective aurora.
+   * Midnight indigo, glass cards, soft violet + cyan accents, restrained atmosphere.
    */
-  --background: 250 55% 5%; /* deep indigo */
-  --surface: 252 42% 9%;
-  --surface-raised: 250 40% 13%;
-  --surface-sunken: 255 50% 3%;
+  --background: 246 32% 7%; /* deep indigo */
+  --surface: 246 27% 10%;
+  --surface-raised: 245 24% 13%;
+  --surface-sunken: 247 30% 6%;
 
-  --foreground: 250 40% 96%;
-  --muted: 252 30% 15%;
-  --muted-foreground: 255 22% 72%;
+  --foreground: 240 22% 94%;
+  --muted: 245 19% 18%;
+  --muted-foreground: 242 14% 70%;
 
-  --primary: 247 100% 72%; /* violet */
+  --primary: 249 82% 75%; /* violet */
   --primary-foreground: 255 48% 8%;
-  --accent: 280 95% 72%;
+  --accent: 268 62% 74%;
   --accent-foreground: 255 48% 8%;
-  --ai: 189 94% 53%; /* cyan */
+  --ai: 189 65% 65%; /* cyan */
   --ai-foreground: 255 48% 6%;
   --ai-muted: 250 40% 18%;
   --success: 152 70% 52%;
@@ -186,27 +186,27 @@
   --orange: 24 95% 68%;
   --orange-foreground: 255 48% 8%;
 
-  --border: 255 35% 28%;
-  --input: 252 32% 22%;
-  --ring: 247 100% 72%;
-  --sidebar: 255 50% 5%;
-  --sidebar-border: 255 32% 18%;
+  --border: 245 20% 25%;
+  --input: 245 20% 25%;
+  --ring: 249 82% 75%;
+  --sidebar: 247 30% 8%;
+  --sidebar-border: 245 20% 21%;
 
-  /* AI chart series — violet / cyan / magenta neon spectrum */
-  --chart-1: 247 100% 72%;
-  --chart-2: 189 94% 53%;
-  --chart-3: 300 85% 68%;
-  --chart-4: 152 70% 52%;
-  --chart-5: 214 90% 68%;
-  --chart-6: 32 95% 60%;
+  /* AI chart series — restrained violet, cyan, blue, amber, lilac and mint */
+  --chart-1: 249 82% 75%;
+  --chart-2: 189 65% 65%;
+  --chart-3: 218 74% 72%;
+  --chart-4: 35 78% 68%;
+  --chart-5: 278 55% 75%;
+  --chart-6: 158 46% 61%;
 
-  --chart-grid: 252 28% 20%;
-  --chart-axis: 255 18% 62%;
+  --chart-grid: 245 18% 23%;
+  --chart-axis: 242 14% 70%;
   --overlay: 255 50% 3%;
 
-  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.45), 0 0 0 1px hsl(255 35% 28% / 0.55);
-  --shadow-raised: 0 10px 32px -8px rgb(90 50 220 / 0.35), 0 0 28px -10px hsl(189 94% 53% / 0.18);
-  --shadow-overlay: 0 22px 56px -12px rgb(0 0 0 / 0.78), 0 0 48px -16px rgb(120 80 255 / 0.28);
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.18);
+  --shadow-raised: 0 10px 28px -12px rgb(0 0 0 / 0.45);
+  --shadow-overlay: 0 20px 48px -12px rgb(0 0 0 / 0.6);
   --shadow-none: 0 0 #0000;
 
   --nav-active-bg: 247 100% 72% / 0.18;
@@ -214,9 +214,48 @@
   --aurora-a: 247 100% 72%;
   --aurora-b: 280 95% 72%;
   --aurora-c: 189 94% 53%;
-  --aurora-opacity: 1;
-  --glass-blur: 14px;
-  --glass-tint: 0.68;
+  --aurora-opacity: 0.35;
+  --glass-blur: 10px;
+  --glass-tint: 0.94;
+
+  --ai-paint-64748b: hsl(var(--muted-foreground));
+  --ai-paint-fff: hsl(var(--surface-raised));
+  --ai-paint-e3a19a: hsl(var(--danger));
+  --ai-paint-1d4fc4: hsl(var(--chart-3));
+  --ai-paint-c8574d: hsl(var(--danger));
+  --ai-paint-8fa6c4: hsl(var(--muted-foreground));
+  --ai-paint-8f3a33: hsl(var(--danger));
+  --ai-paint-0b5f54: hsl(var(--success));
+  --ai-paint-ffffff: hsl(var(--surface-raised));
+  --ai-paint-14a3a1: hsl(var(--chart-2));
+  --ai-paint-5b8def: hsl(var(--chart-3));
+  --ai-paint-9db7f0: hsl(var(--chart-5));
+  --ai-paint-7c9cc9: hsl(var(--chart-4));
+  --ai-paint-5fc4bb: hsl(var(--chart-6));
+  --ai-paint-7c8ba1: hsl(var(--muted-foreground));
+  --ai-paint-f1f5f9: hsl(var(--muted));
+  --ai-paint-f6f8fb: hsl(var(--muted));
+  --ai-paint-edf1f6: hsl(var(--muted));
+  --ai-paint-e2e8f0: hsl(var(--muted));
+  --ai-paint-6fcfc4: hsl(var(--chart-2));
+  --ai-paint-b4c6dc: hsl(var(--chart-5));
+  --ai-paint-94a3b8: hsl(var(--muted-foreground));
+  /* Legacy cockpit SVGs inherit AI colors without changing Light/Dark. */
+  --cockpit-blue: hsl(var(--chart-1));
+  --cockpit-blueSoft: hsl(var(--chart-3));
+  --cockpit-blueMist: hsl(249 30% 19%);
+  --cockpit-teal: hsl(var(--chart-2));
+  --cockpit-units-accent: hsl(var(--chart-2));
+  --cockpit-tealSoft: hsl(189 35% 48%);
+  --cockpit-tealMist: hsl(189 24% 16%);
+  --cockpit-grey: hsl(var(--muted-foreground));
+  --cockpit-greySoft: hsl(242 16% 48%);
+  --cockpit-greyMist: hsl(var(--muted));
+  --cockpit-ink: hsl(var(--foreground));
+  --cockpit-positive: hsl(var(--success));
+  --cockpit-negative: hsl(var(--danger));
+  --cockpit-amber: hsl(var(--warning));
+  --cockpit-amberMist: hsl(35 26% 17%);
 }
 
 @theme inline {

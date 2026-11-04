@@ -10,11 +10,11 @@ import { categoryColour, COCKPIT, tint } from "@/components/executive/cockpit/pa
 import type { CockpitData, SelectHandler, SunburstNode } from "@/components/executive/cockpit/types";
 
 const ENGINE_COLOURS: Record<string, string> = {
-  Petrol: "#9db7f0",
-  Diesel: "#94a3b8",
-  Electric: "#14a3a1",
-  Hybrid: "#6fcfc4",
-  CNG: "#b4c6dc",
+  Petrol: "var(--ai-paint-9db7f0, #9db7f0)",
+  Diesel: "var(--ai-paint-94a3b8, #94a3b8)",
+  Electric: "var(--ai-paint-14a3a1, #14a3a1)",
+  Hybrid: "var(--ai-paint-6fcfc4, #6fcfc4)",
+  CNG: "var(--ai-paint-b4c6dc, #b4c6dc)",
 };
 
 interface Arc {
@@ -193,7 +193,7 @@ function SunburstBody({
                 const mid = (a.start + a.end) / 2 - Math.PI / 2;
                 const r = ((rings[0]! + rings[1]!) / 2) * R;
                 return (
-                  <text key={`l-${a.path.join("/")}`} x={centre + r * Math.cos(mid)} y={centre + r * Math.sin(mid)} textAnchor="middle" dominantBaseline="middle" fontSize={9.5} fontWeight={600} fill="#fff" pointerEvents="none">
+                  <text key={`l-${a.path.join("/")}`} x={centre + r * Math.cos(mid)} y={centre + r * Math.sin(mid)} textAnchor="middle" dominantBaseline="middle" fontSize={9.5} fontWeight={600} fill="var(--ai-paint-fff, #fff)" pointerEvents="none">
                     {a.node.name.length > 10 ? `${a.node.name.slice(0, 9)}…` : a.node.name}
                   </text>
                 );

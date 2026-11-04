@@ -12,9 +12,9 @@ type Level = "state" | "zone";
 type Category = "Leader" | "Average" | "Underperforming";
 
 const CATEGORY_STYLE: Record<Category, { fill: string; stroke: string }> = {
-  Leader: { fill: "hsl(var(--primary))", stroke: "#1d4fc4" },
-  Average: { fill: "#8fa6c4", stroke: "#64748b" },
-  Underperforming: { fill: "#e3a19a", stroke: "#c8574d" },
+  Leader: { fill: "hsl(var(--primary))", stroke: "var(--ai-paint-1d4fc4, #1d4fc4)" },
+  Average: { fill: "var(--ai-paint-8fa6c4, #8fa6c4)", stroke: "var(--ai-paint-64748b, #64748b)" },
+  Underperforming: { fill: "var(--ai-paint-e3a19a, #e3a19a)", stroke: "var(--ai-paint-c8574d, #c8574d)" },
 };
 
 export function BubbleMatrix({
@@ -200,7 +200,7 @@ function MatrixSvg({
                 >
                   <circle cx={cx} cy={cy} r={r} fill={style.fill} fillOpacity={active ? 0.85 : 0.55} stroke={style.stroke} strokeWidth={active ? 2 : 1} />
                   {labelled.has(item.key) ? (
-                    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={r > 14 ? 10 : 9} fontWeight={600} fill={r > 12 ? "#fff" : COCKPIT.ink} pointerEvents="none">
+                    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={r > 14 ? 10 : 9} fontWeight={600} fill={r > 12 ? "var(--ai-paint-fff, #fff)" : COCKPIT.ink} pointerEvents="none">
                       {item.key.length <= 3 ? item.key : item.name}
                     </text>
                   ) : null}

@@ -12,13 +12,13 @@ function easeOutCubic(t: number): number {
 }
 
 /**
- * Animates a numeric value from 0 → target when the element enters the viewport.
- * Skips motion when the user prefers reduced motion.
+ * Counts once on entry, then transitions from the currently displayed value.
+ * A new result cancels the previous frame; unrelated renders never restart it.
  */
 export function useCountUp(
   target: number | null | undefined,
   {
-    duration = 900,
+    duration = 700,
     decimals = 0,
     enabled = true,
   }: { duration?: number; decimals?: number; enabled?: boolean } = {},
@@ -26,12 +26,13 @@ export function useCountUp(
   const ref = React.useRef<HTMLElement | null>(null);
   const [display, setDisplay] = React.useState(0);
   const [visible, setVisible] = React.useState(false);
+  const current = React.useRef(0);
 
   React.useEffect(() => {
     const node = ref.current;
     if (!node || typeof IntersectionObserver === "undefined") {
-      setVisible(true);
-      return;
+      const frame = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(frame);
     }
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -47,30 +48,38 @@ export function useCountUp(
   }, []);
 
   React.useEffect(() => {
-    if (!enabled || !visible) return;
-    if (target == null || Number.isNaN(target)) {
-      setDisplay(0);
-      return;
-    }
-    if (prefersReducedMotion() || duration <= 0) {
-      setDisplay(target);
-      return;
-    }
+    if (target == null || !Number.isFinite(target) || !visible) return;
 
     let frame = 0;
     const start = performance.now();
-    const from = 0;
+    const from = current.current;
     const delta = target - from;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const finish = () => {
+      cancelAnimationFrame(frame);
+      current.current = target;
+      setDisplay(target);
+    };
+    const onMotionChange = () => { if (media.matches) finish(); };
+    media.addEventListener("change", onMotionChange);
 
     const tick = (now: number) => {
+      if (!enabled || prefersReducedMotion() || duration <= 0) {
+        finish();
+        return;
+      }
       const t = Math.min(1, (now - start) / duration);
       const next = from + delta * easeOutCubic(t);
+      current.current = next;
       setDisplay(decimals > 0 ? Number(next.toFixed(decimals)) : Math.round(next));
       if (t < 1) frame = requestAnimationFrame(tick);
-      else setDisplay(target);
+      else finish();
     };
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      media.removeEventListener("change", onMotionChange);
+    };
   }, [target, duration, decimals, enabled, visible]);
 
   return { display, ref };

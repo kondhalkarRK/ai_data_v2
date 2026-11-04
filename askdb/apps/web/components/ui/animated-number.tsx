@@ -9,7 +9,7 @@ export function AnimatedNumber({
   value,
   format,
   fallback = "—",
-  duration = 900,
+  duration = 700,
   decimals,
   className,
   as: Tag = "span",
@@ -25,18 +25,19 @@ export function AnimatedNumber({
 }) {
   const inferredDecimals =
     decimals ??
-    (value != null && !Number.isInteger(value) ? Math.min(2, String(value).split(".")[1]?.length ?? 1) : 0);
+    (value != null && !Number.isInteger(value) ? Math.min(4, String(value).split(".")[1]?.length ?? 1) : 0);
   const { display, ref } = useCountUp(value, { duration, decimals: inferredDecimals });
 
   const text =
-    value == null || Number.isNaN(value)
+    value == null || !Number.isFinite(value)
       ? fallback
-      : (format ?? ((n: number) => n.toLocaleString()))(display);
+      : (format ?? ((n: number) => n.toLocaleString("en-IN")))(display);
 
   // Always attach the intersection observer to a span so tag polymorphism stays type-safe.
   return (
     <Tag className={cn("tabular-nums", className)}>
-      <span ref={ref as React.RefObject<HTMLSpanElement>}>{text}</span>
+      <span className="sr-only">{value == null || !Number.isFinite(value) ? fallback : (format ?? ((n: number) => n.toLocaleString("en-IN")))(value)}</span>
+      <span ref={ref as React.RefObject<HTMLSpanElement>} aria-hidden="true">{text}</span>
     </Tag>
   );
 }

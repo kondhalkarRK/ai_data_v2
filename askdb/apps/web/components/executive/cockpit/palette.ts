@@ -1,24 +1,23 @@
 import { chartColor } from "@/lib/chart-colors";
 
 /**
- * Cockpit palette: soft blue, executive grey and light teal. Concrete colours (not CSS
- * variables) so exported PNGs render identically outside the page.
+ * Cockpit palette: soft blue, executive grey and light teal. AI overrides use CSS tokens; Light and Dark retain their original palette.
  */
 export const COCKPIT = {
-  blue: "#2f6fed",
-  blueSoft: "#8fb3f5",
-  blueMist: "#e3ecfd",
-  teal: "#14a3a1",
-  tealSoft: "#8fd6d2",
-  tealMist: "#dff4f2",
-  grey: "#64748b",
-  greySoft: "#cbd5e1",
-  greyMist: "#f1f5f9",
-  ink: "#1e293b",
-  positive: "#0f8f7e",
-  negative: "#c8574d",
-  amber: "#d69e2e",
-  amberMist: "#fdf3dc",
+  blue: "var(--cockpit-blue, #2f6fed)",
+  blueSoft: "var(--cockpit-blueSoft, #8fb3f5)",
+  blueMist: "var(--cockpit-blueMist, #e3ecfd)",
+  teal: "var(--cockpit-teal, #14a3a1)",
+  tealSoft: "var(--cockpit-tealSoft, #8fd6d2)",
+  tealMist: "var(--cockpit-tealMist, #dff4f2)",
+  grey: "var(--cockpit-grey, #64748b)",
+  greySoft: "var(--cockpit-greySoft, #cbd5e1)",
+  greyMist: "var(--cockpit-greyMist, #f1f5f9)",
+  ink: "var(--cockpit-ink, #1e293b)",
+  positive: "var(--cockpit-positive, #0f8f7e)",
+  negative: "var(--cockpit-negative, #c8574d)",
+  amber: "var(--cockpit-amber, #d69e2e)",
+  amberMist: "var(--cockpit-amberMist, #fdf3dc)",
 } as const;
 
 export const CATEGORY_COLOURS = [
@@ -46,6 +45,9 @@ export function categoryColour(index: number): string {
 
 /** Mix a hex colour toward white (amount 0..1). */
 export function tint(hex: string, amount: number): string {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) {
+    return `color-mix(in srgb, ${hex} ${(1 - amount) * 100}%, white)`;
+  }
   const n = Number.parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255;
   const g = (n >> 8) & 255;

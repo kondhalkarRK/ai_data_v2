@@ -26,6 +26,7 @@ import {
   TONE_COLOUR,
   TRUST,
 } from "@/components/reliability/ui";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import { useCountUp } from "@/hooks/use-count-up";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +56,7 @@ export function TrustGauge({ score, band, size = 208 }: { score: number | null; 
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 14;
-  const { display, ref } = useCountUp(score, { duration: 1100, decimals: 1 });
+  const { display, ref } = useCountUp(score, { duration: 700, decimals: 1 });
   const value = score == null ? 0 : Math.max(0, Math.min(100, display));
   const [mx, my] = polar(cx, cy, r, START + (SWEEP * value) / 100);
   const colour = BAND_COLOUR[band];
@@ -88,7 +89,7 @@ export function TrustGauge({ score, band, size = 208 }: { score: number | null; 
               stroke={colour}
               strokeWidth={12}
               strokeLinecap="round"
-              className="transition-[d] duration-75"
+              
             />
             <circle cx={mx} cy={my} r={7.5} fill="hsl(var(--surface-raised))" stroke={colour} strokeWidth={3} />
           </>
@@ -140,7 +141,7 @@ export function TrustHero({
           <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Enterprise trust score</p>
           <span
             className="rounded-full px-2.5 py-0.5 text-2xs font-semibold"
-            style={{ backgroundColor: `${bandColour}1f`, color: bandColour }}
+            style={{ backgroundColor: `color-mix(in srgb, ${bandColour} 12%, transparent)`, color: bandColour }}
           >
             {hero.bandLabel}
           </span>
@@ -182,7 +183,7 @@ export function TrustHero({
         <KpiTile
           icon={<ListChecks className="size-4" />}
           label="Active DQ rules"
-          value={formatCount(hero.rulesActive)}
+          value={hero.rulesActive}
           foot={`${hero.rulesTotal} defined · ${formatCount(hero.recordsChecked)} records checked`}
           accent={TRUST.blue}
           onClick={() => {
@@ -193,7 +194,7 @@ export function TrustHero({
         <KpiTile
           icon={<CheckCircle2 className="size-4" />}
           label="Passing"
-          value={formatCount(hero.rulesPassing)}
+          value={hero.rulesPassing}
           foot={hero.rulesActive ? `${Math.round((hero.rulesPassing / hero.rulesActive) * 100)}% of active rules` : "—"}
           accent={TRUST.green}
           onClick={() => {
@@ -204,7 +205,7 @@ export function TrustHero({
         <KpiTile
           icon={<CircleAlert className="size-4" />}
           label="Failing"
-          value={formatCount(hero.rulesFailing)}
+          value={hero.rulesFailing}
           foot={hero.rulesErrored ? `${hero.rulesErrored} could not run` : "below their target"}
           accent={hero.rulesFailing ? TRUST.amber : TRUST.grey}
           onClick={() => {
@@ -215,7 +216,7 @@ export function TrustHero({
         <KpiTile
           icon={<ShieldAlert className="size-4" />}
           label="Critical issues"
-          value={formatCount(hero.criticalIssues)}
+          value={hero.criticalIssues}
           foot={hero.criticalIssues ? "need attention today" : "none open"}
           accent={hero.criticalIssues ? TRUST.coral : TRUST.green}
           onClick={() => {
@@ -226,7 +227,7 @@ export function TrustHero({
         <KpiTile
           icon={<Database className="size-4" />}
           label="Datasets monitored"
-          value={formatCount(hero.datasetsMonitored)}
+          value={hero.datasetsMonitored}
           foot={data.dataAsOf ? `data as of ${formatWhen(data.dataAsOf)}` : "across the warehouse"}
           accent={TRUST.teal}
           onClick={() => onJump("datasets")}
@@ -234,7 +235,9 @@ export function TrustHero({
         <KpiTile
           icon={<Sparkles className="size-4" />}
           label="Trust trend"
-          value={formatDelta(delta)}
+          value={delta}
+          format={formatDelta}
+          decimals={1}
           foot="last 7 days"
           accent={delta != null && delta < -0.05 ? TRUST.amber : TRUST.green}
           spark={trend.slice(-30)}
@@ -274,6 +277,8 @@ function KpiTile({
   icon,
   label,
   value,
+  format = formatCount,
+  decimals = 0,
   foot,
   accent,
   spark,
@@ -281,7 +286,9 @@ function KpiTile({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: number | null;
+  format?: (value: number) => string;
+  decimals?: number;
   foot: string;
   accent: string;
   spark?: Array<number | null>;
@@ -294,14 +301,14 @@ function KpiTile({
       className={cn(cardClass, "group p-3.5 text-left transition hover:border-[#8fb3f5] hover:shadow-md")}
     >
       <div className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-        <span className="icon-well size-6 rounded-md" style={{ backgroundColor: `${accent}17`, color: accent }}>
+        <span className="icon-well size-6 rounded-md" style={{ backgroundColor: `color-mix(in srgb, ${accent} 9%, transparent)`, color: accent }}>
           {icon}
         </span>
         <span className="truncate">{label}</span>
       </div>
-      <div className="mt-2 flex items-end justify-between gap-2">
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
         <p className="truncate text-2xl font-semibold tracking-tight text-foreground tabular-nums dark:text-foreground">
-          {value}
+          <AnimatedNumber value={value} format={format} decimals={decimals} />
         </p>
         {spark ? <Sparkline values={spark} colour={accent} width={64} height={24} /> : null}
       </div>

@@ -34,7 +34,7 @@ export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: Sele
         growth={kpis.units.growth}
         foot={compare}
         spark={history.map((p) => p.units ?? 0)}
-        accent="hsl(var(--chart-3))"
+        accent="var(--cockpit-units-accent, hsl(var(--chart-3)))"
       />
       <KpiCard
         icon={<ShoppingCart className="size-4" />}
@@ -160,7 +160,7 @@ function KpiCard({
         </span>
         {label}
       </div>
-      <div className="mt-2 flex items-end justify-between gap-2">
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0">
           <AnimatedNumber
             value={numeric}
