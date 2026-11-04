@@ -16,6 +16,7 @@ from app.api.deps import (
     get_registry,
     get_scoped_analytics,
     get_semantic_service,
+    verify_csrf,
 )
 from app.core.config import Settings
 from app.db.session import DatabaseRegistry
@@ -32,8 +33,26 @@ from app.schemas.analytics import (
     SavedAnalysisResponse,
     SavedAnalysisUpdate,
 )
+from app.schemas.analytics_workspace import (
+    WorkspaceNarrationRequest,
+    WorkspaceNarrationResponse,
+    WorkspacePlanResponse,
+    WorkspaceRequest,
+    WorkspaceRunRequest,
+    WorkspaceRunResponse,
+    WorkspaceSaved,
+    WorkspaceSaveRequest,
+)
 from app.semantic.service import SemanticService
 from app.services.analytics.runner import AnalyticsService, capabilities_for, inspect_spec
+from app.services.analytics.workspace import (
+    get_workspace,
+    list_workspaces,
+    narrate_workspace,
+    plan_workspace,
+    run_panel,
+    save_workspace,
+)
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -57,6 +76,52 @@ def _service(
 
 
 AnalyticsServiceDep = Annotated[AnalyticsService, Depends(_service)]
+
+
+@router.post(
+    "/workspace/plan", response_model=WorkspacePlanResponse, dependencies=[Depends(verify_csrf)]
+)
+async def workspace_plan(
+    body: WorkspaceRequest, service: AnalyticsServiceDep
+) -> WorkspacePlanResponse:
+    return await plan_workspace(service, body)
+
+
+@router.post(
+    "/workspace/run", response_model=WorkspaceRunResponse, dependencies=[Depends(verify_csrf)]
+)
+async def workspace_run(
+    body: WorkspaceRunRequest, service: AnalyticsServiceDep
+) -> WorkspaceRunResponse:
+    return await run_panel(service, body.panel)
+
+
+@router.post(
+    "/workspace/narration",
+    response_model=WorkspaceNarrationResponse,
+    dependencies=[Depends(verify_csrf)],
+)
+async def workspace_narration(
+    body: WorkspaceNarrationRequest, service: AnalyticsServiceDep
+) -> WorkspaceNarrationResponse:
+    return await narrate_workspace(service, body)
+
+
+@router.post("/workspaces", response_model=WorkspaceSaved, dependencies=[Depends(verify_csrf)])
+async def workspace_save(
+    body: WorkspaceSaveRequest, service: AnalyticsServiceDep
+) -> WorkspaceSaved:
+    return await save_workspace(service, body)
+
+
+@router.get("/workspaces", response_model=list[WorkspaceSaved])
+async def workspaces(service: AnalyticsServiceDep) -> list[WorkspaceSaved]:
+    return await list_workspaces(service)
+
+
+@router.get("/workspaces/{workspace_id}", response_model=WorkspaceSaved)
+async def workspace_get(workspace_id: uuid.UUID, service: AnalyticsServiceDep) -> WorkspaceSaved:
+    return await get_workspace(service, workspace_id)
 
 
 @router.get(

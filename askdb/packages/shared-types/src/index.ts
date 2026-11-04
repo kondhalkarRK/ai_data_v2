@@ -656,3 +656,27 @@ export interface AskWizNarration {
   revision: number; paragraphs: string[]; aiUsed: boolean; llmCalls: number; tokens: number;
   limitation: string | null;
 }
+
+/** Unified automotive analytics: business definitions, never executable SQL. */
+export interface AnalyticsWorkspacePanel {
+  id: string;
+  title: string;
+  kind: "kpi" | "chart" | "table";
+  spec: AnalyticsSpec;
+  rationale: string;
+  daily: boolean;
+}
+export interface AnalyticsWorkspacePlan {
+  answerKind: "clarification" | "single_value" | "analysis" | "report" | "dashboard";
+  title: string;
+  panels: AnalyticsWorkspacePanel[];
+  clarification: string | null;
+  assumptions: string[];
+}
+export interface SavedAnalyticsWorkspace {
+  id: string;
+  revision: number;
+  plan: AnalyticsWorkspacePlan;
+  warning: string | null;
+  messages: Array<{ question: string; answer: string }>;
+}

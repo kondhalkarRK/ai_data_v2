@@ -5,6 +5,19 @@ the configured warehouse, LLM providers or hosted deployment were tested live.
 
 ## Architecture
 
+Unified Analytics Builder is implemented behind disabled-by-default
+`ASK_ME_ANALYTICS_WORKSPACE_ENABLED` / `NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED`.
+The automotive-only plan endpoint uses strict response contracts and semantic
+catalog validation; the experimental `analytics-workspace.tsx` renders variable
+panels through the existing governed runner, including daily automotive trends.
+Owner-scoped saved workspaces and conversation turns use the additive
+`0013_analytics_workspaces` migration. Existing analyses and Auto boards can be
+imported without changing originals. Narration uses signed evidence and bounded
+LLM curation; core results never wait for it. No agents/dependencies were added.
+Live deployment acceptance remains blocked by failed configured application and
+automotive database connections; the migration was not applied to those databases.
+See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for verified scope and rollback.
+
 - `apps/web`: Next.js 16 App Router, React 19, TypeScript, Tailwind 4, Radix,
   TanStack Query for server state, Zustand for browser UI preferences, next-themes.
   Charts are custom SVG; ontology uses React Flow and graph layout helpers.
@@ -105,6 +118,18 @@ utilities. Executive filter refetches retain previous values within an industry;
 the application does not invent intermediate datasets or change calculations.
 
 ## Configuration, validation and risks
+
+### Development environment constraint (user confirmed)
+
+This laptop is a code-development environment without a local PostgreSQL or LLM
+service setup. Do not attempt live PostgreSQL connectivity, apply database
+migrations, or call live LLM providers during routine development verification
+unless the user explicitly requests those checks or supplies a configured test
+environment. Their absence is expected, not a code defect or a reason to hold up
+implementation. Continue mocked LLM tests, SQLite persistence tests, semantic
+compiler/numerical/security tests, frontend/component tests, typecheck, lint and
+builds. Report live integration checks as not applicable to this environment;
+never claim they passed. Keep migrations ready for the configured deployment.
 
 ### AI-Augmented Executive Intelligence (2026-11-04)
 

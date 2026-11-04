@@ -212,3 +212,11 @@ remains unchanged. See `docs/ASKWIZ_IMPLEMENTATION.md` for its exact scope,
 migration, feature flags, evidence-curated LLM narration and limits. A subsequent
 full production webpack build passed outside the sandbox; the earlier build
 restriction recorded above describes the Executive Intelligence checkpoint.
+
+Analytics Builder now also has a unified automotive workspace behind separate
+disabled-by-default rollout flags. It supports question-dependent response shapes,
+daily analysis, scoped persistence, conversational refinement and signed-evidence
+narration. Existing Auto boards and analyses remain importable and untouched.
+See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for migration 0013, activation,
+rollback and verification. Configured database connectivity and live-provider
+acceptance remain outstanding; this does not change Executive Intelligence gates.

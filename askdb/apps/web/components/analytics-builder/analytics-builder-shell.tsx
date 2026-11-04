@@ -1467,7 +1467,7 @@ function toChartKind(viz: AnalyticsVizKind, fallback: string | undefined): Chart
   return "bar";
 }
 
-function ResultPreview({
+export function ResultPreview({
   result,
   viz,
   tab,

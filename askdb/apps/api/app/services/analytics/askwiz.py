@@ -407,6 +407,10 @@ class AskWizService:
             "Unknown metric, ambiguous date/target or unsupported request: operation=clarify and explain. "
             "Use period=null when editing without a date change. wholeBoard=true only for explicit board-wide edits. "
             "For a selected chart update set operation=update. Chart count excludes KPI cards. "
+            "Choose the smallest useful response: one chart for a simple trend or breakdown; "
+            "three to five for an explicit executive dashboard. Never default to four charts. "
+            "Respect an explicitly requested chart count. Populate charts with the requested "
+            "metric and dimension rather than unrelated recipe panels. "
             + ("Existing board: " + board.model_dump_json() if board else "")
         )
         raw = await self.completion(system, prompt, max_tokens=800)

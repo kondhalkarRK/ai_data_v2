@@ -5,11 +5,14 @@ import * as React from "react";
 
 import { AnalyticsBuilderShell } from "@/components/analytics-builder/analytics-builder-shell";
 import { AskWiz } from "@/components/analytics-builder/askwiz";
+import { AnalyticsWorkspace } from "@/components/analytics-builder/analytics-workspace";
 import { useActiveIndustry, useSession } from "@/hooks/use-session";
 
 export function BuilderModes({ pack }: { pack: SemanticPackResponse }) {
   const industry = useActiveIndustry();
   const { data: user } = useSession();
+  const unified = (process.env.NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED ?? "false").toLowerCase() === "true";
+  if (industry === "automotive" && unified) return <AnalyticsWorkspace key={JSON.stringify([user?.id, user?.role, user?.regionAccess])} pack={pack} />;
   const enabled = (process.env.NEXT_PUBLIC_ASK_ME_ASKWIZ_ENABLED ?? "true").toLowerCase() === "true";
   if (industry !== "automotive" || !enabled) return <AnalyticsBuilderShell key={industry} pack={pack} />;
   // Remount both workspaces when identity/access changes, never retain another scope's results.

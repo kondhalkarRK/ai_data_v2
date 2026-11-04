@@ -1,5 +1,12 @@
 # AskWiz — automotive Auto Analytics Builder
 
+Replacement status: the unified Analytics Builder replaces AskWiz/AskChart surfaces
+when its rollout flags are enabled. Legacy UI/routes remain for rollback and
+saved-board imports. The original fixed-recipe behavior is retained only on that
+compatibility path. Migration 0013 adds independent workspace persistence; no old
+boards are deleted. Activation/live acceptance is pending database connectivity.
+See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for current scope and checks.
+
 Implemented 2026-11-04. Automotive only. Insurance keeps the existing Builder;
 Custom remains the initial mode and keeps its existing assistance, charts,
 saved analyses, exports and interactions. No agent integration or new dependency.
