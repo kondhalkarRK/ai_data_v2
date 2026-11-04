@@ -11,9 +11,11 @@ from fastapi import APIRouter
 from app.api.routes import (
     admin,
     analytics,
+    askwiz,
     auth,
     catalog,
     chat,
+    dashboard,
     data,
     executive,
     knowledge,
@@ -28,9 +30,11 @@ api_v1_router.include_router(semantic.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(kpi.router)
 api_v1_router.include_router(executive.router)
+api_v1_router.include_router(dashboard.router)
 api_v1_router.include_router(trust.router)
 api_v1_router.include_router(chat.router)
 api_v1_router.include_router(knowledge.router)
 api_v1_router.include_router(analytics.router)
+api_v1_router.include_router(askwiz.router)
 api_v1_router.include_router(catalog.router)
 api_v1_router.include_router(admin.router)

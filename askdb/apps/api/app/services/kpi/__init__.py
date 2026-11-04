@@ -152,6 +152,8 @@ class KpiService:
     ) -> KpiSummaryResponse:
         as_of = as_of or date.today()
         start, end, label = resolve_window(window, as_of)
+        prior_cards: list[KpiCard] = []
+        prior = None
         if self._industry is Industry.INSURANCE:
             cards = await ins_kpi.fetch_insurance_summary(
                 self._connection, start=start, end=end, lob=lob, region=region
@@ -222,7 +224,7 @@ class KpiService:
                     )
                     cards = _attach_deltas(cards, prior_cards)
 
-        return KpiSummaryResponse(
+        response = KpiSummaryResponse(
             industry=self._industry.value,
             window=window,
             window_label=label,
@@ -235,6 +237,12 @@ class KpiService:
             scenario_available=True,
             compare_enabled=compare,
         )
+        response._dashboard_source = {
+            "cards": cards, "prior_cards": prior_cards,
+            "prior_start": prior[0].isoformat() if prior and prior[0] else None,
+            "prior_end": prior[1].isoformat() if prior and prior[1] else None,
+        }
+        return response
 
     async def export_csv(
         self,

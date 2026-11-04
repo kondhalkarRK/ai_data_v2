@@ -5,6 +5,7 @@ autogenerate reads. New model modules must be imported here.
 """
 
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedAnalysis, SavedQuestion
+from app.models.askwiz import AutoDashboard
 from app.models.audit import AuthAuditEvent
 from app.models.base import Base
 from app.models.catalog import CatalogChange, CatalogColumn, CatalogRefresh, CatalogValue
@@ -31,6 +32,7 @@ __all__ = [
     "AppSetting",
     "AuthAuditEvent",
     "AuthEventType",
+    "AutoDashboard",
     "Base",
     "CatalogChange",
     "CatalogColumn",

@@ -33,6 +33,16 @@ the configured warehouse, LLM providers or hosted deployment were tested live.
 - Analytics Builder: `components/analytics-builder/`, `hooks/use-analytics.ts`
   -> `/analytics/*` -> backend catalog, compiler and runner. Structured specs
   are validated, compiled and executed; analyses can be saved and duplicated.
+  Automotive now has optional Auto / Custom modes (`builder-modes.tsx`). Custom
+  is unchanged/default; insurance retains its original Builder. Auto (`askwiz.tsx`)
+  generates sales boards from predefined KPI recipes and bounded LLM intent,
+  with AskChart edits and separate evidence-curated LLM narration. New
+  `/analytics/auto/*` routes use `services/analytics/askwiz.py` and owner-scoped
+  `auto_dashboards` specifications (migration `0012_auto_dashboards`, not applied
+  during development). Daily compilation is explicitly opt-in for automotive
+  Auto; existing compiler/runner defaults remain unchanged. No agents/dependencies.
+  See `docs/ASKWIZ_IMPLEMENTATION.md` for activation, flags, query budgets,
+  cache/deployment limits and verification evidence.
 - Data Trust: `components/reliability/` -> `/trust/reliability*`: scoring,
   dimensions, rules, monitors, alerts, freshness, drift and trends. Older trust
   endpoints/components coexist with the current reliability experience.
@@ -95,6 +105,58 @@ utilities. Executive filter refetches retain previous values within an industry;
 the application does not invent intermediate datasets or change calculations.
 
 ## Configuration, validation and risks
+
+### AI-Augmented Executive Intelligence (2026-11-04)
+
+Both active dashboard paths now wrap existing charts/KPIs with
+`components/executive/dashboard-intelligence.tsx`: three deterministic briefing
+observations at most, supported Explain actions, one contextual question/evidence
+drawer and segment application. Automotive supports revenue/units/orders by
+zone/make/model using the existing grouped scan. Insurance supports premium and
+claim-count drivers by region/LOB with one bounded on-demand SELECT; loss ratio
+uses captured numerator/denominator effects in percentage points. Existing chart
+engines, exports, metric formulas and animation utilities are retained.
+
+`app/schemas/dashboard.py`, `app/services/executive/dashboard.py` and
+`app/api/routes/dashboard.py` implement optional executive `augmentation` metadata,
+POST `/executive/explain` and POST `/executive/ask`. The server binds result
+handles to user/role/industry/region scope/semantic revision, rechecks access and
+does not accept client numeric facts or SQL. Current/prior dates come from the
+domain services. Residuals reconcile additive effects; ratio effects use a
+symmetric decomposition. On-demand insurance evidence exposes its timestamp and
+warns when totals changed. A Data Trust link opens its existing overview, not a
+new metric-specific quality endpoint.
+
+Known questions are deterministic. Unrecognized wording may use one bounded
+existing LLM classification into allowlisted metric/dimension/operation; no
+agents, tool calling, generated SQL or new dependencies. Ask uses existing
+quota/audit/usage/conversation tables, with dashboard-scoped memory. Explain works
+without AI quota. The old unreferenced `AskDashboardAi` was reviewed and remains
+unused because its general-chat payload lacks dashboard filters.
+
+`hooks/use-debounced-value.ts`, `hooks/use-retained-query-data.ts` and
+`lib/executive/dashboard.ts` coordinate selection changes and supported filter
+merging. Requests are abortable and key-isolated; prior results remain labelled
+during updates/failures. The drawer retains its captured scope until the user
+explicitly adopts a current selection. Core charts never await optional AI.
+
+Rollback: set `ASK_ME_AUGMENTED_DASHBOARD_ENABLED=false` server-side and
+`NEXT_PUBLIC_ASK_ME_AUGMENTED_DASHBOARD_ENABLED=false` for the frontend build.
+Both default true. No schema migration. Handles currently live in a bounded
+process-local store (256, 10-minute TTL); single-worker or sticky routing is
+required. Restart/expiry/eviction asks for refresh. Non-sticky multiworker rollout
+needs shared storage.
+
+Executive augmentation checkpoint: 118 selected backend tests, 24 frontend files / 130 tests,
+TypeScript, changed-frontend lint and targeted strict mypy passed. Isolated
+Chromium used synthetic API fixtures across both industries/three themes and
+tablet; it was not live end-to-end verification. Local 100-run assembly/handle
+benchmark p95 2.858 ms excludes database/network/LLM work. The current production
+build was then unverified (font DNS, then offline-mocked prerender EPERM; escalation
+declined). Subsequent AskWiz verification passed a full production webpack build
+outside the sandbox, along with 127 selected backend cases and 135 frontend tests.
+See `docs/AI_AUGMENTED_DASHBOARD_PLAN.md` section 13 for exact delivery scope,
+verification limitations and outstanding Phase 4 live/pilot gates.
 
 - `app/core/config.py`, `.env.example`, `apps/web/next.config.ts` define settings.
   Important switches: auth bypass (development only on API), New Chat UI, RAG,

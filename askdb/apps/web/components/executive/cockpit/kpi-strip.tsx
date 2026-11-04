@@ -7,9 +7,11 @@ import { monotonePath } from "@/components/executive/cockpit/chart-utils";
 import { formatCount, formatInr, formatPct, formatPts } from "@/components/executive/cockpit/format";
 import type { CockpitData, SelectHandler } from "@/components/executive/cockpit/types";
 import { AnimatedNumber } from "@/components/ui/animated-number";
+import { useDashboardActions } from "@/components/executive/dashboard-intelligence";
 import { cn } from "@/lib/utils";
 
 export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: SelectHandler }) {
+  const dashboard = useDashboardActions();
   const { kpis, period } = data;
   const history = data.trend.filter((p) => p.revenue != null).slice(-12);
   const compare = `vs ${period.priorLabel}`;
@@ -18,6 +20,8 @@ export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: Sele
       <KpiCard
         icon={<IndianRupee className="size-4" />}
         label="Total Revenue"
+        onExplain={dashboard ? () => dashboard.explain("revenue") : undefined}
+        explanationDisabled={dashboard?.updating}
         numeric={kpis.revenue.value}
         formatValue={formatInr}
         growth={kpis.revenue.growth}
@@ -29,6 +33,8 @@ export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: Sele
       <KpiCard
         icon={<Package className="size-4" />}
         label="Units Sold"
+        onExplain={dashboard ? () => dashboard.explain("units") : undefined}
+        explanationDisabled={dashboard?.updating}
         numeric={kpis.units.value}
         formatValue={formatCount}
         growth={kpis.units.growth}
@@ -39,6 +45,8 @@ export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: Sele
       <KpiCard
         icon={<ShoppingCart className="size-4" />}
         label="Total Orders"
+        onExplain={dashboard ? () => dashboard.explain("orders") : undefined}
+        explanationDisabled={dashboard?.updating}
         numeric={kpis.orders.value}
         formatValue={formatCount}
         growth={kpis.orders.growth}
@@ -129,6 +137,8 @@ function KpiCard({
   spark,
   accent,
   featured,
+  onExplain,
+  explanationDisabled,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -139,6 +149,8 @@ function KpiCard({
   spark?: number[];
   accent: string;
   featured?: boolean;
+  onExplain?: () => void;
+  explanationDisabled?: boolean;
 }) {
   return (
     <div
@@ -175,6 +187,7 @@ function KpiCard({
         </div>
         {spark ? <Sparkline values={spark} colour={accent} /> : null}
       </div>
+      {onExplain ? <button type="button" disabled={explanationDisabled} className="mt-3 text-xs font-medium text-primary hover:underline disabled:opacity-50" onClick={onExplain} aria-label={`Explain ${label}`}>Explain this change</button> : null}
     </div>
   );
 }

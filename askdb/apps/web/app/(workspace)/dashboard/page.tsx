@@ -8,6 +8,10 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useMemo, useState } from "react";
 
+import { DashboardIntelligence } from "@/components/executive/dashboard-intelligence";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useRetainedQueryData } from "@/hooks/use-retained-query-data";
+
 import { AiIntelligenceSection } from "@/components/executive/ai-intelligence";
 import { BusinessHealthPanel } from "@/components/executive/business-health";
 import { ExecutiveCockpit } from "@/components/executive/cockpit/executive-cockpit";
@@ -53,14 +57,14 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
   const [lob, setLob] = useState("");
   const [region, setRegion] = useState("");
   const [make, setMake] = useState("");
-  const [forceRefresh, setForceRefresh] = useState(false);
+  const forceRefresh = React.useRef(false);
 
   const filters = useQuery({
     queryKey: ["kpi-filters", industry],
     queryFn: () => apiClient.get<KpiFilters>("/api/v1/kpis/filters", { industry }),
   });
 
-  const qs = useMemo(() => {
+  const rawQs = useMemo(() => {
     const params = new URLSearchParams({ window: windowId });
     if (lob) params.set("lob", lob);
     if (region) params.set("region", region);
@@ -68,18 +72,19 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
     return params.toString();
   }, [windowId, lob, region, make]);
 
-  const bundle = useQuery({
+  const qs = useDebouncedValue(rawQs);
+  const bundle = useQuery<ExecutiveIntelligence & { viewFilters: Record<string, string> }>({
     queryKey: ["executive-intelligence", industry, qs],
     // Keep the current industry's values visible while a new filter window loads.
     placeholderData: (previous, query) => query?.queryKey[1] === industry ? previous : undefined,
-    queryFn: async () => {
-      const refresh = forceRefresh ? "&refresh=true" : "";
+    queryFn: async ({ signal }) => {
+      const refresh = forceRefresh.current ? "&refresh=true" : "";
+      forceRefresh.current = false;
       const data = await apiClient.get<ExecutiveIntelligence>(
         `/api/v1/executive/intelligence?${qs}${refresh}`,
-        { industry },
+        { industry, signal },
       );
-      setForceRefresh(false);
-      return data;
+      return { ...data, viewFilters: Object.fromEntries(new URLSearchParams(qs)) };
     },
   });
 
@@ -87,7 +92,10 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
     router.push(`/semantic?tab=graph&focus=${encodeURIComponent(kpiId)}`);
   }
 
-  const data = bundle.data;
+  const data = useRetainedQueryData(bundle.data, industry);
+  const updating = bundle.isFetching || qs !== rawQs;
+  const displayedRegion = data?.viewFilters.region ?? "";
+  const displayedMake = data?.viewFilters.make ?? "";
   const highlightCards = useMemo(() => {
     if (!data) return [];
     const cards = [...data.cards];
@@ -144,7 +152,7 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
             variant="secondary"
             className="gap-1.5"
             onClick={() => {
-              setForceRefresh(true);
+              forceRefresh.current = true;
               void bundle.refetch();
             }}
           >
@@ -154,9 +162,9 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
         }
       />
 
-      {bundle.isPending ? (
+      {bundle.isPending && !data ? (
         <LoadingState title="Building Executive Intelligence" />
-      ) : bundle.isError ? (
+      ) : bundle.isError && !data ? (
         <Card>
           <CardContent className="space-y-2 pt-5 text-sm text-danger">
             <p>Could not load Executive Intelligence.</p>
@@ -167,7 +175,11 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
           </CardContent>
         </Card>
       ) : data ? (
+        <DashboardIntelligence augmentation={data.augmentation} updating={updating} updateFailed={bundle.isError} pendingLabel={Array.from(new URLSearchParams(rawQs)).map(([k, v]) => `${k}: ${v}`).join(" · ")}
+          onApplyFilters={(patch) => { if (patch.region) setRegion(patch.region); if (patch.lob) setLob(patch.lob); }}
+          onRefresh={() => { forceRefresh.current = true; void bundle.refetch(); }}>
         <div className={cn("space-y-8", presenterMode && "text-base")}>
+          {bundle.isError ? <p role="alert" className="rounded-lg border border-warning/30 p-3 text-xs">Refresh failed. Retaining the previously loaded view. <button type="button" onClick={() => void bundle.refetch()} className="text-primary underline">Retry</button></p> : null}
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p>
               {data.windowLabel}
@@ -175,8 +187,8 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
               {data.endDate ? ` → ${data.endDate}` : ""}
               {" · "}
               {data.compareLabel}
-              {region ? ` · Focus: ${region}` : ""}
-              {make ? ` · ${make}` : ""}
+              {displayedRegion ? ` · Focus: ${displayedRegion}` : ""}
+              {displayedMake ? ` · ${displayedMake}` : ""}
             </p>
             <p>
               Data as of {formatStamp(data.dataAsOf)}
@@ -205,8 +217,8 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
                   data={data}
                   industry={industry}
                   presenterMode={presenterMode}
-                  regionFilter={region}
-                  makeFilter={make}
+                  regionFilter={displayedRegion}
+                  makeFilter={displayedMake}
                   onRegionChange={setRegion}
                   onMakeChange={setMake}
                 />
@@ -322,6 +334,7 @@ function ClassicDashboard({ industry }: { industry: Industry }) {
             </aside>
           </div>
         </div>
+        </DashboardIntelligence>
       ) : null}
     </PageShell>
   );

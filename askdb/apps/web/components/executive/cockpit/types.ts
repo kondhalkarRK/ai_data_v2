@@ -1,3 +1,5 @@
+import type { DashboardAugmentation } from "@nql/shared-types";
+
 export interface CockpitFilters {
   year?: string;
   quarter?: string;
@@ -95,6 +97,7 @@ export interface CockpitInsight {
 }
 
 export interface CockpitData {
+  augmentation?: DashboardAugmentation | null;
   period: {
     label: string;
     start: string;

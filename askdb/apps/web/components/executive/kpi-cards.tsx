@@ -16,6 +16,7 @@ import * as React from "react";
 import { formatCount, formatInr, formatPct } from "@/components/executive/cockpit/format";
 import type { ExecKpiCard } from "@/components/executive/types";
 import { AnimatedNumber } from "@/components/ui/animated-number";
+import { useDashboardActions } from "@/components/executive/dashboard-intelligence";
 import { EmptyState } from "@/components/ui/status-pill";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,7 @@ export function KpiCardsGrid({
   onExplore?: (kpiId: string) => void;
   presenterMode?: boolean;
 }) {
+  const dashboard = useDashboardActions();
   if (!cards.length) {
     return (
       <EmptyState
@@ -71,13 +73,18 @@ export function KpiCardsGrid({
       {cards.map((card, index) => {
         const Icon = KPI_ICONS[index % KPI_ICONS.length]!;
         const featured = index === 0;
-        const up = card.delta != null && card.delta >= 0;
+        const ratio = dashboard?.metrics.find((metric) => metric.id === card.id && metric.format === "percent");
+        const points = ratio?.current != null && ratio.prior != null;
+        const delta = points ? ratio.current! - ratio.prior! : card.delta;
+        const up = delta != null && delta >= 0;
+        const favorable = card.id === "loss_ratio" ? !up : up;
         return (
+          <div key={card.id} className="relative">
           <button
-            key={card.id}
             type="button"
             className={cn(
-              "group p-4 text-left transition-colors",
+              "group h-full w-full p-4 text-left transition-colors",
+              dashboard && ["written_premium", "earned_premium", "claim_count", "loss_ratio"].includes(card.id) && "pb-12",
               featured
                 ? "card-primary hover:border-primary/35"
                 : "card-secondary hover:border-border hover:bg-muted/20",
@@ -114,11 +121,11 @@ export function KpiCardsGrid({
                 {card.formatted}
               </p>
             )}
-            {card.delta != null ? (
+            {delta != null ? (
               <p
                 className={cn(
                   "mt-1.5 inline-flex items-center gap-1 text-xs tabular-nums",
-                  up ? "text-success" : "text-danger",
+                  delta === 0 ? "text-muted-foreground" : favorable ? "text-success" : "text-danger",
                 )}
               >
                 {up ? (
@@ -127,11 +134,13 @@ export function KpiCardsGrid({
                   <TrendingDown className="size-3.5" aria-hidden="true" />
                 )}
                 <span>
-                  {(Math.abs(card.delta) * 100).toFixed(1)}% {compareLabel}
+                  {(Math.abs(delta) * 100).toFixed(1)}{points ? " pp" : "%"} {compareLabel}
                 </span>
               </p>
             ) : null}
           </button>
+          {dashboard && ["written_premium", "earned_premium", "claim_count", "loss_ratio"].includes(card.id) ? <button type="button" disabled={dashboard.updating} onClick={() => dashboard.explain(card.id)} className="absolute bottom-4 left-4 text-xs font-medium text-primary hover:underline disabled:opacity-50" aria-label={`Explain ${card.label}`}>Explain this change</button> : null}
+          </div>
         );
       })}
     </div>

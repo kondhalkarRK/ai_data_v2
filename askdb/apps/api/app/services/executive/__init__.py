@@ -25,7 +25,7 @@ from app.services.kpi import KpiService
 from app.services.kpi.windows import prior_comparable_window
 
 # Simple process cache: (industry, window, filters) -> (expires_at, payload dict)
-_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_CACHE: dict[str, tuple[float, ExecutiveIntelligenceResponse]] = {}
 _CACHE_TTL_SECONDS = 300
 
 
@@ -57,7 +57,7 @@ class ExecutiveIntelligenceService:
         if not force_refresh and cache_key in _CACHE:
             expires, payload = _CACHE[cache_key]
             if expires > now:
-                return ExecutiveIntelligenceResponse.model_validate(payload)
+                return payload.model_copy(deep=True)
 
         cfg = get_domain_config(self._industry)
         summary = await self._kpi.summary(
@@ -143,7 +143,8 @@ class ExecutiveIntelligenceService:
             what_if_presets=presets,
             chart_metrics=chart_metrics,
         )
-        _CACHE[cache_key] = (now + _CACHE_TTL_SECONDS, response.model_dump(by_alias=True))
+        response._dashboard_source = summary._dashboard_source
+        _CACHE[cache_key] = (now + _CACHE_TTL_SECONDS, response.model_copy(deep=True))
         return response
 
     def _compare_label(self, window: WindowId) -> str:

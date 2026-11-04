@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import time
 import uuid
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
@@ -13,9 +14,10 @@ from app.api.deps import (
     RegionScopeDep,
     RequireUser,
     get_app_session,
+    get_app_settings,
     get_scoped_analytics,
 )
-from app.core.config import Industry
+from app.core.config import Industry, Settings
 from app.models.activity import InsightFeedback
 from app.schemas.executive import (
     ExecutiveIntelligenceResponse,
@@ -31,6 +33,7 @@ from app.services.executive.cockpit import (
     clear_cockpit_cache,
     fetch_cockpit_options,
 )
+from app.services.executive.dashboard import QueryMeter, register_dashboard, semantic_revision
 from app.services.executive.region_map import (
     DealerMapRow,
     ModelMapRow,
@@ -52,25 +55,49 @@ async def executive_intelligence(
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     scope: RegionScopeDep,
+    settings: Annotated[Settings, Depends(get_app_settings)],
     window: WindowId = Query(default="ytd"),
     lob: str | None = Query(default=None),
     region: str | None = Query(default=None),
     make: str | None = Query(default=None),
     refresh: bool = Query(default=False),
 ) -> ExecutiveIntelligenceResponse:
-    del user
+    started = time.perf_counter()
     assert_requested_region(scope, region)
     if refresh:
         clear_executive_cache()
-    service = ExecutiveIntelligenceService(connection=connection, industry=industry)
-    return await service.get_bundle(
+    meter = QueryMeter(connection)
+    revision = (
+        semantic_revision(settings, industry) if settings.ask_me_augmented_dashboard_enabled else ""
+    )
+    service = ExecutiveIntelligenceService(
+        connection=cast(AsyncConnection, meter), industry=industry
+    )
+    result = await service.get_bundle(
         window=window,
         lob=lob,
         region=region,
         make=make,
         force_refresh=refresh,
-        scope_key=scope.cache_key(),
+        scope_key=f"{scope.cache_key()}|{revision}",
     )
+    if settings.ask_me_augmented_dashboard_enabled:
+        result.augmentation = register_dashboard(
+            result,
+            settings=settings,
+            industry=industry,
+            user=user,
+            scope=scope,
+            meter=meter,
+            started=started,
+            revision=revision,
+            filters={
+                k: v
+                for k, v in {"window": window, "lob": lob, "region": region, "make": make}.items()
+                if v
+            },
+        )
+    return result
 
 
 @router.get("/cockpit", response_model=CockpitResponse)
@@ -79,6 +106,7 @@ async def executive_cockpit(
     industry: ActiveIndustry,
     connection: AnalyticsConnection,
     scope: RegionScopeDep,
+    settings: Annotated[Settings, Depends(get_app_settings)],
     year: int | None = Query(default=None, ge=2000, le=2100),
     quarter: int | None = Query(default=None, ge=1, le=4),
     month: int | None = Query(default=None, ge=1, le=12),
@@ -93,7 +121,7 @@ async def executive_cockpit(
     sales_person_id: int | None = Query(default=None),
     refresh: bool = Query(default=False),
 ) -> CockpitResponse:
-    del user
+    started = time.perf_counter()
     if industry != Industry.AUTOMOTIVE:
         raise HTTPException(status_code=404, detail="The KPI cockpit is available for automotive.")
     assert_requested_region(scope, zone)
@@ -106,9 +134,28 @@ async def executive_cockpit(
     )  # fmt: skip
     if refresh:
         clear_cockpit_cache()
-    return await ExecutiveCockpitService(connection).get_cockpit(
-        filters, force_refresh=refresh, scope_key=scope.cache_key()
+    meter = QueryMeter(connection)
+    revision = (
+        semantic_revision(settings, industry) if settings.ask_me_augmented_dashboard_enabled else ""
     )
+    result = (
+        await ExecutiveCockpitService(cast(AsyncConnection, meter)).get_cockpit(
+            filters, force_refresh=refresh, scope_key=f"{scope.cache_key()}|{revision}"
+        )
+    ).model_copy(deep=True)
+    if settings.ask_me_augmented_dashboard_enabled:
+        result.augmentation = register_dashboard(
+            result,
+            settings=settings,
+            industry=industry,
+            user=user,
+            scope=scope,
+            meter=meter,
+            started=started,
+            revision=revision,
+            filters={k: str(v) for k, v in filters.__dict__.items() if v is not None},
+        )
+    return result
 
 
 @router.get("/cockpit/options", response_model=CockpitOptions)

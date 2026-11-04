@@ -11,17 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from app.schemas.kpi import KpiCard, KpiSeriesPoint, NamedValue
 from app.services.kpi.windows import format_currency, format_number, format_percent
 
-
-async def fetch_insurance_summary(
-    connection: AsyncConnection,
-    *,
-    start: date | None,
-    end: date | None,
-    lob: str | None,
-    region: str | None,
-) -> list[KpiCard]:
-    sql = text(
-        """
+INSURANCE_SUMMARY_SQL = """
         SELECT
             CAST(:end_date AS date) AS data_through,
             p.written_premium,
@@ -73,7 +63,17 @@ async def fetch_insurance_summary(
                    OR r.region_name = CAST(:region AS text))
         ) p
         """
-    )
+
+
+async def fetch_insurance_summary(
+    connection: AsyncConnection,
+    *,
+    start: date | None,
+    end: date | None,
+    lob: str | None,
+    region: str | None,
+) -> list[KpiCard]:
+    sql = text(INSURANCE_SUMMARY_SQL)
     params = {
         "start_date": start,
         "end_date": end,

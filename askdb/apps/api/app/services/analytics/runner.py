@@ -167,7 +167,14 @@ class AnalyticsService:
 
     # -- run --
 
-    async def run(self, spec: AnalyticsSpec) -> AnalyticsRunResponse:
+    async def run(
+        self,
+        spec: AnalyticsSpec,
+        *,
+        daily: bool = False,
+        include_drivers: bool = True,
+        prepare: bool = True,
+    ) -> AnalyticsRunResponse:
         scope = await load_region_scope(self._app, self._user)
         for filt in spec.filters:
             domain = (filt.domain or "").casefold()
@@ -186,7 +193,7 @@ class AnalyticsService:
                 },
             )
         try:
-            query = compile_builder_query(spec, catalog)
+            query = compile_builder_query(spec, catalog, daily=daily)
         except (BuilderCompileError, SemanticCompileError, ValueError) as exc:
             logger.warning("Analytics Builder could not compile a validated spec: %s", exc)
             raise AnalyticsRunError(
@@ -196,7 +203,8 @@ class AnalyticsService:
                 },
             ) from exc
 
-        await self._prepare()
+        if prepare:
+            await self._prepare()
         try:
             result = await self._analytics.execute(text(query.sql))
             mappings = result.mappings().fetchmany(MAX_ROWS + 1)
@@ -211,8 +219,8 @@ class AnalyticsService:
         ]
 
         as_of = await self._data_as_of(query.fact_table, query.date_column)
-        partial = _partial_period(query, as_of, rows)
-        driver = await self._driver(spec, catalog, query) if rows else None
+        partial = None if daily else _partial_period(query, as_of, rows)
+        driver = await self._driver(spec, catalog, query) if rows and include_drivers else None
 
         metric_def = catalog.resolve(spec).metric
         metric_label = catalog.metric_label(metric_def) if metric_def else query.metric_column
@@ -241,6 +249,11 @@ class AnalyticsService:
         chart, viz = build_chart(query, columns, rows, spec.viz)
         warnings = [issue.message for issue in report.issues if issue.severity == "warning"]
         notes = list(query.notes)
+        if daily and as_of and spec.date_to and as_of.isoformat() < spec.date_to:
+            notes.append(
+                f"Requested dates extend beyond warehouse coverage ({as_of.isoformat()}). "
+                "Missing days are not zero sales."
+            )
         if truncated:
             notes.append(f"Showing the first {MAX_ROWS} rows; add a filter to narrow the result.")
         if not rows:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 from app.schemas.common import ApiModel
 
@@ -42,6 +42,7 @@ class KpiFilterOptions(ApiModel):
 
 
 class KpiSummaryResponse(ApiModel):
+    _dashboard_source: dict[str, Any] = PrivateAttr(default_factory=dict)
     industry: str
     window: WindowId
     window_label: str

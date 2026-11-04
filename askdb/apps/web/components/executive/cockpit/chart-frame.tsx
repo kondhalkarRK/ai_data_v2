@@ -6,6 +6,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 
 import { exportCsv, exportSvgPng } from "@/components/executive/cockpit/chart-utils";
+import { useDashboardActions } from "@/components/executive/dashboard-intelligence";
 import { useChartThemeKey } from "@/hooks/use-chart-theme-key";
 import { interactive, overlay, surface, type as typeScale } from "@/lib/surface";
 import { cn } from "@/lib/utils";
@@ -20,8 +21,10 @@ export function ChartFrame({
   className,
   bodyClassName,
   children,
+  explainMetric,
 }: {
   title: string;
+  explainMetric?: string;
   subtitle?: React.ReactNode;
   controls?: React.ReactNode;
   csv?: () => Array<Record<string, unknown>>;
@@ -33,6 +36,7 @@ export function ChartFrame({
   children: (expanded: boolean) => React.ReactNode;
 }) {
   const [expanded, setExpanded] = React.useState(false);
+  const dashboard = useDashboardActions();
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const themeKey = useChartThemeKey();
 
@@ -66,6 +70,7 @@ export function ChartFrame({
           {subtitle ? <p className={cn("mt-1 truncate", typeScale.subtitle)}>{subtitle}</p> : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {dashboard && explainMetric ? <button type="button" disabled={dashboard.updating} className="mr-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-50" onClick={() => dashboard.explain(explainMetric)} aria-label={`Explain ${title}`}>Explain</button> : null}
           {controls}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>

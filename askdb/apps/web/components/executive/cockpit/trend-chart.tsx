@@ -44,6 +44,7 @@ export function TrendChart({ data, className }: { data: CockpitData; className?:
   return (
     <ChartFrame
       title="Revenue trend"
+      explainMetric="revenue"
       subtitle={
         hasPartialMonth
           ? "Completed months = full-month revenue · current month = month-to-date (MTD)"

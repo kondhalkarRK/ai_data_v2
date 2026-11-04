@@ -132,6 +132,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   try {
     response = await send();
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
     const hint =
       "Cannot reach the API (Failed to fetch). Start the API on :8000 " +
       "(scripts/dev.ps1), confirm Data Sources loads, and use http://localhost:3000 " +

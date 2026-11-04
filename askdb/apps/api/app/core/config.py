@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     # TEMPORARY local testing only. When true, API routes skip JWT/CSRF and act as the
     # first active admin. Refused in production. Pair with NEXT_PUBLIC_AUTH_BYPASS on web.
     auth_bypass: bool = False
+    ask_me_augmented_dashboard_enabled: bool = True
+    ask_me_askwiz_enabled: bool = True
+    askwiz_timezone: str = "Asia/Kolkata"
+    askwiz_run_timeout_seconds: int = Field(default=20, ge=5, le=60)
 
     # --- databases ---------------------------------------------------------
     app_database_url: str = "postgresql+psycopg://askdb_app:askdb_app@localhost:5432/askdb_app"

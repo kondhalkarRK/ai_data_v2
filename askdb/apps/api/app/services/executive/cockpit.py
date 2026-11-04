@@ -229,6 +229,9 @@ def resolve_period(data_max: date, filters: CockpitFilters) -> Period:
 class ExecutiveCockpitService:
     def __init__(self, connection: AsyncConnection) -> None:
         self._connection = connection
+        self._dashboard_sql = ""
+        self._dashboard_params: dict[str, Any] = {}
+        self._scope_key = "all"
 
     # ------------------------------------------------------------------ queries
 
@@ -245,7 +248,8 @@ class ExecutiveCockpitService:
         return value
 
     async def _dimensions(self) -> Dimensions:
-        cached = _DIM_CACHE.get("dims")
+        cache_key = f"dims|{self._scope_key}"
+        cached = _DIM_CACHE.get(cache_key)
         if cached and cached[0] > time.time():
             return cached[1]
         carlines = await self._rows(
@@ -260,7 +264,9 @@ class ExecutiveCockpitService:
             carlines={row.pop("carline_id"): row for row in carlines},
             regions={row.pop("region_id"): row for row in regions},
         )
-        _DIM_CACHE["dims"] = (time.time() + _CACHE_TTL_SECONDS, dims)
+        if len(_DIM_CACHE) >= _CACHE_MAX:
+            _DIM_CACHE.pop(next(iter(_DIM_CACHE)))
+        _DIM_CACHE[cache_key] = (time.time() + _CACHE_TTL_SECONDS, dims)
         return dims
 
     def _where(
@@ -312,6 +318,7 @@ class ExecutiveCockpitService:
             "ps": period.prior_start,
             "pe": period.prior_end,
         }
+        self._dashboard_sql, self._dashboard_params = sql, params
         grouped = Grouped()
         for row in await self._rows(sql, params):
             carline = dims.carlines.get(row["carline_id"])
@@ -445,6 +452,7 @@ class ExecutiveCockpitService:
         scope_key: str = "all",
     ) -> CockpitResponse:
         key = f"{scope_key}|{filters.cache_key()}"
+        self._scope_key = scope_key
         now = time.time()
         cached = _CACHE.get(key)
         if cached and cached[0] > now and not force_refresh:
@@ -542,6 +550,11 @@ class ExecutiveCockpitService:
             computed_at=datetime.now(UTC).isoformat(),
         )
         response.insights = self._insights(response, grouped, filters, actuals)
+        from app.services.executive.dashboard import automotive_source
+
+        response._dashboard_source = automotive_source(
+            response, grouped, self._dashboard_sql, self._dashboard_params
+        )
         return response
 
     # ------------------------------------------------------------------ sections

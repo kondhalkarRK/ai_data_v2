@@ -112,11 +112,28 @@ def date_window(
     return DateWindow(*found)
 
 
-def compile_builder_query(spec: AnalyticsSpec, catalog: Catalog) -> BuilderQuery:
+def compile_builder_query(
+    spec: AnalyticsSpec, catalog: Catalog, *, daily: bool = False
+) -> BuilderQuery:
     selection = catalog.resolve(spec)
     if selection.metric is None or not selection.metric.supported:
         raise BuilderCompileError("No supported metric selected")
-    return _Compiler(spec, selection, catalog).compile()
+    compiler = _Compiler(spec, selection, catalog)
+    if daily:
+        # Auto-only grain extension. Custom/insurance capabilities remain unchanged.
+        from dataclasses import replace
+
+        if catalog.industry != Industry.AUTOMOTIVE or spec.analysis not in {"basic", "trend"}:
+            raise BuilderCompileError("Daily charts require automotive basic/trend analysis")
+        compiler.dims = [
+            replace(d, alias="sales_day", expression="{alias}.sales_date::date", time_grain="day")
+            if d.time_grain == "month"
+            else d
+            for d in compiler.dims
+        ]
+        compiler.time_dim = next((d for d in compiler.dims if d.time_grain), None)
+        compiler.cat_dims = [d for d in compiler.dims if not d.time_grain]
+    return compiler.compile()
 
 
 class _Compiler:

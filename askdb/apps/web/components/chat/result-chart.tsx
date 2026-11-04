@@ -40,6 +40,7 @@ export function ResultChart({
   className,
   initialType = "bar",
   hideTypeSelect = false,
+  hideControls = false,
 }: {
   xKey: string;
   yKey: string;
@@ -50,6 +51,8 @@ export function ResultChart({
   className?: string;
   initialType?: ChartKind;
   hideTypeSelect?: boolean;
+  /** Auto boards edit validated specifications through AskChart instead. */
+  hideControls?: boolean;
 }) {
   const keys = React.useMemo(() => {
     if (columns?.length) return columns;
@@ -112,7 +115,7 @@ export function ResultChart({
         </p>
         <p className="text-[10px] text-muted-foreground">Hover a point for exact values</p>
       </div>
-      <div className="flex flex-wrap items-end gap-2">
+      {hideControls ? null : <div className="flex flex-wrap items-end gap-2">
         <FieldSelect
           id="chart-x"
           label="X Axis"
@@ -144,7 +147,7 @@ export function ResultChart({
             onChange={(value) => setChartType(value as ChartKind)}
           />
         )}
-      </div>
+      </div>}
 
       <React.Fragment key={themeKey}>
         {multi ? (

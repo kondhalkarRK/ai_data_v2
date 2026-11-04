@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 from app.schemas.common import ApiModel
+from app.schemas.dashboard import DashboardAugmentation
 
 
 class CockpitPeriod(ApiModel):
@@ -135,6 +136,8 @@ class CockpitInsight(ApiModel):
 
 
 class CockpitResponse(ApiModel):
+    _dashboard_source: dict[str, Any] = PrivateAttr(default_factory=dict)
+    augmentation: DashboardAugmentation | None = None
     period: CockpitPeriod
     applied_filters: dict[str, str] = Field(default_factory=dict)
     empty: bool = False

@@ -1,4 +1,4 @@
-import type { Industry } from "@nql/shared-types";
+import type { DashboardAugmentation, Industry } from "@nql/shared-types";
 
 export interface ExecKpiCard {
   id: string;
@@ -63,6 +63,7 @@ export interface SuggestedQuestion {
 }
 
 export interface ExecutiveIntelligence {
+  augmentation?: DashboardAugmentation | null;
   industry: Industry | string;
   title: string;
   tagline: string;

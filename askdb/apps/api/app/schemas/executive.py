@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 from app.schemas.common import ApiModel
+from app.schemas.dashboard import DashboardAugmentation
 from app.schemas.kpi import KpiCard, KpiSeriesPoint, NamedValue, WindowId
 
 
@@ -63,6 +64,8 @@ class SuggestedQuestion(ApiModel):
 
 
 class ExecutiveIntelligenceResponse(ApiModel):
+    _dashboard_source: dict[str, Any] = PrivateAttr(default_factory=dict)
+    augmentation: DashboardAugmentation | None = None
     industry: str
     title: str
     tagline: str

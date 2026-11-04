@@ -564,3 +564,95 @@ export interface SavedAnalysis {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Server-issued, user/scope-bound facts for the augmented executive dashboard. */
+export interface DashboardContext {
+  resultId: string;
+  industry: Industry;
+  semanticRevision: string;
+  periodLabel: string;
+  compareLabel: string;
+  start: string | null;
+  end: string | null;
+  priorStart: string | null;
+  priorEnd: string | null;
+  filters: Record<string, string>;
+  dataAsOf: string;
+  computedAt: string;
+}
+
+export interface DashboardMetric {
+  id: string;
+  label: string;
+  format: "currency" | "integer" | "percent";
+  current: number | null;
+  prior: number | null;
+  definition: string;
+  dimensions: string[];
+  supported: boolean;
+  unavailableReason: string | null;
+}
+
+export interface DashboardAugmentation {
+  snapshotToken: string;
+  context: DashboardContext;
+  metrics: DashboardMetric[];
+  highlights: Array<{ metricId: string; title: string; body: string; tone: "positive" | "negative" | "neutral" }>;
+  caveats: string[];
+  performance: { elapsedMs: number; queryCount: number; warehouseMs: number; cacheHit: boolean };
+}
+
+export interface DashboardContributor {
+  label: string;
+  current: number;
+  prior: number;
+  change: number;
+  filters: Record<string, string>;
+  residual: boolean;
+}
+
+export interface DashboardExplanation {
+  context: DashboardContext;
+  metric: DashboardMetric;
+  dimension: string;
+  narrative: string;
+  contributors: DashboardContributor[];
+  caveats: string[];
+  sourceTables: string[];
+  sql: string | null;
+  sqlParameters: Record<string, unknown>;
+  priorSqlParameters: Record<string, unknown>;
+  reconciled: boolean;
+  evidenceChanged: boolean;
+  evidenceComputedAt?: string | null;
+  queryCount: number;
+  elapsedMs: number;
+  conversationId: string | null;
+  suggestedQuestions: string[];
+}
+// Automotive AskWiz Auto boards; Custom analyses retain their existing contracts.
+export interface AskWizChart {
+  id: string; title: string;
+  metric: "revenue" | "units_sold" | "orders" | "average_selling_price" | "active_salespeople";
+  dimension: "day" | "month" | "make" | "model" | "region" | "state" | "city" | "dealer" | "car_type" | "engine_type";
+  viz: "bar" | "line" | "area" | "pie" | "table";
+}
+export interface AskWizDefinition {
+  version: 1; recipe: string; start: string; end: string; priorStart: string; priorEnd: string;
+  timezone: string; filters: Record<string, string[]>; charts: AskWizChart[];
+}
+export interface AskWizBoard {
+  id: string; title: string; revision: number; saved: boolean; definition: AskWizDefinition;
+  canUndo: boolean; message: string; llmCalls: number; tokens: number;
+}
+export interface AskWizChartResult {
+  chartId: string; result: AnalyticsRunResponse | null; error: string | null; cacheHit: boolean;
+}
+export interface AskWizResults {
+  boardId: string; revision: number; charts: AskWizChartResult[]; kpis: AskWizChartResult[];
+  elapsedMs: number; queryCount: number; cacheHits: number; computedAt: string;
+}
+export interface AskWizNarration {
+  revision: number; paragraphs: string[]; aiUsed: boolean; llmCalls: number; tokens: number;
+  limitation: string | null;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { AnalyticsBuilderShell } from "@/components/analytics-builder/analytics-builder-shell";
+import { BuilderModes } from "@/components/analytics-builder/builder-modes";
 import { LoadingState } from "@/components/loading/loading-state";
 import { PageHeader } from "@/components/shell/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,7 +24,7 @@ export default function AnalyticsBuilderPage() {
           </CardContent>
         </Card>
       ) : (
-        <AnalyticsBuilderShell pack={pack.data} />
+        <BuilderModes pack={pack.data} />
       )}
     </>
   );

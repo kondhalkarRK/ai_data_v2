@@ -5,6 +5,11 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Download, Loader2, RefreshCw, SlidersHorizontal } from "lucide-react";
 import * as React from "react";
 
+import { DashboardIntelligence } from "@/components/executive/dashboard-intelligence";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useRetainedQueryData } from "@/hooks/use-retained-query-data";
+import { mergeDashboardFilters } from "@/lib/executive/dashboard";
+
 import { BubbleMatrix } from "@/components/executive/cockpit/bubble-matrix";
 import { exportCsv } from "@/components/executive/cockpit/chart-utils";
 import { activeFilterCount, FilterPane } from "@/components/executive/cockpit/filter-pane";
@@ -63,18 +68,19 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
   const [filters, setFilters] = React.useState<CockpitFilters>({});
   const [paneOpen, setPaneOpen] = React.useState(false);
   const refreshNext = React.useRef(false);
-  const qs = toQuery(filters);
+  const rawQs = toQuery(filters);
+  const qs = useDebouncedValue(rawQs);
 
   const cockpit = useQuery({
     queryKey: ["executive-cockpit", industry, qs],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const refresh = refreshNext.current;
       refreshNext.current = false;
       const params = new URLSearchParams(qs);
       if (refresh) params.set("refresh", "true");
-      return apiClient.get<CockpitData>(`/api/v1/executive/cockpit?${params.toString()}`, { industry });
+      return apiClient.get<CockpitData>(`/api/v1/executive/cockpit?${params.toString()}`, { industry, signal });
     },
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === industry ? previous : undefined,
     staleTime: 60_000,
   });
 
@@ -106,7 +112,8 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
     [options.data],
   );
 
-  const data = cockpit.data;
+  const data = useRetainedQueryData(cockpit.data, industry);
+  const updating = cockpit.isFetching || rawQs !== qs;
   const count = activeFilterCount(filters);
   const chips = (Object.entries(filters) as Array<[FilterKey, string | undefined]>).filter(
     (entry): entry is [FilterKey, string] => Boolean(entry[1]),
@@ -180,7 +187,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
         onClear={() => setFilters({})}
       />
 
-      {cockpit.isPending ? (
+      {cockpit.isPending && !data ? (
         <CockpitSkeleton />
       ) : cockpit.isError && !data ? (
         <div className="rounded-2xl border border-border bg-surface-raised p-6 text-sm">
@@ -210,9 +217,15 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
         <div className={cn("space-y-10 transition-opacity", cockpit.isFetching && "opacity-80")}>
           {cockpit.isError ? (
             <ModuleStatusBanner tone="warn">
-              Refresh failed. Showing the figures last loaded for this selection.
+              Update failed. Retaining the last successful view identified in the briefing.
             </ModuleStatusBanner>
           ) : null}
+          <DashboardIntelligence
+            augmentation={data.augmentation} updating={updating} updateFailed={cockpit.isError}
+            pendingLabel={Object.entries(filters).map(([k, v]) => `${k}: ${v}`).join(" · ") || "all permitted data"}
+            onApplyFilters={(patch) => setFilters((current) => mergeDashboardFilters({ ...current }, patch))}
+            onRefresh={() => { refreshNext.current = true; void cockpit.refetch(); }}
+          >
           <KpiStrip data={data} onSelect={select} />
 
           <ModuleSection
@@ -239,6 +252,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
           <ModuleSection title="Regional performance" description="State and city contribution with drill-down filters.">
             <GeoIntelligence data={data} onSelect={select} />
           </ModuleSection>
+          </DashboardIntelligence>
         </div>
       ) : null}
 
