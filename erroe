@@ -1,3 +1,5 @@
+.\.venv\Scripts\python.exe -m alembic -x target=app upgrade 0012_auto_dashboards
+
 These steps use PowerShell, matching Cursor's paths. The error was `password authentication failed for user "askdb_app"`, so the first job is making the database URL and the Postgres user agree.
 
 ## 1. Find the database URL the app uses
