@@ -1,3 +1,12 @@
+# Embedding configuration update — 2026-11-06
+
+Local Hugging Face/SentenceTransformer loading has been removed. Historical
+instructions below mentioning `sentence-transformers` installation or MiniLM
+configuration are superseded. Use `RAG_EMBEDDING_PROVIDER=openai_compatible` with
+an explicitly configured embeddings API/model, or `ASK_ME_RAG_ENABLED=false` when
+document RAG is unnecessary. See `traditional-rag.md`. AskBI requires no local
+embedding model. Do not disable TLS verification to work around model downloads.
+
 Qeusion  : can guide me detailed setup for RAG, will excute below stuff but i need to run and install,
 # apps/api
 alembic upgrade head

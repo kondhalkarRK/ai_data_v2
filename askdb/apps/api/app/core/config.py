@@ -169,7 +169,7 @@ class Settings(BaseSettings):
 
     # --- embeddings / llm --------------------------------------------------
     embeddings_provider: Literal["hash", "sentence-transformers", "openai"] = "hash"
-    embeddings_model: str = "all-MiniLM-L6-v2"
+    embeddings_model: str = ""
 
     llm_api_key: SecretStr = SecretStr("")
     llm_base_url: str = "https://openai.generative.engine.capgemini.com/v1"
@@ -205,10 +205,12 @@ class Settings(BaseSettings):
     rag_chunk_overlap_chars: int = Field(default=180, ge=0)
     rag_top_k: int = Field(default=6, ge=1, le=50)
     # Real embedding providers for the Traditional RAG path (never hash when RAG is on).
+    # Retain the old spelling only to provide an actionable error for existing env files.
+    # The local model loader has been removed; no Hugging Face download is supported.
     rag_embedding_provider: Literal["openai_compatible", "sentence_transformers"] = (
-        "sentence_transformers"
+        "openai_compatible"
     )
-    rag_embedding_model: str = "all-MiniLM-L6-v2"
+    rag_embedding_model: str = ""
     # 0 = verify from the provider at runtime and pick a compatible Qdrant collection.
     rag_embedding_dimension: int = Field(default=0, ge=0)
     rag_embedding_base_url: str = ""

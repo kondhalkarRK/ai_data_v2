@@ -30,41 +30,6 @@ class EmbeddingClient(Protocol):
     def embed_query(self, text: str) -> list[float]: ...
 
 
-class SentenceTransformersEmbeddingClient:
-    def __init__(self, model_id: str, expected_dimension: int | None = None) -> None:
-        try:
-            from sentence_transformers import SentenceTransformer  # type: ignore
-        except ImportError as exc:
-            raise DependencyUnavailableError(
-                "sentence-transformers is required for rag_embedding_provider=sentence_transformers."
-            ) from exc
-        self._model_id = model_id
-        self._model = SentenceTransformer(model_id)
-        probe = self._model.encode(["dimension-probe"], normalize_embeddings=True)
-        self._dimension = int(len(probe[0]))
-        if expected_dimension and expected_dimension != self._dimension:
-            raise ValidationError(
-                f"Embedding model '{model_id}' produces {self._dimension} dimensions, "
-                f"but RAG_EMBEDDING_DIMENSION={expected_dimension}."
-            )
-
-    def identity(self) -> EmbeddingIdentity:
-        return EmbeddingIdentity(
-            provider="sentence_transformers",
-            model_id=self._model_id,
-            dimension=self._dimension,
-        )
-
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        if not texts:
-            return []
-        vectors = self._model.encode(texts, normalize_embeddings=True)
-        return [list(map(float, row)) for row in vectors]
-
-    def embed_query(self, text: str) -> list[float]:
-        return self.embed_texts([text])[0]
-
-
 class OpenAICompatibleEmbeddingClient:
     def __init__(
         self,
@@ -76,6 +41,10 @@ class OpenAICompatibleEmbeddingClient:
         timeout_seconds: float = 60.0,
         verify: bool | str = True,
     ) -> None:
+        if not model_id.strip():
+            raise ValidationError(
+                "RAG_EMBEDDING_MODEL must name an embedding model on your provider."
+            )
         if not base_url.strip():
             raise ValidationError("RAG_EMBEDDING_BASE_URL is required for openai_compatible.")
         if not api_key.strip():
@@ -153,8 +122,10 @@ class FakeEmbeddingClient:
 def build_embedding_client(settings: Settings) -> EmbeddingClient:
     expected = settings.rag_embedding_dimension or None
     if settings.rag_embedding_provider == "sentence_transformers":
-        return SentenceTransformersEmbeddingClient(
-            settings.rag_embedding_model, expected_dimension=expected
+        raise ValidationError(
+            "Local Hugging Face embeddings have been removed. Set "
+            "RAG_EMBEDDING_PROVIDER=openai_compatible and configure its embedding model, "
+            "URL and key, or set ASK_ME_RAG_ENABLED=false if document RAG is not needed."
         )
     api_key = (
         settings.rag_embedding_api_key.get_secret_value().strip()
@@ -191,7 +162,9 @@ def _cached_identity(
     return EmbeddingIdentity(provider=provider, model_id=model, dimension=dimension or 0)
 
 
-def verify_embedding_identity(settings: Settings, client: EmbeddingClient | None = None) -> EmbeddingIdentity:
+def verify_embedding_identity(
+    settings: Settings, client: EmbeddingClient | None = None
+) -> EmbeddingIdentity:
     active = client or build_embedding_client(settings)
     identity = active.identity()
     if settings.rag_embedding_dimension and settings.rag_embedding_dimension != identity.dimension:

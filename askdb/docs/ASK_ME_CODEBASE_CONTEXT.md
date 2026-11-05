@@ -82,6 +82,10 @@ See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for verified scope and rollbac
   `app/rag/`. Enabled RAG uses PostgreSQL metadata/jobs, blob storage, real
   embeddings, Qdrant and ACL filtering. Legacy filesystem/hash retrieval also
   exists. Document mutations require `ASK_ME_RAG_ENABLED`.
+  Local Hugging Face/SentenceTransformer loading was removed on 2026-11-06.
+  Traditional RAG requires an explicitly configured OpenAI-compatible embeddings
+  API and model; old `sentence_transformers` settings fail with migration guidance.
+  Readiness runs blocking vector/embedding probes in threads with bounded waits.
 - Admin: `components/admin/` -> `/admin/*`, `/catalog/*`: LLM settings,
   governance, usage/cost, trust, semantic/catalog refresh and audit.
 - Supporting pages: Home/readiness, Data Preview/export, Query History, Saved

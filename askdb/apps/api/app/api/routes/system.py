@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import UTC, datetime
 from typing import Annotated
@@ -101,7 +102,12 @@ async def _dependency_reports(
 
     if rag_enabled(settings):
         started = time.perf_counter()
-        qdrant_ok, qdrant_detail = QdrantIndex(settings).ping()
+        try:
+            qdrant_ok, qdrant_detail = await asyncio.wait_for(
+                asyncio.to_thread(lambda: QdrantIndex(settings).ping()), timeout=3
+            )
+        except TimeoutError:
+            qdrant_ok, qdrant_detail = False, "Qdrant readiness probe timed out."
         reports.append(
             DependencyReport(
                 name="qdrant",
@@ -112,13 +118,20 @@ async def _dependency_reports(
         )
         started = time.perf_counter()
         try:
-            from app.rag.embeddings import build_embedding_client, verify_embedding_identity
+            from app.rag.embeddings import verify_embedding_identity
 
-            identity = verify_embedding_identity(settings, build_embedding_client(settings))
+            identity = await asyncio.wait_for(
+                asyncio.to_thread(verify_embedding_identity, settings), timeout=3
+            )
             embed_status = "ok"
             embed_detail = (
                 f"provider={identity.provider}; model={identity.model_id}; "
                 f"dimension={identity.dimension}"
+            )
+        except TimeoutError:
+            embed_status = "unavailable"
+            embed_detail = (
+                "Embedding readiness probe timed out. Check the configured embedding service."
             )
         except Exception as exc:
             embed_status = "unavailable"

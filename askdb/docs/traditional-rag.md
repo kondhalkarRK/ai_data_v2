@@ -30,7 +30,14 @@ alembic upgrade head
 
 ## Embeddings & Qdrant
 
-- Providers: `sentence_transformers` or `openai_compatible`
+- Provider: `openai_compatible`. Local Hugging Face/SentenceTransformer loading
+  was removed. Set `RAG_EMBEDDING_MODEL` to an embedding model supported by your
+  configured API, plus `RAG_EMBEDDING_BASE_URL` and `RAG_EMBEDDING_API_KEY`.
+  Existing LLM URL/key are fallbacks, but that service must support `/embeddings`.
+  A chat-only model cannot provide document embeddings. If document RAG is not
+  needed, set `ASK_ME_RAG_ENABLED=false`; AskBI does not require document RAG.
+  Changing embedding models requires reindexing documents into the compatible
+  model/dimension collection; old vectors are not automatically converted.
 - Provider, model id and dimension are recorded per document / collection
 - Collection name includes model + dimension (`askme_rag_{industry}_{model}_d{dim}`)
 - Never mix incompatible dimensions in one collection; never truncate vectors
