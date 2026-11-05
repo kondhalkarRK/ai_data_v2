@@ -680,3 +680,46 @@ export interface SavedAnalyticsWorkspace {
   warning: string | null;
   messages: Array<{ question: string; answer: string }>;
 }
+// AskBI v2: durable report conversation, independent of AI Chat.
+export type BiPanel = AnalyticsWorkspacePanel & {
+  calculation: "z_score" | "index_to_average" | null;
+  grain: "day" | "week" | "month" | "quarter" | "year" | null;
+  section: string;
+  dateIntent: string | null;
+};
+export interface BiPlan {
+  version: 2;
+  title: string;
+  answerKind: "single_value" | "analysis" | "report" | "dashboard";
+  panels: BiPanel[];
+  assumptions: string[];
+}
+export interface BiTurn {
+  id: string;
+  question: string;
+  answer: string;
+  kind: "answer" | "clarification" | "unsupported" | "error" | "edit";
+  code: string | null;
+  changedPanelIds: string[];
+}
+export interface BiUsage {
+  validationQueries?: number;
+  llmCalls: number;
+  tokens: number;
+  usageComplete: boolean;
+  elapsedMs: number;
+}
+export interface BiReport {
+  id: string;
+  revision: number;
+  title: string;
+  saved: boolean;
+  warning: string | null;
+  state: {
+    plan: BiPlan | null;
+    previous: BiPlan | null;
+    pending: { question: string; clarification: string; selectedPanelId: string | null } | null;
+    turns: BiTurn[];
+    usage: BiUsage;
+  };
+}

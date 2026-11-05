@@ -174,6 +174,8 @@ class AnalyticsService:
         daily: bool = False,
         include_drivers: bool = True,
         prepare: bool = True,
+        bi_grain: str | None = None,
+        query_override: BuilderQuery | None = None,
     ) -> AnalyticsRunResponse:
         scope = await load_region_scope(self._app, self._user)
         for filt in spec.filters:
@@ -193,7 +195,7 @@ class AnalyticsService:
                 },
             )
         try:
-            query = compile_builder_query(spec, catalog, daily=daily)
+            query = query_override or compile_builder_query(spec, catalog, daily=daily, bi_grain=bi_grain)
         except (BuilderCompileError, SemanticCompileError, ValueError) as exc:
             logger.warning("Analytics Builder could not compile a validated spec: %s", exc)
             raise AnalyticsRunError(
@@ -219,7 +221,7 @@ class AnalyticsService:
         ]
 
         as_of = await self._data_as_of(query.fact_table, query.date_column)
-        partial = None if daily else _partial_period(query, as_of, rows)
+        partial = None if daily or bi_grain in {"day", "week"} else _partial_period(query, as_of, rows)
         driver = await self._driver(spec, catalog, query) if rows and include_drivers else None
 
         metric_def = catalog.resolve(spec).metric
@@ -249,7 +251,7 @@ class AnalyticsService:
         chart, viz = build_chart(query, columns, rows, spec.viz)
         warnings = [issue.message for issue in report.issues if issue.severity == "warning"]
         notes = list(query.notes)
-        if daily and as_of and spec.date_to and as_of.isoformat() < spec.date_to:
+        if (daily or bi_grain in {"day", "week"}) and as_of and spec.date_to and as_of.isoformat() < spec.date_to:
             notes.append(
                 f"Requested dates extend beyond warehouse coverage ({as_of.isoformat()}). "
                 "Missing days are not zero sales."

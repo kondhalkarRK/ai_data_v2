@@ -100,6 +100,8 @@ class Settings(BaseSettings):
     ask_me_augmented_dashboard_enabled: bool = True
     ask_me_askwiz_enabled: bool = True
     ask_me_analytics_workspace_enabled: bool = False
+    ask_me_askbi_enabled: bool = False
+    ask_me_askbi_advanced_enabled: bool = False
     askwiz_timezone: str = "Asia/Kolkata"
     askwiz_run_timeout_seconds: int = Field(default=20, ge=5, le=60)
 

@@ -113,11 +113,17 @@ def date_window(
 
 
 def compile_builder_query(
-    spec: AnalyticsSpec, catalog: Catalog, *, daily: bool = False
+    spec: AnalyticsSpec, catalog: Catalog, *, daily: bool = False, bi_grain: str | None = None
 ) -> BuilderQuery:
     selection = catalog.resolve(spec)
     if selection.metric is None or not selection.metric.supported:
         raise BuilderCompileError("No supported metric selected")
+    if bi_grain in {"day", "week"}:
+        from app.services.analytics.bi.calendar import CalendarCompiler
+
+        if catalog.industry != Industry.AUTOMOTIVE:
+            raise BuilderCompileError("BI calendar grains are automotive only")
+        return CalendarCompiler(spec, selection, catalog, bi_grain).compile()
     compiler = _Compiler(spec, selection, catalog)
     if daily:
         # Auto-only grain extension. Custom/insurance capabilities remain unchanged.

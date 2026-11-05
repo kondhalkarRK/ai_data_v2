@@ -34,6 +34,8 @@ const nextConfig: NextConfig = {
 
   // Optional New Chat experience. Off by default; Classic is the only UI when false.
   env: {
+    NEXT_PUBLIC_ASK_ME_ASKBI_ENABLED:
+      process.env.NEXT_PUBLIC_ASK_ME_ASKBI_ENABLED ?? process.env.ASK_ME_ASKBI_ENABLED ?? "false",
     NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED:
       process.env.NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED ??
       process.env.ASK_ME_ANALYTICS_WORKSPACE_ENABLED ?? "false",

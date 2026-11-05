@@ -1,9 +1,23 @@
 # Ask Me — verified codebase context
 
-Verified against implementation on 2026-11-04. This describes code, not a claim that
+Verified against implementation on 2026-11-05. This describes code, not a claim that
 the configured warehouse, LLM providers or hosted deployment were tested live.
 
 ## Architecture
+
+AskBI now takes precedence for automotive when `ASK_ME_ASKBI_ENABLED` (API) and
+`NEXT_PUBLIC_ASK_ME_ASKBI_ENABLED` (frontend build) are enabled. Both default off.
+It restores Custom Report / Auto Report · AskBI, preserving Custom, insurance and
+general AI Chat. `components/analytics-builder/askbi/` calls `/analytics/bi/*`;
+`app/services/analytics/bi/` owns finite interpretation, clarification, semantic
+validation, execution and signed-evidence narration. `BiReportRecord` stores
+owner/scope-bound reports and revisions through additive migration
+`0014_bi_reports`. Variable one-to-six-panel plans replace fixed board recipes.
+Day/week calendar compilation is opt-in; chart-only edits reuse results.
+The separately gated advanced path supports only validated z-score/index-to-average
+benchmarks, not unrestricted SQL. SQLGlot is the only added runtime dependency;
+no agents were added. See `ASKBI_IMPLEMENTATION.md` for verified checks,
+deployment precedence, rollback and outstanding live/advanced-coverage limits.
 
 Unified Analytics Builder is implemented behind disabled-by-default
 `ASK_ME_ANALYTICS_WORKSPACE_ENABLED` / `NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED`.
@@ -46,7 +60,9 @@ See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for verified scope and rollbac
 - Analytics Builder: `components/analytics-builder/`, `hooks/use-analytics.ts`
   -> `/analytics/*` -> backend catalog, compiler and runner. Structured specs
   are validated, compiled and executed; analyses can be saved and duplicated.
-  Automotive now has optional Auto / Custom modes (`builder-modes.tsx`). Custom
+  AskBI is the newest optional automotive Auto mode, described above. With its
+  flag disabled, legacy precedence and implementations remain available.
+  Automotive has optional Auto / Custom modes (`builder-modes.tsx`). Custom
   is unchanged/default; insurance retains its original Builder. Auto (`askwiz.tsx`)
   generates sales boards from predefined KPI recipes and bounded LLM intent,
   with AskChart edits and separate evidence-curated LLM narration. New

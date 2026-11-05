@@ -6,6 +6,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
@@ -20,6 +21,7 @@ from app.api.deps import (
 )
 from app.core.config import Settings
 from app.db.session import DatabaseRegistry
+from app.models.bi_report import BiReportRecord
 from app.schemas.analytics import (
     AnalyticsAssistRequest,
     AnalyticsAssistResponse,
@@ -43,7 +45,18 @@ from app.schemas.analytics_workspace import (
     WorkspaceSaved,
     WorkspaceSaveRequest,
 )
+from app.schemas.bi import (
+    BiCreate,
+    BiNarration,
+    BiNarrationRequest,
+    BiReport,
+    BiRunRequest,
+    BiTurnRequest,
+)
 from app.semantic.service import SemanticService
+from app.services.analytics.bi import execution as bi_execution
+from app.services.analytics.bi import repository as bi_repository
+from app.services.analytics.bi.service import turn as bi_turn
 from app.services.analytics.runner import AnalyticsService, capabilities_for, inspect_spec
 from app.services.analytics.workspace import (
     get_workspace,
@@ -76,6 +89,81 @@ def _service(
 
 
 AnalyticsServiceDep = Annotated[AnalyticsService, Depends(_service)]
+
+
+@router.get("/bi/capabilities")
+async def bi_capabilities(
+    user: RequireUser,
+    industry: ActiveIndustry,
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> dict[str, object]:
+    return {
+        "enabled": settings.ask_me_askbi_enabled and industry.value == "automotive",
+        "engine": "askbi-v2",
+        "schemaVersion": 2,
+        "advancedEnabled": settings.ask_me_askbi_advanced_enabled,
+        "maxQueries": 6,
+        "migration": "0014_bi_reports",
+    }
+
+
+@router.post("/bi/reports", response_model=BiReport, dependencies=[Depends(verify_csrf)])
+async def bi_create(body: BiCreate, service: AnalyticsServiceDep) -> BiReport:
+    return await bi_repository.create(service, body)
+
+
+@router.get("/bi/reports", response_model=list[BiReport])
+async def bi_reports(service: AnalyticsServiceDep) -> list[BiReport]:
+    _, scope = await bi_repository.context(service)
+    rows = (
+        await service._app.scalars(
+            select(BiReportRecord)
+            .where(
+                BiReportRecord.user_id == service._user.id,
+                BiReportRecord.scope_key == bi_repository.scope_key(service, scope),
+                BiReportRecord.saved.is_(True),
+            )
+            .limit(50)
+        )
+    ).all()
+    return [bi_repository.view(row, service) for row in rows]
+
+
+@router.get("/bi/reports/{report_id}", response_model=BiReport)
+async def bi_get(report_id: uuid.UUID, service: AnalyticsServiceDep) -> BiReport:
+    _, scope = await bi_repository.context(service)
+    return bi_repository.view(await bi_repository.owned(service, report_id, scope), service)
+
+
+@router.post(
+    "/bi/reports/{report_id}/turns", response_model=BiReport, dependencies=[Depends(verify_csrf)]
+)
+async def bi_ask(
+    report_id: uuid.UUID, body: BiTurnRequest, service: AnalyticsServiceDep
+) -> BiReport:
+    return await bi_turn(service, report_id, body)
+
+
+@router.post(
+    "/bi/reports/{report_id}/run",
+    response_model=WorkspaceRunResponse,
+    dependencies=[Depends(verify_csrf)],
+)
+async def bi_run(
+    report_id: uuid.UUID, body: BiRunRequest, service: AnalyticsServiceDep
+) -> WorkspaceRunResponse:
+    return await bi_execution.run(service, report_id, body)
+
+
+@router.post(
+    "/bi/reports/{report_id}/narration",
+    response_model=BiNarration,
+    dependencies=[Depends(verify_csrf)],
+)
+async def bi_narrate(
+    report_id: uuid.UUID, body: BiNarrationRequest, service: AnalyticsServiceDep
+) -> BiNarration:
+    return await bi_execution.narrate(service, report_id, body)
 
 
 @router.post(

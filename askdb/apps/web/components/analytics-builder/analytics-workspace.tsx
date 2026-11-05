@@ -174,7 +174,7 @@ export function AnalyticsWorkspace({ pack }: { pack: SemanticPackResponse }) {
   </div>;
 }
 
-function WorkspacePanel({ panel, state, selected, onSelect, onRetry, onEdit, onRemove }: { panel: Panel; state?: PanelState; selected: boolean; onSelect: () => void; onRetry: () => void; onEdit: (update: Partial<Panel>) => void; onRemove: () => void }) {
+export function WorkspacePanel({ panel, state, selected, onSelect, onRetry, onEdit, onRemove }: { panel: Panel; state?: PanelState; selected: boolean; onSelect: () => void; onRetry: () => void; onEdit: (update: Partial<Panel>) => void; onRemove: () => void }) {
   const [table, setTable] = React.useState(false);
   const result = state?.result;
   const current = state?.scope === scopeOf(panel);
