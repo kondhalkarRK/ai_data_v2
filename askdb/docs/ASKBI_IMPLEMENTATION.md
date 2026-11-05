@@ -88,6 +88,11 @@ compute over the full governed aggregate before applying display limits.
 
    Do not assume a root `.env` is automatically loaded by Next.js. Public flags
    are compiled into the browser bundle. Restart the API and rebuild/restart web.
+   `.env.example` is a template and is never loaded as runtime configuration.
+   It contains all setting names from the local root `.env`, with safe example
+   values; credentials must stay in the ignored environment files. Seeing
+   **Auto · AskWiz** means the frontend selected its legacy flag branch. Check
+   `apps/web/.env.local` and restart/rebuild the actual running web checkout.
 5. Select Automotive -> Analytics Builder -> **Auto Report · AskBI**. The initial
    Custom Report view is intentional. The new flag takes precedence over both the
    unified-workspace and AskWiz flags; those flags need not be changed to false.
