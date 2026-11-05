@@ -1,3 +1,11 @@
+.\.venv\Scripts\python.exe -m alembic -c .\alembic.ini upgrade head
+.\.venv\Scripts\python.exe -m alembic -c .\alembic.ini current
+Test-Path should return True. The final revision should be 0014_bi_reports (head).
+
+If the same error continues, inspect the configuration:
+Get-Content .\alembic.ini -TotalCount 8
+
+====
 (.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic upgrade 0014_bi_reports
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
