@@ -1,9 +1,58 @@
-From the askdb root folder, run:
-.\apps\api\.venv\Scripts\python.exe -m pip install "sqlglot>=30,<31"
-Verify using that exact Python:
-.\apps\api\.venv\Scripts\python.exe -c "import sys, sqlglot; print(sys.executable); print(sqlglot.__version__)"
-It should print your office checkout’s apps\api\.venv\Scripts\python.exe and 30.29.0.
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> .\apps\api\.venv\Scripts\python.exe -m pip install "sqlglot>=30,<31"
+Collecting sqlglot<31,>=30
+  Using cached sqlglot-30.29.0-py3-none-any.whl.metadata (25 kB)
+Using cached sqlglot-30.29.0-py3-none-any.whl (804 kB)
+Installing collected packages: sqlglot
+Successfully installed sqlglot-30.29.0
 
-Then start the application again:
-.\scripts\dev.ps1
-You do not need to rerun the migration. If installation or import verification fails, paste that output before retrying
+[notice] A new release of pip is available: 26.2.1 -> 26.2.2
+[notice] To update, run: python.exe -m pip install --upgrade pip
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> .\apps\api\.venv\Scripts\python.exe -c "import sys, sqlglot; print(sys.executable); print(sqlglot.__version__)"
+C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Scripts\python.exe
+30.29.0
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> .\scripts\dev.ps1
+Database profile: LOCAL (Postgres via .env)
+Supabase is unused. For a manager demo: .\scripts\dev.ps1 -Profile hosted
+Clearing leftover API processes ...
+API reload: OFF (set ASKDB_API_RELOAD=1 to enable)
+Starting API on http://127.0.0.1:8000 ...
+Web rewrite target: http://localhost:8000
+2026-11-06 00:36:47,166 INFO    [-] uvicorn.error: Started server process [39904]
+2026-11-06 00:36:47,167 INFO    [-] uvicorn.error: Waiting for application startup.
+2026-11-06 00:36:47,307 INFO    [-] app.db.session: database registry started
+2026-11-06 00:36:47,561 INFO    [-] app.main: api started
+2026-11-06 00:36:47,572 INFO    [-] app.main: in-process RAG worker started
+2026-11-06 00:36:47,573 INFO    [-] app.rag.worker: RAG worker started id=local-01c7ed9f
+2026-11-06 00:36:47,576 INFO    [-] uvicorn.error: Application startup complete.
+2026-11-06 00:36:47,603 INFO    [-] uvicorn.error: Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-11-06 00:36:48,005 INFO    [1d015ab1b3d147b1] uvicorn.access: 127.0.0.1:51398 - "GET /health HTTP/1.1" 200
+API process is up (/health OK on :8000).
+
+Backend checks:
+2026-11-06 00:36:48,022 INFO    [c7796630aff34b03] uvicorn.access: 127.0.0.1:51398 - "GET /health HTTP/1.1" 200
+  /health  OK (nql-insight-api)
+  /ready   FAIL (The operation has timed out.)
+  /auth/me FAIL (The operation has timed out.)
+  If AUTH_BYPASS=true, create an admin then restart API:
+    cd apps\api; .\.venv\Scripts\python.exe ..\..\scripts\create_admin.py --generate
+
+Starting frontend on http://localhost:3000 ...
+
+> nql-insight@0.1.0 dev
+> npm run dev --workspace apps/web
+
+
+> @nql/web@0.1.0 dev
+> next dev
+
+2026-11-06 00:37:06,090 INFO    [830f4e6efe144af6] sentence_transformers.SentenceTransformer: Use pytorch device_name: cpu
+2026-11-06 00:37:06,090 INFO    [830f4e6efe144af6] sentence_transformers.SentenceTransformer: Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+▲ Next.js 16.3.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.158:3000
+- Environments: .env.local
+✓ Ready in 1604ms
+✓ Running next.config.ts took 265ms
+'(MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /sentence-transformers/all-MiniLM-L6-v2/resolve/main/modules.json (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1000)')))"), '(Request ID: 2af7e86b-0839-4ca3-88c8-945a6be6aec9)')' thrown while requesting HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/modules.json
+2026-11-06 00:37:06,795 WARNING [830f4e6efe144af6] huggingface_hub.utils._http: '(MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /sentence-transformers/all-MiniLM-L6-v2/resolve/main/modules.json (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1000)')))"), '(Request ID: 2af7e86b-0839-4ca3-88c8-945a6be6aec9)')' thrown while requesting HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/modules.json
+Retrying in 1s [Retry 1/5].
