@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import ValidationError as ContractError
 
 from app.core.exceptions import ValidationError
-from app.schemas.analytics_workspace import WorkspaceRequest
+from app.schemas.analytics_workspace import WorkspaceRequest, WorkspaceSpec
 from app.schemas.bi import BiPanel, BiPlan, BiProposal, BiState
 from app.services.analytics.bi.llm import BiCompletion, BiProviderError
 from app.services.analytics.catalog import Catalog, first_error
@@ -16,6 +16,66 @@ from app.services.analytics.workspace import local_plan, validate_question_dates
 from app.services.security.region_scope import RegionScope, assert_requested_region
 
 PERIODS = ("yesterday", "last week", "this week", "last month", "this month", "last quarter")
+
+LEADERSHIP_PROMPTS = {
+    "create a weekly sales and revenue briefing for the cfo": ("CFO sales briefing", "last week"),
+    "create a monthly sales and revenue briefing for the cfo": ("CFO sales briefing", "last month"),
+    "show the monthly business pulse by market and product for the ceo": ("CEO business pulse", "last month"),
+    "show last month's region and dealer performance": ("Regional performance", "last month"),
+    "build a weekly sales team and dealer report": ("Sales team performance", "last week"),
+}
+
+
+def leadership_plan(question: str, now: datetime) -> BiProposal | None:
+    preset = LEADERSHIP_PROMPTS.get(question.strip().casefold().rstrip(".?!"))
+    if preset is None:
+        return None
+    title, period = preset
+    start, end = period_dates(period, now)
+    weekly = period == "last week"
+    definitions = {
+        "CFO sales briefing": [
+            ("Revenue", "revenue", None), ("Average selling price", "average_selling_price", None),
+            ("Revenue trend", "revenue", "time"), ("Revenue by region", "revenue", "region"),
+            ("Units by make", "units_sold", "make"), ("Revenue by dealer", "revenue", "dealer"),
+        ],
+        "CEO business pulse": [
+            ("Revenue", "revenue", None), ("Units sold", "units_sold", None),
+            ("Revenue trend", "revenue", "time"), ("Revenue by region", "revenue", "region"),
+            ("Units by make", "units_sold", "make"), ("Units by model", "units_sold", "model"),
+        ],
+        "Regional performance": [
+            ("Revenue", "revenue", None), ("Units sold", "units_sold", None),
+            ("Revenue trend", "revenue", "time"), ("Revenue by region", "revenue", "region"),
+            ("Revenue by dealer", "revenue", "dealer"), ("Units by model", "units_sold", "model"),
+        ],
+        "Sales team performance": [
+            ("Units sold", "units_sold", None), ("Active salespeople", "active_salespeople", None),
+            ("Units trend", "units_sold", "time"), ("Units by salesperson", "units_sold", "salesperson"),
+            ("Revenue by dealer", "revenue", "dealer"), ("Units by model", "units_sold", "model"),
+        ],
+    }
+    panels: list[BiPanel] = []
+    for index, (label, metric, breakdown) in enumerate(definitions[title]):
+        is_time = breakdown == "time"
+        spec = WorkspaceSpec(
+            metrics=[metric], dimensions=["month" if is_time else breakdown] if breakdown else [],
+            analysis="trend" if is_time else "top_n" if breakdown else "basic",
+            viz="line" if is_time else "bar" if breakdown else "kpi",
+            date_preset="custom", date_from=start, date_to=end,
+            limit=35 if is_time else 10 if breakdown else 1,
+        )
+        panels.append(BiPanel(
+            id=f"leader-{index + 1}", title=label, spec=spec,
+            kind="chart" if breakdown else "kpi", grain=("day" if weekly else "week") if is_time else None,
+            section="Key metrics" if not breakdown else "Sales movement" if is_time else "Performance breakdown",
+            date_intent=period, rationale="Uses the approved automotive metric definition.",
+        ))
+    plan = BiPlan(
+        title=f"{title} · {period}", answer_kind="report", panels=panels,
+        assumptions=[f"The reporting period is the last completed calendar { 'week' if weekly else 'month' }."],
+    )
+    return BiProposal(kind="answer", plan=plan, message=f"Prepared {plan.title}. The report uses six governed panels; values and evidence load next.")
 
 
 def period_dates(intent: str, now: datetime) -> tuple[str, str]:
@@ -103,6 +163,19 @@ def fast_plan(question: str, now: datetime, previous: BiPlan | None) -> BiPropos
     # complete exact template; otherwise retained filters could be lost.
     if previous is not None:
         return None  # A continuation must resolve retained filters, not silently reset them.
+    preset = leadership_plan(question, now)
+    if preset:
+        return preset
+    # A complete metric + breakdown question may omit dates. Use the last fully
+    # closed month, and disclose the assumption instead of relying on an LLM.
+    undated = re.fullmatch(
+        r"(?:(?:show|show me) )?(?:the )?(?:total )?"
+        r"(sales|revenue|units|orders) (?:by|per) (model|region|make|dealer)[?.]?",
+        question.strip().casefold(),
+    )
+    assumed_period = undated is not None
+    if undated:
+        question = f"{undated[1]} by {undated[2]} last month"
     found = local_plan(WorkspaceRequest(prompt=question), now)
     if found is None:
         return None
@@ -120,9 +193,15 @@ def fast_plan(question: str, now: datetime, previous: BiPlan | None) -> BiPropos
     ]
     kind = "report" if "report" in question.casefold() else found.answer_kind
     plan = BiPlan(title=found.title, answer_kind=kind, panels=panels, assumptions=found.assumptions)
+    if assumed_period:
+        plan.assumptions.append("No period was specified. Showing the last completed calendar month.")
     return BiProposal(
         kind="answer",
-        message=f"Prepared {plan.title.lower()} using the approved metric definition. Results and evidence appear in the report.",
+        message=(
+            f"Prepared {plan.title.lower()} using the approved metric definition. "
+            + ("I used the last completed calendar month. " if assumed_period else "")
+            + "Results and evidence appear in the report."
+        ),
         plan=plan,
     )
 

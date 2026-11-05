@@ -945,3 +945,14 @@
     scroll-behavior: auto !important;
   }
 }
+
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body:has(.askbi-printable) * { visibility: hidden !important; }
+  body:has(.askbi-printable) .askbi-printable,
+  body:has(.askbi-printable) .askbi-printable * { visibility: visible !important; }
+  .askbi-printable { position: absolute; inset: 0 auto auto 0; width: 100%; padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .askbi-printable fieldset { border: 0; }
+  .askbi-printable section, .askbi-printable [id^="askbi-panel-"] { break-inside: avoid; }
+  .askbi-printable button, .askbi-printable select, .askbi-printable details { display: none !important; }
+}

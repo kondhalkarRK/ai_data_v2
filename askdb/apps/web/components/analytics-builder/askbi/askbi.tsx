@@ -6,7 +6,7 @@ import { MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConversationPanel } from "./conversation-panel";
 import { ReportCanvas } from "./report-canvas";
-import { useAskBI } from "./use-askbi";
+import { panelScope, useAskBI } from "./use-askbi";
 
 export function AskBI() {
   const bi = useAskBI();
@@ -16,6 +16,7 @@ export function AskBI() {
   const [rename, setRename] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const plan = bi.report?.state.plan ?? null;
+  const exportReady = Boolean(plan && plan.panels.every(panel => bi.results[panel.id]?.result && bi.results[panel.id]?.scope === panelScope(panel)));
   const focusPanel = (id: string) => { bi.setSelected(id); setDrawer(false); document.getElementById(`askbi-panel-${id}`)?.scrollIntoView({ block: "nearest" }); };
   const chooseExample = (text: string) => { setQuestion(text); setSidebar(true); if (window.innerWidth < 1024) setDrawer(true); };
   function ask() { if (!question.trim() || bi.status) return; void bi.command("ask", question.trim()); setQuestion(""); }
@@ -34,6 +35,12 @@ export function AskBI() {
         <Button variant="ghost" disabled={!bi.report?.state.previous || Boolean(bi.status)} onClick={() => void bi.command("undo")}>Undo</Button>
         <Button variant="ghost" disabled={!plan} onClick={() => { setTitle(plan?.title ?? ""); setRename(!rename); }}>Rename</Button>
         <Button variant="ghost" onClick={() => { bi.reset(); setQuestion(""); }}>New report</Button>
+        {plan && <Button variant="secondary" disabled={!exportReady || Boolean(bi.status)} onClick={() => window.print()} title="Choose Save as PDF in the print dialog">Export PDF</Button>}
+        {plan && <Button variant="ghost" disabled={!exportReady || Boolean(bi.status)} onClick={() => {
+          const subject = encodeURIComponent(`Ask Me · ${plan.title}`);
+          const body = encodeURIComponent(`Ask Me report: ${plan.title}\nPeriod: ${plan.panels[0]?.spec.dateFrom} to ${plan.panels[0]?.spec.dateTo}\n\nAttach the PDF exported from AskBI before sending. Recipients must be authorized for the data.`);
+          window.location.href = `mailto:?subject=${subject}&body=${body}`;
+        }} title="Opens your default mail app; attach the exported PDF before sending">Email draft</Button>}
         <Button variant="secondary" className="hidden lg:inline-flex" onClick={() => setSidebar(!sidebar)} aria-pressed={sidebar}><MessageSquare className="mr-2 size-4" />{sidebar ? "Hide chat" : "AskBI"}</Button>
         <Button variant="secondary" className="lg:hidden" onClick={() => setDrawer(true)}><MessageSquare className="mr-2 size-4" />AskBI</Button>
       </div>
@@ -42,7 +49,7 @@ export function AskBI() {
     {bi.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{bi.error}</p>}
     {bi.report?.warning && <p className="text-sm text-muted-foreground">{bi.report.warning}</p>}
     <div className={`grid items-start gap-5 ${sidebar ? "lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>
-      <div className="min-w-0"><ReportCanvas plan={plan} results={bi.results} selected={bi.selected} onSelect={id => { bi.setSelected(id); setSidebar(true); }} onCommand={(...args) => void bi.command(...args)} onRetry={id => { const panel = plan?.panels.find(p => p.id === id); if (panel) void bi.retryPanel(panel); }} onExample={chooseExample} busy={Boolean(bi.status)} briefing={bi.briefing} /></div>
+      <div className="min-w-0"><div className="askbi-printable">{plan && <div className="hidden print:block"><h1 className="text-2xl font-semibold">{plan.title}</h1><p className="text-sm">Ask Me · Automotive · {plan.panels[0]?.spec.dateFrom} to {plan.panels[0]?.spec.dateTo} · Generated {new Date().toLocaleString()}</p><p className="text-xs">For the signed-in user&apos;s permitted data scope. Inspect each panel&apos;s definition and evidence before distribution.</p></div>}<ReportCanvas plan={plan} results={bi.results} selected={bi.selected} onSelect={id => { bi.setSelected(id); setSidebar(true); }} onCommand={(...args) => void bi.command(...args)} onRetry={id => { const panel = plan?.panels.find(p => p.id === id); if (panel) void bi.retryPanel(panel); }} onExample={chooseExample} busy={Boolean(bi.status)} briefing={bi.briefing} /></div></div>
       {sidebar && <aside className="sticky top-4 hidden h-[calc(100dvh-23rem)] min-h-[26rem] max-h-[48rem] overflow-hidden rounded-2xl border border-border bg-surface-raised lg:block" aria-label="Report assistant">{chat}</aside>}
     </div>
     <Dialog.Root open={drawer} onOpenChange={setDrawer}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" /><Dialog.Content className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l border-border bg-background shadow-lg"><Dialog.Title className="sr-only">AskBI report assistant</Dialog.Title><Dialog.Description className="sr-only">Ask a question about this report or refine a selected chart.</Dialog.Description><Dialog.Close className="absolute right-3 top-3 z-10 rounded p-1 focus-visible:outline-ring" aria-label="Close conversation"><X className="size-4" /></Dialog.Close>{chat}</Dialog.Content></Dialog.Portal></Dialog.Root>

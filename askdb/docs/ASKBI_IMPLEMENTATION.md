@@ -16,6 +16,19 @@ questions and contextual follow-ups into governed specifications. Exact supporte
 initial requests reuse templates, and local chart presentation edits reuse data.
 Metric definitions remain in the semantic catalog, not model-generated formulas.
 
+Four exact leadership starter questions now appear on the empty Auto Report
+canvas. Send creates a fixed two-KPI/four-chart automotive report for CFO, CEO,
+regional or sales leadership, with last completed week/month dates and governed
+metric definitions. The CFO question also accepts “monthly” in place of “weekly”.
+The LLM remains available for novel follow-ups and optional evidence narration.
+The report groups KPI cards, trend and ranked breakdowns for readable alignment.
+“Export PDF” opens the browser print dialog only after all panels have current
+results; choose Save as PDF. “Email draft” opens the default mail application
+with a subject and period and instructs the user to attach that PDF. This is a
+manual handoff, not automatic Outlook delivery or an attached message. The
+authenticated Microsoft Graph integration needed for automatic delivery remains
+unimplemented. See `ASKBI_LEADERSHIP_REPORT_PLAN.md`.
+
 Server-owned state preserves clarification questions and answers, selected-panel
 context, report revisions and recent conversation. Typed failures retain the
 report. Idempotency receipts prevent duplicate mutations; stale revisions conflict
@@ -130,6 +143,9 @@ the additive table; no destructive downgrade is necessary.
   query, retained state across mode switches, all three themes at 1440/820 widths,
   reduced-motion configuration, keyboard drawer dismissal and flag mismatch;
   no browser page errors. The final run passed against the production build.
+  A second fixture run after the leadership UI changes passed. The fixture uses
+  a one-panel reply, so it does not visually validate the six-panel layout or
+  final printed PDF. Those need office data or a dedicated six-panel fixture.
   Start web on port 3000 and run `node scripts/verify-askbi.mjs` from the repo root;
   set `ASKBI_BASE_URL` to use another local port. Screenshots were visually inspected. This is fixture
   verification, not a live end-to-end database/provider test.

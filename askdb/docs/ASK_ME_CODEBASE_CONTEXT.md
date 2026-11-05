@@ -18,6 +18,13 @@ The separately gated advanced path supports only validated z-score/index-to-aver
 benchmarks, not unrestricted SQL. SQLGlot is the only added runtime dependency;
 no agents were added. See `ASKBI_IMPLEMENTATION.md` for verified checks,
 deployment precedence, rollback and outstanding live/advanced-coverage limits.
+An exact undated metric-by-breakdown request such as “total sales by region”
+uses the last completed calendar month with an explicit assumption, avoiding
+an LLM call for that supported request. Four exact automotive leadership
+starter prompts now produce two KPI and four chart panels. The report canvas
+groups KPI/trend/breakdowns and supports browser Save as PDF; an email draft
+requires manually attaching that PDF. See `ASKBI_LEADERSHIP_REPORT_PLAN.md` for
+the verified scope and remaining Outlook Graph integration.
 
 Unified Analytics Builder is implemented behind disabled-by-default
 `ASK_ME_ANALYTICS_WORKSPACE_ENABLED` / `NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED`.

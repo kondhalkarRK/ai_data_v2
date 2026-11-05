@@ -77,6 +77,46 @@ def test_unknown_qualifiers_never_use_template():
     assert planning.fast_plan("daily profit last week", NOW, None) is None
 
 
+@pytest.mark.parametrize("question", ["total sales by region", "Show me revenue by region?"])
+def test_undated_region_sales_uses_disclosed_completed_month(catalog, question):
+    proposal = planning.fast_plan(question, NOW, None)
+    assert proposal is not None and proposal.kind == "answer" and proposal.plan is not None
+    assert len(proposal.plan.panels) == 1
+    panel = proposal.plan.panels[0]
+    assert panel.spec.metrics == ["revenue"]
+    assert panel.spec.dimensions == ["region"]
+    assert (panel.spec.date_from, panel.spec.date_to) == ("2026-10-01", "2026-10-31")
+    assert "last completed" in proposal.message
+    assert "last completed" in proposal.plan.assumptions[0]
+    planning.validate(proposal.plan, catalog, SCOPE)
+
+
+def test_undated_fast_path_does_not_discard_qualifiers():
+    assert planning.fast_plan("total sales by region for Tata", NOW, None) is None
+
+
+@pytest.mark.parametrize("question", list(planning.LEADERSHIP_PROMPTS))
+def test_leadership_report_presets_are_governed_and_bounded(catalog, question):
+    proposal = planning.fast_plan(question, NOW, None)
+    assert proposal is not None and proposal.plan is not None
+    assert proposal.kind == "answer" and proposal.plan.answer_kind == "report"
+    assert len(proposal.plan.panels) == 6
+    assert [p.kind for p in proposal.plan.panels].count("kpi") == 2
+    assert [p.kind for p in proposal.plan.panels].count("chart") == 4
+    assert all(p.spec.filters == [] for p in proposal.plan.panels)
+    planning.validate(proposal.plan, catalog, SCOPE)
+    for p in proposal.plan.panels:
+        assert sqlglot.parse_one(
+            compile_builder_query(p.spec, catalog, bi_grain=p.grain).sql, read="postgres"
+        )
+
+
+def test_leadership_prompt_with_extra_qualifier_is_not_a_preset():
+    assert planning.fast_plan(
+        "Create a weekly sales and revenue briefing for the CFO for Tata", NOW, None
+    ) is None
+
+
 def test_context_preserves_original_and_pending_slot():
     state = BiState(
         pending=BiPending(question="Make a sales report", clarification="Which period and metric?")
