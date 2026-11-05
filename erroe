@@ -1,3 +1,39 @@
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic upgrade 0014_bi_reports
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+ERROR [alembic.util.messaging] Can't locate revision identified by '0014_bi_reports'
+FAILED: Can't locate revision identified by '0014_bi_reports'
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic upgrade 0014_bi_reports
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+ERROR [alembic.util.messaging] Can't locate revision identified by '0014_bi_reports'
+FAILED: Can't locate revision identified by '0014_bi_reports'
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> Test-Path .\migrations\versions\0014_bi_reports.py
+False
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic heads
+0013_analytics_workspaces (head)
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic current
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+0013_analytics_workspaces (head)
+
+============
+
+The error shows 0014_bi_Reports with a capital R. Alembic revision IDs are case-sensitive. Use all lowercase:
+cd E:\ai_data_rag\ai_data_v2\askdb\apps\api
+
+.\.venv\Scripts\python.exe -m alembic upgrade 0014_bi_reports
+If it still fails, check that your office checkout contains the migration:
+Test-Path .\migrations\versions\0014_bi_reports.py
+.\.venv\Scripts\python.exe -m alembic heads
+.\.venv\Scripts\python.exe -m alembic current
+- If Test-Path returns False, bring the latest code—including that migration file—to your office laptop.
+- If heads shows 0014_bi_reports, run:
+.\.venv\Scripts\python.exe -m alembic upgrade head
+If current itself fails mentioning 0014_bi_Reports, share that output. The database may reference a differently named revision; don’t edit or stamp its migration version yet.
+
+=======================
+
 .\.venv\Scripts\python.exe -m alembic -x target=app upgrade 0012_auto_dashboards
 
 These steps use PowerShell, matching Cursor's paths. The error was `password authentication failed for user "askdb_app"`, so the first job is making the database URL and the Postgres user agree.
