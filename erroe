@@ -1,57 +1,9 @@
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic -c .\alembic.ini upgrade head
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic -c .\alembic.ini current
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
-0014_bi_reports (head)
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> cd ../..
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> .\scripts\dev.ps1
-Database profile: LOCAL (Postgres via .env)
-Supabase is unused. For a manager demo: .\scripts\dev.ps1 -Profile hosted
-Clearing leftover API processes ...
-API reload: OFF (set ASKDB_API_RELOAD=1 to enable)
-Starting API on http://127.0.0.1:8000 ...
-Web rewrite target: http://localhost:8000
-Traceback (most recent call last):
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\run_dev.py", line 34, in <module>
-    main()
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\run_dev.py", line 21, in main
-    uvicorn.run(
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\uvicorn\main.py", line 609, in run
-    config.load_app()
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\uvicorn\config.py", line 428, in load_app
-    return import_from_string(self.app)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\uvicorn\importer.py", line 22, in import_from_string
-    raise exc from None
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
-    module = importlib.import_module(module_str)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Program Files\Python312\Lib\importlib\__init__.py", line 90, in import_module
-    return _bootstrap._gcd_import(name[level:], package, level)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
-  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
-  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
-  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
-  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
-  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\main.py", line 21, in <module>
-    from app.api.router import api_v1_router
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\api\router.py", line 11, in <module>
-    from app.api.routes import (
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\api\routes\analytics.py", line 57, in <module>
-    from app.services.analytics.bi import execution as bi_execution
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\services\analytics\bi\execution.py", line 23, in <module>
-    from app.services.analytics.bi.advanced import compile_advanced
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\services\analytics\bi\advanced.py", line 9, in <module>
-    import sqlglot
-ModuleNotFoundError: No module named 'sqlglot'
-Stopping API ...
-The API exited during startup (exit 1). Check the uvicorn output above.
-At C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\scripts\dev.ps1:214 char:13
-+             throw "The API exited during startup (exit $($api.ExitCod ...
-+             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : OperationStopped: (The API exited ...n output above.:String) [], RuntimeException
-    + FullyQualifiedErrorId : The API exited during startup (exit 1). Check the uvicorn output above.
+From the askdb root folder, run:
+.\apps\api\.venv\Scripts\python.exe -m pip install "sqlglot>=30,<31"
+Verify using that exact Python:
+.\apps\api\.venv\Scripts\python.exe -c "import sys, sqlglot; print(sys.executable); print(sqlglot.__version__)"
+It should print your office checkout’s apps\api\.venv\Scripts\python.exe and 30.29.0.
+
+Then start the application again:
+.\scripts\dev.ps1
+You do not need to rerun the migration. If installation or import verification fails, paste that output before retrying
