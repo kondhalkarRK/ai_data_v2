@@ -1,391 +1,57 @@
-.\.venv\Scripts\python.exe -m alembic -c .\alembic.ini upgrade head
-.\.venv\Scripts\python.exe -m alembic -c .\alembic.ini current
-Test-Path should return True. The final revision should be 0014_bi_reports (head).
-
-If the same error continues, inspect the configuration:
-Get-Content .\alembic.ini -TotalCount 8
-
-====
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic upgrade 0014_bi_reports
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic -c .\alembic.ini upgrade head
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
-ERROR [alembic.util.messaging] Can't locate revision identified by '0014_bi_reports'
-FAILED: Can't locate revision identified by '0014_bi_reports'
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic upgrade 0014_bi_reports
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic -c .\alembic.ini current
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
-ERROR [alembic.util.messaging] Can't locate revision identified by '0014_bi_reports'
-FAILED: Can't locate revision identified by '0014_bi_reports'
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> Test-Path .\migrations\versions\0014_bi_reports.py
-False
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic heads
-0013_analytics_workspaces (head)
-(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic current
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
-0013_analytics_workspaces (head)
-
-============
-
-The error shows 0014_bi_Reports with a capital R. Alembic revision IDs are case-sensitive. Use all lowercase:
-cd E:\ai_data_rag\ai_data_v2\askdb\apps\api
-
-.\.venv\Scripts\python.exe -m alembic upgrade 0014_bi_reports
-If it still fails, check that your office checkout contains the migration:
-Test-Path .\migrations\versions\0014_bi_reports.py
-.\.venv\Scripts\python.exe -m alembic heads
-.\.venv\Scripts\python.exe -m alembic current
-- If Test-Path returns False, bring the latest code—including that migration file—to your office laptop.
-- If heads shows 0014_bi_reports, run:
-.\.venv\Scripts\python.exe -m alembic upgrade head
-If current itself fails mentioning 0014_bi_Reports, share that output. The database may reference a differently named revision; don’t edit or stamp its migration version yet.
-
-=======================
-
-.\.venv\Scripts\python.exe -m alembic -x target=app upgrade 0012_auto_dashboards
-
-These steps use PowerShell, matching Cursor's paths. The error was `password authentication failed for user "askdb_app"`, so the first job is making the database URL and the Postgres user agree.
-
-## 1. Find the database URL the app uses
-
-```powershell
-cd askdb\apps\api
-Select-String -Path .env, app\core\config.py -Pattern "app_database_url" -CaseSensitive:$false
-```
-
-Note the user, password, host, port and database name in that URL. The default seems to be `askdb_app@localhost:5432`. If a `.env` file sets `APP_DATABASE_URL`, that value wins over the default.
-
-## 2. Make sure Postgres is running and the user's password matches
-
-```powershell
-psql -U postgres -h localhost -p 5432
-```
-
-Then, inside `psql`, replace the names and password with the ones from step 1:
-
-```sql
-\du                                   -- does askdb_app exist?
-\l                                    -- does the database exist?
-ALTER USER askdb_app WITH PASSWORD 'your_dev_password';
--- if the user or database is missing:
--- CREATE USER askdb_app WITH PASSWORD 'your_dev_password';
--- CREATE DATABASE askdb_app OWNER askdb_app;
-\q
-```
-
-Use a local dev password and keep it out of git.
-
-## 3. Point the app at it
-
-```powershell
-$env:APP_DATABASE_URL = "postgresql://askdb_app:your_dev_password@localhost:5432/askdb_app"
-```
-
-Match whatever driver prefix your existing config uses, for example `postgresql+psycopg://`. Check how `config.py` writes it.
-
-## 4. Back up first
-
-```powershell
-pg_dump -U askdb_app -h localhost -d askdb_app -F c -f backup_before_0010.dump
-```
-
-## 5. Check where Alembic is now
-
-```powershell
-.\.venv\Scripts\alembic -x target=app current
-```
-
-It should show `0009_user_region_access`. If it shows something else or nothing, stop and send me the output.
-
-## 6. Apply, then test the downgrade
-
-```powershell
-.\.venv\Scripts\alembic -x target=app upgrade 0010_conversation_session_memory
-.\.venv\Scripts\alembic -x target=app downgrade 0009_user_region_access
-.\.venv\Scripts\alembic -x target=app upgrade 0010_conversation_session_memory
-```
-
-This proves the migration runs, rolls back, and runs again cleanly.
-
-## 7. Verify the column exists
-
-```powershell
-psql -U askdb_app -h localhost -d askdb_app -c "\d conversations"
-```
-
-You should see `session_memory | jsonb`.
-
-## 8. Check it works end to end
-
-Start the app locally and ask a question, then ask "What about South?" in the same conversation. Then check that memory was saved:
-
-```powershell
-psql -U askdb_app -h localhost -d askdb_app -c "SELECT id, session_memory IS NOT NULL AS has_memory FROM conversations ORDER BY updated_at DESC LIMIT 3;"
-```
-
-If `updated_at` isn't a column name in your schema, drop the `ORDER BY` clause. `has_memory` should be true for the conversation you just used, and you can spot-check that the JSON contains plan state and no SQL or rows.
-
-## If something fails
-- **Password error again:** step 2 and step 3 don't match, or a `.env` file is overriding your variable.
-- **`alembic current` shows a different revision:** don't force anything. Send me the output.
-- **Wrong database:** run `\conninfo` in `psql` to confirm what you're connected to.
-
-Only run this against a local dev database. Don't apply it to a shared or production database until the later stages pass and you've reviewed them.
-
-==========
-
-cd askdb\apps\api
-$env:APP_DATABASE_URL = "<your-local-dev-url>"   # if you override settings
-.\.venv\Scripts\alembic -x target=app upgrade 0010_conversation_session_memory
-.\.venv\Scripts\alembic -x target=app downgrade 0009_user_region_access
-.\.venv\Scripts\alembic -x target=app upgrade 0010_conversation_session_memory
-
-
-
-
-Use the full path (from apps/api):
-
-python tests/chat_routing_eval/run_baseline.py --compare tests/chat_routing_eval/results/baseline_stage0.csv
-
-
-
-which all cars has Coral Pink color
-Answered from data
-Answered in 0.5s
-High confidence
-
-Dataset Trust: 99% (Excellent)
-Grounded on
-
-Semantic Layer
-Business Glossary
-KPI Definition
-LLM
-Schema
-Data Quality Check
-Understood as: revenue · by month · colour name: Coral Pink
-
-revenue interpreted as SUM(total_sales)
-
-Joins: fact_sales · fact_sales → dim_color
-
-Filters: Colour = Coral Pink
-
-
-
-Questions that tend to hit the LLM (decision.path = llm_reasoning, stage llm)
-These use complex analysis (moving average, growth, top-N per group, divergence, etc.) so with llm_first the backend calls generate_validated_sql even when a governed query exists.
-
-Automotive
-
-Top 3 models in each state by revenue
-6-month moving average of Tata revenue by month
-Month-over-month revenue growth for Hyundai by month
-Which dealers are above the regional average for revenue?
-Brands with increasing revenue but decreasing unit sales
-Year-on-year growth ranking of dealers by revenue
-Insurance
-
-Top 3 agents in each region by written premium
-3-month moving average of loss ratio by month
-Period-over-period growth in claims incurred by product
-Regions above average for claim severity
-Products with rising earned premium but falling claim count
-YoY growth ranking of channels by written premium
-Extra LLM touch (interpretation, not always full SQL generation)
-Messy or non-governed phrasing with no matching template — e.g. “toto sales revnue all tata modls last yr” — may trigger interpret when nlq_llm_interpretation is on, then planning. Less predictable than the list above.
-
-Won’t hit LLM (good controls)
-
-Revenue by month
-Top brand by revenue
-Maruti Suzuki sales by year
-Questions that tend to hit hybrid (route = hybrid — SQL plus knowledge snippets)
-Hybrid is triggered by words like why, reason, factors, insights, drivers, explain the increase/decrease, etc. The app still runs analytics SQL, then searches the knowledge base and merges snippets into the narrative.
-
-Automotive (SQL + docs)
-
-Why did Tata revenue increase in 2024 compared to 2023?
-What factors drove the drop in SUV sales last quarter?
-Explain the decrease in Maruti revenue in the west region
-What insights explain the spike in electric vehicle sales by month?
-Drivers of revenue growth for Hyundai dealers in 2024
-Insurance
-
-Why did loss ratio increase in the north region last year?
-What contributed to the rise in claim severity for motor policies?
-Explain the decrease in written premium by channel in Q2
-What insights can you share about claim frequency and regional trends?
-Reasons behind the growth in claims incurred for health products
-Hybrid is much more useful if you have uploaded reports / knowledge hub content; with an empty corpus you still get hybrid routing but citations may be thin.
-
-Pure knowledge (no SQL — for contrast)
-Summarize the key findings from the uploaded report
-What does the policy document say about deductible limits?
-→ route = knowledge, not hybrid, no LLM required for routing.
-
-
-Here’s where the “Ask DB” name comes from and what to touch to rename it.
-
-Primary (UI name in the top-left + browser tab)
-File	Role
-askdb/apps/web/lib/brand.ts
-Main source: APP_NAME and APP_TAGLINE. Used for page title, applicationName, and accessibility text. Change APP_NAME here first.
-askdb/apps/web/components/brand/wordmark.tsx
-Visible wordmark is hardcoded as “Ask” + “DB” (two colors). Renaming to anything else (e.g. “Acme Analytics”) requires editing this component, not only brand.ts.
-askdb/apps/web/components/brand/logo.tsx
-Sidebar/login logo: icon + BrandWordmark + screen-reader APP_NAME.
-askdb/apps/web/app/layout.tsx
-Browser tab title: default: APP_NAME, template %s · ${APP_NAME}.
-askdb/apps/web/components/shell/sidebar.tsx
-Top-left link uses <Logo />; aria-label="Ask DB home" is hardcoded — update if you rename.
-Home hero: askdb/apps/web/app/(workspace)/home/page.tsx uses <BrandWordmark size="hero" /> — same wordmark component.
-
-Login / 404: app/(auth)/login/page.tsx, app/not-found.tsx use <Logo />.
-
-Optional (not the corner label, but still says “Ask DB”)
-File	Notes
-askdb/apps/api/app/core/config.py
-app_name: str = "Ask DB" (API metadata; not the web corner).
-askdb/apps/api/app/main.py
-OpenAPI title="Ask DB API".
-askdb/apps/api/app/services/llm.py
-System prompt: "You are Ask DB for …".
-askdb/.env / askdb/.env.example
-NEXT_PUBLIC_APP_NAME=Ask DB — not referenced in apps/web code today; branding is lib/brand.ts, not this env var.
-askdb/apps/web/.env.local
-Has NEXT_PUBLIC_APP_NAME=NQL Insight — also unused by the app; can confuse you; align or remove.
-Static HTML under apps/web/public/ (user-guide.html, knowledge-graph-guide.html, knowledge-hub/AskDB_Guide.html)
-Separate docs, not the shell UI.
-askdb/apps/web/tests/e2e/auth.spec.ts
-Expects heading “Ask DB.” — update if you change the hero wordmark + period.
-Practical rename checklist
-Set APP_NAME (and tagline if needed) in lib/brand.ts.
-Update wordmark.tsx so the visible text matches (not only APP_NAME if the name isn’t “Ask” + “DB”).
-Fix sidebar.tsx aria-label.
-Run the app and check sidebar, home hero, login, and browser tab.
-Optionally sync API title, LLM prompt, docs, and e2e test.
-Note: The product name in the top-left is the sidebar Logo, not topbar.tsx (top bar is industry/user/region, not the brand).
-
-
-What “Data Trust” is (one sentence)
-Data Trust is AskDB’s data reliability control room: it runs automated checks on your warehouse, rolls them into a trust score (0–100), and shows what is wrong, how serious it is, and which dashboards/chat answers depend on that data.
-
-In the app: sidebar Data Trust → route /data-quality (Reliability Center UI).
-
-What a “monitor” is
-A monitor is a data-quality rule the platform runs on a schedule (when you Run checks or refresh). Each monitor:
-
-Targets a dataset (e.g. sales transactions, claims).
-Checks something concrete (missing values, duplicates, stale data, invalid codes, etc.).
-Has a pass threshold (e.g. “at least 99% of rows must pass”).
-Maps to a quality dimension (Completeness, Timeliness, Validity, …).
-Contributes to the overall trust score and shows as passing / failing with optional sample failures.
-There are two kinds:
-
-Type	Who defines it	Can delete?
-Built-in rules
-Shipped per industry (automotive / insurance) — reconciliations, freshness, volume, cross-table checks
-No — admins enable/disable or tune threshold/owner
-Custom monitors
-Admins create via New monitor
-Yes — only custom ones
-Custom monitors do not accept free-form SQL; the server builds read-only checks from a safe template (column must exist on the dataset catalog). That limits risk and keeps checks consistent.
-
-How monitors help the business
-Early warning — Problems surface in Data Trust before executives see wrong KPIs or AI gives confident answers on bad data.
-Single trust score — One number plus bands (Excellent / Good / Fair / Risk) and 6 dimensions (Accuracy, Completeness, Consistency, Timeliness, Validity, Uniqueness), each with a plain question (e.g. “Is the data refreshed within its agreed SLA?”).
-Prioritization — Severity (critical → low) and owner so teams know who acts.
-Traceability to use cases — Built-in datasets are tagged with where data is used (e.g. Executive cockpit, Revenue dashboard, AI Chat answers), so leaders see why a failing rule matters.
-Trend — Score and dimension trends over time (e.g. 7-day delta on the hero).
-Operational detail — Freshness table, schema drift, entity/catalog changes, alerts, drill-down on a rule.
-Important distinction for leadership: The trust % on an individual AI Chat answer is a separate, answer-level score (semantic match, SQL path, empty results). Data Trust monitors govern warehouse quality; they do not replace per-answer trust, but they reduce the chance that chat and dashboards run on bad data.
-
-Monitor types (what you can add)
-When an admin clicks New monitor, they choose a kind (UI labels):
-
-Kind	Business meaning	Example
-Required values (not_null)
-Column must be filled
-Every sales row has a dealer
-No duplicates (unique)
-Business key unique
-order_id not repeated
-Value range (range)
-Min/max business limits
-total_sales ≥ 0
-Allowed values (allowed_values)
-Approved code list
-claim_status only Open/Closed/…
-Format (pattern) (pattern)
-Regex format
-Policy number pattern
-Freshness (freshness)
-Data not older than X hours
-Sales loaded within 36 hours
-Reference match (reference)
-Values exist in another dataset
-dealer_id exists in dealers
-Each kind maps to a dimension (e.g. Freshness → Timeliness).
-
-How to add a monitor (for admins)
-Who: Administrators only (API: RequireAdmin; UI: New monitor only when role === admin).
-
-Where: Data Trust → top right New monitor (also Run checks to execute all active rules).
-
-Steps (same as the dialog):
-
-Name (≥ 3 characters) and optional description.
-Kind (see table above).
-Dataset and column (from catalog — unknown columns are rejected).
-Severity and target (threshold 0–100% pass rate).
-Owner (e.g. Data Engineering) and optional tags.
-Submit → API POST /api/v1/trust/reliability/monitors → monitor is saved and included in the next run.
-After creation: use Run checks (or wait for cached refresh) to see status in the rules catalog and impact on the trust score.
-
-Admin Center → Data Trust Admin is complementary: enable/disable built-in DQ rules and refresh trust scores platform-wide, without building a new custom monitor.
-
-Leadership examples (storytelling)
-Example 1 — Maruti / automotive sales
-Goal: Ensure AI Chat and revenue views are not using stale sales.
-
-Built-in: Freshness on fact_sales (SLA-style; already in defaults).
-Custom monitor (admin adds):
-Kind: Freshness
-Dataset: Sales transactions
-Max age: 36 hours
-Severity: High
-Target: 100%
-If it fails: Timeliness dimension drops; hero shows Risk/Fair; rule detail explains lag; assets list includes AI Chat answers so leaders know NLQ is affected.
-Example 2 — Insurance claims
-Goal: No claims with invalid status breaking loss-ratio KPIs.
-
-Custom monitor:
-Kind: Allowed values
-Dataset: Claims
-Column: claim_status
-Allowed: Open, Closed, Pending, …
-Dimension: Validity
-Target: 99%
-If it fails: Validity fails; drill-down shows sample bad values; executives see trust drop before trusting claim dashboards.
-Example 3 — Dealer consistency
-Goal: Sales rows must point to real dealers.
-
-Custom monitor:
-Kind: Reference match
-Dataset: Sales
-Column: dealer_id
-Reference: Dealers dataset, same column
-Dimension: Consistency
-Helps: Prevents “orphan” sales that inflate regional rollups and confuse chat answers that filter by dealer.
-What leaders should remember
-Monitors = automated promises about data (“fresh enough,” “complete,” “consistent”).
-Built-in rules cover industry-critical reconciliations; custom monitors let the business add their policies without writing SQL.
-Trust score is the rollup for steering meetings; failing critical monitors mean “slow down decisions on that data until fixed.”
-Only admins create/delete custom monitors; all users can view Data Trust to see transparency.
-Fixing data or the pipeline improves the score on the next Run checks; disabling a rule hides the signal but does not fix the underlying issue.
-Optional one-liner for the board
-“Data Trust monitors are like smoke detectors on our analytics warehouse—they run every day, feed one trust score, and tell us if dashboards and Ask DB are safe to use before we act on the numbers.”
-
-If you want this as a single slide, I can turn it into 4–5 bullets plus one Maruti example only
-
+0014_bi_reports (head)
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> cd ../..
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> .\scripts\dev.ps1
+Database profile: LOCAL (Postgres via .env)
+Supabase is unused. For a manager demo: .\scripts\dev.ps1 -Profile hosted
+Clearing leftover API processes ...
+API reload: OFF (set ASKDB_API_RELOAD=1 to enable)
+Starting API on http://127.0.0.1:8000 ...
+Web rewrite target: http://localhost:8000
+Traceback (most recent call last):
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\run_dev.py", line 34, in <module>
+    main()
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\run_dev.py", line 21, in main
+    uvicorn.run(
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\uvicorn\main.py", line 609, in run
+    config.load_app()
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\uvicorn\config.py", line 428, in load_app
+    return import_from_string(self.app)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\uvicorn\importer.py", line 22, in import_from_string
+    raise exc from None
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\.venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\main.py", line 21, in <module>
+    from app.api.router import api_v1_router
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\api\router.py", line 11, in <module>
+    from app.api.routes import (
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\api\routes\analytics.py", line 57, in <module>
+    from app.services.analytics.bi import execution as bi_execution
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\services\analytics\bi\execution.py", line 23, in <module>
+    from app.services.analytics.bi.advanced import compile_advanced
+  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api\app\services\analytics\bi\advanced.py", line 9, in <module>
+    import sqlglot
+ModuleNotFoundError: No module named 'sqlglot'
+Stopping API ...
+The API exited during startup (exit 1). Check the uvicorn output above.
+At C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\scripts\dev.ps1:214 char:13
++             throw "The API exited during startup (exit $($api.ExitCod ...
++             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (The API exited ...n output above.:String) [], RuntimeException
+    + FullyQualifiedErrorId : The API exited during startup (exit 1). Check the uvicorn output above.
