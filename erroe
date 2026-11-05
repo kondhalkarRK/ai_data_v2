@@ -1,3 +1,24 @@
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic upgrade 0014_bi_reports
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+ERROR [alembic.util.messaging] Can't locate revision identified by '0014_bi_reports'
+FAILED: Can't locate revision identified by '0014_bi_reports'
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic upgrade 0014_bi_reports
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+ERROR [alembic.util.messaging] Can't locate revision identified by '0014_bi_reports'
+FAILED: Can't locate revision identified by '0014_bi_reports'
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> Test-Path .\migrations\versions\0014_bi_reports.py
+False
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic heads
+0013_analytics_workspaces (head)
+(.venv) PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\apps\api> .\.venv\Scripts\python.exe -m alembic current
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+0013_analytics_workspaces (head)
+
+============
+
 The error shows 0014_bi_Reports with a capital R. Alembic revision IDs are case-sensitive. Use all lowercase:
 cd E:\ai_data_rag\ai_data_v2\askdb\apps\api
 
