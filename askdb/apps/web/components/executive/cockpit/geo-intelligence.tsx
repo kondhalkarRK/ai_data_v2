@@ -92,7 +92,7 @@ function RankedGrid({ items, onPick }: { items: RankedItem[]; onPick: (item: Ran
               </span>
               <span className="flex min-w-0 items-center gap-1.5">
                 <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                  <span className="block h-full rounded-full bg-[#5b8def]" style={{ width: `${(item.revenue / max) * 100}%` }} />
+                  <span className="block h-full rounded-full bg-[hsl(var(--chart-1))]" style={{ width: `${(item.revenue / max) * 100}%` }} />
                 </span>
                 <span className="w-16 shrink-0 text-right text-[10px] font-semibold tabular-nums text-muted-foreground">
                   {formatInr(item.revenue)}

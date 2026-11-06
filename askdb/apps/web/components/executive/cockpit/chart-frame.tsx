@@ -129,7 +129,8 @@ export function ChartFrame({
       <div className={cn("invisible", className)} aria-hidden="true" />
       {createPortal(
         <div
-          className={cn("fixed inset-0 z-[60] flex p-4 sm:p-8", overlay.scrim)}
+          className={cn("executive-cockpit fixed inset-0 z-[60] flex p-4 sm:p-8", overlay.scrim)}
+          data-chart-palette={document.querySelector(".executive-cockpit[data-chart-palette]")?.getAttribute("data-chart-palette") ?? "classic"}
           role="dialog"
           aria-modal="true"
           aria-label={title}

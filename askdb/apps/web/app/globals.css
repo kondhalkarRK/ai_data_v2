@@ -1038,3 +1038,65 @@
 .askbi-tree-tile-3 { fill: color-mix(in oklab, hsl(var(--chart-5)) 36%, hsl(var(--surface-raised))); }
 .askbi-tree-tile-4 { fill: color-mix(in oklab, hsl(var(--chart-3)) 36%, hsl(var(--surface-raised))); }
 .askbi-tree-tile-5 { fill: color-mix(in oklab, hsl(var(--chart-6)) 36%, hsl(var(--surface-raised))); }
+
+/* Executive chart modes are scoped to the automotive cockpit. Status tokens stay global. */
+.executive-cockpit {
+  --executive-category-1: #315ec9; --executive-category-2: #098b88;
+  --executive-category-3: #6d77c9; --executive-category-4: #bd7640;
+  --executive-category-5: #4b9c75; --executive-category-6: #9b68a8;
+  --executive-category-7: #458ab6; --executive-category-8: #a48632;
+  --executive-category-9: #6a7f92; --executive-category-10: #b05e73;
+  --executive-category-11: #437e6e; --executive-category-12: #7870ac;
+  --executive-category-13: #b07158; --executive-category-14: #568c9f;
+  --executive-category-15: #777f4e;
+}
+.dark .executive-cockpit, .theme-ai .executive-cockpit {
+  --executive-category-1: #8ba8f2; --executive-category-2: #66c9c2;
+  --executive-category-3: #b09bed; --executive-category-4: #e9af72;
+  --executive-category-5: #8dcc9f; --executive-category-6: #d49bd5;
+  --executive-category-7: #75b9de; --executive-category-8: #d6c077;
+  --executive-category-9: #acbbc8; --executive-category-10: #e59aab;
+  --executive-category-11: #85bfae; --executive-category-12: #b4a7d8;
+  --executive-category-13: #dfaa8f; --executive-category-14: #8cc8d1;
+  --executive-category-15: #b8c386;
+}
+.executive-cockpit[data-chart-palette="vibrant"] {
+  --chart-1: 224 79% 49%; --chart-2: 174 79% 31%;
+  --chart-3: 268 67% 53%; --chart-4: 31 89% 43%;
+  --chart-5: 344 65% 52%; --chart-6: 192 77% 36%;
+  --cockpit-blue: hsl(var(--chart-1)); --cockpit-blueSoft: hsl(var(--chart-3));
+  --cockpit-teal: hsl(var(--chart-2)); --cockpit-units-accent: hsl(var(--chart-2));
+  --cockpit-orders-accent: hsl(var(--chart-3));
+  --ai-paint-5b8def: hsl(var(--chart-1)); --ai-paint-14a3a1: hsl(var(--chart-2));
+  --ai-paint-7c9cc9: hsl(var(--chart-3)); --ai-paint-9db7f0: hsl(var(--chart-4));
+  --ai-paint-6fcfc4: hsl(var(--chart-5)); --ai-paint-5fc4bb: hsl(var(--chart-6));
+  --executive-category-1: #305bd8; --executive-category-2: #079e91;
+  --executive-category-3: #884add; --executive-category-4: #d88617;
+  --executive-category-5: #c34b79; --executive-category-6: #1495b4;
+  --executive-category-7: #689544; --executive-category-8: #a462c7;
+  --executive-category-9: #b75e42; --executive-category-10: #476bbb;
+  --executive-category-11: #408f74; --executive-category-12: #b38b28;
+  --executive-category-13: #9e648a; --executive-category-14: #527d9b;
+  --executive-category-15: #777b46;
+}
+.dark .executive-cockpit[data-chart-palette="vibrant"] {
+  --chart-1: 219 93% 69%; --chart-2: 171 76% 55%;
+  --chart-3: 271 85% 73%; --chart-4: 36 94% 65%;
+  --chart-5: 342 82% 72%; --chart-6: 188 81% 63%;
+}
+.theme-ai .executive-cockpit[data-chart-palette="vibrant"] {
+  --chart-1: 239 91% 76%; --chart-2: 183 76% 65%;
+  --chart-3: 281 78% 77%; --chart-4: 40 92% 68%;
+  --chart-5: 348 76% 73%; --chart-6: 199 85% 71%;
+}
+.dark .executive-cockpit[data-chart-palette="vibrant"],
+.theme-ai .executive-cockpit[data-chart-palette="vibrant"] {
+  --executive-category-1: #99a8ff; --executive-category-2: #69d5c6;
+  --executive-category-3: #c49af0; --executive-category-4: #f2ba6b;
+  --executive-category-5: #ed94b4; --executive-category-6: #7bd2e5;
+  --executive-category-7: #a8d27e; --executive-category-8: #d3a1e5;
+  --executive-category-9: #eda98e; --executive-category-10: #85a6ed;
+  --executive-category-11: #8bd0b1; --executive-category-12: #e2ce7c;
+  --executive-category-13: #d5a4c8; --executive-category-14: #94c4dc;
+  --executive-category-15: #bfc98b;
+}

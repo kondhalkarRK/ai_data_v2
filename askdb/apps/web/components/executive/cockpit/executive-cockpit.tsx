@@ -56,6 +56,17 @@ const FILTER_LABELS: Record<FilterKey, string> = {
 };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const PALETTE_KEY = "ask-me-executive-chart-palette-v1";
+const subscribePalette = (notify: () => void) => {
+  window.addEventListener("storage", notify);
+  window.addEventListener("executive-palette-change", notify);
+  return () => { window.removeEventListener("storage", notify); window.removeEventListener("executive-palette-change", notify); };
+};
+const paletteSnapshot = (): "classic" | "vibrant" => {
+  try { return window.localStorage.getItem(PALETTE_KEY) === "vibrant" ? "vibrant" : "classic"; }
+  catch { return "classic"; }
+};
+const serverPalette = (): "classic" => "classic";
 
 function toQuery(filters: CockpitFilters): string {
   const params = new URLSearchParams();
@@ -64,6 +75,14 @@ function toQuery(filters: CockpitFilters): string {
 }
 
 export function ExecutiveCockpit({ industry }: { industry: Industry }) {
+  const persistedPalette = React.useSyncExternalStore(subscribePalette, paletteSnapshot, serverPalette);
+  const [fallbackPalette, setFallbackPalette] = React.useState<"classic" | "vibrant" | null>(null);
+  const chartPalette = fallbackPalette ?? persistedPalette;
+  const changePalette = (next: "classic" | "vibrant") => {
+    try { window.localStorage.setItem(PALETTE_KEY, next); setFallbackPalette(null); }
+    catch { setFallbackPalette(next); }
+    window.dispatchEvent(new Event("executive-palette-change"));
+  };
   const regionAccess = useRegionAccess();
   const [filters, setFilters] = React.useState<CockpitFilters>({});
   const [paneOpen, setPaneOpen] = React.useState(false);
@@ -97,7 +116,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
 
   const select: SelectHandler = React.useCallback((key, value) => {
     setFilters((current) => ({ ...current, [key]: current[key] === value ? undefined : value }));
-  }, []);
+  }, [setFilters]);
 
   const label = React.useCallback(
     (key: FilterKey, value: string): string => {
@@ -143,6 +162,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
   }));
 
   return (
+    <div className="executive-cockpit" data-chart-palette={chartPalette}>
     <ModuleWorkspace>
       <ModulePageHeader
         eyebrow="Executive intelligence"
@@ -160,6 +180,9 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
             <ModuleToolbarButton onClick={() => setPaneOpen((v) => !v)} active={count > 0}>
               <SlidersHorizontal className="size-3.5" /> Filters{count ? ` (${count})` : ""}
             </ModuleToolbarButton>
+            <div role="radiogroup" aria-label="Chart colors" className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-surface-sunken p-0.5 text-xs">
+              {(["classic", "vibrant"] as const).map((mode) => <button key={mode} type="button" role="radio" aria-checked={chartPalette === mode} onClick={() => changePalette(mode)} className={cn("rounded-md px-2.5 py-1.5 font-medium focus-visible:outline-2 focus-visible:outline-primary", chartPalette === mode ? "bg-surface-raised text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} title={`${mode === "classic" ? "Restrained blue and teal" : "Expressive, balanced colors"} for charts`}><span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: mode === "classic" ? "#4d7ce0" : "#9c62e8" }} />{mode === "classic" ? "Classic" : "Vibrant"}</button>)}
+            </div>
             <ModuleToolbarButton
               onClick={() => {
                 refreshNext.current = true;
@@ -266,6 +289,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
         onClear={() => setFilters({})}
       />
     </ModuleWorkspace>
+    </div>
   );
 }
 

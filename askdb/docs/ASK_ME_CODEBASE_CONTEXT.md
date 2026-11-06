@@ -75,7 +75,12 @@ See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for verified scope and rollbac
   of backend events. SSE `ask` and a Next.js streaming proxy also exist.
 - Executive Intelligence: `components/executive/`, particularly `cockpit/` ->
   `/executive/*`, `/kpis/*`: domain KPIs, trends, comparisons, geographic and
-  dealer/model exploration, insights and scenario functionality.
+  dealer/model exploration, insights and scenario functionality. The automotive
+  cockpit has a separate Classic/Vibrant chart-color preference stored in browser
+  storage (`ask-me-executive-chart-palette-v1`). Dashboard-scoped tokens live in
+  `apps/web/app/globals.css` under `.executive-cockpit`; `cockpit/palette.ts`
+  assigns fifteen stable category colors. Each mode adapts to Light, Dark and AI
+  without changing API queries or the insurance dashboard.
 - Analytics Builder: `components/analytics-builder/`, `hooks/use-analytics.ts`
   -> `/analytics/*` -> backend catalog, compiler and runner. Structured specs
   are validated, compiled and executed; analyses can be saved and duplicated.

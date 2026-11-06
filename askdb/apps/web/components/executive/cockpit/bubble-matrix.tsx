@@ -12,7 +12,7 @@ type Level = "state" | "zone";
 type Category = "Leader" | "Average" | "Underperforming";
 
 const CATEGORY_STYLE: Record<Category, { fill: string; stroke: string }> = {
-  Leader: { fill: "hsl(var(--primary))", stroke: "var(--ai-paint-1d4fc4, #1d4fc4)" },
+  Leader: { fill: "hsl(var(--chart-1))", stroke: "hsl(var(--chart-1))" },
   Average: { fill: "var(--ai-paint-8fa6c4, #8fa6c4)", stroke: "var(--ai-paint-64748b, #64748b)" },
   Underperforming: { fill: "var(--ai-paint-e3a19a, #e3a19a)", stroke: "var(--ai-paint-c8574d, #c8574d)" },
 };

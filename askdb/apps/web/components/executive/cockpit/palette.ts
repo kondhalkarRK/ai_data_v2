@@ -1,5 +1,3 @@
-import { chartColor } from "@/lib/chart-colors";
-
 /**
  * Cockpit palette: soft blue, executive grey and light teal. AI overrides use CSS tokens; Light and Dark retain their original palette.
  */
@@ -39,8 +37,8 @@ export const CATEGORY_COLOURS = [
 ];
 
 export function categoryColour(index: number): string {
-  if (typeof document !== "undefined") return chartColor(index);
-  return CATEGORY_COLOURS[index % CATEGORY_COLOURS.length] ?? COCKPIT.blue;
+  const slot = ((index % CATEGORY_COLOURS.length) + CATEGORY_COLOURS.length) % CATEGORY_COLOURS.length;
+  return `var(--executive-category-${slot + 1}, ${CATEGORY_COLOURS[slot]})`;
 }
 
 /** Mix a hex colour toward white (amount 0..1). */

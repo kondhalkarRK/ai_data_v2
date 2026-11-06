@@ -51,7 +51,7 @@ export function KpiStrip({ data, onSelect }: { data: CockpitData; onSelect: Sele
         formatValue={formatCount}
         growth={kpis.orders.growth}
         foot={`Avg price ${formatInr(kpis.avgPrice.value)} (${formatPct(kpis.avgPrice.growth, true)})`}
-        accent="hsl(var(--muted-foreground))"
+        accent="var(--cockpit-orders-accent, hsl(var(--muted-foreground)))"
       />
       <LeaderCard
         icon={<Car className="size-4" />}
