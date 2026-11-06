@@ -1,3 +1,9 @@
+npm ci
+npm ls @azure/msal-browser --workspace apps/web --depth=0
+.\scripts\dev.ps1
+
+----
+
 Build Error
 
 
