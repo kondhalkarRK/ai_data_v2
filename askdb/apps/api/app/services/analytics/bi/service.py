@@ -15,7 +15,13 @@ from app.schemas.bi import BiPending, BiPlan, BiReport, BiState, BiTurn, BiTurnR
 from app.services.analytics.bi.advanced import prepare
 from app.services.analytics.bi.execution import validate_values
 from app.services.analytics.bi.llm import BiCompletion, BiProviderError
-from app.services.analytics.bi.planning import propose, refresh_dates, validate, validate_chart
+from app.services.analytics.bi.planning import (
+    apply_report_filter,
+    propose,
+    refresh_dates,
+    validate,
+    validate_chart,
+)
 from app.services.analytics.bi.repository import context, owned, persist, view
 from app.services.analytics.runner import AnalyticsService
 from app.services.executive.dashboard import QueryMeter
@@ -108,6 +114,17 @@ async def turn(base: AnalyticsService, report_id: uuid.UUID, body: BiTurnRequest
                 kind, answer = proposal.kind, proposal.message
                 if proposal.kind == "answer":
                     assert proposal.plan
+                    if (
+                        previous
+                        and previous.report_filter
+                        and not proposal.plan.report_filter
+                        and not re.search(
+                            r"\b(?:yesterday|today|last|this|week|month|quarter|year|20\d{2})\b",
+                            body.question,
+                            re.IGNORECASE,
+                        )
+                    ):
+                        proposal.plan = apply_report_filter(proposal.plan, previous.report_filter)
                     if any(p.spec.filters for p in proposal.plan.panels):
                         original_connection = base._analytics
                         meter = QueryMeter(original_connection)
@@ -149,6 +166,13 @@ async def turn(base: AnalyticsService, report_id: uuid.UUID, body: BiTurnRequest
             state.plan = refresh_dates(state.plan, now)
             state.pending = None
             answer = "Refreshing report data. Relative periods now use the current business date; previous results remain labeled until replaced."
+        elif body.action == "filter":
+            if not state.plan or not body.report_filter:
+                raise ValidationError("Choose a valid report period before applying filters.")
+            state.plan = apply_report_filter(state.plan, body.report_filter)
+            await validate_values(base, state.plan.panels)
+            state.pending = None
+            answer = "Report filters applied. Updated data is loading."
         elif state.plan:
             plan = state.plan.model_copy(deep=True)
             if body.action == "rename":

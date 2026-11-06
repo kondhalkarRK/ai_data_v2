@@ -1,5 +1,6 @@
 """Versioned automotive BI contracts. No client SQL or permission fields."""
 
+from datetime import date
 from typing import Literal
 from uuid import UUID
 
@@ -31,6 +32,7 @@ class BiPlan(StrictModel):
     answer_kind: Literal["single_value", "analysis", "report", "dashboard"] = "analysis"
     panels: list[BiPanel] = Field(min_length=1, max_length=6)
     assumptions: list[str] = Field(default_factory=list, max_length=6)
+    report_filter: "BiReportFilter | None" = None
 
     @model_validator(mode="after")
     def shape(self) -> "BiPlan":
@@ -114,9 +116,44 @@ class BiTurnRequest(StrictModel):
     question: str = Field(default="", max_length=2000)
     selected_panel_id: str | None = Field(default=None, max_length=80)
     action: Literal[
-        "ask", "save", "undo", "refresh", "remove", "move_up", "move_down", "visualize", "rename"
+        "ask",
+        "save",
+        "undo",
+        "refresh",
+        "remove",
+        "move_up",
+        "move_down",
+        "visualize",
+        "rename",
+        "filter",
     ] = "ask"
     value: str | None = Field(default=None, max_length=160)
+    report_filter: "BiReportFilter | None" = None
+
+
+class BiReportFilter(StrictModel):
+    period: Literal["year", "month", "week"]
+    year: int = Field(ge=2000, le=2100)
+    month: int | None = Field(default=None, ge=1, le=12)
+    week_start: date | None = None
+    make: str | None = Field(default=None, max_length=100)
+    region: str | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def period_fields(self) -> "BiReportFilter":
+        if self.period == "month" and self.month is None:
+            raise ValueError("Select a month.")
+        if self.period == "week" and (
+            self.week_start is None
+            or self.week_start.weekday() != 0
+            or self.week_start.year != self.year
+        ):
+            raise ValueError("Select a Monday in the chosen year.")
+        if self.make is not None and not self.make.strip():
+            self.make = None
+        if self.region is not None and not self.region.strip():
+            self.region = None
+        return self
 
 
 class BiRunRequest(StrictModel):

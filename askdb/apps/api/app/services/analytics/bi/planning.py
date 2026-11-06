@@ -8,8 +8,8 @@ from typing import Any
 from pydantic import ValidationError as ContractError
 
 from app.core.exceptions import ValidationError
-from app.schemas.analytics_workspace import WorkspaceRequest, WorkspaceSpec
-from app.schemas.bi import BiPanel, BiPlan, BiProposal, BiState
+from app.schemas.analytics_workspace import WorkspaceFilter, WorkspaceRequest, WorkspaceSpec
+from app.schemas.bi import BiPanel, BiPlan, BiProposal, BiReportFilter, BiState
 from app.services.analytics.bi.llm import BiCompletion, BiProviderError
 from app.services.analytics.catalog import Catalog, first_error
 from app.services.analytics.workspace import local_plan, validate_question_dates
@@ -18,11 +18,12 @@ from app.services.security.region_scope import RegionScope, assert_requested_reg
 PERIODS = ("yesterday", "last week", "this week", "last month", "this month", "last quarter")
 
 LEADERSHIP_PROMPTS = {
-    "create a weekly sales and revenue briefing for the cfo": ("CFO sales briefing", "last week"),
-    "create a monthly sales and revenue briefing for the cfo": ("CFO sales briefing", "last month"),
-    "show the monthly business pulse by market and product for the ceo": ("CEO business pulse", "last month"),
-    "show last month's region and dealer performance": ("Regional performance", "last month"),
-    "build a weekly sales team and dealer report": ("Sales team performance", "last week"),
+    "sales report for ceo": ("Sales Report for CEO", "last month"),
+    "financial sales briefing for cfo": ("Financial Sales Briefing for CFO", "last month"),
+    "region & dealer performance": ("Region & Dealer Performance", "last month"),
+    "sales team performance": ("Sales Team Performance", "last week"),
+    "make & model comparison": ("Make & Model Comparison", "last month"),
+    "sales momentum & emerging models": ("Sales Momentum & Model Leaders", "last week"),
 }
 
 
@@ -34,48 +35,133 @@ def leadership_plan(question: str, now: datetime) -> BiProposal | None:
     start, end = period_dates(period, now)
     weekly = period == "last week"
     definitions = {
-        "CFO sales briefing": [
-            ("Revenue", "revenue", None), ("Average selling price", "average_selling_price", None),
-            ("Revenue trend", "revenue", "time"), ("Revenue by region", "revenue", "region"),
-            ("Units by make", "units_sold", "make"), ("Revenue by dealer", "revenue", "dealer"),
+        "Financial Sales Briefing for CFO": [
+            ("Revenue", "revenue", None),
+            ("Average selling price", "average_selling_price", None),
+            ("Revenue trend", "revenue", "time"),
+            ("ASP by make", "average_selling_price", "make"),
+            ("Revenue by region", "revenue", "region"),
+            ("Revenue by dealer", "revenue", "dealer"),
         ],
-        "CEO business pulse": [
-            ("Revenue", "revenue", None), ("Units sold", "units_sold", None),
-            ("Revenue trend", "revenue", "time"), ("Revenue by region", "revenue", "region"),
-            ("Units by make", "units_sold", "make"), ("Units by model", "units_sold", "model"),
+        "Sales Report for CEO": [
+            ("Revenue", "revenue", None),
+            ("Units sold", "units_sold", None),
+            ("Revenue trend", "revenue", "time"),
+            ("Revenue by region", "revenue", "region"),
+            ("Units by make", "units_sold", "make"),
+            ("Units by model", "units_sold", "model"),
         ],
-        "Regional performance": [
-            ("Revenue", "revenue", None), ("Units sold", "units_sold", None),
-            ("Revenue trend", "revenue", "time"), ("Revenue by region", "revenue", "region"),
-            ("Revenue by dealer", "revenue", "dealer"), ("Units by model", "units_sold", "model"),
+        "Region & Dealer Performance": [
+            ("Revenue", "revenue", None),
+            ("Units sold", "units_sold", None),
+            ("Revenue by region", "revenue", "region"),
+            ("Units by dealer", "units_sold", "dealer"),
+            ("Revenue trend", "revenue", "time"),
+            ("Region and model mix", "units_sold", "region_model"),
         ],
-        "Sales team performance": [
-            ("Units sold", "units_sold", None), ("Active salespeople", "active_salespeople", None),
-            ("Units trend", "units_sold", "time"), ("Units by salesperson", "units_sold", "salesperson"),
-            ("Revenue by dealer", "revenue", "dealer"), ("Units by model", "units_sold", "model"),
+        "Sales Team Performance": [
+            ("Units sold", "units_sold", None),
+            ("Active salespeople", "active_salespeople", None),
+            ("Units trend", "units_sold", "time"),
+            ("Units by salesperson", "units_sold", "salesperson"),
+            ("Orders by dealer", "orders", "dealer"),
+            ("Units by model", "units_sold", "model"),
+        ],
+        "Make & Model Comparison": [
+            ("Units sold", "units_sold", None),
+            ("Average selling price", "average_selling_price", None),
+            ("Units by make", "units_sold", "make"),
+            ("Models by units", "units_sold", "model"),
+            ("ASP by model", "average_selling_price", "model"),
+            ("Revenue trend", "revenue", "time"),
+        ],
+        "Sales Momentum & Model Leaders": [
+            ("Revenue", "revenue", None),
+            ("Orders", "orders", None),
+            ("Revenue trend", "revenue", "time"),
+            ("Units trend", "units_sold", "time"),
+            ("Models by units", "units_sold", "model"),
+            ("Revenue by make", "revenue", "make"),
         ],
     }
     panels: list[BiPanel] = []
     for index, (label, metric, breakdown) in enumerate(definitions[title]):
         is_time = breakdown == "time"
-        spec = WorkspaceSpec(
-            metrics=[metric], dimensions=["month" if is_time else breakdown] if breakdown else [],
-            analysis="trend" if is_time else "top_n" if breakdown else "basic",
-            viz="line" if is_time else "bar" if breakdown else "kpi",
-            date_preset="custom", date_from=start, date_to=end,
-            limit=35 if is_time else 10 if breakdown else 1,
+        dimensions = (
+            (
+                ["month"]
+                if is_time
+                else ["region", "model"]
+                if breakdown == "region_model"
+                else [breakdown]
+            )
+            if breakdown
+            else []
         )
-        panels.append(BiPanel(
-            id=f"leader-{index + 1}", title=label, spec=spec,
-            kind="chart" if breakdown else "kpi", grain=("day" if weekly else "week") if is_time else None,
-            section="Key metrics" if not breakdown else "Sales movement" if is_time else "Performance breakdown",
-            date_intent=period, rationale="Uses the approved automotive metric definition.",
-        ))
+        spec = WorkspaceSpec(
+            metrics=[metric],
+            dimensions=dimensions,
+            analysis="trend"
+            if is_time
+            else "basic"
+            if breakdown == "region_model"
+            else "top_n"
+            if breakdown
+            else "basic",
+            viz="area"
+            if is_time and index == 2 and title == "Sales Momentum & Model Leaders"
+            else "line"
+            if is_time
+            else "heatmap"
+            if breakdown == "region_model"
+            else "treemap"
+            if breakdown == "region" and title == "Financial Sales Briefing for CFO"
+            else "treemap"
+            if breakdown == "make"
+            and title in {"Sales Report for CEO", "Sales Momentum & Model Leaders"}
+            else "bar"
+            if breakdown
+            else "kpi",
+            date_preset="custom",
+            date_from=start,
+            date_to=end,
+            limit=35 if is_time else 100 if breakdown == "region_model" else 10 if breakdown else 1,
+        )
+        panels.append(
+            BiPanel(
+                id=f"leader-{index + 1}",
+                title=label,
+                spec=spec,
+                kind="chart" if breakdown else "kpi",
+                grain=("day" if weekly else "week") if is_time else None,
+                section="Key metrics"
+                if not breakdown
+                else "Sales movement"
+                if is_time
+                else "Performance breakdown",
+                date_intent=period,
+                rationale="Uses the approved automotive metric definition.",
+            )
+        )
     plan = BiPlan(
-        title=f"{title} · {period}", answer_kind="report", panels=panels,
-        assumptions=[f"The reporting period is the last completed calendar { 'week' if weekly else 'month' }."],
+        title=title,
+        answer_kind="report",
+        panels=panels,
+        assumptions=[
+            f"The reporting period is the last completed calendar {'week' if weekly else 'month'}."
+        ],
+        report_filter=BiReportFilter(
+            period="week" if weekly else "month",
+            year=date.fromisoformat(start).year,
+            month=date.fromisoformat(start).month if not weekly else None,
+            week_start=date.fromisoformat(start) if weekly else None,
+        ),
     )
-    return BiProposal(kind="answer", plan=plan, message=f"Prepared {plan.title}. The report uses six governed panels; values and evidence load next.")
+    return BiProposal(
+        kind="answer",
+        plan=plan,
+        message=f"Prepared {plan.title}. The report uses six governed panels; values and evidence load next.",
+    )
 
 
 def period_dates(intent: str, now: datetime) -> tuple[str, str]:
@@ -84,6 +170,42 @@ def period_dates(intent: str, now: datetime) -> tuple[str, str]:
         raise ValidationError("This relative period is not supported. Choose exact dates.")
     spec = resolved.panels[0].spec
     return str(spec.date_from), str(spec.date_to)
+
+
+def apply_report_filter(plan: BiPlan, selection: BiReportFilter) -> BiPlan:
+    """Apply one explicit date/make scope to every panel; no model call or SQL input."""
+    if selection.period == "year":
+        start, end = date(selection.year, 1, 1), date(selection.year, 12, 31)
+    elif selection.period == "month":
+        assert selection.month is not None
+        start = date(selection.year, selection.month, 1)
+        end = (
+            date(selection.year + 1, 1, 1)
+            if selection.month == 12
+            else date(selection.year, selection.month + 1, 1)
+        ) - timedelta(days=1)
+    else:
+        assert selection.week_start is not None
+        start, end = selection.week_start, selection.week_start + timedelta(days=6)
+    updated = plan.model_copy(deep=True)
+    for panel in updated.panels:
+        panel.spec.date_from, panel.spec.date_to = str(start), str(end)
+        panel.date_intent = None
+        panel.spec.filters = [f for f in panel.spec.filters if f.domain not in {"make", "region"}]
+        if selection.make:
+            panel.spec.filters.append(WorkspaceFilter(domain="make", values=[selection.make]))
+        if selection.region:
+            panel.spec.filters.append(WorkspaceFilter(domain="region", values=[selection.region]))
+        if "month" in panel.spec.dimensions and panel.spec.analysis == "trend":
+            panel.grain = (
+                "day"
+                if selection.period == "week"
+                else "week"
+                if selection.period == "month"
+                else "month"
+            )
+    updated.report_filter = selection
+    return updated
 
 
 def data_key(panel: BiPanel) -> str:
@@ -194,7 +316,9 @@ def fast_plan(question: str, now: datetime, previous: BiPlan | None) -> BiPropos
     kind = "report" if "report" in question.casefold() else found.answer_kind
     plan = BiPlan(title=found.title, answer_kind=kind, panels=panels, assumptions=found.assumptions)
     if assumed_period:
-        plan.assumptions.append("No period was specified. Showing the last completed calendar month.")
+        plan.assumptions.append(
+            "No period was specified. Showing the last completed calendar month."
+        )
     return BiProposal(
         kind="answer",
         message=(
@@ -357,4 +481,16 @@ def refresh_dates(plan: BiPlan, now: datetime) -> BiPlan:
         for panel in updated.panels:
             if panel.date_intent == "last week":
                 panel.spec.date_to = str(now.date() - timedelta(days=7))
+    if updated.report_filter and len(intents) == 1:
+        intent = next(iter(intents))
+        if intent in {"last week", "last month"}:
+            start = date.fromisoformat(updated.panels[0].spec.date_from)
+            updated.report_filter = BiReportFilter(
+                period="week" if intent == "last week" else "month",
+                year=start.year,
+                month=start.month if intent == "last month" else None,
+                week_start=start if intent == "last week" else None,
+                make=updated.report_filter.make,
+                region=updated.report_filter.region,
+            )
     return updated

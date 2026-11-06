@@ -26,11 +26,17 @@ export function BuilderModes({ pack }: { pack: SemanticPackResponse }) {
 function AutomotiveModes({ pack, askbi = false }: { pack: SemanticPackResponse; askbi?: boolean }) {
   const [mode, setMode] = React.useState<"custom" | "auto">("custom");
   const [visited, setVisited] = React.useState(false);
+  const requestedAuto = React.useSyncExternalStore(
+    () => () => {},
+    () => askbi && new URLSearchParams(window.location.search).has("askbiReport"),
+    () => false,
+  );
+  const activeMode = requestedAuto && !visited ? "auto" : mode;
   return <div className="space-y-5">
     <div role="group" aria-label="Analytics Builder mode" className="inline-flex rounded-xl border border-border bg-surface-raised p-1">
-      {(["custom", "auto"] as const).map((value) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => { setMode(value); if (value === "auto") setVisited(true); }} className={`rounded-lg px-5 py-2 text-sm font-medium focus-visible:outline-ring ${mode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{value === "auto" ? askbi ? "Auto Report · AskBI" : "Auto · AskWiz" : askbi ? "Custom Report" : "Custom"}</button>)}
+      {(["custom", "auto"] as const).map((value) => <button key={value} type="button" aria-pressed={activeMode === value} onClick={() => { setMode(value); setVisited(true); }} className={`rounded-lg px-5 py-2 text-sm font-medium focus-visible:outline-ring ${activeMode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{value === "auto" ? askbi ? "Auto Report · AskBI" : "Auto · AskWiz" : askbi ? "Custom Report" : "Custom"}</button>)}
     </div>
-    <div hidden={mode !== "custom"}><AnalyticsBuilderShell pack={pack} /></div>
-    {visited ? <div hidden={mode !== "auto"}>{askbi ? <AskBI /> : <AskWiz />}</div> : null}
+    <div hidden={activeMode !== "custom"}><AnalyticsBuilderShell pack={pack} /></div>
+    {visited || requestedAuto ? <div hidden={activeMode !== "auto"}>{askbi ? <AskBI /> : <AskWiz />}</div> : null}
   </div>;
 }

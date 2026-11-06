@@ -21,8 +21,9 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   // Same-origin in dev (rewrites). Keep absolute API hosts for production/direct mode.
-  `connect-src 'self' ${rewriteTarget} http://127.0.0.1:8000 http://localhost:8000`,
+  `connect-src 'self' ${rewriteTarget} http://127.0.0.1:8000 http://localhost:8000 https://login.microsoftonline.com https://graph.microsoft.com`,
   "frame-ancestors 'none'",
+  "frame-src 'self' https://login.microsoftonline.com",
   "base-uri 'self'",
   "form-action 'self'",
   "object-src 'none'",
@@ -34,6 +35,8 @@ const nextConfig: NextConfig = {
 
   // Optional New Chat experience. Off by default; Classic is the only UI when false.
   env: {
+    NEXT_PUBLIC_ASK_ME_OUTLOOK_CLIENT_ID: process.env.NEXT_PUBLIC_ASK_ME_OUTLOOK_CLIENT_ID ?? "",
+    NEXT_PUBLIC_ASK_ME_OUTLOOK_TENANT_ID: process.env.NEXT_PUBLIC_ASK_ME_OUTLOOK_TENANT_ID ?? "",
     NEXT_PUBLIC_ASK_ME_ASKBI_ENABLED:
       process.env.NEXT_PUBLIC_ASK_ME_ASKBI_ENABLED ?? process.env.ASK_ME_ASKBI_ENABLED ?? "false",
     NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED:
@@ -80,6 +83,14 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
+        ],
+      },
+      {
+        // MSAL's silent refresh opens this same-origin redirect page in an iframe.
+        source: "/outlook-redirect",
+        headers: [
+          { key: "Content-Security-Policy", value: contentSecurityPolicy.replace("frame-ancestors 'none'", "frame-ancestors 'self'") },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
         ],
       },
     ];

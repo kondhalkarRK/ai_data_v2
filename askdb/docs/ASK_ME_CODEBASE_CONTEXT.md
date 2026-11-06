@@ -20,11 +20,16 @@ no agents were added. See `ASKBI_IMPLEMENTATION.md` for verified checks,
 deployment precedence, rollback and outstanding live/advanced-coverage limits.
 An exact undated metric-by-breakdown request such as “total sales by region”
 uses the last completed calendar month with an explicit assumption, avoiding
-an LLM call for that supported request. Four exact automotive leadership
-starter prompts now produce two KPI and four chart panels. The report canvas
-groups KPI/trend/breakdowns and supports browser Save as PDF; an email draft
-requires manually attaching that PDF. See `ASKBI_LEADERSHIP_REPORT_PLAN.md` for
-the verified scope and remaining Outlook Graph integration.
+an LLM call for that supported request. Six exact automotive leadership
+starter prompts now produce distinct two-KPI/four-chart reports. The report
+canvas shows title, dates, make, evidence briefing and grouped charts. A
+server-validated year/month/week/make filter updates all panels without an LLM
+call; the region/dealer report can also narrow to a permitted region. Current
+and previous results remain distinct. Browser Save as PDF remains.
+Optional `outlook-draft.ts` uses a configured Entra SPA and delegated Graph
+`Mail.ReadWrite` to create an unsent draft with current KPIs, up to three inline
+chart images, the full PDF and an owner-scoped saved-report link. Manual mailto
+remains available. See `ASKBI_LEADERSHIP_REPORT_PLAN.md` for office QA limits.
 
 Unified Analytics Builder is implemented behind disabled-by-default
 `ASK_ME_ANALYTICS_WORKSPACE_ENABLED` / `NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED`.

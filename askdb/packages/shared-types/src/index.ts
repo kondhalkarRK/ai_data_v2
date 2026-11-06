@@ -693,6 +693,15 @@ export interface BiPlan {
   answerKind: "single_value" | "analysis" | "report" | "dashboard";
   panels: BiPanel[];
   assumptions: string[];
+  reportFilter?: BiReportFilter | null;
+}
+export interface BiReportFilter {
+  period: "year" | "month" | "week";
+  year: number;
+  month?: number | null;
+  weekStart?: string | null;
+  make?: string | null;
+  region?: string | null;
 }
 export interface BiTurn {
   id: string;

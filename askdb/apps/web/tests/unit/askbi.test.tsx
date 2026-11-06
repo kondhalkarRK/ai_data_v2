@@ -46,6 +46,16 @@ it("leaves insurance on its existing Custom implementation", () => {
   expect(screen.queryByRole("button", { name: /AskBI/ })).not.toBeInTheDocument();
 });
 
+it("opens Auto Report for a saved-report link", async () => {
+  vi.stubEnv("NEXT_PUBLIC_ASK_ME_ASKBI_ENABLED", "true");
+  window.history.replaceState({}, "", "/analytics-builder?askbiReport=report-1");
+  try {
+    render(<BuilderModes pack={{} as never} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Auto Report · AskBI" })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByText("AskBI report content")).toBeVisible();
+  } finally { window.history.replaceState({}, "", "/"); }
+});
+
 it("keeps one durable conversation through clarification and short answer", async () => {
   const post = setup(); let turns = 0;
   const clarification: BiReport = { ...draft(), revision: 2, state: { ...draft().state, pending: { question: "Sales", clarification: "Which period?", selectedPanelId: null }, turns: [{ id: "t1", question: "Sales", answer: "Which period?", kind: "clarification", code: null, changedPanelIds: [] }] } };
@@ -95,7 +105,7 @@ it("discards a late turn response after New report", async () => {
   const post = setup(); let finish: (value: unknown) => void = () => {};
   post.mockImplementation(async path => path.endsWith("/reports") ? draft() as never : new Promise(resolve => { finish = resolve; }) as never);
   const hook = renderHook(useAskBI); await ready(hook);
-  let work: Promise<void>;
+  let work: Promise<BiReport | undefined>;
   act(() => { work = hook.result.current.command("ask", "Old question"); });
   await waitFor(() => expect(post.mock.calls.some(([p]) => p.endsWith("/turns"))).toBe(true));
   act(() => hook.result.current.reset());

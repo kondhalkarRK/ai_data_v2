@@ -13,13 +13,23 @@ import sqlglot
 from pydantic import ValidationError as ContractError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.api.routes.analytics import _permitted_region_values
 from app.core.config import Industry, Settings
 from app.core.exceptions import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from app.models import Base
 from app.models.enums import Role
 from app.models.user import User
+from app.schemas.analytics import FilterValueItem, FilterValuesResponse
 from app.schemas.analytics_workspace import WorkspaceSpec
-from app.schemas.bi import BiCreate, BiPanel, BiPending, BiPlan, BiState, BiTurnRequest
+from app.schemas.bi import (
+    BiCreate,
+    BiPanel,
+    BiPending,
+    BiPlan,
+    BiReportFilter,
+    BiState,
+    BiTurnRequest,
+)
 from app.semantic.service import SemanticService
 from app.services.analytics.bi import advanced, execution, planning, repository, service
 from app.services.analytics.bi.llm import BiProviderError
@@ -112,9 +122,73 @@ def test_leadership_report_presets_are_governed_and_bounded(catalog, question):
 
 
 def test_leadership_prompt_with_extra_qualifier_is_not_a_preset():
-    assert planning.fast_plan(
-        "Create a weekly sales and revenue briefing for the CFO for Tata", NOW, None
-    ) is None
+    assert (
+        planning.fast_plan(
+            "Create a weekly sales and revenue briefing for the CFO for Tata", NOW, None
+        )
+        is None
+    )
+
+
+def test_report_filters_apply_same_dates_and_make_to_every_panel(catalog):
+    plan = planning.fast_plan("Make & Model Comparison", NOW, None).plan
+    selected = BiReportFilter(period="month", year=2025, month=4, make="Tata")
+    filtered = planning.apply_report_filter(plan, selected)
+    assert all(
+        (p.spec.date_from, p.spec.date_to) == ("2025-04-01", "2025-04-30") for p in filtered.panels
+    )
+    assert all(
+        len(p.spec.filters) == 1 and p.spec.filters[0].values == ["Tata"] for p in filtered.panels
+    )
+    assert all(not p.date_intent for p in filtered.panels)
+    planning.validate(filtered, catalog, SCOPE)
+    assert not plan.panels[0].spec.filters
+
+
+def test_region_report_filters_dealers_and_models_within_permitted_zone(catalog):
+    plan = planning.fast_plan("Region & Dealer Performance", NOW, None).plan
+    west = RegionScope(unrestricted=False, zones=("West",))
+    filtered = planning.apply_report_filter(
+        plan, BiReportFilter(period="month", year=2026, month=10, region="Mumbai")
+    )
+    assert all(
+        len(p.spec.filters) == 1
+        and p.spec.filters[0].domain == "region"
+        and p.spec.filters[0].values == ["Mumbai"]
+        for p in filtered.panels
+    )
+    planning.validate(filtered, catalog, west)
+    forbidden = planning.apply_report_filter(
+        plan, BiReportFilter(period="month", year=2026, month=10, region="New Delhi")
+    )
+    with pytest.raises(AuthorizationError):
+        planning.validate(forbidden, catalog, west)
+
+
+def test_region_options_exclude_places_outside_user_scope():
+    west = RegionScope(unrestricted=False, zones=("West",))
+    values = FilterValuesResponse(
+        domain="region",
+        label="Region",
+        values=[FilterValueItem(value="Mumbai"), FilterValueItem(value="New Delhi")],
+    )
+    result = _permitted_region_values(values, west)
+    assert [item.value for item in result.values] == ["Mumbai"]
+
+
+def test_week_filter_uses_monday_and_preserves_missing_values():
+    from pydantic import ValidationError as PydanticError
+
+    plan = planning.fast_plan("Sales Report for CEO", NOW, None).plan
+    filtered = planning.apply_report_filter(
+        plan, BiReportFilter(period="week", year=2026, week_start="2026-11-02")
+    )
+    assert all(
+        (p.spec.date_from, p.spec.date_to) == ("2026-11-02", "2026-11-08") for p in filtered.panels
+    )
+    assert next(p for p in filtered.panels if p.title == "Revenue trend").grain == "day"
+    with pytest.raises(PydanticError):
+        BiReportFilter(period="week", year=2026, week_start="2026-11-03")
 
 
 def test_context_preserves_original_and_pending_slot():

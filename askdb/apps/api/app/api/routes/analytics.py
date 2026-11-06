@@ -6,7 +6,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
@@ -30,6 +30,7 @@ from app.schemas.analytics import (
     AnalyticsInspectRequest,
     AnalyticsRunRequest,
     AnalyticsRunResponse,
+    FilterValueItem,
     FilterValuesResponse,
     SavedAnalysisCreate,
     SavedAnalysisResponse,
@@ -66,6 +67,7 @@ from app.services.analytics.workspace import (
     run_panel,
     save_workspace,
 )
+from app.services.security.region_scope import RegionScope, zone_for_label
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -105,6 +107,48 @@ async def bi_capabilities(
         "maxQueries": 6,
         "migration": "0014_bi_reports",
     }
+
+
+@router.get("/bi/region-options", response_model=FilterValuesResponse)
+async def bi_region_options(service: AnalyticsServiceDep) -> FilterValuesResponse:
+    _, scope = await bi_repository.context(service)
+    values = await service.filter_values("region", limit=200)
+    return _permitted_region_values(values, scope)
+
+
+def _permitted_region_values(
+    values: FilterValuesResponse, scope: RegionScope
+) -> FilterValuesResponse:
+    return values.model_copy(
+        update={
+            "values": [
+                item
+                for item in values.values
+                if scope.unrestricted or zone_for_label(item.value) in scope.zones
+            ]
+        }
+    )
+
+
+@router.get("/bi/make-options", response_model=FilterValuesResponse)
+async def bi_make_options(service: AnalyticsServiceDep) -> FilterValuesResponse:
+    await bi_repository.context(service)
+    # This connection applies the caller's region row policy. The shared value
+    # dictionary is cached by industry and cannot provide scoped availability.
+    rows = await service._analytics.execute(
+        text(
+            "SELECT DISTINCT c.make::text AS value "
+            "FROM automotive.fact_sales AS s "
+            "JOIN automotive.dim_carline AS c ON c.carline_id = s.carline_id "
+            "WHERE c.make IS NOT NULL AND c.make::text <> '' "
+            "ORDER BY value LIMIT 200"
+        )
+    )
+    return FilterValuesResponse(
+        domain="make",
+        label="Make",
+        values=[FilterValueItem(value=str(row.value)) for row in rows],
+    )
 
 
 @router.post("/bi/reports", response_model=BiReport, dependencies=[Depends(verify_csrf)])

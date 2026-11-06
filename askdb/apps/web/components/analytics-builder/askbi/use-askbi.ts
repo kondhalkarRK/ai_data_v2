@@ -1,20 +1,24 @@
 "use client";
 
 import * as React from "react";
-import type { AnalyticsRunResponse, AnalyticsSpec, BiPanel, BiReport, BiTurn, BiUsage } from "@nql/shared-types";
+import type { AnalyticsRunResponse, AnalyticsSpec, BiPanel, BiPlan, BiReport, BiReportFilter, BiTurn, BiUsage } from "@nql/shared-types";
 import { apiClient, ApiError } from "@/lib/api-client";
 
 export const BI_ROOT = "/api/v1/analytics/bi";
 const options = { industry: "automotive" as const };
 type RunResult = { result: AnalyticsRunResponse; evidence: string; queryCount: number; elapsedMs: number };
 export type PanelResult = Partial<RunResult> & { scope?: string; resultSpec?: AnalyticsSpec; error?: string; loading?: boolean; revision?: number; loadedAt?: string };
-export type ReportAction = "ask" | "save" | "undo" | "refresh" | "remove" | "move_up" | "move_down" | "visualize" | "rename";
+export type ReportAction = "ask" | "save" | "undo" | "refresh" | "remove" | "move_up" | "move_down" | "visualize" | "rename" | "filter";
 export type SavedOption = { id: string; title: string; source?: "analysis" | "board" | "workspace" };
 export type Capability = { enabled: boolean; engine: string; schemaVersion: number; advancedEnabled: boolean; migration: string };
 const failure = (error: unknown) => error instanceof ApiError ? `${error.message}${error.requestId && error.requestId !== "-" ? ` (reference ${error.requestId})` : ""}` : error instanceof Error ? error.message : "The request failed. Please retry.";
 export const panelScope = (panel: BiPanel) => JSON.stringify({ ...panel.spec, viz: undefined, grain: panel.grain ?? null, daily: panel.daily ?? false, calculation: panel.calculation ?? null });
 // The reused renderer expects the original workspace scope encoding.
 export const rendererScope = (panel: BiPanel) => JSON.stringify({ ...panel.spec, viz: undefined, daily: panel.daily ?? false });
+export const reportReady = (plan: BiPlan | null, results: Record<string, PanelResult>) => Boolean(plan && plan.panels.every(panel => {
+  const state = results[panel.id];
+  return state?.result && state.scope === panelScope(panel) && !state.loading && !state.error;
+}));
 
 export function useAskBI() {
   const [capability, setCapability] = React.useState<Capability | null>(null);
@@ -148,7 +152,7 @@ export function useAskBI() {
     }
   }
 
-  async function command(action: ReportAction, question = "", value?: string, target = selected, retry = false) {
+  async function command(action: ReportAction, question = "", value?: string, target = selected, retry = false, reportFilter?: BiReportFilter) {
     if (locked.current || !capability?.enabled) return;
     const work = begin(); setStatus(action === "ask" ? "Understanding your question…" : "Applying report change…");
     try {
@@ -167,7 +171,7 @@ export function useAskBI() {
         setCurrent(current); needsSync.current = false;
       }
       const retryQuestion = retry ? current.state.turns.at(-1)?.question ?? question : question;
-      const body = retry && needsSync.current && lastRequest.current?.id === current.id && "requestId" in lastRequest.current.body ? lastRequest.current.body : { requestId: crypto.randomUUID(), revision: current.revision, question: retryQuestion, selectedPanelId: target, action, value: value ?? null };
+      const body = retry && needsSync.current && lastRequest.current?.id === current.id && "requestId" in lastRequest.current.body ? lastRequest.current.body : { requestId: crypto.randomUUID(), revision: current.revision, question: retryQuestion, selectedPanelId: target, action, value: value ?? null, reportFilter: reportFilter ?? null };
       lastRequest.current = { id: current.id, body };
       const next = await apiClient.post<BiReport>(`${BI_ROOT}/reports/${current.id}/turns`, body, { ...options, signal: work.signal });
       if (work.id !== sequence.current) return;
@@ -176,8 +180,9 @@ export function useAskBI() {
       const last = next.state.turns.at(-1);
       if (last?.kind === "error") { setError(last.answer); return; }
       if (last?.kind === "clarification" || last?.kind === "unsupported") return;
-      if (action === "save") { void loadSaved(work.signal); return; }
+      if (action === "save") { void loadSaved(work.signal); return next; }
       await display(next, work.id, work.signal, action === "refresh");
+      return next;
     } catch (cause) {
       if (work.id === sequence.current) {
         needsSync.current = true; setError(failure(cause));

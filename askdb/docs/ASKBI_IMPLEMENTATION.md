@@ -1,6 +1,6 @@
 # AskBI implementation and deployment
 
-Verified 2026-11-05. Automotive only. This records implemented code and offline
+Updated 2026-11-06. Automotive only. This records implemented code and offline
 checks; it does not certify a live PostgreSQL/LLM deployment or WrenAI parity.
 
 ## What changed
@@ -16,18 +16,27 @@ questions and contextual follow-ups into governed specifications. Exact supporte
 initial requests reuse templates, and local chart presentation edits reuse data.
 Metric definitions remain in the semantic catalog, not model-generated formulas.
 
-Four exact leadership starter questions now appear on the empty Auto Report
-canvas. Send creates a fixed two-KPI/four-chart automotive report for CFO, CEO,
-regional or sales leadership, with last completed week/month dates and governed
-metric definitions. The CFO question also accepts “monthly” in place of “weekly”.
-The LLM remains available for novel follow-ups and optional evidence narration.
-The report groups KPI cards, trend and ranked breakdowns for readable alignment.
-“Export PDF” opens the browser print dialog only after all panels have current
-results; choose Save as PDF. “Email draft” opens the default mail application
-with a subject and period and instructs the user to attach that PDF. This is a
-manual handoff, not automatic Outlook delivery or an attached message. The
-authenticated Microsoft Graph integration needed for automatic delivery remains
-unimplemented. See `ASKBI_LEADERSHIP_REPORT_PLAN.md`.
+Six exact leadership starter questions appear on the empty Auto Report canvas:
+CEO sales, CFO financial sales, region/dealer performance, sales team performance,
+make/model comparison, and sales momentum/model leaders. A click fills the composer;
+Send builds a server-owned automotive plan with two KPIs and four varied charts.
+Unknown qualifiers continue through governed LLM interpretation. Initial dates
+are the last completed calendar month or Monday–Sunday week, stated on screen.
+After generation, year/month/week and make filters apply to every panel through a
+validated server turn without an LLM call. The region/dealer report also offers a
+permitted region selector so dealers and models narrow together. Save/open and
+Undo retain the selection. The make choices query scoped sales data; region
+choices exclude places outside the user's zone. A custom AI date span is labeled
+“Current range” until a calendar period is selected.
+
+The report canvas shows title, dates, make, evidence briefing and governed panels.
+“Export PDF” opens browser print after all panels have current results. “Create
+Outlook draft” appears only when public Microsoft Entra client and tenant IDs are
+configured. It saves the report, captures current charts and KPIs, generates a
+full PDF, and creates a **draft** through Microsoft Graph with delegated
+`Mail.ReadWrite`; it does not send. The link opens the owner-scoped saved report.
+“Manual email draft” remains available and requires attaching the exported PDF.
+Outlook rendering and attachment behavior still need office-environment QA.
 
 Server-owned state preserves clarification questions and answers, selected-panel
 context, report revisions and recent conversation. Typed failures retain the
@@ -48,7 +57,8 @@ replacing a newer report.
 
 - Frontend entry: `apps/web/components/analytics-builder/builder-modes.tsx`.
 - AskBI UI/state: `apps/web/components/analytics-builder/askbi/`; existing
-  `analytics-workspace.tsx` exports its panel renderer for reuse.
+  `analytics-workspace.tsx` exports its panel renderer for reuse. `report-filters.tsx`
+  owns the filter bar; `outlook-draft.ts` builds the email and uses Graph.
 - HTTP endpoints: `apps/api/app/api/routes/analytics.py`, `/analytics/bi/*`.
   Capabilities, owned report create/list/get, turns, panel execution and narration.
 - Contracts: `apps/api/app/schemas/bi.py` and
@@ -75,8 +85,9 @@ compute over the full governed aggregate before applying display limits.
 
 ## Enable on the office laptop
 
-1. Update the checkout and API environment dependencies using the normal project
-   install process. The only new runtime dependency is `sqlglot>=30,<31`.
+1. Update the checkout and install API/web dependencies through the normal project
+   process. AskBI uses `sqlglot>=30,<31`; the Outlook draft UI uses
+   `@azure/msal-browser`, `html2canvas` and `jspdf`.
 2. From `apps/api`, activate the project environment, then run:
 
    ```powershell
@@ -115,6 +126,19 @@ compute over the full governed aggregate before applying display limits.
    engine mismatch produces an actionable message instead of silently loading old
    AskWiz. If the mode itself is old, check the deployed frontend build/flag.
 
+### Optional Outlook draft setup
+
+Register a single-page application in Microsoft Entra for the Ask Me web origin.
+Add `https://<your-web-origin>/outlook-redirect` as its SPA redirect URI (and the
+localhost equivalent for local development). Grant delegated Microsoft Graph
+`Mail.ReadWrite` and complete the tenant's consent process. Set
+`NEXT_PUBLIC_ASK_ME_OUTLOOK_CLIENT_ID` and `NEXT_PUBLIC_ASK_ME_OUTLOOK_TENANT_ID`
+in `apps/web/.env.local`, then rebuild web. These are public identifiers, not
+client secrets. The feature creates an unsent draft in the signed-in user's
+mailbox, with no recipients set. The saved-report link is owner-scoped; email
+recipients cannot open it without a separately authorized share feature. The
+manual mailto draft remains when Graph is not configured or fails.
+
 Legacy source discovery still uses its existing endpoints and feature flags.
 Keep the relevant old flags enabled if users need to browse/import those sources.
 
@@ -143,15 +167,26 @@ the additive table; no destructive downgrade is necessary.
   query, retained state across mode switches, all three themes at 1440/820 widths,
   reduced-motion configuration, keyboard drawer dismissal and flag mismatch;
   no browser page errors. The final run passed against the production build.
-  A second fixture run after the leadership UI changes passed. The fixture uses
-  a one-panel reply, so it does not visually validate the six-panel layout or
-  final printed PDF. Those need office data or a dedicated six-panel fixture.
+  The updated fixture also loads a synthetic six-panel CEO report, verifies PDF
+  readiness, and checks the Outlook redirect's same-origin iframe headers. Its
+  desktop and lower-chart screenshots were visually inspected. It does not
+  validate a final printed PDF or a real Outlook tenant.
   Start web on port 3000 and run `node scripts/verify-askbi.mjs` from the repo root;
   set `ASKBI_BASE_URL` to use another local port. Screenshots were visually inspected. This is fixture
   verification, not a live end-to-end database/provider test.
 - Alembic offline SQL generation passed; migration execution remains for office.
 - No tests were added solely for fonts or cosmetic styling. Git was unavailable
   on PATH, so no Git-based baseline/diff verification was possible.
+
+The six-report/filter/draft change was checked separately on 2026-11-06:
+36 selected backend tests and 16 focused frontend hook/studio tests passed;
+six catalog-validated preset cases, filter/date/scope, draft HTML and Graph
+payload checks are included. Frontend typecheck and the final webpack build
+passed. Full lint still
+reports unrelated pre-existing React-hook errors outside AskBI. The full backend
+AskBI suite stalls at the HTTP-contract test in this laptop environment; that
+live-style check and Outlook desktop/web visual checks remain for the office.
+The earlier browser fixture above predates the final six-report/Outlook changes.
 
 ## Limits and remaining release gates
 
@@ -185,6 +220,10 @@ the additive table; no destructive downgrade is necessary.
   multi-user permissions. Measure first-result/report latency and auxiliary query
   counts there against the plan's proposed 3s/8s/15s p95 targets. Those targets
   remain unmeasured; no local connectivity tests were attempted.
+- Starter periods use the last completed business calendar period. If the
+  warehouse is behind, that period can be empty; AskBI shows an empty result
+  rather than silently moving the report to a different, unapproved date range.
+  Office data should confirm the best default period for this POC.
 
 The implemented foundation is ready for office acceptance behind a reversible
 flag. Broad advanced-analysis parity and live operational acceptance remain open.
