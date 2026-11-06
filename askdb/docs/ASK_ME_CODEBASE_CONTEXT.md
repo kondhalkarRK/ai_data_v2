@@ -1,6 +1,6 @@
 # Ask Me — verified codebase context
 
-Verified against implementation on 2026-11-05. This describes code, not a claim that
+Verified against implementation on 2026-11-06. This describes code, not a claim that
 the configured warehouse, LLM providers or hosted deployment were tested live.
 
 ## Architecture
@@ -21,11 +21,18 @@ deployment precedence, rollback and outstanding live/advanced-coverage limits.
 An exact undated metric-by-breakdown request such as “total sales by region”
 uses the last completed calendar month with an explicit assumption, avoiding
 an LLM call for that supported request. Six exact automotive leadership
-starter prompts now produce distinct two-KPI/four-chart reports. The report
-canvas shows title, dates, make, evidence briefing and grouped charts. A
+starter prompts now produce distinct reports. The first five display two KPIs
+and four charts. The sixth, Revenue Lift, displays two KPIs and three charts,
+with an additional governed regional comparison query. Its prior aligned
+revenue and region results support a local
+5–30% target slider and reconciled observed regional changes without extra LLM
+calls. The refreshed report canvas shows the originating question, one title,
+metric-consistent chart accents, a wide primary chart, compact panel options,
+dates, make, evidence briefing and grouped charts. A
 server-validated year/month/week/make filter updates all panels without an LLM
 call; the region/dealer report can also narrow to a permitted region. Current
-and previous results remain distinct. Browser Save as PDF remains.
+and previous results remain distinct. Browser Save as PDF uses a report-only
+light paper layout, then restores the active screen theme.
 Optional `outlook-draft.ts` uses a configured Entra SPA and delegated Graph
 `Mail.ReadWrite` to create an unsent draft with current KPIs, up to three inline
 chart images, the full PDF and an owner-scoped saved-report link. Manual mailto

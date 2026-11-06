@@ -18,7 +18,7 @@ Metric definitions remain in the semantic catalog, not model-generated formulas.
 
 Six exact leadership starter questions appear on the empty Auto Report canvas:
 CEO sales, CFO financial sales, region/dealer performance, sales team performance,
-make/model comparison, and sales momentum/model leaders. A click fills the composer;
+make/model comparison, and revenue lift. A click fills the composer;
 Send builds a server-owned automotive plan with two KPIs and four varied charts.
 Unknown qualifiers continue through governed LLM interpretation. Initial dates
 are the last completed calendar month or Monday–Sunday week, stated on screen.
@@ -30,7 +30,17 @@ choices exclude places outside the user's zone. A custom AI date span is labeled
 “Current range” until a calendar period is selected.
 
 The report canvas shows title, dates, make, evidence briefing and governed panels.
-“Export PDF” opens browser print after all panels have current results. “Create
+The presentation refresh adds a visible question, a single report title, wider
+hero charts, compact panel options and metric-consistent accents across themes.
+Revenue Lift uses aligned prior revenue and region queries. Its target slider
+calculates actual lift, target revenue and the shortfall or excess locally from
+completed results; it makes no additional LLM call and never changes actuals.
+Current and prior regional changes are reconciled before a comparison appears.
+The slider is a viewing scenario; the Outlook report link carries its chosen
+percentage, while a report reopened from the saved library starts at 10%.
+“Export PDF” opens browser print after all panels have current results. It uses
+a light paper palette while printing and restores the active theme afterward.
+“Create
 Outlook draft” appears only when public Microsoft Entra client and tenant IDs are
 configured. It saves the report, captures current charts and KPIs, generates a
 full PDF, and creates a **draft** through Microsoft Graph with delegated
@@ -170,8 +180,9 @@ the additive table; no destructive downgrade is necessary.
   no browser page errors. The final run passed against the production build.
   The updated fixture also loads a synthetic six-panel CEO report, verifies PDF
   readiness, and checks the Outlook redirect's same-origin iframe headers. Its
-  desktop and lower-chart screenshots were visually inspected. It does not
-  validate a final printed PDF or a real Outlook tenant.
+  desktop and lower-chart screenshots were visually inspected. The synthetic
+  Revenue Lift print was rendered and visually inspected as a two-page A4
+  landscape PDF. It does not validate real data or a real Outlook tenant.
   Start web on port 3000 and run `node scripts/verify-askbi.mjs` from the repo root;
   set `ASKBI_BASE_URL` to use another local port. Screenshots were visually inspected. This is fixture
   verification, not a live end-to-end database/provider test.
@@ -187,7 +198,17 @@ passed. Full lint still
 reports unrelated pre-existing React-hook errors outside AskBI. The full backend
 AskBI suite stalls at the HTTP-contract test in this laptop environment; that
 live-style check and Outlook desktop/web visual checks remain for the office.
-The earlier browser fixture above predates the final six-report/Outlook changes.
+The presentation and Revenue Lift update was checked separately on 2026-11-06:
+11 focused backend cases and 18 AskBI frontend cases passed, including aligned
+prior periods, 10%/20% scenario arithmetic, regional reconciliation and stale
+result rejection. Targeted AskBI lint, frontend typecheck and the production
+webpack build passed. The updated Chrome fixture exercises the six-card flow,
+CEO report, Revenue Lift slider and regional comparison with synthetic data,
+three themes, 1440/820 widths and reduced motion, with no page errors. Full lint
+still reports existing React-rule errors in unrelated files and older shared
+chart code. The synthetic Revenue Lift PDF and Export PDF theme restoration
+were checked in Chrome; real-data PDF and Outlook rendering remain office
+checks. No live latency or query-count improvement is claimed.
 
 ## Limits and remaining release gates
 

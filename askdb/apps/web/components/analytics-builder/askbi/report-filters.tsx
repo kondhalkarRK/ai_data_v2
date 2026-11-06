@@ -4,6 +4,7 @@ import * as React from "react";
 import type { BiPlan, BiReportFilter } from "@nql/shared-types";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
+import { reportScopeSpec } from "./revenue-lift";
 
 function weekInput(iso?: string | null) {
   if (!iso) return "";
@@ -24,7 +25,7 @@ function monday(value: string) {
 }
 
 export function ReportFilters({ plan, busy, onApply, hideRegionFilter = false }: { plan: BiPlan; busy: boolean; onApply: (filter: BiReportFilter) => void; hideRegionFilter?: boolean }) {
-  const first = plan.panels[0]?.spec;
+  const first = reportScopeSpec(plan);
   const showRegion = !hideRegionFilter && plan.panels.some(panel => panel.title === "Region and model mix");
   type DraftFilter = Omit<BiReportFilter, "period"> & { period: BiReportFilter["period"] | "current" };
   const initial: DraftFilter = plan.reportFilter ?? { period: "current", year: Number(first?.dateFrom?.slice(0, 4)) || new Date().getFullYear(), month: Number(first?.dateFrom?.slice(5, 7)) || 1, make: first?.filters.find(item => item.domain === "make")?.values[0] ?? null, region: first?.filters.find(item => item.domain === "region")?.values[0] ?? null };

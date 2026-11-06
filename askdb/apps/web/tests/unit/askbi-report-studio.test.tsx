@@ -8,6 +8,7 @@ import { ReportCanvas } from "@/components/analytics-builder/askbi/report-canvas
 import { buildOutlookBody, createOutlookDraft, getOutlookToken, prepareOutlookAuth } from "@/components/analytics-builder/askbi/outlook-draft";
 import { panelScope, reportReady } from "@/components/analytics-builder/askbi/use-askbi";
 import type { PanelResult } from "@/components/analytics-builder/askbi/use-askbi";
+import { liftScenario, regionalContributions, reportScopeSpec, LIFT_QUESTION } from "@/components/analytics-builder/askbi/revenue-lift";
 
 vi.mock("@azure/msal-browser", () => ({ createStandardPublicClientApplication: vi.fn(async () => ({ getAllAccounts: () => [], loginPopup: async () => ({ accessToken: "fixture-token" }) })) }));
 vi.mock("html2canvas", () => ({ default: vi.fn(async () => ({ width: 800, height: 250, toDataURL: () => "data:image/jpeg;base64,anBlZw==" })) }));
@@ -22,11 +23,42 @@ const plan: BiPlan = { version: 2, title: "CEO <Sales>", answerKind: "report", a
 
 it("shows six distinct starters and puts the chosen question in the composer", async () => {
   const onExample = vi.fn();
-  render(<ReportCanvas plan={null} results={{}} selected={null} onSelect={vi.fn()} onCommand={vi.fn()} onRetry={vi.fn()} onExample={onExample} busy={false} briefing={[]} />);
-  const starters = ["Sales Report for CEO", "Financial Sales Briefing for CFO", "Region & Dealer Performance", "Sales Team Performance", "Make & Model Comparison", "Sales Momentum & Emerging Models"];
+  render(<ReportCanvas plan={null} results={{}} selected={null} onSelect={vi.fn()} onCommand={vi.fn()} onRetry={vi.fn()} onExample={onExample} busy={false} briefing={[]} liftPercent={10} onLiftPercent={vi.fn()} />);
+  const starters = ["Sales Report for CEO", "Financial Sales Briefing for CFO", "Region & Dealer Performance", "Sales Team Performance", "Make & Model Comparison", "Revenue Lift"];
   for (const question of starters) expect(screen.getByRole("button", { name: new RegExp(question.replace(/[&]/g, "&")) })).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: /Sales Report for CEO/ }));
   expect(onExample).toHaveBeenCalledWith("Sales Report for CEO");
+  await userEvent.click(screen.getByRole("button", { name: /Revenue Lift/ }));
+  expect(onExample).toHaveBeenCalledWith(LIFT_QUESTION);
+});
+
+it("recalculates lift targets without changing actual revenue", () => {
+  expect(liftScenario(108, 100, 10)?.target).toBeCloseTo(110);
+  expect(liftScenario(108, 100, 10)?.gap).toBeCloseTo(-2);
+  expect(liftScenario(108, 100, 20)?.target).toBeCloseTo(120);
+  expect(liftScenario(108, 100, 20)?.gap).toBeCloseTo(-12);
+  expect(liftScenario(108, 100, 20)?.actualLift).toBeCloseTo(8);
+  expect(liftScenario(108, 0, 10)).toBeNull();
+  expect(liftScenario(null, 100, 10)).toBeNull();
+});
+
+it("reconciles observed regional changes and rejects stale comparison results", () => {
+  const currentRegion: BiPanel = { ...plan.panels[0]!, id: "leader-4", kind: "chart", title: "Revenue by region", spec: { ...spec, dimensions: ["region"], viz: "bar", limit: 100 } };
+  const baselineRegion: BiPanel = { ...currentRegion, id: "revenue-lift-region-baseline", title: "Prior revenue by region", spec: { ...currentRegion.spec, dateFrom: "2026-09-01", dateTo: "2026-09-30" } };
+  const baseline: BiPanel = { ...plan.panels[0]!, id: "revenue-lift-baseline", spec: { ...spec, dateFrom: "2026-09-01", dateTo: "2026-09-30" } };
+  const liftPlan: BiPlan = { ...plan, panels: [{ ...plan.panels[0]!, id: "leader-1" }, baseline, currentRegion, baselineRegion] };
+  expect(reportScopeSpec({ ...liftPlan, panels: [baseline, ...liftPlan.panels.filter(item => item.id !== baseline.id)] })?.dateFrom).toBe("2026-10-01");
+  const result = (panel: BiPanel, rows: Array<Record<string, unknown>>) => ({ scope: panelScope(panel), result: { rows, meta: { valueColumn: "revenue", truncated: false } } }) as PanelResult;
+  const results = {
+    "leader-1": result(liftPlan.panels[0]!, [{ revenue: 108 }]),
+    "revenue-lift-baseline": result(baseline, [{ revenue: 100 }]),
+    "leader-4": result(currentRegion, [{ region: "West", revenue: 60 }, { region: "East", revenue: 48 }]),
+    "revenue-lift-region-baseline": result(baselineRegion, [{ region: "West", revenue: 45 }, { region: "East", revenue: 55 }]),
+  };
+  expect(regionalContributions(liftPlan, results)?.rows.map(row => [row.name, row.delta])).toEqual([["West", 15], ["East", -7]]);
+  const withResidual = { ...results, "leader-1": result(liftPlan.panels[0]!, [{ revenue: 110 }]) };
+  expect(regionalContributions(liftPlan, withResidual)?.rows.at(-1)).toMatchObject({ name: "Other / reconciliation", delta: 2 });
+  expect(regionalContributions(liftPlan, { ...results, "revenue-lift-region-baseline": { ...results["revenue-lift-region-baseline"], scope: "previous" } })).toBeNull();
 });
 
 it("submits one Monday-Sunday week and make selection without an LLM request", async () => {

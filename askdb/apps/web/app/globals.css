@@ -947,12 +947,94 @@
 }
 
 @media print {
-  @page { size: A4 landscape; margin: 12mm; }
+  @page { size: A4 landscape; margin: 10mm; }
+  html:has(.askbi-printable) {
+    --background: 0 0% 100% !important; --surface: 0 0% 100% !important;
+    --surface-raised: 0 0% 100% !important; --surface-sunken: 216 28% 95% !important;
+    --foreground: 222 35% 14% !important; --muted: 216 28% 95% !important;
+    --muted-foreground: 215 14% 40% !important; --border: 214 22% 84% !important;
+    --primary: 221 78% 46% !important; --success: 162 84% 29% !important;
+    --danger: 0 72% 44% !important;
+    --color-background: #fff !important; --color-surface-raised: #fff !important;
+    --color-foreground: #1c273b !important; --color-muted: #edf1f6 !important;
+    --color-muted-foreground: #526176 !important; --color-border: #cbd5e1 !important;
+    --color-primary: #3455bf !important; --color-success: #087a59 !important;
+    --color-danger: #bd2d34 !important;
+  }
+  body:has(.askbi-printable) { background: #fff !important; }
   body:has(.askbi-printable) * { visibility: hidden !important; }
   body:has(.askbi-printable) .askbi-printable,
   body:has(.askbi-printable) .askbi-printable * { visibility: visible !important; }
-  .askbi-printable { position: absolute; inset: 0 auto auto 0; width: 100%; padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .askbi-printable {
+    position: absolute; inset: 0 auto auto 0; width: 100%; padding: 0;
+    color-scheme: light;
+    --background: 0 0% 100%; --surface-raised: 0 0% 100%;
+    --foreground: 222 35% 14%; --muted: 216 28% 95%;
+    --muted-foreground: 215 14% 40%; --border: 214 22% 84%;
+    --chart-grid: 214 22% 88%; --chart-axis: 215 14% 43%;
+    --success: 162 84% 33%; --danger: 0 72% 44%;
+    --color-background: #fff; --color-surface-raised: #fff;
+    --color-foreground: #1c273b; --color-muted: #edf1f6;
+    --color-muted-foreground: #526176; --color-border: #cbd5e1;
+    --color-primary: #3455bf; --color-success: #087a59; --color-danger: #bd2d34;
+    color: #1c273b; background: #fff;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
+  .askbi-printable .askbi-report {
+    --askbi-revenue: 225 86% 48% !important; --askbi-units: 174 76% 30% !important;
+    --askbi-asp: 274 64% 48% !important; --askbi-orders: 31 91% 43% !important;
+  }
+  .askbi-printable .askbi-report, .askbi-printable .askbi-report * { color: #1c273b !important; }
+  .askbi-printable .askbi-report .text-muted-foreground { color: #526176 !important; }
+  .askbi-printable .askbi-report .text-primary { color: #3455bf !important; }
+  .askbi-printable .askbi-report .text-success { color: #087a59 !important; }
+  .askbi-printable .askbi-report .text-danger { color: #bd2d34 !important; }
+  .askbi-printable .askbi-report .bg-surface-raised,
+  .askbi-printable .askbi-report .bg-background { background-color: #fff !important; }
+  .askbi-printable .askbi-report .bg-muted { background-color: #edf1f6 !important; }
   .askbi-printable fieldset { border: 0; }
-  .askbi-printable section, .askbi-printable [id^="askbi-panel-"] { break-inside: avoid; }
-  .askbi-printable button, .askbi-printable select, .askbi-printable details { display: none !important; }
+  .askbi-printable section { break-inside: auto; }
+  .askbi-printable [data-askbi-pdf], .askbi-printable [id^="askbi-panel-"] { break-inside: avoid; }
+  .askbi-printable [aria-label="Supporting analysis"] > div { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .askbi-printable .askbi-report > * + * { margin-top: 8px; }
+  .askbi-printable .askbi-report > header { padding-bottom: 8px; }
+  .askbi-printable .askbi-report > header h2 { margin-top: 3px; font-size: 25px; }
+  .askbi-printable .askbi-report > section { padding: 10px; }
+  .askbi-printable .askbi-panel { min-height: 0; padding: 8px; }
+  .askbi-printable .askbi-kpi-value { font-size: 22px; }
+  .askbi-printable .askbi-report svg { height: 150px !important; max-height: 150px !important; }
+  .askbi-printable button, .askbi-printable select, .askbi-printable details, .askbi-printable input[type="range"] { display: none !important; }
 }
+
+/* AskBI report accents stay metric-consistent across cards and charts. */
+.askbi-report {
+  --askbi-revenue: 225 86% 52%;
+  --askbi-units: 174 76% 34%;
+  --askbi-asp: 274 64% 52%;
+  --askbi-orders: 31 91% 47%;
+}
+.dark .askbi-report {
+  --askbi-revenue: 208 91% 63%;
+  --askbi-units: 172 70% 52%;
+  --askbi-asp: 277 76% 70%;
+  --askbi-orders: 37 94% 62%;
+}
+.theme-ai .askbi-report {
+  --askbi-revenue: 249 84% 72%;
+  --askbi-units: 185 73% 59%;
+  --askbi-asp: 286 69% 72%;
+  --askbi-orders: 37 85% 63%;
+}
+.askbi-panel[data-metric="revenue"] { --chart-1: var(--askbi-revenue); }
+.askbi-panel[data-metric="units_sold"] { --chart-1: var(--askbi-units); }
+.askbi-panel[data-metric="average_selling_price"] { --chart-1: var(--askbi-asp); }
+.askbi-panel[data-metric="orders"] { --chart-1: var(--askbi-orders); }
+.askbi-panel .askbi-kpi-value { color: hsl(var(--chart-1)); }
+.askbi-panel .askbi-bar { background: hsl(var(--chart-1)); }
+.askbi-target-bar { background: hsl(var(--askbi-revenue)); }
+.askbi-tree-tile-0 { fill: color-mix(in oklab, hsl(var(--chart-1)) 36%, hsl(var(--surface-raised))); }
+.askbi-tree-tile-1 { fill: color-mix(in oklab, hsl(var(--chart-2)) 36%, hsl(var(--surface-raised))); }
+.askbi-tree-tile-2 { fill: color-mix(in oklab, hsl(var(--chart-4)) 32%, hsl(var(--surface-raised))); }
+.askbi-tree-tile-3 { fill: color-mix(in oklab, hsl(var(--chart-5)) 36%, hsl(var(--surface-raised))); }
+.askbi-tree-tile-4 { fill: color-mix(in oklab, hsl(var(--chart-3)) 36%, hsl(var(--surface-raised))); }
+.askbi-tree-tile-5 { fill: color-mix(in oklab, hsl(var(--chart-6)) 36%, hsl(var(--surface-raised))); }

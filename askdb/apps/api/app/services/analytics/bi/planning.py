@@ -2,6 +2,7 @@
 
 import json
 import re
+import calendar
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -23,7 +24,7 @@ LEADERSHIP_PROMPTS = {
     "region & dealer performance": ("Region & Dealer Performance", "last month"),
     "sales team performance": ("Sales Team Performance", "last week"),
     "make & model comparison": ("Make & Model Comparison", "last month"),
-    "sales momentum & emerging models": ("Sales Momentum & Model Leaders", "last week"),
+    "show revenue lift against a 10% target": ("Revenue Lift", "last month"),
 }
 
 
@@ -50,6 +51,14 @@ def leadership_plan(question: str, now: datetime) -> BiProposal | None:
             ("Revenue by region", "revenue", "region"),
             ("Units by make", "units_sold", "make"),
             ("Units by model", "units_sold", "model"),
+        ],
+        "Revenue Lift": [
+            ("Current revenue", "revenue", None),
+            ("Prior-period revenue", "revenue", None),
+            ("Revenue trend", "revenue", "time"),
+            ("Revenue by region", "revenue", "region"),
+            ("Prior revenue by region", "revenue", "region"),
+            ("Revenue by make", "revenue", "make"),
         ],
         "Region & Dealer Performance": [
             ("Revenue", "revenue", None),
@@ -109,7 +118,7 @@ def leadership_plan(question: str, now: datetime) -> BiProposal | None:
             if breakdown
             else "basic",
             viz="area"
-            if is_time and index == 2 and title == "Sales Momentum & Model Leaders"
+            if is_time and index == 2 and title == "Revenue Lift"
             else "line"
             if is_time
             else "heatmap"
@@ -118,18 +127,20 @@ def leadership_plan(question: str, now: datetime) -> BiProposal | None:
             if breakdown == "region" and title == "Financial Sales Briefing for CFO"
             else "treemap"
             if breakdown == "make"
-            and title in {"Sales Report for CEO", "Sales Momentum & Model Leaders"}
+            and title in {"Sales Report for CEO", "Make & Model Comparison", "Revenue Lift"}
+            else "treemap"
+            if breakdown == "model" and title == "Sales Team Performance"
             else "bar"
             if breakdown
             else "kpi",
             date_preset="custom",
             date_from=start,
             date_to=end,
-            limit=35 if is_time else 100 if breakdown == "region_model" else 10 if breakdown else 1,
+            limit=35 if is_time else 100 if breakdown == "region_model" or title == "Revenue Lift" and breakdown == "region" else 10 if breakdown else 1,
         )
         panels.append(
             BiPanel(
-                id=f"leader-{index + 1}",
+                id="revenue-lift-baseline" if title == "Revenue Lift" and index == 1 else "revenue-lift-region-baseline" if title == "Revenue Lift" and index == 4 else f"leader-{index + 1}",
                 title=label,
                 spec=spec,
                 kind="chart" if breakdown else "kpi",
@@ -157,6 +168,12 @@ def leadership_plan(question: str, now: datetime) -> BiProposal | None:
             week_start=date.fromisoformat(start) if weekly else None,
         ),
     )
+    if title == "Revenue Lift":
+        prior_start, prior_end = prior_aligned_period(date.fromisoformat(start), date.fromisoformat(end), "month")
+        for panel in (panels[1], panels[4]):
+            panel.spec.date_from, panel.spec.date_to = str(prior_start), str(prior_end)
+            panel.date_intent = None
+        plan.assumptions.append("Lift targets are scenarios based on the preceding aligned period, not forecasts.")
     return BiProposal(
         kind="answer",
         plan=plan,
@@ -172,7 +189,25 @@ def period_dates(intent: str, now: datetime) -> tuple[str, str]:
     return str(spec.date_from), str(spec.date_to)
 
 
-def apply_report_filter(plan: BiPlan, selection: BiReportFilter) -> BiPlan:
+def prior_aligned_period(start: date, end: date, period: str) -> tuple[date, date]:
+    """Previous calendar period, clipped to the selected period's elapsed days."""
+    if period == "week":
+        prior_start = start - timedelta(days=7)
+    elif period == "month":
+        year, month = (start.year - 1, 12) if start.month == 1 else (start.year, start.month - 1)
+        prior_start = date(year, month, 1)
+    else:
+        prior_start = date(start.year - 1, 1, 1)
+    if period == "month":
+        prior_full_end = date(prior_start.year, prior_start.month, calendar.monthrange(prior_start.year, prior_start.month)[1])
+    elif period == "year":
+        prior_full_end = date(prior_start.year, 12, 31)
+    else:
+        prior_full_end = prior_start + timedelta(days=6)
+    return prior_start, min(prior_full_end, prior_start + (end - start))
+
+
+def apply_report_filter(plan: BiPlan, selection: BiReportFilter, *, today: date | None = None) -> BiPlan:
     """Apply one explicit date/make scope to every panel; no model call or SQL input."""
     if selection.period == "year":
         start, end = date(selection.year, 1, 1), date(selection.year, 12, 31)
@@ -188,8 +223,16 @@ def apply_report_filter(plan: BiPlan, selection: BiReportFilter) -> BiPlan:
         assert selection.week_start is not None
         start, end = selection.week_start, selection.week_start + timedelta(days=6)
     updated = plan.model_copy(deep=True)
+    is_lift = any(p.id == "revenue-lift-baseline" for p in updated.panels)
+    current_day = today or date.today()
+    if is_lift and start <= current_day <= end:
+        if start == current_day:
+            raise ValidationError("The selected period has no completed days yet. Choose an earlier period.")
+        end = current_day - timedelta(days=1)
+    prior_start, prior_end = prior_aligned_period(start, end, selection.period) if is_lift else (start, end)
     for panel in updated.panels:
-        panel.spec.date_from, panel.spec.date_to = str(start), str(end)
+        panel_start, panel_end = (prior_start, prior_end) if panel.id in {"revenue-lift-baseline", "revenue-lift-region-baseline"} else (start, end)
+        panel.spec.date_from, panel.spec.date_to = str(panel_start), str(panel_end)
         panel.date_intent = None
         panel.spec.filters = [f for f in panel.spec.filters if f.domain not in {"make", "region"}]
         if selection.make:
@@ -475,6 +518,15 @@ def refresh_dates(plan: BiPlan, now: datetime) -> BiPlan:
     for panel in updated.panels:
         if panel.date_intent:
             panel.spec.date_from, panel.spec.date_to = period_dates(panel.date_intent, now)
+    lift_current = next((p for p in updated.panels if p.id == "leader-1" and any(item.id == "revenue-lift-baseline" for item in updated.panels)), None)
+    if lift_current and lift_current.date_intent:
+        current = lift_current.spec
+        period = "week" if lift_current.date_intent == "last week" else "month"
+        prior_start, prior_end = prior_aligned_period(date.fromisoformat(current.date_from), date.fromisoformat(current.date_to), period)
+        for previous in (p for p in updated.panels if p.id in {"revenue-lift-baseline", "revenue-lift-region-baseline"}):
+            previous.spec.date_from, previous.spec.date_to = str(prior_start), str(prior_end)
+        start = date.fromisoformat(current.date_from)
+        updated.report_filter = BiReportFilter(period=period, year=start.year, month=start.month if period == "month" else None, week_start=start if period == "week" else None, make=updated.report_filter.make if updated.report_filter else None, region=updated.report_filter.region if updated.report_filter else None)
     # Preserve elapsed comparison alignment when both relative weeks occur.
     intents = {p.date_intent for p in updated.panels}
     if {"this week", "last week"} <= intents:

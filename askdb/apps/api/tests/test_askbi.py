@@ -3,7 +3,7 @@
 import json
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
@@ -128,6 +128,36 @@ def test_leadership_prompt_with_extra_qualifier_is_not_a_preset():
         )
         is None
     )
+
+
+def test_revenue_lift_uses_prior_aligned_governed_revenue(catalog):
+    plan = planning.fast_plan("Show revenue lift against a 10% target", NOW, None).plan
+    assert plan.title == "Revenue Lift"
+    assert plan.panels[0].spec.metrics == ["revenue"]
+    assert plan.panels[1].id == "revenue-lift-baseline"
+    assert (plan.panels[1].spec.date_from, plan.panels[1].spec.date_to) == ("2026-09-01", "2026-09-30")
+    assert plan.panels[4].id == "revenue-lift-region-baseline"
+    assert (plan.panels[4].spec.date_from, plan.panels[4].spec.date_to) == ("2026-09-01", "2026-09-30")
+    selected = BiReportFilter(period="month", year=2025, month=4, make="Tata")
+    filtered = planning.apply_report_filter(plan, selected)
+    assert (filtered.panels[0].spec.date_from, filtered.panels[0].spec.date_to) == ("2025-04-01", "2025-04-30")
+    assert (filtered.panels[1].spec.date_from, filtered.panels[1].spec.date_to) == ("2025-03-01", "2025-03-30")
+    assert (filtered.panels[4].spec.date_from, filtered.panels[4].spec.date_to) == ("2025-03-01", "2025-03-30")
+    assert all(p.spec.filters[0].values == ["Tata"] for p in filtered.panels)
+    planning.validate(filtered, catalog, SCOPE)
+
+    week = planning.apply_report_filter(
+        plan, BiReportFilter(period="week", year=2026, week_start="2026-11-02"), today=date(2026, 11, 6)
+    )
+    assert (week.panels[0].spec.date_from, week.panels[0].spec.date_to) == ("2026-11-02", "2026-11-05")
+    assert (week.panels[1].spec.date_from, week.panels[1].spec.date_to) == ("2026-10-26", "2026-10-29")
+    assert (week.panels[4].spec.date_from, week.panels[4].spec.date_to) == ("2026-10-26", "2026-10-29")
+    reordered = plan.model_copy(deep=True)
+    reordered.panels = [reordered.panels[1], reordered.panels[0], *reordered.panels[2:]]
+    refreshed = planning.refresh_dates(reordered, NOW.replace(month=12))
+    assert next(p for p in refreshed.panels if p.id == "leader-1").spec.date_from == "2026-11-01"
+    assert next(p for p in refreshed.panels if p.id == "revenue-lift-baseline").spec.date_from == "2026-10-01"
+    assert refreshed.report_filter.month == 11
 
 
 def test_report_filters_apply_same_dates_and_make_to_every_panel(catalog):

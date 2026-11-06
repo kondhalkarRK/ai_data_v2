@@ -46,6 +46,19 @@ await page.route('**/api/**', async route => {
       report.state.plan = { version: 2, title: report.title, answerKind: 'report', assumptions: ['The period is the last completed month.'], reportFilter: { period: 'month', year: 2026, month: 10, make: null }, panels: definitions.map(([title, metric, dimension, viz], i) => ({ id: `leader-${i + 1}`, title, kind: dimension ? 'chart' : 'kpi', spec: { ...spec, metrics: [metric], dimensions: dimension ? [dimension] : [], viz, analysis: dimension === 'month' ? 'trend' : dimension ? 'top_n' : 'basic', dateFrom: '2026-10-01', dateTo: '2026-10-31' }, grain: dimension === 'month' ? 'week' : null, daily: false, calculation: null, dateIntent: 'last month', section: dimension ? dimension === 'month' ? 'Sales movement' : 'Performance breakdown' : 'Key metrics', rationale: 'Approved metric.' })) };
       report.state.pending = null;
       report.state.turns.push({ id: request.requestId, question: request.question, answer: 'Prepared Sales Report for CEO.', kind: 'answer', code: null, changedPanelIds: report.state.plan.panels.map(p => p.id) });
+    } else if (request.question === 'Show revenue lift against a 10% target') {
+      report.title = 'Revenue Lift';
+      const definitions = [
+        ['leader-1', 'Current revenue', null, 'kpi', false],
+        ['revenue-lift-baseline', 'Prior-period revenue', null, 'kpi', true],
+        ['leader-3', 'Revenue trend', 'month', 'area', false],
+        ['leader-4', 'Revenue by region', 'region', 'bar', false],
+        ['revenue-lift-region-baseline', 'Prior revenue by region', 'region', 'bar', true],
+        ['leader-6', 'Revenue by make', 'make', 'treemap', false],
+      ];
+      report.state.plan = { version: 2, title: report.title, answerKind: 'report', assumptions: ['The target is a scenario, not a forecast.'], reportFilter: { period: 'month', year: 2026, month: 10, make: null }, panels: definitions.map(([id, title, metricDimension, viz, prior]) => ({ id, title, kind: metricDimension ? 'chart' : 'kpi', spec: { ...spec, metrics: ['revenue'], dimensions: metricDimension ? [metricDimension] : [], viz, analysis: metricDimension === 'month' ? 'trend' : metricDimension ? 'top_n' : 'basic', dateFrom: prior ? '2026-09-01' : '2026-10-01', dateTo: prior ? '2026-09-30' : '2026-10-31', limit: metricDimension === 'region' ? 100 : metricDimension ? 10 : 1 }, grain: metricDimension === 'month' ? 'week' : null, daily: false, calculation: null, dateIntent: prior ? null : 'last month', section: metricDimension ? metricDimension === 'month' ? 'Sales movement' : 'Performance breakdown' : 'Key metrics', rationale: 'Approved revenue metric.' })) };
+      report.state.pending = null;
+      report.state.turns.push({ id: request.requestId, question: request.question, answer: 'Prepared Revenue Lift.', kind: 'answer', code: null, changedPanelIds: report.state.plan.panels.map(p => p.id) });
     } else {
       report.title = 'Weekly sales review';
       report.state.previous = structuredClone(report.state.plan);
@@ -61,10 +74,11 @@ await page.route('**/api/**', async route => {
     const selected = report.state.plan?.panels.find(p => p.id === route.request().postDataJSON().panelId) ?? panel;
     const metric = selected.spec.metrics[0];
     const dimension = selected.spec.dimensions[0];
-    const rows = !dimension ? [{ [metric]: metric === 'revenue' ? 1250000 : 42 }] : dimension === 'month' ? [{ month: 'Week 1', [metric]: 310000 }, { month: 'Week 2', [metric]: 390000 }, { month: 'Week 3', [metric]: 280000 }, { month: 'Week 4', [metric]: 270000 }] : ['North', 'South', 'West', 'East'].map((label, i) => ({ [dimension]: label, [metric]: metric === 'revenue' ? [420000, 350000, 280000, 200000][i] : [18, 12, 8, 4][i] }));
+    const liftRows = report.title === 'Revenue Lift' ? selected.id === 'leader-1' ? [{ revenue: 1080000 }] : selected.id === 'revenue-lift-baseline' ? [{ revenue: 1000000 }] : dimension === 'region' ? ['North', 'South', 'West', 'East'].map((region, i) => ({ region, revenue: (selected.id === 'revenue-lift-region-baseline' ? [350000, 300000, 240000, 110000] : [420000, 350000, 200000, 110000])[i] })) : dimension === 'make' ? ['Tata', 'Hyundai', 'Mahindra', 'Kia'].map((make, i) => ({ make, revenue: [420000, 310000, 210000, 140000][i] })) : null : null;
+    const rows = liftRows ?? (!dimension ? [{ [metric]: metric === 'revenue' ? 1250000 : 42 }] : dimension === 'month' ? [{ month: 'Week 1', [metric]: 310000 }, { month: 'Week 2', [metric]: 390000 }, { month: 'Week 3', [metric]: 280000 }, { month: 'Week 4', [metric]: 270000 }] : ['North', 'South', 'West', 'East'].map((label, i) => ({ [dimension]: label, [metric]: metric === 'revenue' ? [420000, 350000, 280000, 200000][i] : [18, 12, 8, 4][i] })));
     const fixtureRows = selected.id === 'p1' ? points : rows;
     const x = selected.id === 'p1' ? 'sales_day' : dimension;
-    body = { result: { title: selected.title, columns: dimension ? [x, metric] : [metric], rows: fixtureRows, sql: 'SELECT approved_metric', chart: dimension ? { x, y: metric, type: selected.spec.viz, series: [], points: fixtureRows } : null, recommendedViz: selected.spec.viz, insights: { executive: selected.id === 'p1' ? 'Highest returned revenue: INR 1,90,000 on 29 October.' : 'Synthetic UI fixture.', analyst: 'Synthetic UI fixture.' }, meta: { dataAsOf: '2026-11-01', metricFormat: metric === 'revenue' ? 'currency' : 'number', valueColumn: metric, warnings: [], notes: [] } }, evidence: 'fixture-evidence', elapsedMs: 10, queryCount: 3 };
+    body = { result: { title: selected.title, columns: dimension ? [x, metric] : [metric], rows: fixtureRows, sql: 'SELECT approved_metric', chart: dimension ? { x, y: metric, type: selected.spec.viz, series: [], points: fixtureRows } : null, recommendedViz: selected.spec.viz, insights: { executive: selected.id === 'p1' ? 'Highest returned revenue: INR 1,90,000 on 29 October.' : 'Synthetic UI fixture.', analyst: 'Synthetic UI fixture.' }, meta: { dataAsOf: '2026-11-01', metricFormat: metric === 'revenue' ? 'currency' : 'number', valueColumn: metric, truncated: false, warnings: [], notes: [] } }, evidence: 'fixture-evidence', elapsedMs: 10, queryCount: 3 };
   } else if (path.endsWith('/narration')) body = { paragraphs: ['For this selection: the strongest returned day is 29 October.'], aiUsed: false, usage };
   else if (path.endsWith('/analyses') || path.endsWith('/workspaces') || path.endsWith('/auto/boards')) body = [];
   else if (path.includes('/bi/reports/')) body = report;
@@ -81,13 +95,16 @@ try {
   const input = page.getByRole('textbox', { name: 'Ask a report question' });
   await input.fill('Sales performance');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await page.getByRole('button', { name: 'AskBI', exact: true }).click();
   await expect(page.getByText('Which metric and period?', { exact: true })).toBeVisible();
   if (runs !== 0) throw new Error('Clarification executed data');
   await input.fill('Revenue last week by day');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Daily revenue', exact: true })).toBeVisible();
   await expect(page.getByText('Highest returned revenue: INR 1,90,000 on 29 October.')).toBeVisible();
+  await page.getByText('Data and definition').click();
   await page.getByLabel('Daily revenue visualization').selectOption('bar');
+  await page.getByRole('button', { name: 'AskBI', exact: true }).click();
   await expect(page.getByText('Changed chart presentation.', { exact: true })).toBeVisible();
   if (runs !== 1) throw new Error(`Presentation edit reran ${runs} queries`);
   await page.getByRole('button', { name: 'Custom Report', exact: true }).click();
@@ -109,13 +126,43 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: 'New report', exact: true }).click();
   await page.getByRole('button', { name: /Sales Report for CEO/ }).click();
-  await input.fill('Sales Report for CEO');
+  await expect(input).toHaveValue('Sales Report for CEO');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Units by model', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Export PDF' })).toBeEnabled();
   await page.screenshot({ path: 'askbi-six-panel-verification.png', fullPage: true });
   await page.getByRole('heading', { name: 'Units by model', exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'askbi-six-panel-bottom.png' });
+  await page.getByRole('button', { name: 'New report', exact: true }).click();
+  await page.getByRole('button', { name: /Revenue Lift/ }).click();
+  await expect(input).toHaveValue('Show revenue lift against a 10% target');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Revenue Lift', exact: true })).toBeVisible();
+  await expect(page.getByText('Shortfall to target')).toBeVisible();
+  await expect(page.getByText('₹20,000')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Observed revenue change by region' })).toBeVisible();
+  const slider = page.getByRole('slider', { name: 'Revenue lift target percentage' });
+  await slider.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByText('Target: 20% above prior period')).toBeVisible();
+  await expect(page.getByText('₹1,20,000')).toBeVisible();
+  await page.evaluate(() => { for (const element of document.querySelectorAll('*')) if (element.scrollTop > 0) element.scrollTop = 0; });
+  await page.screenshot({ path: 'askbi-revenue-lift-verification.png', fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.remove('theme-ai'); document.documentElement.classList.add('light'); });
+  await page.pdf({ path: 'tmp/pdfs/askbi-revenue-lift-print.pdf', format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true });
+  await page.evaluate(() => { document.documentElement.classList.remove('light'); document.documentElement.classList.add('theme-ai'); });
+  await page.evaluate(() => { window.print = () => { window.__askbiPrintTheme = document.documentElement.className; window.dispatchEvent(new Event('afterprint')); }; });
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  await page.waitForFunction(() => window.__askbiPrintTheme);
+  if (!await page.evaluate(() => window.__askbiPrintTheme.includes('light') && document.documentElement.classList.contains('theme-ai'))) throw new Error('Export PDF did not use a light print palette and restore the AI theme');
+  for (const theme of ['light', 'dark', 'theme-ai']) {
+    await page.evaluate(value => { document.documentElement.classList.remove('light', 'dark', 'theme-ai'); document.documentElement.classList.add(value); }, theme);
+    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw new Error(`Revenue Lift overflow ${theme}`);
+    if (theme === 'light') await page.screenshot({ path: 'askbi-revenue-lift-light-verification.png' });
+  }
+  await page.getByRole('heading', { name: 'Observed revenue change by region' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'askbi-revenue-lift-bottom.png' });
   enabled = false;
   await page.reload();
   await page.getByRole('button', { name: 'Auto Report · AskBI', exact: true }).click();

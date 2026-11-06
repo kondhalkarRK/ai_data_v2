@@ -41,6 +41,7 @@ export function ResultChart({
   initialType = "bar",
   hideTypeSelect = false,
   hideControls = false,
+  hideHeading = false,
 }: {
   xKey: string;
   yKey: string;
@@ -51,6 +52,7 @@ export function ResultChart({
   className?: string;
   initialType?: ChartKind;
   hideTypeSelect?: boolean;
+  hideHeading?: boolean;
   /** Auto boards edit validated specifications through AskChart instead. */
   hideControls?: boolean;
 }) {
@@ -109,12 +111,12 @@ export function ResultChart({
 
   return (
     <div className={cn("space-y-3", className)} data-chart-theme={themeKey}>
-      <div className="flex items-center justify-between gap-2">
+      {!hideHeading && <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold tracking-tight">
           {multi ? seriesKeys.map(prettyKey).join(" vs ") : prettyKey(yKey)} by {prettyKey(xKey)}
         </p>
         <p className="text-[10px] text-muted-foreground">Hover a point for exact values</p>
-      </div>
+      </div>}
       {hideControls ? null : <div className="flex flex-wrap items-end gap-2">
         <FieldSelect
           id="chart-x"

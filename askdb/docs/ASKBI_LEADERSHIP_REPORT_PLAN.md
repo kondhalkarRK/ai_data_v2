@@ -6,8 +6,8 @@ insurance and general AI Chat retain their existing paths.
 ## Server-owned starter reports
 
 The six exact cards fill the AskBI composer. Send uses a validated predefined
-plan, with no interpretation call. Each plan has two approved KPI cards and four
-charts; novel questions and bounded evidence narration can use the existing LLM.
+plan, with no interpretation call. Each plan has two approved KPI queries and four
+chart queries; novel questions and bounded evidence narration can use the existing LLM.
 All panel queries remain governed and independently loaded.
 
 - **Sales Report for CEO:** revenue, units, revenue trend, regional revenue,
@@ -24,9 +24,11 @@ All panel queries remain governed and independently loaded.
 - **Make & Model Comparison:** units, weighted ASP, make and model rankings,
   ASP by model and revenue trend. Make selection narrows this comparison and
   the UI says so.
-- **Sales Momentum & Emerging Models:** revenue, orders, revenue and units
-  trends, leading models and make revenue. The generated title says “Model
-  Leaders”; it does not claim an emerging model without aligned comparisons.
+- **Revenue Lift:** current and prior aligned revenue, revenue trend, current and
+  prior regional breakdowns, and make mix. A 5–30% slider changes only the
+  scenario target; actual lift and the gap come from completed governed results.
+  Regional observed changes are shown only when both breakdowns are complete
+  and reconcile to the total, including any residual.
 
 The first period is the last completed calendar month or Monday–Sunday week,
 visible in the title area and assumptions. After generation, a year, month,
@@ -43,8 +45,14 @@ previous while new data loads, and failed/empty panels keep their own states.
 The report has an on-canvas title, dates, make and permission reminder, a short
 evidence briefing, KPI row, prominent chart and grouped supporting charts.
 Existing chart editing, evidence inspection, conversations and Undo remain.
-Browser Export PDF is enabled only when all current panels finish; its print CSS
-hides editing controls and avoids splitting chart containers.
+The refreshed canvas uses one title, a visible originating question, report-specific
+chart composition, metric-consistent chart colors and ranked bars. Secondary
+editing controls live under each panel's Options/Data and definition disclosures.
+The AskBI sidebar collapses after Send so the report has more room; selecting a
+panel reopens it. Starter cards still only fill the composer.
+Browser Export PDF is enabled only when all current panels finish; it uses a
+light paper palette, restores the user's theme afterward, hides editing
+controls and avoids splitting chart containers.
 
 With an Entra SPA connection configured, **Create Outlook draft** saves the
 report, captures up to three current charts as inline images, includes two or
@@ -59,8 +67,10 @@ Offline semantic/compiler tests cover all six plans, filter consistency,
 Monday–Sunday dates, scoped values, and strict qualifiers. Focused frontend
 tests cover all six cards, filter submission, stale-response hook behavior and
 HTML email values/escaping. The office environment still needs real automotive
-data, real Outlook tenant consent, browser/tablet and printed PDF inspection,
+data, real Outlook tenant consent, browser/tablet and printed PDF inspection
+with permitted production data,
 desktop/web Outlook image rendering, attachments and regional permission review.
 Local PostgreSQL, LLM and Graph verification were unavailable and were not
-claimed. The two public Entra IDs must be configured in `apps/web/.env.local`;
+claimed. Synthetic Chrome checks covered tablet layout and a two-page A4
+Revenue Lift PDF. The two public Entra IDs must be configured in `apps/web/.env.local`;
 see `ASKBI_IMPLEMENTATION.md`.
