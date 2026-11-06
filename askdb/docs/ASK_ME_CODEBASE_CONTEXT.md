@@ -119,6 +119,10 @@ See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for verified scope and rollbac
   illustrative carousel (governed answer, report, decision) and keeps the real
   `ConnectedDataSources` readiness panel separate. The report CTA opens AskBI
   Auto mode via `?mode=auto` only when its automotive frontend flag is enabled.
+  `home-motion-scenes.tsx` contains fixed, internally consistent example
+  sequences; CSS in `globals.css` reveals their steps over about six seconds.
+  The carousel waits 9.5 seconds, pauses on interaction or hidden tabs, and
+  displays complete scenes immediately for reduced motion. No example calls an API.
 
 ## Question pipeline and security
 
