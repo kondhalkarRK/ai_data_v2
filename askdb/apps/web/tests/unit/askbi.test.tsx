@@ -56,6 +56,16 @@ it("opens Auto Report for a saved-report link", async () => {
   } finally { window.history.replaceState({}, "", "/"); }
 });
 
+it("opens Auto Report from the Home CTA without opening a saved report", async () => {
+  vi.stubEnv("NEXT_PUBLIC_ASK_ME_ASKBI_ENABLED", "true");
+  window.history.replaceState({}, "", "/analytics-builder?mode=auto");
+  try {
+    render(<BuilderModes pack={{} as never} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Auto Report · AskBI" })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByText("AskBI report content")).toBeVisible();
+  } finally { window.history.replaceState({}, "", "/"); }
+});
+
 it("keeps one durable conversation through clarification and short answer", async () => {
   const post = setup(); let turns = 0;
   const clarification: BiReport = { ...draft(), revision: 2, state: { ...draft().state, pending: { question: "Sales", clarification: "Which period?", selectedPanelId: null }, turns: [{ id: "t1", question: "Sales", answer: "Which period?", kind: "clarification", code: null, changedPanelIds: [] }] } };

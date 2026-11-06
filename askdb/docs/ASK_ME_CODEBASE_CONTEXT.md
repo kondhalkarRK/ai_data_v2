@@ -115,6 +115,10 @@ See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for verified scope and rollbac
 - Supporting pages: Home/readiness, Data Preview/export, Query History, Saved
   Questions and personal AI usage. Legacy Data Sources, System Logs, LLM
   Observability and Cost Analytics routes redirect to consolidated pages.
+  Home now uses `components/home/home-story.tsx` for a full-width, three-scene
+  illustrative carousel (governed answer, report, decision) and keeps the real
+  `ConnectedDataSources` readiness panel separate. The report CTA opens AskBI
+  Auto mode via `?mode=auto` only when its automotive frontend flag is enabled.
 
 ## Question pipeline and security
 

@@ -28,7 +28,7 @@ function AutomotiveModes({ pack, askbi = false }: { pack: SemanticPackResponse; 
   const [visited, setVisited] = React.useState(false);
   const requestedAuto = React.useSyncExternalStore(
     () => () => {},
-    () => askbi && new URLSearchParams(window.location.search).has("askbiReport"),
+    () => askbi && (new URLSearchParams(window.location.search).has("askbiReport") || new URLSearchParams(window.location.search).get("mode") === "auto"),
     () => false,
   );
   const activeMode = requestedAuto && !visited ? "auto" : mode;

@@ -1100,3 +1100,8 @@
   --executive-category-13: #d5a4c8; --executive-category-14: #94c4dc;
   --executive-category-15: #bfc98b;
 }
+
+@keyframes home-story-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.home-story-enter { animation: home-story-enter 520ms cubic-bezier(.22,1,.36,1) both; }
+.home-story[data-story-paused="true"] [class*="hero-"] { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .home-story-enter { animation: none; } }

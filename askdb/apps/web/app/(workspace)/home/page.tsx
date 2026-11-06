@@ -1,61 +1,16 @@
 "use client";
 
-import Link from "next/link";
-
 import { ConnectedDataSources } from "@/components/home/connected-data-sources";
-import { HeroBackdrop } from "@/components/home/hero-backdrop";
-import { HeroLiveDemo } from "@/components/home/hero-live-demo";
-import { BrandWordmark } from "@/components/brand/wordmark";
-import { Button } from "@/components/ui/button";
-import { PageShell } from "@/components/ui/page-shell";
-
-const FEATURE_CHIPS = [
-  "Semantic Layer Grounded",
-  "Zero-Guess SQL",
-  "Works With Any Warehouse",
-  "Built-in Data Quality",
-  "Row-Level Governance",
-] as const;
+import { HomeStory } from "@/components/home/home-story";
 
 export default function HomePage() {
   return (
-    <PageShell className="max-w-6xl">
-      <section className="relative overflow-hidden rounded-[var(--radius-card)] border border-border/50 bg-card/40 shadow-[var(--shadow-card)]">
-        <HeroBackdrop />
-        <div className="relative grid gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center lg:gap-10 lg:px-10 lg:py-14">
-          <div>
-            <BrandWordmark size="hero" withPeriod />
-            <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Ask your data anything, in plain English. Every answer is grounded in your
-              semantic layer, validated against your data quality — no guesswork, no wrong
-              numbers.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link href="/chat">Ask your data a question</Link>
-              </Button>
-              <Button asChild size="lg" variant="secondary">
-                <a href="#how-it-works">See how it works</a>
-              </Button>
-            </div>
-            <ul className="mt-8 flex flex-wrap gap-2">
-              {FEATURE_CHIPS.map((chip) => (
-                <li
-                  key={chip}
-                  className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] text-muted-foreground"
-                >
-                  {chip}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <HeroLiveDemo />
-        </div>
+    <div className="w-full min-w-0 space-y-8 pb-8">
+      <HomeStory />
+      <section className="grid gap-3 sm:grid-cols-3" aria-label="How Ask Me works">
+        {[["01", "Ask", "Start with a business question in plain language."], ["02", "Understand", "Use governed definitions and inspect the evidence behind an answer."], ["03", "Act", "Explore an executive view or build a report for the next conversation."]].map(([step, title, description]) => <div key={step} className="rounded-2xl border border-border bg-surface-raised p-5"><span className="text-xs font-semibold tracking-widest text-primary">{step}</span><h2 className="mt-2 text-base font-semibold">{title}</h2><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p></div>)}
       </section>
-
-      <div className="mt-10 border-t border-border/60 pt-8">
-        <ConnectedDataSources />
-      </div>
-    </PageShell>
+      <div className="rounded-2xl border border-border bg-surface-raised p-5 sm:p-6"><ConnectedDataSources /></div>
+    </div>
   );
 }
