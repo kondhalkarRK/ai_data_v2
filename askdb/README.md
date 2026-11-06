@@ -113,6 +113,14 @@ The password is read from a hidden prompt, or from `ADMIN_PASSWORD` for unattend
 
 **5. Run both services.**
 
+Install web dependencies from the repository root first (and repeat after pulling
+changes to `package-lock.json`). The development script starts Next.js but does
+not install packages:
+
+```bash
+npm ci
+```
+
 ```bash
 # from askdb/
 ./scripts/dev.ps1        # Windows

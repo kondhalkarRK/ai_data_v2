@@ -85,17 +85,18 @@ compute over the full governed aggregate before applying display limits.
 
 ## Enable on the office laptop
 
-1. Update the checkout and install API/web dependencies through the normal project
-   process. AskBI uses `sqlglot>=30,<31`; the Outlook draft UI uses
-   `@azure/msal-browser`, `html2canvas` and `jspdf`.
-2. From `apps/api`, activate the project environment, then run:
+1. Update the checkout and, from the **repository root**, run `npm ci`. The
+   root `package-lock.json` installs the web workspace dependencies, including
+   `@azure/msal-browser`, `html2canvas` and `jspdf`. `scripts/dev.ps1` does not
+   install them. The API separately uses `sqlglot>=30,<31`.
+2. From `apps/api`, activate the project environment and check the migration:
 
    ```powershell
-   python -m alembic upgrade head
    python -m alembic current
    ```
 
-   The application database should report `0014_bi_reports`. This migration was
+   If it already reports `0014_bi_reports (head)`, no migration command is
+   needed. Otherwise run `python -m alembic upgrade head`. The migration was
    **not applied on the development laptop**.
 3. Set the API environment:
 
