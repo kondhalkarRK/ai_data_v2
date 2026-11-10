@@ -9,6 +9,7 @@ import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 import { useSession } from "@/hooks/use-session";
 import { useUiStore } from "@/stores/ui-store";
+import { cn } from "@/lib/utils";
 
 /**
  * The authenticated shell.
@@ -27,6 +28,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   const { data: user, isPending, isError, error } = useSession();
   const presenterMode = useUiStore((state) => state.presenterMode);
   const setSidebarCollapsed = useUiStore((state) => state.setSidebarCollapsed);
+  const mobileNavOpen = useUiStore((state) => state.mobileNavOpen);
+  const setMobileNavOpen = useUiStore((state) => state.setMobileNavOpen);
 
   React.useEffect(() => {
     if (AUTH_BYPASS) return;
@@ -88,7 +91,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     <div className={presenterMode ? "flex h-dvh presenter-mode" : "flex h-dvh overflow-hidden"}>
       {presenterMode ? null : (
         <React.Suspense fallback={null}>
-          <Sidebar user={user} />
+          {mobileNavOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} className="fixed inset-0 z-30 bg-black/55 lg:hidden" />}
+          <div className={cn("fixed inset-y-0 left-0 z-40 transition-transform duration-200 lg:static lg:visible lg:translate-x-0", mobileNavOpen ? "visible translate-x-0" : "invisible -translate-x-full")}><Sidebar user={user} /></div>
         </React.Suspense>
       )}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

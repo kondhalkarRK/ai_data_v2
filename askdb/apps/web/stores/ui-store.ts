@@ -13,6 +13,7 @@ import { persist } from "zustand/middleware";
  */
 interface UiState {
   sidebarCollapsed: boolean;
+  mobileNavOpen: boolean;
   presenterMode: boolean;
   commandPaletteOpen: boolean;
   /** Overrides the user's saved default for this browser session only. */
@@ -20,6 +21,7 @@ interface UiState {
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setMobileNavOpen: (open: boolean) => void;
   togglePresenterMode: () => void;
   setCommandPaletteOpen: (open: boolean) => void;
   setIndustryOverride: (industry: Industry | null) => void;
@@ -29,12 +31,14 @@ export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       sidebarCollapsed: false,
+      mobileNavOpen: false,
       presenterMode: false,
       commandPaletteOpen: false,
       industryOverride: null,
 
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+      setMobileNavOpen: (mobileNavOpen) => set({ mobileNavOpen }),
       togglePresenterMode: () => set((state) => ({ presenterMode: !state.presenterMode })),
       setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),
       setIndustryOverride: (industryOverride) => set({ industryOverride }),

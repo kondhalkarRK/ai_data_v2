@@ -115,13 +115,18 @@ See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for verified scope and rollbac
 - Supporting pages: Home/readiness, Data Preview/export, Query History, Saved
   Questions and personal AI usage. Legacy Data Sources, System Logs, LLM
   Observability and Cost Analytics routes redirect to consolidated pages.
-  Home now uses `components/home/home-story.tsx` for a full-width, three-scene
-  illustrative carousel (governed answer, report, decision) and keeps the real
-  `ConnectedDataSources` readiness panel separate. The report CTA opens AskBI
-  Auto mode via `?mode=auto` only when its automotive frontend flag is enabled.
+  Home now uses `components/home/home-workspace.tsx` as a signed-in task surface:
+  active industry and permitted region, API readiness and data-as-of context,
+  a question composer, four task links, owner-scoped saved questions and AskBI
+  reports, and compact health with expandable `ConnectedDataSources` details.
+  Submissions use the existing `/chat?q=` one-shot deep link, not a second chat
+  pipeline. AskBI links require both its automotive frontend flag and the API's
+  enabled v2 capability; otherwise Home links to the supported Builder.
+  `components/home/home-story.tsx` remains an optional dialog tour with three
+  illustrative scenes (governed answer, report, decision).
   `home-motion-scenes.tsx` contains fixed, internally consistent example
   sequences; CSS in `globals.css` reveals their steps over about six seconds.
-  The carousel waits 9.5 seconds, pauses on interaction or hidden tabs, and
+  The tour carousel waits 9.5 seconds, pauses on interaction or hidden tabs, and
   displays complete scenes immediately for reduced motion. No example calls an API.
 
 ## Question pipeline and security
@@ -147,6 +152,8 @@ SQL execution, retrieval and conversational context.
 
 `app/(workspace)/` owns routes; `lib/navigation.ts` owns navigation;
 `components/shell/` and `components/ui/` supply shared chrome/primitives.
+The shell shows its sidebar as a dismissible overlay below the large-screen
+breakpoint; `stores/ui-store.ts` keeps this mobile-open state transient.
 `app/globals.css`, `lib/surface.ts`, `lib/design.ts` and `lib/chart-colors.ts`
 define shared tokens and presentation. `app/providers.tsx` maps Light, Dark and
 AI to `light`, `dark`, `theme-ai`; persistence key is `nql-theme`.

@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelLeftOpen, Presentation, Search } from "lucide-react";
+import { Menu, Presentation, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -14,8 +14,7 @@ import { useUiStore } from "@/stores/ui-store";
 
 export function Topbar() {
   const pathname = usePathname();
-  const collapsed = useUiStore((state) => state.sidebarCollapsed);
-  const toggleSidebar = useUiStore((state) => state.toggleSidebar);
+  const setMobileNavOpen = useUiStore((state) => state.setMobileNavOpen);
   const presenterMode = useUiStore((state) => state.presenterMode);
   const togglePresenterMode = useUiStore((state) => state.togglePresenterMode);
   const setCommandPaletteOpen = useUiStore((state) => state.setCommandPaletteOpen);
@@ -23,17 +22,17 @@ export function Topbar() {
 
   return (
     <header className="app-topbar sticky top-0 z-20 flex h-[var(--topbar-height)] shrink-0 items-center gap-3 border-b border-border px-4">
-      {collapsed ? (
+      {(
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={toggleSidebar}
-          aria-label="Expand sidebar"
+          onClick={() => setMobileNavOpen(true)}
+          aria-label="Open navigation"
           className="lg:hidden"
         >
-          <PanelLeftOpen />
+          <Menu />
         </Button>
-      ) : null}
+      )}
 
       {/* Main workspace tabs. Real links, so they are bookmarkable and the back button
           behaves — the legacy Streamlit tabs were neither. */}

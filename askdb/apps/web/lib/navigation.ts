@@ -83,7 +83,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Home",
         icon: Home,
         minRole: "user",
-        description: "Ask Me hero, live demo, and connected data sources.",
+        description: "Ask your data, resume saved work, and check data health.",
       },
       {
         href: "/analytics-builder",
