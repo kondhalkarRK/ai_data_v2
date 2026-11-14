@@ -2,10 +2,11 @@
 
 import type { IndustryListResponse, ReadinessResponse } from "@nql/shared-types";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
+import { BrandWordmark } from "@/components/brand/wordmark";
 import { Button } from "@/components/ui/button";
 import { useActiveIndustry, useRegionAccess, useSession } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
@@ -67,6 +68,10 @@ export function HomeWorkspace() {
     </header>
 
     <section aria-labelledby="home-ask-heading" className="mx-auto flex max-w-3xl flex-col items-center pb-6 pt-8 text-center sm:pt-12">
+      <div className={styles.brandIntro}>
+        <BrandWordmark size="hero" className={styles.wordmark} />
+        <p className={styles.tagline}>Your data. Explained.</p>
+      </div>
       <div className={styles.visual} aria-hidden="true">
         <div className={styles.halo} />
         <svg viewBox="0 0 480 180" className={styles.art} fill="none">
@@ -75,7 +80,6 @@ export function HomeWorkspace() {
           {[64, 140, 214, 286, 358, 416].map((x, i) => <g key={x} className={styles.point} style={{ animationDelay: `${i * 120}ms` }}><circle cx={x} cy={[125, 98, 112, 62, 76, 32][i]} r="10" fill="currentColor" opacity=".1" /><circle cx={x} cy={[125, 98, 112, 62, 76, 32][i]} r="3.5" fill="currentColor" /></g>)}
           {[52, 78, 64, 114, 100, 144].map((height, i) => <rect key={i} className={styles.bar} style={{ animationDelay: `${i * 100}ms` }} x={52 + i * 70} y={166 - height} width="25" height={height} rx="5" fill="currentColor" opacity=".08" />)}
         </svg>
-        <span className={styles.badge}><Sparkles className="size-3.5" /> A little curiosity. A clearer picture.</span>
       </div>
       <h2 id="home-ask-heading" className="mt-6 text-3xl font-semibold tracking-tight sm:text-4xl">Ask anything about your data</h2>
       <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">From a quick question to your next insight. Explore your {activeName.toLowerCase()} data in your own words.</p>
