@@ -1,0 +1,11 @@
+.visual { position: relative; width: min(100%, 480px); height: 200px; display: grid; place-items: center; color: var(--color-primary); }
+.art { position: relative; width: 100%; height: 180px; color: inherit; }
+.halo { position: absolute; inset: 12% 16%; border-radius: 50%; background: radial-gradient(ellipse, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 70%); }
+.connector { stroke-dasharray: 500; animation: connect 1.8s ease-out both; }
+.point { animation: appear 1s ease-out both; }
+.bar { transform-origin: center bottom; transform-box: fill-box; animation: grow 1.5s ease-out both; }
+.badge { position: absolute; bottom: -2px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--color-border); border-radius: 999px; padding: 8px 12px; background: var(--color-surface-raised); color: var(--color-muted-foreground); font-size: 11px; }
+@keyframes connect { from { stroke-dashoffset: 500; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes appear { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes grow { from { transform: scaleY(.05); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .connector, .point, .bar { animation: none; } }

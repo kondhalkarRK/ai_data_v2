@@ -115,15 +115,19 @@ See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for verified scope and rollbac
 - Supporting pages: Home/readiness, Data Preview/export, Query History, Saved
   Questions and personal AI usage. Legacy Data Sources, System Logs, LLM
   Observability and Cost Analytics routes redirect to consolidated pages.
-  Home now uses `components/home/home-workspace.tsx` as a signed-in task surface:
-  active industry and permitted region, API readiness and data-as-of context,
-  a question composer, four task links, owner-scoped saved questions and AskBI
-  reports, and compact health with expandable `ConnectedDataSources` details.
-  Submissions use the existing `/chat?q=` one-shot deep link, not a second chat
-  pipeline. AskBI links require both its automotive frontend flag and the API's
-  enabled v2 capability; otherwise Home links to the supported Builder.
-  `components/home/home-story.tsx` remains an optional dialog tour with three
-  illustrative scenes (governed answer, report, decision).
+  Home uses `components/home/home-workspace.tsx` as a spacious question-first
+  landing page (simplified 2026-11-14): local-time greeting, compact PostgreSQL /
+  active-industry / API chips, existing readiness and industry refresh, collapsed
+  permission/semantic details, and a theme-token SVG data-to-chart animation.
+  Animation respects reduced motion. Status checks never assume connectivity;
+  raw dependency details, credentials and connection strings are not displayed.
+  The PostgreSQL chip reflects the active industry's analytics database availability.
+  Task cards, saved-work lists, trust-summary and report-capability queries were
+  removed from Home; their features remain available through navigation.
+  Submissions use the existing `/chat?q=` deep link. Three industry-specific
+  suggestions populate the composer. Scoped CSS is in `home-workspace.module.css`.
+  `components/home/home-story.tsx` remains available in the source but is no longer
+  mounted by Home.
   `home-motion-scenes.tsx` contains fixed, internally consistent example
   sequences; CSS in `globals.css` reveals their steps over about six seconds.
   The tour carousel waits 9.5 seconds, pauses on interaction or hidden tabs, and
