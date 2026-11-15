@@ -1,0 +1,171 @@
+AskMe - ChromaDB Compatibility Check (Windows PowerShell)
+=======================================================
+
+Purpose
+-------
+Check whether embedded Chroma can run on your office laptop before changing
+AskMe. This uses a separate Python environment and temporary synthetic data.
+It does not connect to PostgreSQL, call an LLM/embedding API, or configure an
+embedding model. It does not verify company approval or real RAG performance.
+
+Prerequisites
+-------------
+- An approved Python installation (use the same version as your AskMe backend).
+- Access to your organization's permitted Python package repository.
+- Permission to install Python packages in a project-local virtual environment.
+- This script must be present in the office checkout:
+  scripts\check_chroma_compatibility.py
+
+Do not run PowerShell as administrator or bypass office security restrictions.
+Replace the project path below if your office checkout is in another location.
+Run one command at a time. Stop at the first failure and keep its error output.
+
+1. Open PowerShell
+------------------
+Open Windows Start, search for PowerShell, and open it normally.
+
+2. Open the AskMe project folder
+-------------------------------
+cd E:\ai_data_rag\ai_data_v2\askdb
+
+Confirm the script exists:
+
+Test-Path .\scripts\check_chroma_compatibility.py
+
+Expected: True
+If False, copy/pull the script into this checkout before continuing.
+
+3. Check Python and create an isolated environment
+------------------------------------------------
+python --version
+
+python -m venv .venv-chroma-check
+
+Use a new test environment. If .venv-chroma-check already exists from an earlier
+attempt, its installed packages remain; use a different folder name throughout
+these commands if you need a clean environment.
+
+No activation is needed. All commands below use the test Python explicitly.
+Do not install these packages into AskMe's existing backend environment yet.
+
+4. Preview Chroma's dependencies WITHOUT installing them
+------------------------------------------------------
+This contacts the permitted package repository and may download/cache metadata.
+It writes a dependency report in the project folder.
+
+.\.venv-chroma-check\Scripts\python.exe -m pip install --dry-run --only-binary=:all: --report chroma-install-report.json chromadb
+
+Inspect potentially restricted dependencies:
+
+Select-String -Path chroma-install-report.json -Pattern 'huggingface|tokenizers|onnxruntime'
+
+IMPORTANT: Disabling local model downloads does not remove Chroma's installed
+dependencies. If company policy prohibits these packages, stop here. Do not use
+--no-deps, disable TLS checks, or bypass package restrictions.
+
+If pip does not recognize --dry-run or --report, the test environment's pip is
+too old. If your organization permits updating it, run:
+
+.\.venv-chroma-check\Scripts\python.exe -m pip install --upgrade pip
+
+Then repeat step 4. Use the approved package repository configuration.
+
+5. Install Chroma in the TEST environment
+---------------------------------------
+Continue only if the dependencies are permitted.
+
+.\.venv-chroma-check\Scripts\python.exe -m pip install --only-binary=:all: chromadb
+
+This requests available prebuilt packages rather than compiling source locally.
+The unpinned command evaluates the version available from your repository at
+execution time; the final application integration will pin a tested version.
+
+Check dependency consistency:
+
+.\.venv-chroma-check\Scripts\python.exe -m pip check
+
+Expected: No broken requirements found.
+
+6. Run the compatibility script
+------------------------------
+.\.venv-chroma-check\Scripts\python.exe scripts\check_chroma_compatibility.py
+
+The script prints Python/SQLite/Chroma versions and selected installed packages.
+It creates a disposable index in the Windows temporary directory and tests:
+- Writing two synthetic vectors.
+- Reopening the index in a separate process.
+- Nearest-neighbor search.
+- Metadata filtering.
+- Deleting a record and verifying deletion after another reopen.
+
+Automatic embeddings are explicitly disabled. Vectors are supplied by the script.
+The script blocks Python socket connection calls during each test stage. This is
+a guard, not an OS firewall or proof of all native-library network behavior.
+Temporary index files are normally removed at the end of the script.
+
+7. Expected successful output
+-----------------------------
+Version/dependency lines appear first, followed by:
+
+PASS: write
+PASS: read
+PASS: verify-delete
+PASS: local storage, query, filtering, restart and persistent delete.
+No embedding model was configured; all vectors were supplied by this script.
+This does not verify API access, RAG answer quality, scale or company approval.
+
+8. Record the installed versions
+-------------------------------
+.\.venv-chroma-check\Scripts\python.exe -m pip freeze > chroma-check-installed.txt
+
+Keep chroma-install-report.json and chroma-check-installed.txt for review.
+The preview and actual install can differ if repository contents change between
+steps; the installed-version file records what was actually tested.
+
+9. What to share for review
+--------------------------
+- The complete compatibility-script console output.
+- If any command fails, the command and its exact error output.
+- Python version and whether the office package installation was allowed.
+- Whether company policy permits the dependencies reported in step 4.
+
+Before sharing package reports/logs, remove credentials, private repository URLs,
+user-specific paths or other company-sensitive information if present.
+
+Common failures
+---------------
+Python not found:
+Use the approved Python executable or ask IT how Python is provided. Do not
+install another interpreter outside company policy.
+
+No matching distribution / binary package unavailable:
+Possible Python-version, architecture, package-version or repository limitation.
+Share the exact package/error. Do not assume a C++ compiler is required.
+
+Proxy / certificate / network error:
+The package repository may need company proxy or certificate configuration.
+Use IT-provided settings; do not disable certificate verification.
+
+Access denied / DLL blocked:
+Package installation or native execution may be blocked by endpoint policy.
+A virtual environment does not override these controls. Share the exact error.
+
+Unsupported Chroma API / configuration error:
+Record the installed Chroma version. The smoke script may need adjustment for
+that approved version; an API mismatch alone is not proof Chroma cannot run.
+
+Temporary-folder permission / file lock error:
+Share the error. The test writes to a unique temporary folder, never AskMe's
+existing document or vector storage. Do not delete application data to fix it.
+
+What a PASS means
+-----------------
+Basic embedded storage/search works in this Python environment and temp folder.
+Next, separately verify the approved persistent application folder, embedding
+endpoint, document parsing, permissions, real corpus performance and AI Chat.
+No application migration, feature activation or live provider check is performed.
+
+Reference
+---------
+https://docs.trychroma.com/docs/collections/manage-collections
+https://docs.trychroma.com/docs/run-chroma/clients
