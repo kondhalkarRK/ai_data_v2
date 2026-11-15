@@ -1,14 +1,18 @@
-# AskMe frontend - copy/merge into apps/web/.env.local.
-# Public settings only. NEVER add database passwords or provider API keys here.
-# Local development: browser uses same-origin proxy routes.
-NEXT_PUBLIC_API_BASE_URL=
-API_REWRITE_TARGET=http://localhost:8000
-NEXT_PUBLIC_APP_NAME=AskMe
-NEXT_PUBLIC_AUTH_BYPASS=false
-NEXT_PUBLIC_ASK_ME_NEW_CHAT_UI_ENABLED=true
-NEXT_PUBLIC_ASK_ME_AUGMENTED_DASHBOARD_ENABLED=true
-NEXT_PUBLIC_ASK_ME_ASKWIZ_ENABLED=true
-NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED=true
-NEXT_PUBLIC_ASK_ME_ASKBI_ENABLED=true
+Debug AskMe: with “Use knowledge documents” ON, this question gets no answer:
+“How do I escalate a delayed delivery?”
 
-# No frontend RAG key/endpoint needed. The chat switch sends useDocuments.
+Trace and fix the actual failure:
+1. Frontend sends useDocuments:true; both API endpoints forward it.
+2. API loads RAG enabled + Chroma from the correct environment.
+3. Demo policy was uploaded, is active INDEXED, and matches the user's industry/ACL.
+4. Ingestion and retrieval use the same Chroma path, namespace and embedding model.
+5. Authorized chunks reach generation; response events render correctly.
+6. Check whether a required SQL connection blocks document-only requests.
+
+Reference:
+docs/RAG_IMPLEMENTATION_CHECKPOINT.md
+docs/rag-demo/01_DEMO_AUTOMOTIVE_DELIVERY_POLICY.md
+
+Report the root cause, apply the minimal fix and run a regression test.
+Do not expose secrets, bypass permissions, call live providers or run migrations
+without approval. Do not fabricate a successful answer.
