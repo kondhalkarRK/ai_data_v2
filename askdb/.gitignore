@@ -72,3 +72,7 @@ Thumbs.db
 .turbo/
 .cache/
 *.tsbuildinfo
+
+/.venv-chroma-check/
+/chroma-install-report.json
+/chroma-check-installed.txt
