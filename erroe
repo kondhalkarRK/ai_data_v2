@@ -1,196 +1,117 @@
-# ---------------------------------------------------------------------------
-# NQL Insight - example environment
-#
-# Copy to .env and fill in real values. Never commit .env.
-# Generate secrets with:  python -c "import secrets; print(secrets.token_urlsafe(64))"
-# ---------------------------------------------------------------------------
+# AskMe API configuration - SANITIZED TEMPLATE, not an active .env.
+# Copy/merge into the root .env or apps/api/.env after filling placeholders.
+# Never overwrite working database/JWT/provider values with placeholders.
+# Existing unrelated feature flags are retained from the supplied configuration.
+# Process environment overrides files; apps/api/.env overrides root .env.
 
-# --- Runtime ---------------------------------------------------------------
-ENVIRONMENT=development                 # development | staging | production
+ENVIRONMENT=development
 LOG_LEVEL=INFO
 API_HOST=0.0.0.0
 API_PORT=8000
-
-# --- Security --------------------------------------------------------------
-# REQUIRED. Minimum 32 characters. The API refuses to start in production
-# without a strong value.
-JWT_SECRET_KEY=tMD4W5j_d4F_Ut_J_ARLMWG4cBwsgdeM7c_IxB4OsTuLipGibDxYSXrLrP33K2Yj
 JWT_ALGORITHM=HS256
 JWT_ACCESS_TTL_MINUTES=15
 JWT_REFRESH_TTL_DAYS=14
 JWT_ISSUER=nql-insight
 JWT_AUDIENCE=nql-insight-web
-
 COOKIE_DOMAIN=
-COOKIE_SECURE=false                     # must be true in production (HTTPS only)
-COOKIE_SAMESITE=lax                     # lax | strict | none
+COOKIE_SECURE=false
+COOKIE_SAMESITE=lax
 CSRF_HEADER_NAME=x-csrf-token
-
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-TRUSTED_HOSTS=localhost,127.0.0.1
-
 RATE_LIMIT_LOGIN_PER_MINUTE=5
 RATE_LIMIT_API_PER_MINUTE=120
-
-# TEMPORARY local testing: skip login JWT/CSRF and use the first admin user.
-# Must stay false in production. Pair with NEXT_PUBLIC_AUTH_BYPASS=true in
-# apps/web/.env.local. Turn both off once real login works again.
 AUTH_BYPASS=false
-
-# --- Application database (auth, history, cost, saved questions) -----------
-APP_DATABASE_URL=postgresql+psycopg://askdb_app:rahul8143@localhost:5432/askdb_app
-
-# --- Analytics databases ---------------------------------------------------
-# Runtime: SELECT-only reader. The API also forces read-only transactions.
-AUTOMOTIVE_DATABASE_URL=postgresql+psycopg://askdb_reader:askdb_reader@localhost:5432/askdb_automotive
-INSURANCE_DATABASE_URL=postgresql+psycopg://askdb_reader:askdb_reader@localhost:5432/askdb_insurance
-# Migrations and seeds: owner role (never used by the API process).
-AUTOMOTIVE_MIGRATE_DATABASE_URL=postgresql+psycopg://askdb_owner:askdb_owner@localhost:5432/askdb_automotive
-INSURANCE_MIGRATE_DATABASE_URL=postgresql+psycopg://askdb_owner:askdb_owner@localhost:5432/askdb_insurance
-
-DEFAULT_INDUSTRY=insurance              # automotive | insurance
-
+DEFAULT_INDUSTRY=insurance
 DB_POOL_MIN_SIZE=1
 DB_POOL_MAX_SIZE=10
 DB_CONNECT_TIMEOUT_SECONDS=10
 SQL_STATEMENT_TIMEOUT_SECONDS=30
 SQL_MAX_RESULT_ROWS=1000
 SQL_PREVIEW_PAGE_SIZE=50
-
-# --- MongoDB (documents, conversations, audit) -----------------------------
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DATABASE=nql_insight
-
-# --- Qdrant (vectors) ------------------------------------------------------
-QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=
-QDRANT_VECTOR_SIZE=384
-
-# --- Embeddings ------------------------------------------------------------
-EMBEDDINGS_PROVIDER=hash                # hash | sentence-transformers | openai
-EMBEDDINGS_MODEL=
-
-# --- LLM -------------------------------------------------------------------
-# Server-side only. This value must never reach the browser.
-LLM_API_KEY=
-LLM_BASE_URL=https://api.anthropic.com/v1
 LLM_DEFAULT_MODEL=anthropic.claude-opus-5
 LLM_TEMPERATURE=0.2
 LLM_MAX_COMPLETION_TOKENS=6000
 LLM_TIMEOUT_SECONDS=55
-
-ANTHROPIC_API_KEY=
-ANTHROPIC_BASE_URL=https://api.anthropic.com/v1
-
-
-
-# --- Chat routing (API) ----------------------------------------------------
-# Rule-based message router: greetings and casual chat skip NLQ/SQL when true.
 CHAT_ROUTER_ENABLED=true
 CHAT_FOLLOW_UP_GUARD_ENABLED=true
 CHAT_QUESTION_REWRITES_ENABLED=true
-# Structured LLM intent classifier (optional; rule router handles most non-data traffic).
 CHAT_STRUCTURED_CLASSIFIER_ENABLED=false
-
-# false: open-domain general knowledge and programming questions get a polite scope decline
-# (no SQL, no LLM call). true: restores the previous LLM-answered general-knowledge reply.
 CHAT_GENERAL_KNOWLEDGE_ENABLED=true
-
-# --- Web: optional "New Chat" experience ------------------------------------
-# false: only the Classic chat exists. true: /chat shows a Classic | New toggle.
-# Same backend either way. Mapped to NEXT_PUBLIC_ASK_ME_NEW_CHAT_UI_ENABLED in next.config.ts
-# (restart `npm run dev` after changing it).
 ASK_ME_NEW_CHAT_UI_ENABLED=true
-
 ASK_ME_AUGMENTED_DASHBOARD_ENABLED=true
 ASK_ME_ASKWIZ_ENABLED=true
-NEXT_PUBLIC_ASK_ME_ASKWIZ_ENABLED=true
 ASKWIZ_TIMEZONE=Asia/Kolkata
 ASKWIZ_RUN_TIMEOUT_SECONDS=20
-NEXT_PUBLIC_ASK_ME_AUGMENTED_DASHBOARD_ENABLED=true
+ASK_ME_ANALYTICS_WORKSPACE_ENABLED=true
+ASK_ME_ASKBI_ENABLED=true
+ASK_ME_ASKBI_ADVANCED_ENABLED=true
 
-# # --- RAG -------------------------------------------------------------------
-# UPLOAD_MAX_BYTES=26214400               # 25 MiB
-# UPLOAD_ALLOWED_EXTENSIONS=.pdf,.docx,.txt,.md,.html
-# RAG_CHUNK_MAX_CHARS=1400
-# RAG_CHUNK_MIN_CHARS=40
-# RAG_CHUNK_OVERLAP_CHARS=180
-# RAG_TOP_K=6
+# Authentication: reuse your CURRENT private JWT secret to preserve sessions.
+JWT_SECRET_KEY=REPLACE_WITH_YOUR_EXISTING_PRIVATE_JWT_SECRET
+# Development browser settings; preserve approved deployment values if different.
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+TRUSTED_HOSTS=localhost,127.0.0.1
 
-# --- RAG (Traditional) -----------------------------------------------------
-# Safe default when no OpenAI-compatible embedding endpoint is available:
-# RAG stays off so the app does not try to download Hugging Face model files.
-# If you have a real OpenAI/Azure embedding endpoint, flip this to true and provide
-# RAG_EMBEDDING_BASE_URL + RAG_EMBEDDING_API_KEY.
+# Database URLs: retain your CURRENT working private connection strings.
+# URL-encode special characters in database usernames/passwords.
+APP_DATABASE_URL=postgresql+psycopg://APP_USER:APP_PASSWORD@APP_HOST:5432/APP_DATABASE
+AUTOMOTIVE_DATABASE_URL=postgresql+psycopg://READONLY_USER:READONLY_PASSWORD@AUTO_HOST:5432/AUTO_DATABASE
+INSURANCE_DATABASE_URL=postgresql+psycopg://READONLY_USER:READONLY_PASSWORD@INSURANCE_HOST:5432/INSURANCE_DATABASE
+AUTOMOTIVE_MIGRATE_DATABASE_URL=postgresql+psycopg://OWNER_USER:OWNER_PASSWORD@AUTO_HOST:5432/AUTO_DATABASE
+INSURANCE_MIGRATE_DATABASE_URL=postgresql+psycopg://OWNER_USER:OWNER_PASSWORD@INSURANCE_HOST:5432/INSURANCE_DATABASE
+
+# Existing narration/chat service: retain your current approved gateway and model.
+LLM_BASE_URL=https://REPLACE_WITH_YOUR_CURRENT_APPROVED_LLM_GATEWAY/v1
+LLM_API_KEY=REPLACE_WITH_YOUR_CURRENT_LLM_API_KEY
+# Optional separate Anthropic configuration. Keep empty unless actually used.
+ANTHROPIC_API_KEY=
+ANTHROPIC_BASE_URL=
+
+# Chroma document RAG.
+# Keep OFF until the approved embedding model/URL/key below are available.
+# Then change ONLY this flag to true and restart the API for the pilot.
 ASK_ME_RAG_ENABLED=false
-UPLOAD_MAX_BYTES=26214400               # 25 MiB
+RAG_VECTOR_BACKEND=chroma
+# Example folders: change to approved writable absolute folders outside OneDrive.
+RAG_CHROMA_PATH=C:/AskMeData/chroma
+RAG_STORAGE_BACKEND=local
+RAG_STORAGE_ROOT=C:/AskMeData/documents
+RAG_MIN_SIMILARITY=0.25
+RAG_RETAIN_DELETED_FILES=true
+
+UPLOAD_MAX_BYTES=26214400
 UPLOAD_ALLOWED_EXTENSIONS=.pdf,.docx,.txt,.md,.html
 RAG_CHUNK_MAX_CHARS=1400
 RAG_CHUNK_MIN_CHARS=40
 RAG_CHUNK_OVERLAP_CHARS=180
 RAG_TOP_K=6
-# Embedding providers for the new RAG path (never hash when RAG is on).
-# sentence_transformers | openai_compatible
-# Do not use sentence_transformers on this machine unless you want Hugging Face downloads.
-# Embedding providers for the new RAG path (never hash when RAG is on).
-# Use an existing embeddings API; local Hugging Face models are not supported.
+
+# Embeddings are a DIFFERENT capability from chat completions.
+# AskMe appends /embeddings to BASE_URL; do not append /embeddings yourself.
+# Configure an approved OpenAI-compatible endpoint, NOT an arbitrary chat model.
 RAG_EMBEDDING_PROVIDER=openai_compatible
-RAG_EMBEDDING_MODEL=
-# 0 = verify from the provider at runtime (use a separate Qdrant collection if dim differs)
+RAG_EMBEDDING_BASE_URL=https://REPLACE_WITH_APPROVED_EMBEDDING_GATEWAY/v1
+RAG_EMBEDDING_MODEL=REPLACE_WITH_APPROVED_EMBEDDING_MODEL_ID
+RAG_EMBEDDING_API_KEY=REPLACE_WITH_EMBEDDING_API_KEY
 RAG_EMBEDDING_DIMENSION=0
-# Fill only if you have a real OpenAI/Azure embedding endpoint.
-RAG_EMBEDDING_BASE_URL=
-RAG_EMBEDDING_API_KEY=
 RAG_EMBEDDING_BATCH_SIZE=32
-RAG_QDRANT_COLLECTION_PREFIX=askme_rag
-# server = needs Qdrant HTTP (Docker/binary). local = NO Docker (embedded disk).
-# memory = NO Docker (in-RAM, lost on restart). Prefer local on locked-down laptops.
-RAG_QDRANT_MODE=local
-RAG_QDRANT_PATH=
-RAG_STORAGE_BACKEND=local
-RAG_STORAGE_ROOT=
-RAG_RETAIN_DELETED_FILES=true
+
+# One backend process, only its in-process ingestion worker for embedded Chroma.
 RAG_WORKER_IN_PROCESS=true
 RAG_WORKER_POLL_SECONDS=2
 RAG_JOB_LEASE_SECONDS=120
 RAG_JOB_MAX_ATTEMPTS=5
 RAG_JOB_BACKOFF_SECONDS=15
 
-ASK_ME_ANALYTICS_WORKSPACE_ENABLED=true
-NEXT_PUBLIC_ASK_ME_ANALYTICS_WORKSPACE_ENABLED=true
+# Legacy Qdrant/Mongo/EMBEDDINGS_* entries were omitted from this Chroma template.
+# Do not uninstall or delete existing stores; retain private rollback config.
+# No QDRANT_URL, QDRANT_API_KEY or RAG_QDRANT_* values are needed for Chroma.
 
-
-RAG_VECTOR_BACKEND=chroma
-RAG_CHROMA_PATH=
-RAG_MIN_SIMILARITY=0.25
-
-
-# --- Controlled web retrieval ----------------------------------------------
-# Disabled by default. Users opt in per query, and only these hosts are allowed.
+# Web retrieval is independent from uploaded-document retrieval.
 WEB_RETRIEVAL_ENABLED=false
 WEB_RETRIEVAL_ALLOWLIST=
 WEB_RETRIEVAL_TIMEOUT_SECONDS=8
 WEB_RETRIEVAL_MAX_BYTES=2097152
 
-# ---------------------------------------------------------------------------
-# Frontend (apps/web/.env.local)
-# # ---------------------------------------------------------------------------
-# NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-
-# NEXT_PUBLIC_APP_NAME=NQL Insight
-# NEXT_PUBLIC_AUTH_BYPASS=false
-# API_REWRITE_TARGET=http://localhost:8000
-
-# Leave NEXT_PUBLIC_API_BASE_URL empty in local dev so the browser calls same-origin
-# /api and /ready; Next.js rewrites them to the API (avoids CORS Failed to fetch).
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-NEXT_PUBLIC_APP_NAME=Ask DB
-NEXT_PUBLIC_AUTH_BYPASS=false
-API_REWRITE_TARGET=http://localhost:8000
-
-
-# AskBI v2: automotive Custom Report + Auto Report. Apply 0014_bi_reports first.
-ASK_ME_ASKBI_ENABLED=true
-NEXT_PUBLIC_ASK_ME_ASKBI_ENABLED=true
-# Separately gated advanced BI coverage; enable only after acceptance.
-ASK_ME_ASKBI_ADVANCED_ENABLED=true
+# Keep certificate verification enabled. If IT supplies a company CA bundle:
+SSL_VERIFY=true
+SSL_CERT_FILE=
