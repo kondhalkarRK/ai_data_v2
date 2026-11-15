@@ -23,6 +23,7 @@ export function ChatWorkspace() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  const [useDocuments, setUseDocuments] = useState(false);
   const [webRetrieval, setWebRetrieval] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export function ChatWorkspace() {
       id: crypto.randomUUID(),
       role: "user",
       question: text.trim(),
+      documentsEnabled: useDocuments,
     };
     const assistantId = crypto.randomUUID();
     setMessages((prev) => [
@@ -77,7 +79,7 @@ export function ChatWorkspace() {
       // Vercel rewrites buffer SSE, so production uses one JSON round-trip.
       const sync = await apiClient.post<{
         events: Array<{ event: string; data: Record<string, unknown> }>;
-      }>("/api/v1/chat/ask-sync", payload, { industry });
+      }>("/api/v1/chat/ask-sync", payload, { industry, signal: controller.signal });
       for (const frame of sync.events ?? []) {
         const eventName = frame.event;
         const data = frame.data ?? {};
@@ -259,7 +261,7 @@ export function ChatWorkspace() {
                     key={message.id}
                     className="ml-auto max-w-[85%] rounded-[var(--radius-card)] bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-card)]"
                   >
-                    {message.question}
+                    {message.question}<span className="mt-1 block text-[10px] opacity-75">Documents {message.documentsEnabled ? "on" : "off"}</span>
                   </div>
                 ) : (
                   <ResponseCard
@@ -280,6 +282,10 @@ export function ChatWorkspace() {
               className="chat-composer shrink-0 border-t border-border/60 bg-surface-raised px-4 py-3"
               onSubmit={onSubmit}
             >
+              <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <input type="checkbox" role="switch" checked={useDocuments} onChange={event => setUseDocuments(event.target.checked)} />
+                Use knowledge documents {useDocuments ? "· Include permitted sources when relevant" : "· Business data and definitions"}
+              </label>
               <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <input
                   type="checkbox"

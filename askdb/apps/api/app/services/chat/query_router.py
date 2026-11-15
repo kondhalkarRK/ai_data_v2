@@ -69,6 +69,20 @@ class RouteDecision:
     reason: str
 
 
+def explicit_document_question(question: str) -> bool:
+    """Conservative evidence cues; question words alone never select documents."""
+    q = question.casefold()
+    explicit_source = re.search(r"\b(?:document|memo|pdf|uploaded|according|wording)\b", q)
+    if not explicit_source and re.search(
+        r"\b(?:(?:how many|count of|total number of)\s+(?:vehicles|units|sales|claims|policies|orders)|policy (?:count|premium))\b",
+        q,
+    ):
+        return False
+    if re.search(r"\b(?:document|uploaded|pdf|memo|warranty|policy|procedure|escalat\w*)\b", q):
+        return True
+    return any(cue in q for cue in DOCUMENT_CUES)
+
+
 def route_question(
     question: str,
     plan: QuestionPlan | None,
@@ -80,7 +94,7 @@ def route_question(
     if not q:
         return RouteDecision("sql", "empty question defaults to analytics")
 
-    if any(cue in q for cue in DOCUMENT_CUES):
+    if explicit_document_question(q):
         return RouteDecision("knowledge", "document-oriented phrasing")
 
     if _looks_hybrid(q):
@@ -96,7 +110,7 @@ def route_question(
 
 
 def _looks_hybrid(q: str) -> bool:
-    if any(cue in q for cue in HYBRID_CUES):
+    if any(re.search(r"\b" + re.escape(cue) + r"\b", q) for cue in HYBRID_CUES):
         return True
     if re.search(r"\bexplain\b.+\b(increase|decrease|drop|growth|spike)\b", q):
         return True

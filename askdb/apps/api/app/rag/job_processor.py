@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from typing import Any
@@ -17,12 +18,12 @@ from app.models.knowledge import (
 from app.rag.chunking import chunk_document_text
 from app.rag.embeddings import (
     EmbeddingClient,
-    EmbeddingIdentity,
     build_embedding_client,
     collection_name_for,
     embed_texts_batched,
     verify_embedding_identity,
 )
+from app.rag.index_factory import vector_index
 from app.rag.parsers import extract_text
 from app.rag.qdrant_index import QdrantIndex
 from app.rag.storage import DocumentBlobStore
@@ -51,11 +52,15 @@ async def process_ingest_job(
         return {"status": "failed", "error": "document_missing"}
 
     # Retries must never reactivate deleted or superseded documents.
-    if doc.status in {
+    if job.job_type in {
+        KnowledgeJobType.INGEST.value,
+        KnowledgeJobType.REINDEX.value,
+    } and doc.status in {
         KnowledgeDocumentStatus.DELETED.value,
         KnowledgeDocumentStatus.SUPERSEDED.value,
     }:
         await repo.mark_job_done(job_id)
+        await session.commit()
         return {"status": "skipped", "reason": doc.status}
 
     job_type = job.job_type
@@ -132,7 +137,7 @@ async def _ingest_or_reindex(
     await repo.renew_lease(job_id, lease_seconds=settings.rag_job_lease_seconds)
 
     await repo.transition_status(doc.id, KnowledgeDocumentStatus.EXTRACTING)
-    text = extract_text(doc.filename, raw)
+    text = await asyncio.to_thread(extract_text, doc.filename, raw)
     if not text.strip():
         raise ValidationError("Document produced no extractable text.")
     store.write_extracted_text(doc.id, text)
@@ -147,13 +152,15 @@ async def _ingest_or_reindex(
     if not pieces:
         raise ValidationError("Chunking produced no passages.")
 
-    client = embedding_client or build_embedding_client(settings)
+    client = embedding_client or await asyncio.to_thread(build_embedding_client, settings)
+    assert client is not None
     identity = verify_embedding_identity(settings, client)
     collection = collection_name_for(settings, industry=doc.industry, identity=identity)
 
     await repo.transition_status(doc.id, KnowledgeDocumentStatus.EMBEDDING)
     await repo.renew_lease(job_id, lease_seconds=settings.rag_job_lease_seconds)
-    vectors = embed_texts_batched(
+    vectors = await asyncio.to_thread(
+        embed_texts_batched,
         client,
         [piece.text for piece in pieces],
         batch_size=settings.rag_embedding_batch_size,
@@ -173,7 +180,7 @@ async def _ingest_or_reindex(
             }
         )
 
-    index = qdrant or QdrantIndex(settings)
+    index = qdrant or vector_index(settings)
     # Clean any partial prior upsert for this document before writing.
     try:
         index.delete_document_points(collection, str(doc.id))
@@ -183,7 +190,8 @@ async def _ingest_or_reindex(
     await repo.transition_status(doc.id, KnowledgeDocumentStatus.INDEXING)
     await repo.renew_lease(job_id, lease_seconds=settings.rag_job_lease_seconds)
     try:
-        point_ids = index.upsert_chunks(
+        point_ids = await asyncio.to_thread(
+            index.upsert_chunks,
             collection_name=collection,
             identity=identity,
             document_id=str(doc.id),
@@ -200,7 +208,7 @@ async def _ingest_or_reindex(
         index.delete_document_points(collection, str(doc.id))
         raise
 
-    verified = index.count_points_for_document(collection, str(doc.id))
+    verified = await asyncio.to_thread(index.count_points_for_document, collection, str(doc.id))
     if verified != len(chunk_rows):
         index.delete_document_points(collection, str(doc.id))
         raise ValidationError(
@@ -261,10 +269,12 @@ async def _delete_vectors(
     *,
     qdrant: QdrantIndex | None,
 ) -> dict[str, Any]:
-    index = qdrant or QdrantIndex(settings)
+    index = qdrant or vector_index(settings)
     collection = doc.qdrant_collection
     if collection:
         index.delete_document_points(collection, str(doc.id))
+        if index.count_points_for_document(collection, str(doc.id)) != 0:
+            raise ValidationError("Vector cleanup verification failed.")
     return {"status": "vectors_deleted", "document_id": str(doc.id)}
 
 

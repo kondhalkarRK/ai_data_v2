@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import secrets
 import time
 import uuid
@@ -23,6 +24,8 @@ from app.core.exceptions import ValidationError
 from app.models.activity import Conversation, LlmUsage, QueryHistory, SavedQuestion
 from app.models.enums import Role
 from app.models.user import User
+from app.rag.feature import rag_enabled
+from app.rag.generation import grounded_document_reply
 from app.semantic.service import SemanticService
 from app.services.catalog import EntityCatalogService
 from app.services.chat.clarification import (
@@ -33,7 +36,54 @@ from app.services.chat.clarification import (
     resolution_notes,
 )
 from app.services.chat.conversation_context import is_contextual_followup, plan_state
+from app.services.chat.conversation_memory import (
+    DocumentContext,
+    ResultMeta,
+    SessionMemory,
+    analytical_expired,
+    append_general_chat,
+    append_recent_turn,
+    assert_memory_scope,
+    build_analytical_context,
+    clear_pending,
+    empty_memory,
+    follow_up_context_status,
+    is_refresh_request,
+    plan_state_from_memory,
+    resolve_incoming_message,
+    revalidate_plan_for_scope,
+    revalidate_prior_state_for_scope,
+    revalidate_stored_plan_for_scope,
+    session_memory_storage_error,
+    set_pending_clarification,
+)
+from app.services.chat.decision_engine import (
+    Confidence,
+    assess_confidence,
+    decide_route,
+    interpretation_options,
+)
+from app.services.chat.failures import (
+    FailureInfo,
+    classify_database,
+    classify_llm_failure,
+    classify_sql_validation,
+    propose_sql_repair,
+)
 from app.services.chat.follow_up_guard import data_vocabulary_hit, follow_up_guard_allows_sql
+from app.services.chat.intents import (
+    is_out_of_bounds,
+    is_surprise_me,
+    is_whatif,
+    parse_whatif,
+    suggested_followups,
+)
+from app.services.chat.llm_assist import (
+    classify_and_resolve,
+    generate_validated_sql,
+    interpret_question,
+    interpretation_vocabulary,
+)
 from app.services.chat.message_classifier import (
     rule_route_interrupts_analytical_context,
     template_general_chat,
@@ -50,60 +100,16 @@ from app.services.chat.non_data_handlers import (
     general_knowledge_reply,
     no_documents_reply,
 )
-from app.services.chat.pre_plan import early_route, plan_with_rewrites, run_pre_plan
-from app.services.chat.conversation_memory import (
-    DocumentContext,
-    analytical_expired,
-    append_general_chat,
-    append_recent_turn,
-    assert_memory_scope,
-    build_analytical_context,
-    clear_pending,
-    empty_memory,
-    follow_up_context_status,
-    is_refresh_request,
-    plan_state_from_memory,
-    revalidate_prior_state_for_scope,
-    revalidate_plan_for_scope,
-    revalidate_stored_plan_for_scope,
-    resolve_incoming_message,
-    ResultMeta,
-    SessionMemory,
-    session_memory_storage_error,
-    set_pending_clarification,
-)
-from app.rag.feature import rag_enabled
-from app.rag.generation import grounded_document_reply
-from app.services.chat.decision_engine import (
-    Confidence,
-    assess_confidence,
-    decide_route,
-    interpretation_options,
-)
-from app.services.chat.failures import (
-    FailureInfo,
-    classify_database,
-    classify_llm_failure,
-    classify_sql_validation,
-    propose_sql_repair,
-)
-from app.services.chat.intents import (
-    is_out_of_bounds,
-    is_surprise_me,
-    is_whatif,
-    parse_whatif,
-    suggested_followups,
-)
-from app.services.chat.llm_assist import (
-    classify_and_resolve,
-    generate_validated_sql,
-    interpret_question,
-    interpretation_vocabulary,
-)
 from app.services.chat.pipeline import TurnPlan, plan_turn
+from app.services.chat.pre_plan import early_route, plan_with_rewrites, run_pre_plan
 from app.services.chat.profiler import PROFILER, QueryProfile
 from app.services.chat.query_cache import QUERY_CACHE, CachedAnswer
-from app.services.chat.query_router import knowledge_narrative, plan_entities, route_question
+from app.services.chat.query_router import (
+    explicit_document_question,
+    knowledge_narrative,
+    plan_entities,
+    route_question,
+)
 from app.services.chat.question_understanding import QuestionPlan
 from app.services.chat.response_meta import (
     QueryTimings,
@@ -131,8 +137,8 @@ from app.services.chat.value_dictionary import (
     get_value_dictionary,
     resolver_for,
 )
-from app.services.knowledge import KnowledgeService
 from app.services.governance.llm_config import active_llm
+from app.services.knowledge import KnowledgeService
 from app.services.llm import llm_configured
 from app.services.security.region_scope import (
     RegionScope,
@@ -303,7 +309,7 @@ class ChatService:
 
     def _cache_scope(self) -> str:
         governed = active_llm(self._settings)
-        return f"{self._region_scope.cache_key()}|llm:{governed.provider}:{governed.model}"
+        return f"rag-mode-v1|user:{self._user.id}|{self._region_scope.cache_key()}|llm:{governed.provider}:{governed.model}"
 
     def _llm_runtime_meta(self) -> dict[str, Any]:
         governed = active_llm(self._settings)
@@ -380,6 +386,7 @@ class ChatService:
         cancel_event: Event | None = None,
         cancel_requested: set[uuid.UUID] | None = None,
         web_retrieval: bool = False,
+        use_documents: bool = False,
         model_override: str | None = None,
         temperature: float | None = None,
         top_p: float | None = None,
@@ -414,9 +421,15 @@ class ChatService:
 
         conversation = await self._ensure_conversation(conversation_id, question)
         session_memory = await self._load_session_memory(conversation.id)
+        # Legacy summaries have no evidence/ACL provenance. Never reuse them.
+        if session_memory.document is not None or use_documents:
+            session_memory.recent_turns = ()
+            session_memory.general_chat_turns = ()
+        session_memory.document = None
+        documents_allowed = use_documents and rag_enabled(self._settings)
         raw_question = question
         question, _completed_pending = resolve_incoming_message(session_memory, question)
-        bypass_query_cache = is_refresh_request(raw_question) or is_refresh_request(question)
+        bypass_query_cache = is_refresh_request(raw_question) or is_refresh_request(question) or documents_allowed
         append_recent_turn(
             session_memory, role="user", text=question, settings=self._settings
         )
@@ -619,6 +632,13 @@ class ChatService:
             )
 
         async def answer_from_documents(reason: str) -> AsyncIterator[str]:
+            if not documents_allowed:
+                async for frame in finish_without_sql(
+                    path="documents_disabled",
+                    narrative="Knowledge documents are off or unavailable. Enable Use knowledge documents when the server supports it to answer from uploaded sources.",
+                ):
+                    yield frame
+                return
             knowledge = KnowledgeService(
                 self._settings,
                 self._industry,
@@ -649,19 +669,14 @@ class ChatService:
                 )
             except Exception:
                 logger.debug("Knowledge search failed", exc_info=True)
-                citations = []
+                async for frame in finish_without_sql(
+                    path="documents_unavailable", narrative="Document search is unavailable. Please retry; this is not a no-matches result."
+                ):
+                    yield frame
+                return
             for citation in citations:
                 yield _sse("citation", _citation_payload(citation))
             doc_followup = ""
-            if session_memory.document is not None:
-                age = (
-                    datetime.now(UTC) - session_memory.document.updated_at
-                ).total_seconds()
-                if age <= self._settings.chat_analytical_context_ttl_seconds:
-                    doc_followup = (
-                        f"Prior question: {session_memory.document.question}\n"
-                        f"Prior summary: {session_memory.document.summary}"
-                    )
             if rag_enabled(self._settings):
                 reply = await grounded_document_reply(
                     self._settings,
@@ -736,6 +751,19 @@ class ChatService:
                     "route": "knowledge",
                 },
             )
+
+        if explicit_document_question(question):
+            if re.search(r"\b(?:and|also)\b", question, re.IGNORECASE) and re.search(
+                r"\b(?:sales|revenue|units|claims|premium)\b", question, re.IGNORECASE
+            ):
+                async for frame in finish_without_sql(
+                    path="clarification", narrative="Please ask the measured business result and the document procedure separately so each answer has the correct evidence."
+                ):
+                    yield frame
+            else:
+                async for frame in answer_from_documents("explicit document request"):
+                    yield frame
+            return
 
         early = early_route(
             industry=self._industry,
@@ -1208,12 +1236,13 @@ class ChatService:
                 yield frame
             return
 
-        knowledge_service = KnowledgeService(self._settings, self._industry)
         decision = route_question(
             question,
             plan,
-            has_documents=bool(knowledge_service.list_documents()),
+            has_documents=documents_allowed,
         )
+        if not documents_allowed and decision.route == "hybrid":
+            decision = replace(decision, route="sql", reason="documents excluded by request mode")
         yield _sse(
             "stage",
             {"stage": "route", "route": decision.route, "reason": decision.reason},
@@ -1722,7 +1751,7 @@ class ChatService:
 
         try:
             citations = []
-            if decision.route == "hybrid":
+            if decision.route == "hybrid" and documents_allowed:
                 knowledge = KnowledgeService(
                     self._settings,
                     self._industry,
@@ -1884,7 +1913,7 @@ class ChatService:
         )[:5]
         yield _sse("followups", {"items": followups})
 
-        if sql_text and path != "fallback" and not turn.contextual:
+        if not documents_allowed and sql_text and path != "fallback" and not turn.contextual:
             QUERY_CACHE.put(
                 industry=self._industry.value,
                 question=question,

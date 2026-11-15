@@ -22,6 +22,7 @@ export function useChatAsk() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [useDocuments, setUseDocuments] = useState(false);
   const [busy, setBusy] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -42,7 +43,7 @@ export function useChatAsk() {
       const assistantId = crypto.randomUUID();
       setMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: "user", question },
+        { id: crypto.randomUUID(), role: "user", question, documentsEnabled: useDocuments },
         { id: assistantId, role: "assistant", narrative: "" },
       ]);
       setBusy(true);
@@ -52,7 +53,7 @@ export function useChatAsk() {
       try {
         const sync = await apiClient.post<{
           events: Array<{ event: string; data: Record<string, unknown> }>;
-        }>("/api/v1/chat/ask-sync", { question, conversationId, webRetrieval: false }, { industry });
+        }>("/api/v1/chat/ask-sync", { question, conversationId, webRetrieval: false, useDocuments }, { industry, signal: controller.signal });
         for (const frame of sync.events ?? []) {
           const data = frame.data ?? {};
           if (frame.event === "stage" && data.historyId) historyIdRef.current = String(data.historyId);
@@ -78,7 +79,7 @@ export function useChatAsk() {
         void queryClient.invalidateQueries({ queryKey: myUsageKey });
       }
     },
-    [busy, conversationId, industry, patchAssistant, queryClient],
+    [busy, conversationId, industry, patchAssistant, queryClient, useDocuments],
   );
 
   useEffect(() => {
@@ -141,7 +142,7 @@ export function useChatAsk() {
     [flash, messages],
   );
 
-  return { industry, messages, busy, conversationId, toast, runAsk, cancelInFlight, handleAction };
+  return { useDocuments, setUseDocuments, industry, messages, busy, conversationId, toast, runAsk, cancelInFlight, handleAction };
 }
 
 function readCookie(name: string): string | null {

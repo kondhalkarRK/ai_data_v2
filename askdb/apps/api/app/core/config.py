@@ -216,6 +216,9 @@ class Settings(BaseSettings):
     rag_embedding_base_url: str = ""
     rag_embedding_api_key: SecretStr = SecretStr("")
     rag_embedding_batch_size: int = Field(default=32, ge=1, le=256)
+    rag_vector_backend: Literal["qdrant", "chroma"] = "qdrant"
+    rag_chroma_path: str = ""
+    rag_min_similarity: float = Field(default=0.25, ge=-1, le=1)
     rag_qdrant_collection_prefix: str = "askme_rag"
     # server = remote/local Qdrant HTTP (needs Docker/binary). local = embedded disk
     # store via qdrant-client (no Docker). memory = ephemeral embedded store.

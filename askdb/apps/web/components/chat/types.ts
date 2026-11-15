@@ -218,6 +218,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   question?: string;
+  documentsEnabled?: boolean;
   historyId?: string;
   sql?: string;
   priorSql?: string;

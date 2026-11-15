@@ -52,6 +52,7 @@ class AskRequest(ApiModel):
 
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
+    use_documents: bool = False
     web_retrieval: bool = False
 
 
@@ -134,6 +135,7 @@ async def chat_ask(
                 body.conversation_id,
                 cancel_requested=_cancel_requested,
                 web_retrieval=body.web_retrieval,
+                use_documents=body.use_documents,
             ):
                 yield frame.encode("utf-8")
         except NqlError as exc:
@@ -215,6 +217,7 @@ async def chat_ask_sync(
             body.conversation_id,
             cancel_requested=_cancel_requested,
             web_retrieval=body.web_retrieval,
+                use_documents=body.use_documents,
         ):
             frames.append(frame)
     except NqlError as exc:

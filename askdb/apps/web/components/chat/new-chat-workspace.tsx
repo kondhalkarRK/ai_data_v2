@@ -19,7 +19,7 @@ const STARTERS: Record<string, string[]> = {
 
 /** Conversational view over the same chat API as Classic. */
 export function NewChatWorkspace() {
-  const { industry, messages, busy, toast, runAsk, cancelInFlight, handleAction } = useChatAsk();
+  const { useDocuments, setUseDocuments, industry, messages, busy, toast, runAsk, cancelInFlight, handleAction } = useChatAsk();
   const [question, setQuestion] = useState("");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -67,7 +67,7 @@ export function NewChatWorkspace() {
                 key={message.id}
                 className="ml-auto max-w-[85%] rounded-[var(--radius-card)] bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-card)]"
               >
-                {message.question}
+                {message.question}<span className="mt-1 block text-[10px] opacity-75">Documents {message.documentsEnabled ? "on" : "off"}</span>
               </div>
             ) : (
               <AssistantMessage
@@ -88,6 +88,10 @@ export function NewChatWorkspace() {
         className="chat-composer mx-auto w-full max-w-3xl shrink-0 border-t border-border/60 bg-surface-raised px-2 py-3"
         onSubmit={onSubmit}
       >
+        <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" role="switch" checked={useDocuments} onChange={event => setUseDocuments(event.target.checked)} />
+          Use knowledge documents {useDocuments ? "· Include permitted sources when relevant" : "· Business data and definitions"}
+        </label>
         <div className="flex gap-2">
           <input
             aria-label="Ask a question"

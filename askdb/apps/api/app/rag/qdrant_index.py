@@ -198,6 +198,7 @@ class QdrantIndex:
             logger.warning(
                 "Failed deleting Qdrant points for document %s", document_id, exc_info=True
             )
+            raise
 
     def query(
         self,

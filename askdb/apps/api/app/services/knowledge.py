@@ -7,6 +7,7 @@ are used — never the hash fallback.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 import uuid
@@ -14,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Industry, Settings
@@ -21,6 +23,7 @@ from app.core.exceptions import AuthorizationError, NotFoundError, ValidationErr
 from app.models.enums import Role
 from app.models.knowledge import (
     KnowledgeDocument,
+    KnowledgeDocumentChunk,
     KnowledgeDocumentStatus,
     KnowledgeJobType,
     KnowledgeVisibility,
@@ -34,6 +37,7 @@ from app.rag.embeddings import (
     verify_embedding_identity,
 )
 from app.rag.feature import rag_enabled
+from app.rag.index_factory import vector_index
 from app.rag.parsers import extract_text
 from app.rag.qdrant_index import QdrantIndex
 from app.rag.storage import DocumentBlobStore
@@ -207,9 +211,7 @@ def _serialize_document(doc: KnowledgeDocument) -> dict[str, Any]:
         "embeddingDimension": doc.embedding_dimension,
         "qdrantPointCount": doc.qdrant_point_count,
         "supersededById": str(doc.superseded_by_id) if doc.superseded_by_id else None,
-        "replacesDocumentId": (
-            str(doc.replaces_document_id) if doc.replaces_document_id else None
-        ),
+        "replacesDocumentId": (str(doc.replaces_document_id) if doc.replaces_document_id else None),
     }
 
 
@@ -254,9 +256,7 @@ class KnowledgeService:
             return [_serialize_document(doc) for doc in docs]
         allowed = await authorized_document_ids(
             session,
-            RetrievalPrincipal(
-                user=user, industry=self._industry.value, region_scope=region_scope
-            ),
+            RetrievalPrincipal(user=user, industry=self._industry.value, region_scope=region_scope),
         )
         # Also show the user's own in-progress uploads (not yet INDEXED).
         all_industry = await repo.list_for_admin(self._industry.value)
@@ -285,9 +285,7 @@ class KnowledgeService:
         collection: str | None = None,
     ) -> dict[str, Any]:
         if rag_enabled(self._settings):
-            raise ValidationError(
-                "Legacy ingest_text is unavailable when ASK_ME_RAG_ENABLED=true."
-            )
+            raise ValidationError("Legacy ingest_text is unavailable when ASK_ME_RAG_ENABLED=true.")
         suffix = Path(filename).suffix.lower() or ".txt"
         allowed = {ext.lower() for ext in self._settings.upload_allowed_extensions}
         if suffix not in allowed and suffix not in {".txt", ".md", ".html"}:
@@ -337,9 +335,7 @@ class KnowledgeService:
         collection: str | None = None,
     ) -> dict[str, Any]:
         if rag_enabled(self._settings):
-            raise ValidationError(
-                "Use async upload_document when ASK_ME_RAG_ENABLED=true."
-            )
+            raise ValidationError("Use async upload_document when ASK_ME_RAG_ENABLED=true.")
         if len(raw) > self._settings.upload_max_bytes:
             raise ValidationError("Upload exceeds the configured size limit.")
         suffix = Path(filename).suffix.lower()
@@ -479,9 +475,7 @@ class KnowledgeService:
         rows = self._store.iter_chunks(collection=collection)
         if wanted:
             filtered = [
-                (meta, chunk)
-                for meta, chunk in rows
-                if _chunk_mentions(meta, chunk, wanted)
+                (meta, chunk) for meta, chunk in rows if _chunk_mentions(meta, chunk, wanted)
             ]
             if filtered:
                 rows = filtered
@@ -545,21 +539,23 @@ class KnowledgeService:
         session = self._require_session()
         allowed = await authorized_document_ids(
             session,
-            RetrievalPrincipal(
-                user=user, industry=self._industry.value, region_scope=region_scope
-            ),
+            RetrievalPrincipal(user=user, industry=self._industry.value, region_scope=region_scope),
         )
         if not allowed:
             return []
 
-        client = self._embedding_client or build_embedding_client(self._settings)
+        client = self._embedding_client or await asyncio.to_thread(
+            build_embedding_client, self._settings
+        )
+        assert client is not None
         identity = verify_embedding_identity(self._settings, client)
         collection_name = collection_name_for(
             self._settings, industry=self._industry.value, identity=identity
         )
-        index = self._qdrant or QdrantIndex(self._settings)
-        query_vector = client.embed_query(query)
-        points = index.query(
+        index = self._qdrant or vector_index(self._settings)
+        query_vector = await asyncio.to_thread(client.embed_query, query)
+        points = await asyncio.to_thread(
+            index.query,
             collection_name=collection_name,
             query_vector=query_vector,
             allowed_document_ids=[str(item) for item in allowed],
@@ -568,10 +564,33 @@ class KnowledgeService:
         )
 
         # Permission re-check before returning content to callers / LLM.
+        allowed = await authorized_document_ids(
+            session,
+            RetrievalPrincipal(user=user, industry=self._industry.value, region_scope=region_scope),
+        )
         allowed_str = {str(item) for item in allowed}
+        rows = (
+            (
+                await session.scalars(
+                    select(KnowledgeDocumentChunk).where(
+                        KnowledgeDocumentChunk.document_id.in_(allowed),
+                        KnowledgeDocumentChunk.id.in_([point.chunk_id for point in points]),
+                    )
+                )
+            ).all()
+            if points
+            else []
+        )
+        canonical = {row.id: row for row in rows}
         hits: list[Citation] = []
         for point in points:
-            if point.document_id not in allowed_str:
+            chunk = canonical.get(point.chunk_id)
+            if chunk is None or str(chunk.document_id) != point.document_id:
+                continue
+            if (
+                point.document_id not in allowed_str
+                or point.score < self._settings.rag_min_similarity
+            ):
                 continue
             if entities:
                 wanted = {item.casefold() for item in entities if item}
@@ -583,8 +602,8 @@ class KnowledgeService:
                     document_id=point.document_id,
                     title=point.title,
                     chunk_id=point.chunk_id,
-                    snippet=point.text[:400],
-                    locator=point.locator,
+                    snippet=chunk.text_content[:2400],
+                    locator=chunk.locator,
                     confidence=_clip_confidence(point.score),
                     collection=point.collection,
                 )
@@ -624,9 +643,7 @@ class KnowledgeService:
                     {
                         "id": f"{meta['id']}:{index}",
                         "text": piece,
-                        "embedding": _hash_embed(
-                            piece, self._settings.qdrant_vector_size
-                        ),
+                        "embedding": _hash_embed(piece, self._settings.qdrant_vector_size),
                         "locator": f"chunk-{index + 1}",
                         "entities": extract_entities(piece),
                     }
@@ -679,7 +696,9 @@ class KnowledgeService:
             KnowledgeDocumentStatus.SUPERSEDED.value,
         }:
             raise ValidationError("Cannot retry a deleted or superseded document.")
-        await repo.transition_status(doc_uuid, KnowledgeDocumentStatus.PENDING, message="Retry queued")
+        await repo.transition_status(
+            doc_uuid, KnowledgeDocumentStatus.PENDING, message="Retry queued"
+        )
         await repo.enqueue_job(
             document_id=doc_uuid,
             job_type=KnowledgeJobType.INGEST,
@@ -692,10 +711,7 @@ class KnowledgeService:
         return _serialize_document(refreshed)
 
 
-
-def _chunk_mentions(
-    meta: dict[str, Any], chunk: dict[str, Any], wanted: set[str]
-) -> bool:
+def _chunk_mentions(meta: dict[str, Any], chunk: dict[str, Any], wanted: set[str]) -> bool:
     tags = [str(item).casefold() for item in (chunk.get("entities") or meta.get("entities") or [])]
     blob = f"{chunk.get('text', '')} {meta.get('title', '')}".casefold()
     return any(term in tags or term in blob for term in wanted)

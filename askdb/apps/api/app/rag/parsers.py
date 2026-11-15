@@ -27,11 +27,9 @@ def extract_text(filename: str, raw: bytes) -> str:
         try:
             from pypdf import PdfReader  # type: ignore[import-not-found]
         except ImportError as exc:
-            raise ValidationError(
-                "PDF support requires the optional 'pypdf' dependency."
-            ) from exc
+            raise ValidationError("PDF support requires the optional 'pypdf' dependency.") from exc
         try:
-            return "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(raw)).pages)
+            return "\f".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(raw)).pages)
         except Exception as exc:
             raise ValidationError("The PDF could not be parsed.") from exc
     if suffix == ".docx":
@@ -42,7 +40,18 @@ def extract_text(filename: str, raw: bytes) -> str:
                 "DOCX support requires the optional 'python-docx' dependency."
             ) from exc
         try:
-            return "\n".join(paragraph.text for paragraph in Document(io.BytesIO(raw)).paragraphs)
+            document = Document(io.BytesIO(raw))
+            from docx.table import Table
+            from docx.text.paragraph import Paragraph
+
+            blocks = []
+            for element in document.element.body:
+                if element.tag.endswith("}p"):
+                    blocks.append(Paragraph(element, document).text)
+                elif element.tag.endswith("}tbl"):
+                    table = Table(element, document)
+                    blocks.extend(" | ".join(cell.text for cell in row.cells) for row in table.rows)
+            return "\n".join(blocks)
         except Exception as exc:
             raise ValidationError("The DOCX file could not be parsed.") from exc
     raise ValidationError(f"Unsupported upload type '{suffix or '(none)'}'.")

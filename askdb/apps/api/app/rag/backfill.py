@@ -17,6 +17,8 @@ import logging
 import uuid
 from pathlib import Path
 
+from sqlalchemy import select
+
 from app.core.config import Industry, Settings, get_settings
 from app.db.session import DatabaseRegistry
 from app.models.enums import Role
@@ -27,7 +29,6 @@ from app.rag.storage import DocumentBlobStore
 from app.rag.store import KnowledgeStore
 from app.repositories.knowledge_documents import KnowledgeDocumentRepository
 from app.services.knowledge import infer_collection, suggested_questions_for
-from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 

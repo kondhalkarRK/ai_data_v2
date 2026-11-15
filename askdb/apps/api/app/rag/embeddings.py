@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Protocol
@@ -86,6 +87,11 @@ class OpenAICompatibleEmbeddingClient:
         vectors = [list(map(float, item["embedding"])) for item in items]
         if len(vectors) != len(texts):
             raise DependencyUnavailableError("Embedding provider returned incomplete batch.")
+        expected = getattr(self, "_dimension", len(vectors[0]) if vectors else 0)
+        if not expected or any(
+            len(v) != expected or not all(math.isfinite(x) for x in v) for v in vectors
+        ):
+            raise DependencyUnavailableError("Embedding provider returned invalid vectors.")
         return vectors
 
     def embed_query(self, text: str) -> list[float]:
@@ -190,6 +196,13 @@ def collection_name_for(
     """Never mix incompatible dimensions in one collection."""
     prefix = settings.rag_qdrant_collection_prefix.strip() or "askme_rag"
     safe_model = re_sub_model(identity.model_id)
+    if settings.rag_vector_backend == "chroma":
+        import hashlib
+
+        endpoint = settings.rag_embedding_base_url.strip() or settings.llm_base_url.strip()
+        key = f"{identity.provider}|{identity.model_id}|{identity.dimension}|{endpoint}|extract-v2"
+        suffix = hashlib.sha256(key.encode()).hexdigest()[:16]
+        return f"askme_chroma_{industry}_{suffix}"
     return f"{prefix}_{industry}_{safe_model}_d{identity.dimension}"
 
 

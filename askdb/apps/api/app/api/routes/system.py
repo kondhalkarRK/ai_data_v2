@@ -98,19 +98,19 @@ async def _dependency_reports(
         )
 
     from app.rag.feature import rag_enabled
-    from app.rag.qdrant_index import QdrantIndex
+    from app.rag.index_factory import vector_index
 
     if rag_enabled(settings):
         started = time.perf_counter()
         try:
             qdrant_ok, qdrant_detail = await asyncio.wait_for(
-                asyncio.to_thread(lambda: QdrantIndex(settings).ping()), timeout=3
+                asyncio.to_thread(lambda: vector_index(settings).ping()), timeout=3
             )
         except TimeoutError:
             qdrant_ok, qdrant_detail = False, "Qdrant readiness probe timed out."
         reports.append(
             DependencyReport(
-                name="qdrant",
+                name=settings.rag_vector_backend,
                 status="ok" if qdrant_ok else "unavailable",
                 detail=qdrant_detail,
                 latency_ms=int((time.perf_counter() - started) * 1000),
@@ -154,7 +154,7 @@ async def _dependency_reports(
     else:
         reports.append(
             DependencyReport(
-                name="qdrant",
+                name=settings.rag_vector_backend,
                 status="not_configured",
                 detail="Traditional RAG disabled (ASK_ME_RAG_ENABLED=false).",
             )
