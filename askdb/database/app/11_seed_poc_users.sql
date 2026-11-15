@@ -25,14 +25,14 @@ INSERT INTO auth_users (
 VALUES
     (
         'a0000000-0000-4000-8000-000000000001', 'admin',
-        'admin@askdb.local', 'admin@askdb.local', 'PoC Administrator',
+        'admin@askdb.local', 'admin@askdb.local', 'Rahul',
         '$argon2id$v=19$m=65536,t=3,p=4$hft/LUxwNt68dix1bQhBPA$O1HahK8Vr+OFdIzi/OkzspPzAwzYPCUfij+aVSwioC0',
         false, 'admin', 'automotive', true,
         NULL, NULL
     ),
     (
         'a0000000-0000-4000-8000-000000000002', 'user1',
-        'user1@askdb.local', 'user1@askdb.local', 'PoC User',
+        'user1@askdb.local', 'user1@askdb.local', 'Aditi',
         '$argon2id$v=19$m=65536,t=3,p=4$Z+E/w0uJgyHXp5r0WGnz+g$MjJ82NYTzebsiUp5m3bPFV88zbEskqexgfgHPHQC0VA',
         false, 'user', 'automotive', true,
         60000, 50

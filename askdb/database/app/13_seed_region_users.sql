@@ -22,35 +22,35 @@ INSERT INTO auth_users (
 VALUES
     (
         'a0000000-0000-4000-8000-000000000001', 'admin',
-        'admin@askdb.local', 'admin@askdb.local', 'PoC Administrator',
+        'admin@askdb.local', 'admin@askdb.local', 'Rahul',
         '$argon2id$v=19$m=65536,t=3,p=4$hft/LUxwNt68dix1bQhBPA$O1HahK8Vr+OFdIzi/OkzspPzAwzYPCUfij+aVSwioC0',
         false, 'admin', 'automotive', true,
         NULL, NULL
     ),
     (
         'a0000000-0000-4000-8000-000000000011', 'user_north',
-        'user_north@askdb.local', 'user_north@askdb.local', 'North Region Analyst',
+        'user_north@askdb.local', 'user_north@askdb.local', 'Aarav',
         '$argon2id$v=19$m=65536,t=3,p=4$Bj5xnN5HpgT+WAgItbEYag$bYMRZso7d67SBzvZnA/ePhAs4aAIA0VeEnyi+BpeX/E',
         false, 'user', 'automotive', true,
         60000, 50
     ),
     (
         'a0000000-0000-4000-8000-000000000012', 'user_south',
-        'user_south@askdb.local', 'user_south@askdb.local', 'South Region Analyst',
+        'user_south@askdb.local', 'user_south@askdb.local', 'Priya',
         '$argon2id$v=19$m=65536,t=3,p=4$s2/5O5EOoJ8tTqwEgtlgPw$YTZm/fofn8yNaxxMlguZl4nNmQPJ681ccwnEHH9wl04',
         false, 'user', 'automotive', true,
         60000, 50
     ),
     (
         'a0000000-0000-4000-8000-000000000013', 'user_west',
-        'user_west@askdb.local', 'user_west@askdb.local', 'West Region Analyst',
+        'user_west@askdb.local', 'user_west@askdb.local', 'Vikram',
         '$argon2id$v=19$m=65536,t=3,p=4$uJuzPwa1TFja8+LaUnStxw$EtxCqZGHWhlrxsw9eYkQLxpKg0JMKObyT/l39n8bvZE',
         false, 'user', 'automotive', true,
         60000, 50
     ),
     (
         'a0000000-0000-4000-8000-000000000014', 'user_east',
-        'user_east@askdb.local', 'user_east@askdb.local', 'East Region Analyst',
+        'user_east@askdb.local', 'user_east@askdb.local', 'Ananya',
         '$argon2id$v=19$m=65536,t=3,p=4$trJonpe8y/QuvisfpJxquw$IRe6kwISb3cwQsbZotUCh+cjy1QX0zturWtOhPjpTy0',
         false, 'user', 'automotive', true,
         60000, 50

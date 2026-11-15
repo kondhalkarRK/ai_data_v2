@@ -11,6 +11,8 @@ vi.mock("@/hooks/use-session", () => ({
   useActiveIndustry: () => mocks.industry,
   useRegionAccess: () => ({ unrestricted: false, hideRegionFilter: false, label: "West" }),
 }));
+vi.mock("@/components/home/home-story", () => ({ HomeStory: () => <div>Product walkthrough scenes</div> }));
+
 import { HomeWorkspace } from "@/components/home/home-workspace";
 
 function mount() {
@@ -70,3 +72,17 @@ describe("Home workspace", () => {
   });
 });
 
+
+it("opens the optional demo and restores focus after Escape", async () => {
+  const user = userEvent.setup(); mount();
+  expect(screen.getByText("Your data. Explained.")).toBeInTheDocument();
+  expect(screen.getByText("Example data")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  const trigger = screen.getByRole("button", { name: "Watch demo" });
+  await user.click(trigger);
+  expect(screen.getByRole("dialog", { name: "Discover AskMe" })).toBeInTheDocument();
+  expect(screen.getByText("Product walkthrough scenes")).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await waitFor(() => expect(trigger).toHaveFocus());
+});

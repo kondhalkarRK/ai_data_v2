@@ -1,3 +1,11 @@
+.workspaceGrid { display: grid; gap: 40px; align-items: center; padding-top: 48px; }
+.demoCard { position: relative; min-width: 0; overflow: hidden; padding: 24px; border: 1px solid var(--color-border); border-radius: 24px; background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 5%, var(--color-surface-raised)), var(--color-surface-raised)); box-shadow: var(--shadow-card); }
+.demoQuestion, .demoInsight { border: 1px solid var(--color-border); border-radius: 14px; padding: 14px; background: var(--color-background); }
+.demoQuestion { margin-top: 24px; font-size: 14px; animation: appear 600ms ease-out both; }
+.demoChart { margin-top: 18px; }
+.demoInsight { animation: appear 700ms 700ms ease-out both; }
+@media (min-width: 1024px) { .workspaceGrid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 48px; padding-top: 56px; } }
+@media (max-width: 639px) { .workspaceGrid { padding-top: 32px; gap: 28px; } .demoCard { padding: 18px; } }
 .brandIntro { position: relative; isolation: isolate; animation: appear 800ms ease-out both; }
 .brandIntro::before { content: ""; position: absolute; z-index: -1; inset: -35% -30%; border-radius: 50%; background: radial-gradient(ellipse, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 68%); pointer-events: none; }
 .wordmark { font-size: clamp(3.75rem, 8vw, 5.5rem); line-height: 1.05; font-weight: 700; letter-spacing: -.065em; }
@@ -12,4 +20,4 @@
 @keyframes connect { from { stroke-dashoffset: 500; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
 @keyframes appear { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes grow { from { transform: scaleY(.05); } to { transform: scaleY(1); } }
-@media (prefers-reduced-motion: reduce) { .brandIntro, .connector, .point, .bar { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .brandIntro, .connector, .point, .bar, .demoQuestion, .demoInsight { animation: none; } }

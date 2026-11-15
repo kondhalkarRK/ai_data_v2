@@ -8,6 +8,9 @@ import { CHART_SERIES } from "@/lib/design";
 import { formatChatCell } from "@/lib/format-chat-cell";
 import { cn } from "@/lib/utils";
 
+/** Optional report-only formatting; ordinary chat charts retain existing defaults. */
+export const ChartValueFormatContext = React.createContext<{ compact: (value: number) => string; exact: (value: number) => string; categoryColor?: (label: string) => string } | null>(null);
+
 export type ChartKind = "bar" | "line" | "area" | "pie" | "scatter";
 
 const CHART_KINDS: Array<{ id: ChartKind; label: string }> = [
@@ -221,10 +224,11 @@ function MultiSeriesChart({
   seriesKeys: string[];
   chartType: Exclude<ChartKind, "pie">;
 }) {
+  const valueFormat = React.useContext(ChartValueFormatContext);
   const [hover, setHover] = React.useState<number | null>(null);
   const width = 640;
   const height = 260;
-  const pad = { top: 28, right: 16, bottom: 52, left: 58 };
+  const pad = { top: 28, right: 16, bottom: 52, left: valueFormat ? 96 : 58 };
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
   const bounds = axisBounds(
@@ -245,7 +249,7 @@ function MultiSeriesChart({
             <g key={t}>
               <line x1={pad.left} x2={width - pad.right} y1={y} y2={y} stroke="currentColor" className="text-border" />
               <text x={pad.left - 8} y={y + 3} textAnchor="end" className="fill-muted-foreground text-[10px]">
-                {tickLabel(bounds.min + bounds.range * t)}
+                {(valueFormat?.compact ?? tickLabel)(bounds.min + bounds.range * t)}
               </text>
             </g>
           );
@@ -254,7 +258,7 @@ function MultiSeriesChart({
           <line x1={pad.left} x2={width - pad.right} y1={baseline} y2={baseline} stroke="currentColor" className="text-muted-foreground" strokeWidth={1.25} />
         ) : null}
         {seriesKeys.map((key, s) => {
-          const color = SERIES_PALETTE[s % SERIES_PALETTE.length];
+          const color = valueFormat?.categoryColor?.(key) ?? SERIES_PALETTE[s % SERIES_PALETTE.length];
           if (chartType === "bar") {
             return rows.map((row, index) => {
               const value = maybeNumber(row[key]);
@@ -355,7 +359,7 @@ function MultiSeriesChart({
           detail={seriesKeys
             .map((key) => {
               const value = maybeNumber(rows[hover]?.[key]);
-              return `${prettyKey(key)}: ${value == null ? "—" : value.toLocaleString()}`;
+              return `${prettyKey(key)}: ${value == null ? "—" : (valueFormat?.exact(value) ?? value.toLocaleString())}`;
             })
             .join(" · ")}
         />
@@ -415,9 +419,11 @@ function CartesianChart({
   yKey: string;
   anomalies: AnomalyMarker[];
 }) {
+  const valueFormat = React.useContext(ChartValueFormatContext);
+  const gradientId = React.useId().replace(/:/g, "");
   const width = 640;
   const height = 260;
-  const pad = { top: 28, right: 16, bottom: 52, left: 58 };
+  const pad = { top: 28, right: 16, bottom: 52, left: valueFormat ? 96 : 58 };
   const bounds = axisBounds(points.map((p) => p.y));
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
@@ -444,6 +450,7 @@ function CartesianChart({
   return (
     <div className="relative w-full overflow-x-auto">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-[260px] w-full min-w-[320px]">
+        {valueFormat && <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CHART_SERIES.primary} stopOpacity=".85" /><stop offset="100%" stopColor={CHART_SERIES.primary} stopOpacity=".2" /></linearGradient></defs>}
         {[0, 0.25, 0.5, 0.75, 1].map((t) => {
           const y = pad.top + (1 - t) * plotH;
           return (
@@ -463,7 +470,7 @@ function CartesianChart({
                 textAnchor="end"
                 className="fill-muted-foreground text-[10px]"
               >
-                {tickLabel(bounds.min + bounds.range * t)}
+                {(valueFormat?.compact ?? tickLabel)(bounds.min + bounds.range * t)}
               </text>
             </g>
           );
@@ -473,7 +480,7 @@ function CartesianChart({
         ) : null}
 
         {chartType === "area" ? (
-          <path d={areaPath} fill={CHART_SERIES.primary} opacity={0.18} />
+          <path d={areaPath} fill={valueFormat ? `url(#${gradientId})` : CHART_SERIES.primary} opacity={valueFormat ? 0.5 : 0.18} />
         ) : null}
         {chartType === "line" || chartType === "area" ? (
           <path
@@ -502,7 +509,7 @@ function CartesianChart({
                   width={barW}
                   height={Math.max(2, Math.abs(baseline - point.cy))}
                   rx={4}
-                  fill={anomaly ? CHART_SERIES.attention : CHART_SERIES.primary}
+                  fill={anomaly ? CHART_SERIES.attention : valueFormat && chartType === "bar" ? `url(#${gradientId})` : CHART_SERIES.primary}
                   opacity={hover === point.index ? 1 : 0.88}
                 />
               ) : null}
@@ -540,6 +547,7 @@ function CartesianChart({
           );
         })}
         <text
+          style={{ display: valueFormat ? "none" : undefined }}
           x={12}
           y={height / 2}
           transform={`rotate(-90 12 ${height / 2})`}
@@ -555,7 +563,7 @@ function CartesianChart({
       {hover != null ? (
         <HoverCard
           title={points[hover]?.x ?? ""}
-          detail={`${yKey}: ${points[hover]?.y.toLocaleString()}`}
+          detail={`${yKey}: ${(valueFormat?.exact(points[hover]?.y ?? 0) ?? points[hover]?.y.toLocaleString())}`}
           anomaly={anomalyByIndex.get(hover)?.label}
         />
       ) : null}
@@ -574,6 +582,7 @@ function PieChart({
   setHover: (value: number | null) => void;
   yKey: string;
 }) {
+  const valueFormat = React.useContext(ChartValueFormatContext);
   const total = Math.max(
     points.reduce((sum, point) => sum + Math.abs(point.y), 0),
     1,
@@ -610,7 +619,7 @@ function PieChart({
           <path
             key={slice.index}
             d={slice.d}
-            fill={palette[index % palette.length]}
+            fill={valueFormat?.categoryColor?.(String(slice.x)) ?? palette[index % palette.length]}
             opacity={hover == null || hover === slice.index ? 0.92 : 0.35}
             onMouseEnter={() => setHover(slice.index)}
             onMouseLeave={() => setHover(null)}
@@ -623,7 +632,7 @@ function PieChart({
             <span className="flex min-w-0 items-center gap-2">
               <span
                 className="size-2.5 shrink-0 rounded-sm"
-                style={{ backgroundColor: palette[index % palette.length] }}
+                style={{ backgroundColor: valueFormat?.categoryColor?.(String(slice.x)) ?? palette[index % palette.length] }}
               />
               <span className="truncate">{slice.x}</span>
             </span>
@@ -636,7 +645,7 @@ function PieChart({
       {hover != null ? (
         <HoverCard
           title={points[hover]?.x ?? ""}
-          detail={`${yKey}: ${points[hover]?.y.toLocaleString()}`}
+          detail={`${yKey}: ${(valueFormat?.exact(points[hover]?.y ?? 0) ?? points[hover]?.y.toLocaleString())}`}
         />
       ) : null}
     </div>

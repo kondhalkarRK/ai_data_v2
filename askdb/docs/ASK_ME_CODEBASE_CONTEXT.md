@@ -126,8 +126,13 @@ See `UNIFIED_ANALYTICS_BUILDER_IMPLEMENTATION.md` for verified scope and rollbac
   removed from Home; their features remain available through navigation.
   Submissions use the existing `/chat?q=` deep link. Three industry-specific
   suggestions populate the composer. Scoped CSS is in `home-workspace.module.css`.
-  `components/home/home-story.tsx` remains available in the source but is no longer
-  mounted by Home.
+  Home now has a responsive composer/demo split: the large wordmark and
+  'Your data. Explained.' tagline sit left, with an illustrative question/chart/
+  insight preview right. Watch demo mounts `home-story.tsx` inside an optional
+  accessible dialog with Escape/close and focus restoration. Mobile stacks these.
+  The sidebar shows readable role/region labels from the signed-in profile.
+  Existing seeded names can be updated with the optional targeted script
+  `database/app/16_demo_display_names.sql`; no live name update was run here.
   `home-motion-scenes.tsx` contains fixed, internally consistent example
   sequences; CSS in `globals.css` reveals their steps over about six seconds.
   The tour carousel waits 9.5 seconds, pauses on interaction or hidden tabs, and

@@ -11,7 +11,7 @@ import type { PanelResult } from "@/components/analytics-builder/askbi/use-askbi
 import { liftScenario, regionalContributions, reportScopeSpec, LIFT_QUESTION } from "@/components/analytics-builder/askbi/revenue-lift";
 
 vi.mock("@azure/msal-browser", () => ({ createStandardPublicClientApplication: vi.fn(async () => ({ getAllAccounts: () => [], loginPopup: async () => ({ accessToken: "fixture-token" }) })) }));
-vi.mock("html2canvas", () => ({ default: vi.fn(async () => ({ width: 800, height: 250, toDataURL: () => "data:image/jpeg;base64,anBlZw==" })) }));
+vi.mock("html2canvas", () => ({ default: vi.fn(async () => ({ width: 800, height: 250, getContext: () => ({ getImageData: () => ({ data: new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255]) }) }), toDataURL: () => "data:image/png;base64,cG5n" })) }));
 vi.mock("jspdf", () => ({ jsPDF: class { addPage() {} addImage() {} output() { return "data:application/pdf;base64,cGRm"; } } }));
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
@@ -101,21 +101,23 @@ it("keeps PDF and Outlook disabled for stale, incomplete or failed panels", () =
   expect(reportReady(plan, { ...current, units: { ...current.units, error: "timeout" } })).toBe(false);
 });
 
-it("uses completed KPI values and active scope in a short escaped Outlook body", () => {
+it("uses completed KPI values and active scope in a complete escaped Outlook body", () => {
   const scoped: BiPlan = { ...plan, reportFilter: { period: "month", year: 2026, month: 10, make: "Tata" }, panels: [...plan.panels, { ...plan.panels[0]!, id: "regional", title: "Revenue by region", kind: "chart", spec: { ...spec, viz: "bar", dimensions: ["region"] } }] };
   const results = {
     revenue: { result: { rows: [{ revenue: 1234567.4 }], meta: { valueColumn: "revenue", metricFormat: "currency" } } },
     units: { result: { rows: [], meta: { valueColumn: "units_sold" } } },
-    regional: { result: { rows: [{ region: "West", revenue: 120 }], meta: { valueColumn: "revenue", metricFormat: "currency" } } },
+    regional: { result: { rows: [{ region: "West", revenue: 120 }], columns: ["region", "revenue"], meta: { valueColumn: "revenue", metricFormat: "currency" } } },
   } as never;
   const body = buildOutlookBody(scoped, results, ["Revenue increased from verified data."], Array.from({ length: 4 }, (_, i) => ({ title: i === 0 ? "Revenue by region" : `Chart ${i + 1}`, cid: `chart-${i + 1}` })), "https://ask.example/analytics-builder?askbiReport=1");
   expect(body).toContain("CEO &lt;Sales&gt;");
   expect(body).toContain("2026-10-01 to 2026-10-31 · Tata");
   expect(body).toContain("₹12,34,567.4");
   expect(body).toContain("No data");
-  expect(body).toContain("West: ₹120");
+  expect(body).toContain("West");
+  expect(body).toContain("₹120");
+  expect(body).toContain("₹12.35 lakh");
   expect(body).toContain("cid:chart-3");
-  expect(body).not.toContain("cid:chart-4");
+  expect(body).toContain("cid:chart-4");
   expect(body).toContain("askbiReport=1");
 });
 
@@ -127,21 +129,24 @@ it("creates only a reviewable Graph draft with inline chart and full PDF", async
   const results = Object.fromEntries(report.state.plan!.panels.map(panel => [panel.id, { scope: panelScope(panel), result: { rows: [{ [panel.spec.metrics[0]!]: 120 }], meta: { valueColumn: panel.spec.metrics[0] } } }])) as never;
   const root = document.createElement("div");
   root.innerHTML = '<div data-askbi-pdf>Report</div><div id="askbi-panel-chart" data-askbi-pdf>Chart</div>';
-  const fetchDraft = vi.fn(async () => new Response(JSON.stringify({ webLink: "https://outlook.office.com/draft/1" }), { status: 201, headers: { "Content-Type": "application/json" } }));
+  const fetchDraft = vi.fn(async (..._args: [string, RequestInit]) => new Response(JSON.stringify({ id: "draft-id", webLink: "https://outlook.office.com/draft/1" }), { status: 201, headers: { "Content-Type": "application/json" } }));
   vi.stubGlobal("fetch", fetchDraft);
   const link = await createOutlookDraft(report, results, ["Verified briefing."], root, "West", "fixture-token");
   expect(link).toContain("/draft/1");
-  expect(fetchDraft).toHaveBeenCalledOnce();
+  expect(fetchDraft).toHaveBeenCalledTimes(3);
   const [url, options] = fetchDraft.mock.calls[0] as unknown as [string, RequestInit];
   expect(url).toBe("https://graph.microsoft.com/v1.0/me/messages");
   expect(options.method).toBe("POST");
   const message = JSON.parse(String(options.body));
   expect(message).not.toHaveProperty("toRecipients");
   expect(message.body.content).toContain("West");
-  expect(message.attachments).toEqual(expect.arrayContaining([
-    expect.objectContaining({ isInline: true, contentId: "askbi-chart-1", contentType: "image/jpeg" }),
+  expect(message).not.toHaveProperty("attachments");
+  const uploads = fetchDraft.mock.calls.slice(1).map(call => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)));
+  expect(uploads).toEqual(expect.arrayContaining([
+    expect.objectContaining({ isInline: true, contentId: "askbi-chart-1", contentType: "image/png" }),
     expect.objectContaining({ isInline: false, name: "AskBI-report.pdf", contentType: "application/pdf" }),
   ]));
+  expect(fetchDraft.mock.calls.every(call => !String(call[0]).includes("/send"))).toBe(true);
 });
 
 it("prepares the Outlook client before requesting delegated draft access", async () => {

@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import type { AnalyticsSpec, BiPanel } from "@nql/shared-types";
-import { ResultChart, type ChartKind } from "@/components/chat/result-chart";
-import { ResultPreview } from "@/components/analytics-builder/analytics-builder-shell";
+import { ResultChart, ChartValueFormatContext, type ChartKind } from "@/components/chat/result-chart";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { Button } from "@/components/ui/button";
 import { downloadCsv } from "@/lib/analytics/helpers";
+import { formatReportValue, reportCategoryColor } from "./report-format";
 import { panelScope, type PanelResult, type ReportAction } from "./use-askbi";
 
 export function ReportPanel({ panel, state, selected, onSelect, onRetry, onCommand }: {
@@ -19,7 +19,8 @@ export function ReportPanel({ panel, state, selected, onSelect, onRetry, onComma
   const chart = result?.chart;
   const chartKind = (["bar", "line", "area", "pie", "scatter"].includes(panel.spec.viz) ? panel.spec.viz : ["bar", "line", "area", "pie", "scatter"].includes(chart?.type ?? "") ? chart?.type : "bar") as ChartKind;
   const metric = panel.spec.metrics[0] ?? "";
-  const format = (value: unknown) => value == null ? "—" : typeof value === "number" ? new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, ...(result?.meta.metricFormat === "currency" ? { style: "currency", currency: "INR" } : {}) }).format(value) : String(value);
+  const format = (value: unknown) => formatReportValue(value, result?.meta.metricFormat);
+  const exact = (value: unknown) => formatReportValue(value, result?.meta.metricFormat, false);
   const valueColumn = String(result?.meta.valueColumn ?? metric);
   const kpiValue = result?.rows[0]?.[valueColumn];
   return <article data-metric={metric} className={`askbi-panel flex h-full min-w-0 flex-col rounded-2xl border bg-surface-raised p-4 sm:p-5 ${selected ? "border-primary" : "border-border"}`}>
@@ -29,22 +30,22 @@ export function ReportPanel({ panel, state, selected, onSelect, onRetry, onComma
     {result && !current && <p className="text-xs text-muted-foreground">Shown scope: {state?.resultSpec?.dateFrom ?? "previous"} – {state?.resultSpec?.dateTo ?? "selection"}</p>}
     {state?.error && <p role="alert" className="mt-2 text-xs text-danger">{state.error}</p>}
     {(!result || state?.error || !current) && <Button size="sm" variant="secondary" className="mt-2 self-start" disabled={state?.loading} onClick={onRetry}>Retry</Button>}
-    {result && (result.rows.length === 0 ? <p className="flex min-h-36 items-center text-sm text-muted-foreground">No data for this selection. This is not a zero value.</p> : panel.kind === "kpi" && !table ? <div className="mt-auto pt-5"><div className="askbi-kpi-value text-3xl font-semibold tabular-nums sm:text-4xl">{typeof kpiValue === "number" ? <AnimatedNumber value={kpiValue} format={format} /> : format(kpiValue)}</div><p className="mt-2 text-xs text-muted-foreground">{panel.spec.dateFrom} – {panel.spec.dateTo}</p></div> : !table && panel.kind === "chart" && chart ? panel.spec.viz === "bar" && panel.spec.dimensions.length === 1 && !["month", "year", "quarter"].includes(panel.spec.dimensions[0] ?? "") ? <RankedBars points={chart.points} x={chart.x} y={chart.y} format={format} title={panel.title} /> : panel.spec.viz === "treemap" ? <ReportTreemap points={chart.points} x={chart.x} y={chart.y} format={format} title={panel.title} /> : panel.spec.viz === "heatmap" ? <ResultPreview result={result} viz={panel.spec.viz} tab="chart" filterLabel={null} /> : <ResultChart key={`${panel.id}-${panel.spec.viz}-${panel.daily}`} rows={chart.points} columns={result.columns} xKey={chart.x} yKey={chart.y} series={chart.series} initialType={chartKind} hideTypeSelect hideControls hideHeading /> : <div className="mt-4 overflow-auto"><table className="w-full text-left text-xs"><caption className="sr-only">{panel.title} underlying data</caption><thead><tr>{result.columns.map(column => <th className="p-2" key={column}>{column}</th>)}</tr></thead><tbody>{result.rows.map((row, index) => <tr key={index}>{result.columns.map(column => <td key={column} className="border-t border-border p-2">{format(row[column])}</td>)}</tr>)}</tbody></table></div>)}
+    {result && (result.rows.length === 0 ? <p className="flex min-h-36 items-center text-sm text-muted-foreground">No data for this selection. This is not a zero value.</p> : panel.kind === "kpi" && !table ? <div className="mt-auto pt-5"><div title={exact(kpiValue)} data-export-value={format(kpiValue)} className="askbi-kpi-value text-3xl font-semibold tabular-nums sm:text-4xl">{typeof kpiValue === "number" ? <AnimatedNumber value={kpiValue} format={format} /> : format(kpiValue)}</div><p className="mt-2 text-xs text-muted-foreground">{panel.spec.dateFrom} – {panel.spec.dateTo}</p></div> : !table && panel.kind === "chart" && chart ? panel.spec.viz === "bar" && panel.spec.dimensions.length === 1 && !["month", "year", "quarter"].includes(panel.spec.dimensions[0] ?? "") ? <RankedBars points={chart.points} x={chart.x} y={chart.y} format={format} exact={exact} title={panel.title} /> : panel.spec.viz === "treemap" ? <ReportTreemap points={chart.points} x={chart.x} y={chart.y} format={format} exact={exact} title={panel.title} /> : panel.spec.viz === "heatmap" ? <ReportHeatmap points={chart.points} dimensions={panel.spec.dimensions} valueColumn={chart.y} format={format} exact={exact} /> : <ChartValueFormatContext.Provider value={{ compact: format, exact, categoryColor: reportCategoryColor }}><ResultChart key={`${panel.id}-${panel.spec.viz}-${panel.daily}`} rows={chart.points} columns={result.columns} xKey={chart.x} yKey={chart.y} series={chart.series} initialType={chartKind} hideTypeSelect hideControls hideHeading /></ChartValueFormatContext.Provider> : <div className="mt-4 overflow-auto"><table className="w-full text-left text-xs"><caption className="sr-only">{panel.title} underlying data</caption><thead><tr>{result.columns.map(column => <th className="p-2" key={column}>{column}</th>)}</tr></thead><tbody>{result.rows.map((row, index) => <tr key={index}>{result.columns.map(column => <td key={column} className="border-t border-border p-2">{column === valueColumn ? exact(row[column]) : formatReportValue(row[column], undefined, false)}</td>)}</tr>)}</tbody></table></div>)}
     {result?.insights?.executive && panel.kind === "chart" && <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">{result.insights.executive}</p>}
     <details className="mt-3 border-t border-border pt-3 text-xs"><summary className="cursor-pointer text-muted-foreground focus-visible:outline-ring">Data and definition</summary><div className="mt-2 space-y-2 text-muted-foreground"><p>{panel.rationale}</p><p>Data as of: {String(result?.meta.dataAsOf ?? "Unknown")}</p>{result?.meta.notes?.map((note, index) => <p key={index}>{String(note)}</p>)}{result?.meta.warnings?.map((note, index) => <p key={index}>{String(note)}</p>)}{panel.spec.dimensions.length > 0 && <label className="block">Visualization <select aria-label={`${panel.title} visualization`} className="ml-2 rounded border border-input bg-background p-1" value={panel.spec.viz} onChange={event => onCommand("visualize", "", event.target.value as AnalyticsSpec["viz"], panel.id)}>{["auto", "bar", "line", "area", "pie", "donut", "scatter", "heatmap", "treemap", "table"].map(viz => <option key={viz}>{viz}</option>)}</select></label>}{result && <><Button size="sm" variant="secondary" onClick={() => downloadCsv(`${panel.title}.csv`, result.columns, result.rows)}>Export CSV</Button><details><summary>Governed SQL</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap">{result.sql}</pre></details></>}<a className="block text-primary underline" href="/data-quality">Open Data Trust</a></div></details>
   </article>;
 }
 
-function RankedBars({ points, x, y, format, title }: { points: Array<Record<string, unknown>>; x: string; y: string; format: (value: unknown) => string; title: string }) {
+function RankedBars({ points, x, y, format, exact, title }: { points: Array<Record<string, unknown>>; x: string; y: string; format: (value: unknown) => string; exact: (value: unknown) => string; title: string }) {
   const rows = points.map(point => ({ label: String(point[x] ?? "Unknown"), value: Number(point[y]) })).filter(point => Number.isFinite(point.value)).slice(0, 8);
-  const max = Math.max(0, ...rows.map(row => row.value));
+  const max = Math.max(0, ...rows.map(row => Math.abs(row.value)));
   if (!rows.length) return <p className="py-10 text-sm text-muted-foreground">No chartable rows.</p>;
   return <div className="mt-5 space-y-3" role="img" aria-label={`${title}. ${rows.map(row => `${row.label}: ${format(row.value)}`).join("; ")}`}>
-    {rows.map((row, index) => <div key={`${row.label}-${index}`} className="grid grid-cols-[minmax(5rem,8rem)_minmax(0,1fr)_auto] items-center gap-2 text-xs"><span className="truncate text-muted-foreground" title={row.label}>{row.label}</span><div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="askbi-bar h-full rounded-full" style={{ width: `${max > 0 ? Math.max(2, row.value / max * 100) : 0}%` }} /></div><span className="min-w-14 text-right font-medium tabular-nums">{format(row.value)}</span></div>)}
+    {rows.map((row, index) => <div title={`${row.label}: ${exact(row.value)}`} key={`${row.label}-${index}`} className="grid grid-cols-[minmax(5rem,8rem)_minmax(0,1fr)_auto] items-center gap-2 text-xs"><span className="truncate text-muted-foreground" title={row.label}>{row.label}</span><div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="askbi-bar h-full rounded-full" style={{ width: `${max > 0 ? Math.max(2, Math.abs(row.value) / max * 100) : 0}%`, background: `linear-gradient(90deg, ${reportCategoryColor(row.label)}, ${reportCategoryColor(row.label)}aa)` }} /></div><span className="min-w-14 text-right font-medium tabular-nums">{format(row.value)}</span></div>)}
   </div>;
 }
 
-function ReportTreemap({ points, x, y, format, title }: { points: Array<Record<string, unknown>>; x: string; y: string; format: (value: unknown) => string; title: string }) {
+function ReportTreemap({ points, x, y, format, exact, title }: { points: Array<Record<string, unknown>>; x: string; y: string; format: (value: unknown) => string; exact: (value: unknown) => string; title: string }) {
   const rows = points.map(point => ({ label: String(point[x] ?? "Unknown"), value: Number(point[y]) })).filter(point => Number.isFinite(point.value) && point.value > 0).slice(0, 12);
   const total = rows.reduce((sum, row) => sum + row.value, 0);
   if (!total) return <p className="py-10 text-sm text-muted-foreground">No positive values to display as a composition.</p>;
@@ -62,6 +63,15 @@ function ReportTreemap({ points, x, y, format, title }: { points: Array<Record<s
     });
   });
   return <div className="mt-4"><svg viewBox="0 0 640 260" className="h-[260px] w-full rounded-xl" role="img" aria-label={`${title}. Rectangle area represents value. ${rows.map(row => `${row.label}: ${format(row.value)}`).join("; ")}`}>
-    {rectangles.map(item => <g key={`${item.label}-${item.index}`}><rect x={item.left + 1} y={item.top + 1} width={Math.max(0, item.width - 2)} height={Math.max(0, item.height - 2)} rx="5" className={`askbi-tree-tile-${item.index % 6}`} /><title>{item.label}: {format(item.value)}</title>{item.width > 110 && item.height > 55 && <><text x={item.left + 10} y={item.top + item.height - 28} className="fill-foreground text-[12px] font-semibold">{item.label.slice(0, 18)}</text><text x={item.left + 10} y={item.top + item.height - 11} className="fill-foreground text-[11px]">{format(item.value)}</text></>}</g>)}
+    {rectangles.map(item => <g key={`${item.label}-${item.index}`}><rect x={item.left + 1} y={item.top + 1} width={Math.max(0, item.width - 2)} height={Math.max(0, item.height - 2)} rx="5" fill={reportCategoryColor(item.label)} fillOpacity="0.24" /><title>{item.label}: {exact(item.value)}</title>{item.width > 110 && item.height > 55 && <><text x={item.left + 10} y={item.top + item.height - 28} className="fill-foreground text-[12px] font-semibold">{item.label.slice(0, 18)}</text><text x={item.left + 10} y={item.top + item.height - 11} className="fill-foreground text-[11px]">{format(item.value)}</text></>}</g>)}
   </svg><p className="mt-2 text-xs text-muted-foreground">Area represents share of the displayed values. Hover or inspect data for exact figures.</p></div>;
+}
+
+function ReportHeatmap({ points, dimensions, valueColumn, format, exact }: { points: Array<Record<string, unknown>>; dimensions: string[]; valueColumn: string; format: (value: unknown) => string; exact: (value: unknown) => string }) {
+  const maximum = Math.max(1, ...points.map(point => Math.abs(Number(point[valueColumn]) || 0)));
+  return <div className="mt-4 grid max-h-80 grid-cols-2 gap-2 overflow-auto sm:grid-cols-3">{points.map((point, index) => {
+    const label = dimensions.map(key => String(point[key] ?? "Unknown")).join(" / ");
+    const intensity = Math.abs(Number(point[valueColumn]) || 0) / maximum;
+    return <div key={index} title={`${label}: ${exact(point[valueColumn])}`} className="rounded-lg border border-border p-3 text-xs" style={{ background: `${reportCategoryColor(label)}${Math.round((.12 + intensity * .24) * 255).toString(16).padStart(2, "0")}` }}><p className="truncate font-medium">{label}</p><p className="mt-1 tabular-nums">{format(point[valueColumn])}</p></div>;
+  })}</div>;
 }

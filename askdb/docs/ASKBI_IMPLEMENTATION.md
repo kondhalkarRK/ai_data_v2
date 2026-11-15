@@ -1,5 +1,9 @@
 # AskBI implementation and deployment
 
+Presentation/export changes and the remaining office acceptance checklist:
+[Auto Report presentation and export update](ASKBI_PRESENTATION_EXPORT_UPDATE.md)
+(15 November 2026).
+
 Updated 2026-11-06. Automotive only. This records implemented code and offline
 checks; it does not certify a live PostgreSQL/LLM deployment or WrenAI parity.
 

@@ -1,12 +1,14 @@
 "use client";
 
+import * as Dialog from "@radix-ui/react-dialog";
 import type { IndustryListResponse, ReadinessResponse } from "@nql/shared-types";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, RefreshCw } from "lucide-react";
+import { ArrowUpRight, RefreshCw, Play, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { BrandWordmark } from "@/components/brand/wordmark";
+import { HomeStory } from "@/components/home/home-story";
 import { Button } from "@/components/ui/button";
 import { useActiveIndustry, useRegionAccess, useSession } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
@@ -33,6 +35,8 @@ export function HomeWorkspace() {
   const { data: user } = useSession();
   const greeting = React.useSyncExternalStore(subscribeToClock, localGreeting, () => "Welcome");
   const [question, setQuestion] = React.useState("");
+  const demoTrigger = React.useRef<HTMLButtonElement>(null);
+  const [demoOpen, setDemoOpen] = React.useState(false);
   const [detailsOpen, setDetailsOpen] = React.useState(false);
   const industries = useQuery({ queryKey: ["industries"], queryFn: () => apiClient.get<IndustryListResponse>("/api/v1/industries"), staleTime: 60_000 });
   const readiness = useQuery({ queryKey: ["readiness"], queryFn: () => apiClient.get<ReadinessResponse>("/ready"), refetchInterval: 30_000, staleTime: 0 });
@@ -50,7 +54,7 @@ export function HomeWorkspace() {
     if (trimmed) router.push(`/chat?q=${encodeURIComponent(trimmed)}`);
   }
 
-  return <main className="mx-auto w-full max-w-5xl min-w-0 pb-12 pt-2 sm:pt-5">
+  return <main className="mx-auto w-full max-w-6xl min-w-0 pb-12 pt-2 sm:pt-5">
     <header className="space-y-5">
       <div><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{greeting}, {name}</h1><p className="mt-2 text-sm text-muted-foreground">What would you like to explore today?</p></div>
       <div aria-label="Current data context" className="flex flex-wrap items-center gap-2 text-xs">
@@ -67,11 +71,28 @@ export function HomeWorkspace() {
       </section>}
     </header>
 
-    <section aria-labelledby="home-ask-heading" className="mx-auto flex max-w-3xl flex-col items-center pb-6 pt-8 text-center sm:pt-12">
+    <div className={styles.workspaceGrid}>
+    <section aria-labelledby="home-ask-heading" className="flex min-w-0 flex-col items-start text-left">
       <div className={styles.brandIntro}>
         <BrandWordmark size="hero" className={styles.wordmark} />
         <p className={styles.tagline}>Your data. Explained.</p>
       </div>
+      <h2 id="home-ask-heading" className="mt-8 text-3xl font-semibold tracking-tight sm:text-4xl">Ask anything about your data</h2>
+      <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">From a quick question to your next insight. Explore your {activeName.toLowerCase()} data in your own words.</p>
+      <form onSubmit={event => { event.preventDefault(); ask(); }} className="mt-7 flex w-full flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-3 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:p-2">
+        <label htmlFor="home-question" className="sr-only">Ask a question about your data</label>
+        <input id="home-question" value={question} onChange={event => setQuestion(event.target.value)} placeholder={industry === "automotive" ? "How are sales performing across regions?" : "How are claims performing across regions?"} className="h-12 min-w-0 flex-1 rounded-xl bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/40" />
+        <Button type="submit" disabled={!question.trim()} className="h-12 rounded-xl px-6">Ask <ArrowUpRight aria-hidden="true" /></Button>
+      </form>
+      <div className="mt-4 flex flex-wrap justify-start gap-2">{EXAMPLES[industry].map(example => <button key={example} type="button" onClick={() => setQuestion(example)} className="rounded-full border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{example}</button>)}</div>
+      <p className="mt-6 text-xs text-muted-foreground">Your questions stay within your permitted data access.</p>
+    </section>
+    <section aria-labelledby="home-demo-heading" className={styles.demoCard}>
+      <div className="flex items-center justify-between gap-3"><span className="text-[11px] font-semibold uppercase tracking-[.16em] text-primary">A quick look</span><span className="rounded-full border border-border px-2 py-1 text-[10px] text-muted-foreground">Example data</span></div>
+      <h2 id="home-demo-heading" className="mt-3 text-xl font-semibold tracking-tight">See AskMe in action</h2>
+      <p className="mt-2 text-sm text-muted-foreground">One question. A clearer picture.</p>
+      <div className={styles.demoQuestion}><span className="mb-2 block text-[10px] font-semibold uppercase tracking-widest text-primary">01 / Ask</span>{industry === "automotive" ? "How are sales changing by region?" : "How are premiums changing by region?"}</div>
+      <div className={styles.demoChart}><span className="text-[10px] font-semibold uppercase tracking-widest text-primary">02 / Explore</span>
       <div className={styles.visual} aria-hidden="true">
         <div className={styles.halo} />
         <svg viewBox="0 0 480 180" className={styles.art} fill="none">
@@ -81,16 +102,19 @@ export function HomeWorkspace() {
           {[52, 78, 64, 114, 100, 144].map((height, i) => <rect key={i} className={styles.bar} style={{ animationDelay: `${i * 100}ms` }} x={52 + i * 70} y={166 - height} width="25" height={height} rx="5" fill="currentColor" opacity=".08" />)}
         </svg>
       </div>
-      <h2 id="home-ask-heading" className="mt-6 text-3xl font-semibold tracking-tight sm:text-4xl">Ask anything about your data</h2>
-      <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">From a quick question to your next insight. Explore your {activeName.toLowerCase()} data in your own words.</p>
-      <form onSubmit={event => { event.preventDefault(); ask(); }} className="mt-7 flex w-full flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-3 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:p-2">
-        <label htmlFor="home-question" className="sr-only">Ask a question about your data</label>
-        <input id="home-question" value={question} onChange={event => setQuestion(event.target.value)} placeholder={industry === "automotive" ? "How are sales performing across regions?" : "How are claims performing across regions?"} className="h-12 min-w-0 flex-1 rounded-xl bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/40" />
-        <Button type="submit" disabled={!question.trim()} className="h-12 rounded-xl px-6">Ask <ArrowUpRight aria-hidden="true" /></Button>
-      </form>
-      <div className="mt-4 flex flex-wrap justify-center gap-2">{EXAMPLES[industry].map(example => <button key={example} type="button" onClick={() => setQuestion(example)} className="rounded-full border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{example}</button>)}</div>
-      <p className="mt-6 text-xs text-muted-foreground">Your questions stay within your permitted data access.</p>
+      </div>
+      <div className={styles.demoInsight}><span className="mb-2 block text-[10px] font-semibold uppercase tracking-widest text-primary">03 / Understand</span><p className="text-sm leading-relaxed">See the trend, explore the breakdown, and inspect the evidence behind your answer.</p></div>
+      <Button type="button" variant="secondary" className="mt-5 w-full" ref={demoTrigger} onClick={() => setDemoOpen(true)}><Play className="size-4" aria-hidden="true" /> Watch demo</Button>
+      <p className="mt-2 text-center text-[10px] text-muted-foreground">Illustrative walkthrough · No live queries</p>
     </section>
+    </div>
+    <Dialog.Root open={demoOpen} onOpenChange={setDemoOpen}><Dialog.Portal>
+      <Dialog.Overlay className="fixed inset-0 z-40 bg-black/65" />
+      <Dialog.Content onCloseAutoFocus={event => { event.preventDefault(); demoTrigger.current?.focus(); }} className="fixed inset-3 z-50 overflow-y-auto rounded-2xl border border-border bg-background p-3 shadow-[var(--shadow-raised)] outline-none sm:inset-6 sm:p-5" aria-describedby="home-demo-description">
+        <div className="mb-4 flex items-start justify-between gap-3"><div><Dialog.Title className="text-lg font-semibold">Discover AskMe</Dialog.Title><Dialog.Description id="home-demo-description" className="text-xs text-muted-foreground">Explore the product with illustrative scenes. Figures are examples, not live results.</Dialog.Description></div><Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close demo"><X aria-hidden="true" /></Button></Dialog.Close></div>
+        <HomeStory />
+      </Dialog.Content>
+    </Dialog.Portal></Dialog.Root>
   </main>;
 }
 

@@ -1120,3 +1120,21 @@
 @media (prefers-reduced-motion: reduce) {
   .home-motion-beat, .home-motion-bar, .home-motion-line, .home-motion-connector, .home-motion-area { animation: none; opacity: 1; transform: none; stroke-dashoffset: 0; }
 }
+
+/* Auto Report presentation and isolated export paper (does not change screen theme). */
+.askbi-panel[data-metric] { border-top: 3px solid hsl(var(--chart-1)); }
+.askbi-chart-grid .askbi-panel { min-height: 390px; }
+.askbi-export-paper { --background: 0 0% 100%; --surface-raised: 0 0% 100%; --foreground: 220 32% 18%; --muted-foreground: 218 18% 38%; --border: 215 25% 85%; --muted: 215 30% 94%; --primary: 225 60% 47%; --success: 160 75% 28%; --danger: 350 65% 43%; color: #1c273b; background: white; }
+.askbi-export-paper .askbi-report { --askbi-revenue: 225 86% 45%; --askbi-units: 174 76% 30%; --askbi-asp: 274 64% 45%; --askbi-orders: 31 91% 40%; }
+.askbi-export-paper .askbi-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.askbi-export-paper [data-askbi-pdf] { break-inside: avoid; }
+.askbi-export-paper button, .askbi-export-paper select, .askbi-export-paper details { display: none; }
+.askbi-export-paper .text-foreground { color: #1c273b; }
+.askbi-export-paper .text-muted-foreground { color: #526176; }
+.askbi-export-paper .bg-surface-raised, .askbi-export-paper .bg-background { background: white; }
+@media print {
+  .askbi-chart-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .askbi-chart-grid .askbi-panel { min-height: 0; }
+  .askbi-report [data-export-value] > * { display: none !important; }
+  .askbi-report [data-export-value]::before { content: attr(data-export-value); }
+}

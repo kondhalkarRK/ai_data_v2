@@ -1,0 +1,46 @@
+AskMe Chroma environment setup
+=============================
+
+Files:
+- ASKME_CHROMA_API.env.example: sanitized backend template.
+- ASKME_CHROMA_WEB.env.local.example: sanitized frontend template.
+
+1. Keep a private backup of your working environment files. Do not commit it.
+2. MERGE the API template into the root .env or apps/api/.env. Do not blindly
+   replace working values with placeholders. apps/api/.env takes precedence over
+   root .env; OS/process environment values take precedence over both.
+3. Retain your working JWT secret, database URLs, narration gateway/model/key,
+   approved CORS/host values and any other deployment-specific settings.
+4. Set the three RAG_EMBEDDING_* placeholders using the approved embedding API.
+   The base URL must not already end with /embeddings. The current client expects
+   OpenAI-compatible request/response format and Bearer authentication. Do not
+   assume an Azure-native endpoint using api-key headers works without an adapter.
+5. Choose approved local absolute Chroma/document folders outside OneDrive.
+   C:/AskMeData is an EXAMPLE, not a verified writable folder on your laptop.
+6. Keep ASK_ME_RAG_ENABLED=false until embedding configuration is complete.
+   Change it to true for the controlled pilot, then restart the API.
+7. Merge the WEB template into apps/web/.env.local. API keys, JWT secrets and
+   database credentials must never go in this file. Restart/rebuild the frontend.
+8. Confirm the ACTUAL API Python environment has the rag-chroma extra; the
+   separate compatibility environment is not used by the running app.
+9. Use one backend process with the in-process ingestion worker. Do not launch
+   another writer/standalone worker against the same embedded Chroma folder.
+10. Upload the synthetic delivery policy in Automotive as admin; wait for INDEXED.
+    Enable Use knowledge documents in chat, ask the escalation question, then
+    disable it and verify no documentary answer is generated. Check ordinary SQL
+    questions still work. Refer to RAG_IMPLEMENTATION_CHECKPOINT.md for limits.
+
+What changed from the supplied environment:
+- Chroma is explicitly selected and local index/original-storage paths are shown.
+- Legacy Mongo/Qdrant/hash embedding entries were omitted from this template;
+  existing stores must not be deleted and private rollback configuration retained.
+- Backend and public frontend settings are separated.
+- Duplicate/obsolete RAG comments were removed; automatic local embeddings remain
+  disabled in the adapter, with an explicit approved API configuration required.
+- Existing unrelated chat/report/dashboard flags were retained, including the
+  supplied advanced AskBI flag. This does not certify those features for release.
+- All credential/database/provider-endpoint values are placeholders. Default local
+  CORS/hosts must be replaced if your approved deployment differs.
+- No actual .env was modified, no keys were generated, and no providers were called.
+
+Never commit real credentials. A placeholder is not a working API key/model.

@@ -41,6 +41,11 @@ export function Sidebar({ user }: { user: UserProfile }) {
   const compact = collapsed && !mobileNavOpen;
   const logout = useLogout();
 
+  const access = {
+    unrestricted: user.regionAccess?.unrestricted ?? false,
+    hideRegionFilter: user.regionAccess?.hideRegionFilter ?? false,
+    label: user.regionAccess?.zones?.length ? user.regionAccess.zones.join(" · ") + " region" : "Restricted regions",
+  };
   const sections = visibleSections(user.role);
 
   return (
@@ -172,9 +177,9 @@ export function Sidebar({ user }: { user: UserProfile }) {
                         : "bg-muted text-muted-foreground",
                     )}
                   >
-                    {user.role.toUpperCase()}
+                    {user.role === "admin" ? "Administrator" : "Regional user"}
                   </span>
-                  <span className="truncate">{user.username}</span>
+                  <span className="truncate" title={user.username}>{access.unrestricted ? "All regions" : access.hideRegionFilter ? "Restricted regions" : access.label}</span>
                 </p>
               </Link>
               <Button

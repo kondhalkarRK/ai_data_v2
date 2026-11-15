@@ -10,6 +10,7 @@ import { ReportCanvas } from "./report-canvas";
 import { ReportFilters } from "./report-filters";
 import { reportScopeSpec } from "./revenue-lift";
 import { createOutlookDraft, getOutlookToken, outlookConfigured, prepareOutlookAuth } from "./outlook-draft";
+import { createReportSnapshot, copyReportImage, downloadReportImages } from "./report-export";
 import { reportReady, useAskBI } from "./use-askbi";
 
 export function AskBI() {
@@ -20,6 +21,9 @@ export function AskBI() {
   const [sidebar, setSidebar] = React.useState(true);
   const [rename, setRename] = React.useState(false);
   const [title, setTitle] = React.useState("");
+  const exportLock = React.useRef(false);
+  const [imageBusy, setImageBusy] = React.useState(false);
+  const [imageStatus, setImageStatus] = React.useState("");
   const [outlookBusy, setOutlookBusy] = React.useState(false);
   const [liftPercent, setLiftPercent] = React.useState(() => {
     if (typeof window === "undefined") return 10;
@@ -33,7 +37,7 @@ export function AskBI() {
   const openedLink = React.useRef(false);
   const plan = bi.report?.state.plan ?? null;
   const scope = plan ? reportScopeSpec(plan) : null;
-  const busy = Boolean(bi.status) || outlookBusy;
+  const busy = Boolean(bi.status) || outlookBusy || imageBusy;
   const exportReady = reportReady(plan, bi.results);
   React.useEffect(() => {
     if (!outlookConfigured()) return;
@@ -51,15 +55,27 @@ export function AskBI() {
     if (item) { openedLink.current = true; void bi.open(item); }
   }, [bi]);
   async function draftInOutlook() {
-    if (!bi.report || !plan || !reportRoot.current || !exportReady || outlookBusy || !outlookReady) return;
+    if (!bi.report || !plan || !reportRoot.current || !exportReady || exportLock.current || !outlookReady) return;
+    exportLock.current = true;
     setOutlookBusy(true); setOutlookError(""); setDraftLink("");
     try {
+      const snapshot = createReportSnapshot(bi.report, bi.results, bi.briefing, reportRoot.current, region.label, liftPercent);
       const token = await getOutlookToken();
       const saved = bi.report.saved ? bi.report : await bi.command("save");
       if (!saved?.saved) throw new Error("The report could not be saved. Try Save report, then retry the Outlook draft.");
-      setDraftLink(await createOutlookDraft(saved, bi.results, bi.briefing, reportRoot.current, region.label, token, liftPercent));
+      setDraftLink(await createOutlookDraft(saved, bi.results, bi.briefing, reportRoot.current, region.label, token, liftPercent, snapshot));
     } catch (cause) { setOutlookError(cause instanceof Error ? cause.message : "Outlook could not create the draft."); }
-    finally { setOutlookBusy(false); }
+    finally { exportLock.current = false; setOutlookBusy(false); }
+  }
+  async function exportImage(action: "copy" | "download") {
+    if (!bi.report || !reportRoot.current || !exportReady || exportLock.current) return;
+    exportLock.current = true; setImageBusy(true); setImageStatus(""); setOutlookError("");
+    try {
+      const snapshot = createReportSnapshot(bi.report, bi.results, bi.briefing, reportRoot.current, region.label, liftPercent);
+      if (action === "copy") { await copyReportImage(snapshot); setImageStatus("Report image copied. Paste into Outlook as a picture; its text is not editable."); }
+      else { const count = await downloadReportImages(snapshot); setImageStatus(`${count} report image(s) downloaded${count > 1 ? " in one ZIP file" : ""}. Insert all numbered images in order to include the full report.`); }
+    } catch (cause) { setOutlookError(cause instanceof Error ? cause.message : "Image export failed. Use Download images or Export PDF."); }
+    finally { exportLock.current = false; setImageBusy(false); }
   }
   function exportPdf() {
     const root = document.documentElement;
@@ -73,7 +89,7 @@ export function AskBI() {
   const chooseExample = (text: string) => { setQuestion(text); setSidebar(true); if (window.innerWidth < 1024) setDrawer(true); };
   function ask() { if (!question.trim() || busy) return; void bi.command("ask", question.trim()); setQuestion(""); setSidebar(false); setDrawer(false); }
   const chat = <ConversationPanel turns={bi.turns} question={question} setQuestion={setQuestion} selectedTitle={plan?.panels.find(panel => panel.id === bi.selected)?.title}
-    status={bi.status} onAsk={ask} onStop={bi.stop} onWholeReport={() => bi.setSelected(null)} onRetry={() => { if (!outlookBusy) void bi.command("ask", "", undefined, bi.selected, true); }} onFocus={focusPanel} disabled={!bi.capability?.enabled || outlookBusy} />;
+    status={bi.status} onAsk={ask} onStop={bi.stop} onWholeReport={() => bi.setSelected(null)} onRetry={() => { if (!outlookBusy) void bi.command("ask", "", undefined, bi.selected, true); }} onFocus={focusPanel} disabled={!bi.capability?.enabled || outlookBusy || imageBusy} />;
 
   if (bi.capabilityError || (bi.capability && !bi.capability.enabled)) return <section className="rounded-xl border border-border bg-surface-raised p-6" role="alert"><h2 className="font-semibold">AskBI is not available on this API</h2><p className="mt-2 text-sm text-muted-foreground">{bi.capabilityError || "This frontend includes AskBI, but the API feature is disabled for the active industry. Custom Report remains available."}</p><details className="mt-4 text-xs"><summary>Deployment details</summary><p className="mt-2">Frontend: askbi-v2. API requires ASK_ME_ASKBI_ENABLED=true and migration 0014_bi_reports. Restart the API; rebuild the frontend after changing its public flag.</p></details></section>;
   if (!bi.capability) return <p role="status" className="p-6 text-sm text-muted-foreground">Checking reporting capabilities…</p>;
@@ -88,6 +104,7 @@ export function AskBI() {
         <Button variant="ghost" disabled={!plan || busy} onClick={() => { setTitle(plan?.title ?? ""); setRename(!rename); }}>Rename</Button>
         <Button variant="ghost" disabled={busy} onClick={() => { bi.reset(); setQuestion(""); setLiftPercent(10); setSidebar(true); }}>New report</Button>
         {plan && <Button variant="secondary" disabled={!exportReady || busy} onClick={exportPdf} title="Choose Save as PDF in the print dialog">Export PDF</Button>}
+        {plan && <><Button variant="secondary" disabled={!exportReady || busy} onClick={() => void exportImage("copy")} title="Copy a picture, not editable email text">Copy report image</Button><Button variant="ghost" disabled={!exportReady || busy} onClick={() => void exportImage("download")}>Download images</Button></>}
         {plan && outlookConfigured() && <Button variant="secondary" disabled={!exportReady || busy || !outlookReady} onClick={() => void draftInOutlook()}>{outlookBusy ? "Creating draft…" : outlookReady ? "Create Outlook draft" : "Connecting Outlook…"}</Button>}
         {plan && <Button variant="ghost" disabled={!exportReady || busy} onClick={() => {
           const subject = encodeURIComponent(`Ask Me · ${plan.title}`);
@@ -101,12 +118,13 @@ export function AskBI() {
     {rename && <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (busy) return; void bi.command("rename", "", title); setRename(false); }}><label className="sr-only" htmlFor="askbi-title">Report title</label><input id="askbi-title" className="min-w-0 flex-1 rounded-lg border border-input bg-background p-2 text-sm" value={title} onChange={event => setTitle(event.target.value)} maxLength={160} disabled={busy} /><Button disabled={busy || !title.trim()}>Apply title</Button></form>}
     {bi.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{bi.error}</p>}
     {outlookError && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{outlookError}</p>}
+    {imageStatus && <p role="status" className="text-sm text-muted-foreground">{imageStatus}</p>}
     {draftLink && <p role="status" className="text-sm">Outlook draft created for your review. <a className="text-primary underline" href={draftLink} target="_blank" rel="noopener noreferrer">Open draft</a>. Review recipients before sending.</p>}
     {plan && !outlookConfigured() && <p className="text-xs text-muted-foreground">Outlook drafts with charts and PDF need a Microsoft Entra connection. Use Manual email draft and attach the exported PDF until it is configured.</p>}
     {bi.report?.warning && <p className="text-sm text-muted-foreground">{bi.report.warning}</p>}
-    {plan && <ReportFilters key={JSON.stringify(plan.reportFilter ?? scope?.dateFrom)} plan={plan} busy={Boolean(bi.status) || outlookBusy} hideRegionFilter={region.hideRegionFilter} onApply={selection => void bi.command("filter", "", undefined, undefined, false, selection)} />}
+    {plan && <ReportFilters key={JSON.stringify(plan.reportFilter ?? scope?.dateFrom)} plan={plan} busy={Boolean(bi.status) || outlookBusy || imageBusy} hideRegionFilter={region.hideRegionFilter} onApply={selection => void bi.command("filter", "", undefined, undefined, false, selection)} />}
     <div className={`grid items-start gap-5 ${sidebar ? "lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>
-      <div className="min-w-0"><div ref={reportRoot} className="askbi-printable"><ReportCanvas plan={plan} results={bi.results} selected={bi.selected} onSelect={id => { bi.setSelected(id); setSidebar(true); }} onCommand={(...args) => void bi.command(...args)} onRetry={id => { const panel = plan?.panels.find(p => p.id === id); if (panel) void bi.retryPanel(panel); }} onExample={chooseExample} busy={Boolean(bi.status) || outlookBusy} briefing={bi.briefing} scopeLabel={region.label} question={bi.turns.find(turn => turn.question)?.question} liftPercent={liftPercent} onLiftPercent={setLiftPercent} /></div></div>
+      <div className="min-w-0"><div ref={reportRoot} className="askbi-printable"><ReportCanvas plan={plan} results={bi.results} selected={bi.selected} onSelect={id => { bi.setSelected(id); setSidebar(true); }} onCommand={(...args) => void bi.command(...args)} onRetry={id => { const panel = plan?.panels.find(p => p.id === id); if (panel) void bi.retryPanel(panel); }} onExample={chooseExample} busy={Boolean(bi.status) || outlookBusy || imageBusy} briefing={bi.briefing} scopeLabel={region.label} question={bi.turns.find(turn => turn.question)?.question} liftPercent={liftPercent} onLiftPercent={value => { if (!busy) setLiftPercent(value); }} /></div></div>
       {sidebar && <aside className="sticky top-4 hidden h-[calc(100dvh-23rem)] min-h-[26rem] max-h-[48rem] overflow-hidden rounded-2xl border border-border bg-surface-raised lg:block" aria-label="Report assistant">{chat}</aside>}
     </div>
     <Dialog.Root open={drawer} onOpenChange={setDrawer}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" /><Dialog.Content className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l border-border bg-background shadow-lg"><Dialog.Title className="sr-only">AskBI report assistant</Dialog.Title><Dialog.Description className="sr-only">Ask a question about this report or refine a selected chart.</Dialog.Description><Dialog.Close className="absolute right-3 top-3 z-10 rounded p-1 focus-visible:outline-ring" aria-label="Close conversation"><X className="size-4" /></Dialog.Close>{chat}</Dialog.Content></Dialog.Portal></Dialog.Root>
