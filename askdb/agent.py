@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlsplit
+from urllib.parse import quote
 
 import httpx
 from dotenv import load_dotenv
@@ -194,12 +195,97 @@ def _reply(message: str) -> LlmResponse:
     return LlmResponse(content=types.Content(role="model", parts=[types.Part(text=message)]))
 
 
+def _cell(value: object) -> str:
+    """Escape untrusted titles for Markdown table display."""
+    text = str(value).replace("\n", " ").replace("\r", " ")
+    return re.sub(r"([\\`*_{}\[\]<>()|!])", r"\\\1", text)[:180]
+
+
+def _render_comparison(result: dict) -> str:
+    """Render actual tool data directly so the model cannot invent dates or prices."""
+    statuses = {
+        "missing_SERPAPI_API_KEY": "Search is not configured",
+        "provider_authentication": "Search credentials rejected",
+        "rate_limited": "Search limit reached; try later",
+        "no_matching_listings": "No matching listing found",
+        "network_or_timeout": "Store search timed out",
+    }
+    lines = ["Rahul, here is the price comparison.", "",
+             "**Prices from search results — not verified at checkout.**", "",
+             "| Store | Listed price | Rating | Link |",
+             "| --- | --- | --- | --- |"]
+    details = []
+    for store in result["stores"]:
+        candidates = store["offers"]
+        # Uncertain variants remain visible as explanations, never as comparable prices.
+        eligible = [o for o in candidates if o["match_status"] == "candidate_unconfirmed"
+                    and o["listed_price"] is not None and o["condition"] is None]
+        offer = min(eligible, key=lambda o: Decimal(o["listed_price"])) if eligible else None
+        retailer = _cell(store["retailer"])
+        if offer:
+            rating = _cell(offer["rating"]) if offer["rating"] is not None else "Unavailable"
+            if offer["review_count"] is not None:
+                rating += f" ({offer['review_count']} reviews)"
+            link = quote(offer["product_url"], safe=":/?=&%#-._~")
+            lines.append(f"| {retailer} | INR {offer['listed_price']} | {rating} | [View product]({link}) |")
+            details.append(f"- **{retailer}:** {_cell(offer['product_title'])}")
+        else:
+            status = ("Variant or condition could not be matched" if candidates else
+                      statuses.get(store["status"], "Search unavailable; try again later"))
+            lines.append(f"| {retailer} | Unavailable | — | — |")
+            details.append(f"- **{retailer}:** {status}.")
+    lines += ["", *details, "",
+              "Delivery charges, stock, exact variants and offer conditions are unconfirmed. "
+              "No verified lowest-price winner is available.",
+              "Review text is unavailable; ratings are shown only where provided.", "",
+              f"Checked at: {result['checked_at']} (India time)."]
+    if any(s["status"] == "missing_SERPAPI_API_KEY" for s in result["stores"]):
+        lines += ["", "Set SERPAPI_API_KEY in your .env and restart the agent to enable live searches."]
+    return "\n".join(lines)
+
+
+def before_agent(callback_context):
+    """Start every user request with fresh results and its own search budget."""
+    callback_context.state["temp:last_comparison"] = None
+    callback_context.state["temp:shopping_calls"] = 0
+    return None
+
+
 def before_model(callback_context, llm_request):
     """Bound cumulative model input and prevent fabricated price answers without tools."""
     if len(str(llm_request.contents)) > 60000:
         return _reply("Rahul, this conversation is too long. Please start a new chat with the product model and variant.")
+    result = callback_context.state.get("temp:last_comparison")
+    if result:
+        return _reply(_render_comparison(result))
     if not os.getenv("OPENAI_API_KEY"):
         return _reply("Rahul, set OPENAI_API_KEY in your agent's .env before using the model.")
+    llm_request.append_instructions([
+        f"Current India date/time: {_now()}. Never invent a checked-at timestamp. "
+        "Do not add date filters to product searches unless Rahul explicitly requests one. "
+        "Never output Python, def statements, function signatures, Args, Returns, "
+        "docstrings, tool schemas, raw JSON or simulated tool calls. "
+        "Invoke the actual tool through native function calling. "
+        "If you cannot invoke it, explain that live search could not run; never simulate results."
+    ])
+    return None
+
+
+def after_model(callback_context, llm_response):
+    """Prevent textual tool imitations and unsupported price claims from reaching chat."""
+    content = llm_response.content
+    if not content or not content.parts:
+        return None
+    # Preserve genuine native tool calls for ADK execution.
+    if any(part.function_call for part in content.parts):
+        return None
+    result = callback_context.state.get("temp:last_comparison")
+    if result:
+        return _reply(_render_comparison(result))
+    text = "\n".join(part.text or "" for part in content.parts)
+    if re.search(r"```|\bdef\s+\w+\(|\bArgs\s*:|\bReturns\s*:|compare_store_prices|\bchecked[ -]at\b|[₹]|\bINR\s*\d", text, re.I):
+        return _reply("Rahul, live search did not run, so I cannot show current prices. "
+                      "Run the agent's --check-model check to confirm that this gateway supports tool calling.")
     return None
 
 
@@ -257,6 +343,10 @@ never subtract them from a general price. Do not infer free shipping or stock.
 Ratings and counts belong to each source; review text is unavailable, so do not
 invent review themes. If no data exists, explain the configuration/access issue and
 next step. Do not ask for a PIN code: this implementation cannot check local delivery.
+Never display function definitions, arguments, return documentation, tool schemas,
+Python code or raw tool output. Use native tool calls, not text imitations.
+Do not add historical date filters unless requested. Checked-at timestamps come
+only from tool output. The application renders the final comparison for you.
 """
 
 root_agent = Agent(
@@ -265,7 +355,9 @@ root_agent = Agent(
     model=LiteLlm(model=MODEL, api_base=BASE, api_key=os.getenv("OPENAI_API_KEY")),
     instruction=INSTRUCTION,
     tools=[compare_store_prices],
+    before_agent_callback=before_agent,
     before_model_callback=before_model,
+    after_model_callback=after_model,
     before_tool_callback=before_tool,
     after_tool_callback=after_tool,
     on_model_error_callback=on_model_error,

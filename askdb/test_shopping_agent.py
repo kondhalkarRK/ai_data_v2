@@ -64,6 +64,27 @@ class ShoppingChecks(unittest.TestCase):
         declaration = FunctionTool(agent.compare_store_prices)._get_declaration()
         self.assertIn("product_query", str(declaration))
 
+    def test_presentation_uses_tool_time(self):
+        result = {"checked_at": "2026-11-16T12:00:00+05:30", "stores": [
+            {"retailer": r, "status": "missing_SERPAPI_API_KEY", "offers": []}
+            for r in agent.STORES]}
+        rendered = agent._render_comparison(result)
+        self.assertIn(result["checked_at"], rendered)
+        self.assertNotIn("2024-02", rendered)
+        self.assertNotIn("Args:", rendered)
+        self.assertEqual(rendered.count("| Unavailable |"), 4)
+
+    def test_textual_tool_call_is_not_displayed(self):
+        response = agent._reply("def compare_store_prices(product_query):\nArgs: query\nReturns: prices")
+        replacement = agent.after_model(SimpleNamespace(state={}), response)
+        self.assertIn("live search did not run", replacement.content.parts[0].text)
+        self.assertNotIn("def ", replacement.content.parts[0].text)
+
+    def test_request_clears_old_results(self):
+        context = SimpleNamespace(state={"temp:last_comparison": {"checked_at": "2024-02"}})
+        agent.before_agent(context)
+        self.assertIsNone(context.state["temp:last_comparison"])
+
 
 if __name__ == "__main__":
     unittest.main()
