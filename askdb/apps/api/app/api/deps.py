@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Annotated, Any
 
@@ -253,3 +254,19 @@ async def get_scoped_analytics(
 ) -> AsyncIterator[AsyncConnection]:
     async with registry.analytics_connection(industry) as connection:
         yield RegionScopedConnection(connection, industry, scope)  # type: ignore[misc]
+
+
+async def get_optional_scoped_analytics(
+    industry: ActiveIndustry,
+    registry: Annotated[DatabaseRegistry, Depends(get_registry)],
+    scope: RegionScopeDep,
+) -> AsyncIterator[AsyncConnection | None]:
+    try:
+        async with registry.analytics_connection(industry) as connection:
+            yield RegionScopedConnection(connection, industry, scope)  # type: ignore[misc]
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "Analytics SQL connection unavailable; continuing without SQL for document-only routes.",
+            exc_info=True,
+        )
+        yield None

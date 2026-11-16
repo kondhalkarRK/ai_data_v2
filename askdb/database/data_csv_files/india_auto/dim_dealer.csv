@@ -1,0 +1,434 @@
+dealer_id,dealer_code,dealer_name,region_id,city,dealer_grade,active
+1,MSI-DL-0001,Vision Maruti Arena,14,New Delhi,A,true
+2,MSI-DL-0002,Royal Maruti Arena,14,New Delhi,A,true
+3,MSI-DL-0003,Royal Maruti Arena New Delhi,14,New Delhi,B,true
+4,MSI-DL-0004,Shivalik Maruti Arena,14,New Delhi,A,true
+5,MSIN-DL-0001,Metro Nexa,14,New Delhi,A,true
+6,MSIN-DL-0002,Rana Nexa,14,New Delhi,A,true
+7,MSIN-DL-0003,Apex Nexa,14,New Delhi,B,true
+8,MSI-MH-0001,Siddhivinayak Maruti Arena,1,Mumbai,A,true
+9,MSI-MH-0002,Navkar Maruti Arena,1,Mumbai,A,true
+10,MSI-MH-0003,Crown Maruti Arena,1,Mumbai,A,true
+11,MSI-MH-0004,Ambica Maruti Arena,1,Mumbai,B,true
+12,MSIN-MH-0001,Sterling Nexa,1,Mumbai,A,true
+13,MSIN-MH-0002,Siddhivinayak Nexa,1,Mumbai,A,true
+14,MSI-KA-0001,Premier Maruti Arena,35,Bengaluru,A,true
+15,MSI-KA-0002,Unity Maruti Arena,35,Bengaluru,A,true
+16,MSI-KA-0003,Srinivasa Maruti Arena,35,Bengaluru,B,true
+17,MSIN-KA-0001,Tungabhadra Nexa,35,Bengaluru,A,true
+18,MSIN-KA-0002,Krishna Nexa,35,Bengaluru,A,true
+19,MSI-TS-0001,Premier Maruti Arena Hyderabad,36,Hyderabad,A,true
+20,MSI-TS-0002,Excel Maruti Arena,36,Hyderabad,A,true
+21,MSIN-TS-0001,Vijaya Nexa,36,Hyderabad,A,true
+22,MSIN-TS-0002,Crown Nexa,36,Hyderabad,A,true
+23,MSI-TN-0001,Unity Maruti Arena Chennai,37,Chennai,A,true
+24,MSI-TN-0002,Supreme Maruti Arena,37,Chennai,A,true
+25,MSIN-TN-0001,Malabar Nexa,37,Chennai,A,true
+26,MSIN-TN-0002,Kalyani Nexa,37,Chennai,A,true
+27,MSI-MH-0005,Konkan Maruti Arena,2,Pune,B,true
+28,MSI-MH-0006,Apex Maruti Arena,2,Pune,A,false
+29,MSIN-MH-0003,Tapi Nexa,2,Pune,A,true
+30,MSIN-MH-0004,Sterling Nexa Pune,2,Pune,A,true
+31,MSI-GJ-0001,Elite Maruti Arena,9,Ahmedabad,A,true
+32,MSI-GJ-0002,Prestige Maruti Arena,9,Ahmedabad,A,true
+33,MSIN-GJ-0001,Navkar Nexa,9,Ahmedabad,A,true
+34,MSI-WB-0001,Elite Maruti Arena Kolkata,55,Kolkata,A,true
+35,MSI-WB-0002,Teesta Maruti Arena,55,Kolkata,A,true
+36,MSIN-WB-0001,Pinnacle Nexa,55,Kolkata,B,true
+37,MSI-HR-0001,Indraprastha Maruti Arena,15,Gurugram,A,true
+38,MSI-HR-0002,Vista Maruti Arena,15,Gurugram,A,true
+39,MSIN-HR-0001,Sterling Nexa Gurugram,15,Gurugram,A,true
+40,MSI-UP-0001,Vision Maruti Arena Noida,16,Noida,A,true
+41,MSIN-UP-0001,Premier Nexa,16,Noida,A,true
+42,MSI-RJ-0001,Yamuna Maruti Arena,20,Jaipur,B,true
+43,MSIN-RJ-0001,Paras Nexa,20,Jaipur,A,false
+44,MSI-MH-0007,Premier Maruti Arena Thane,3,Thane,A,true
+45,MSIN-MH-0005,Sterling Nexa Thane,3,Thane,A,true
+46,MSI-GJ-0003,Sahyadri Maruti Arena,10,Surat,B,true
+47,MSIN-GJ-0002,Unity Nexa,10,Surat,C,true
+48,MSI-UP-0002,Doaba Maruti Arena,21,Lucknow,C,true
+49,MSIN-UP-0002,Galaxy Nexa,21,Lucknow,B,true
+50,MSI-KL-0001,Vijaya Maruti Arena,38,Kochi,B,true
+51,MSI-MH-0008,Konkan Maruti Arena Navi Mumbai,4,Navi Mumbai,A,true
+52,MSI-TN-0003,Royal Maruti Arena Coimbatore,42,Coimbatore,B,true
+53,MSI-CH-0001,Excel Maruti Arena Chandigarh,19,Chandigarh,B,true
+54,MSI-MH-0009,Ambica Maruti Arena Nagpur,5,Nagpur,B,true
+55,MSI-MP-0001,Premier Maruti Arena Indore,64,Indore,B,true
+56,MSI-GJ-0004,Sterling Maruti Arena,11,Vadodara,B,false
+57,MSI-UP-0003,Paras Maruti Arena,18,Ghaziabad,B,true
+58,MSI-PB-0001,Royal Maruti Arena Ludhiana,26,Ludhiana,B,true
+59,MSI-HR-0003,Apex Maruti Arena Faridabad,17,Faridabad,B,true
+60,MSI-KL-0002,Pinnacle Maruti Arena,39,Thiruvananthapuram,C,true
+61,MSI-MH-0010,Premier Maruti Arena Nashik,6,Nashik,B,true
+62,MSI-GJ-0005,Elite Maruti Arena Rajkot,12,Rajkot,B,true
+63,MSI-UP-0004,Prestige Maruti Arena Kanpur,22,Kanpur,A,true
+64,MSI-AP-0001,Tungabhadra Maruti Arena,46,Visakhapatnam,B,true
+65,MSI-BR-0001,Apex Maruti Arena Patna,58,Patna,B,true
+66,MSI-MP-0002,Chhattis Maruti Arena,65,Bhopal,A,false
+67,MSI-AP-0002,Nilgiri Maruti Arena,47,Vijayawada,B,true
+68,MSI-AS-0001,Supreme Maruti Arena Guwahati,63,Guwahati,B,true
+69,MSI-CG-0001,Trident Maruti Arena,68,Raipur,B,true
+70,MSI-UK-0001,Sterling Maruti Arena Dehradun,29,Dehradun,B,true
+71,MSI-KL-0003,Vision Maruti Arena Kozhikode,40,Kozhikode,C,true
+72,MSI-TN-0004,Kaveri Maruti Arena,43,Madurai,B,true
+73,MSI-OD-0001,Himalaya Maruti Arena,61,Bhubaneswar,B,true
+74,MSI-MH-0011,Vision Maruti Arena Chhatrapati Sambhajinagar,7,Chhatrapati Sambhajinagar,B,true
+75,MSI-UP-0005,Aravali Maruti Arena,23,Varanasi,C,true
+76,MSIN-UP-0003,Yamuna Nexa,23,Varanasi,C,true
+77,MSI-UP-0006,Vision Maruti Arena Agra,24,Agra,B,true
+78,MSI-PB-0002,Premier Maruti Arena Amritsar,27,Amritsar,C,true
+79,MSI-KL-0004,Royal Maruti Arena Thrissur,41,Thrissur,C,true
+80,MSI-KA-0004,Trident Maruti Arena Mysuru,51,Mysuru,B,true
+81,MSI-KA-0005,Nilgiri Maruti Arena Mangaluru,52,Mangaluru,B,true
+82,MSI-JH-0001,Prestige Maruti Arena Ranchi,59,Ranchi,C,true
+83,MSI-GA-0001,Vision Maruti Arena Panaji,13,Panaji,B,true
+84,MSI-UP-0007,Heritage Maruti Arena,25,Meerut,C,true
+85,MSI-PB-0003,Awadh Maruti Arena,28,Jalandhar,C,true
+86,MSI-RJ-0002,Metro Maruti Arena,31,Jodhpur,B,true
+87,MSI-MH-0012,Royal Maruti Arena Kolhapur,8,Kolhapur,C,true
+88,MSI-RJ-0003,Sterling Maruti Arena Udaipur,32,Udaipur,C,true
+89,MSI-TN-0005,Unity Maruti Arena Tiruchirappalli,44,Tiruchirappalli,B,true
+90,MSI-KA-0006,Vijaya Maruti Arena Hubballi,53,Hubballi,B,true
+91,MSI-WB-0003,Vision Maruti Arena Siliguri,56,Siliguri,C,true
+92,MSI-JH-0002,Heritage Maruti Arena Jamshedpur,60,Jamshedpur,C,true
+93,MSI-MP-0003,Chambal Maruti Arena,66,Jabalpur,C,true
+94,MSI-RJ-0004,Rajputana Maruti Arena,33,Kota,B,false
+95,MSI-UP-0008,Awadh Maruti Arena Bareilly,34,Bareilly,C,true
+96,MSI-TN-0006,Coastal Maruti Arena,45,Salem,C,true
+97,MSI-AP-0003,Vision Maruti Arena Guntur,48,Guntur,C,true
+98,MSI-TS-0003,Coastal Maruti Arena Warangal,50,Warangal,C,true
+99,MSI-KA-0007,Chola Maruti Arena,54,Belagavi,C,true
+100,MSI-MP-0004,Satpura Maruti Arena,67,Gwalior,C,true
+101,MSI-AP-0004,Pallava Maruti Arena,49,Tirupati,C,true
+102,MSI-HP-0001,Vista Maruti Arena Shimla,30,Shimla,B,true
+103,MSI-WB-0004,Pinnacle Maruti Arena Durgapur,57,Durgapur,C,true
+104,MSI-OD-0002,Pinnacle Maruti Arena Cuttack,62,Cuttack,C,false
+105,MSI-CG-0002,Unity Maruti Arena Bilaspur,69,Bilaspur,B,true
+106,HYU-DL-0001,Excel Hyundai,14,New Delhi,A,true
+107,HYU-DL-0002,Elite Hyundai,14,New Delhi,B,true
+108,HYU-DL-0003,Capital Hyundai,14,New Delhi,A,true
+109,HYU-MH-0001,Ambica Hyundai,1,Mumbai,A,true
+110,HYU-MH-0002,Pratham Hyundai,1,Mumbai,A,true
+111,HYU-MH-0003,Vision Hyundai,1,Mumbai,B,true
+112,HYU-KA-0001,Excel Hyundai Bengaluru,35,Bengaluru,B,true
+113,HYU-KA-0002,Elite Hyundai Bengaluru,35,Bengaluru,A,true
+114,HYU-KA-0003,Godavari Hyundai,35,Bengaluru,A,true
+115,HYU-TS-0001,Prestige Hyundai,36,Hyderabad,A,true
+116,HYU-TS-0002,Metro Hyundai,36,Hyderabad,A,true
+117,HYU-TS-0003,Sri Lakshmi Hyundai,36,Hyderabad,A,true
+118,HYU-TN-0001,Supreme Hyundai,37,Chennai,A,true
+119,HYU-TN-0002,Vision Hyundai Chennai,37,Chennai,B,true
+120,HYU-TN-0003,Prestige Hyundai Chennai,37,Chennai,A,true
+121,HYU-MH-0004,Deccan Hyundai,2,Pune,B,true
+122,HYU-MH-0005,Elite Hyundai Pune,2,Pune,A,true
+123,HYU-GJ-0001,Mahalaxmi Hyundai,9,Ahmedabad,A,true
+124,HYU-WB-0001,Kalinga Hyundai,55,Kolkata,A,true
+125,HYU-HR-0001,Pink City Hyundai,15,Gurugram,A,true
+126,HYU-UP-0001,Kesar Hyundai,16,Noida,A,false
+127,HYU-RJ-0001,Apex Hyundai,20,Jaipur,B,true
+128,HYU-MH-0006,Pratham Hyundai Thane,3,Thane,A,true
+129,HYU-GJ-0002,Metro Hyundai Surat,10,Surat,B,true
+130,HYU-UP-0002,Rana Hyundai,21,Lucknow,B,true
+131,HYU-KL-0001,Srinivasa Hyundai,38,Kochi,B,true
+132,HYU-MH-0007,Vista Hyundai,4,Navi Mumbai,B,true
+133,HYU-TN-0004,Pinnacle Hyundai,42,Coimbatore,B,true
+134,HYU-CH-0001,Vision Hyundai Chandigarh,19,Chandigarh,A,true
+135,HYU-MH-0008,Crown Hyundai,5,Nagpur,B,true
+136,HYU-MP-0001,Crown Hyundai Indore,64,Indore,A,true
+137,HYU-GJ-0003,Pinnacle Hyundai Vadodara,11,Vadodara,A,true
+138,HYU-UP-0003,Apex Hyundai Ghaziabad,18,Ghaziabad,B,true
+139,HYU-PB-0001,Royal Hyundai,26,Ludhiana,B,true
+140,HYU-HR-0002,Trident Hyundai,17,Faridabad,B,true
+141,HYU-KL-0002,Excel Hyundai Thiruvananthapuram,39,Thiruvananthapuram,B,true
+142,HYU-MH-0009,Konkan Hyundai,6,Nashik,B,true
+143,HYU-GJ-0004,Elite Hyundai Rajkot,12,Rajkot,A,true
+144,HYU-UP-0004,Awadh Hyundai,22,Kanpur,B,true
+145,HYU-AP-0001,Sri Lakshmi Hyundai Visakhapatnam,46,Visakhapatnam,B,true
+146,HYU-BR-0001,Metro Hyundai Patna,58,Patna,B,true
+147,HYU-MP-0002,Apex Hyundai Bhopal,65,Bhopal,B,true
+148,HYU-AP-0002,Coastal Hyundai,47,Vijayawada,B,true
+149,HYU-AS-0001,Metro Hyundai Guwahati,63,Guwahati,B,true
+150,HYU-CG-0001,Trident Hyundai Raipur,68,Raipur,B,true
+151,HYU-UK-0001,Shivalik Hyundai,29,Dehradun,B,true
+152,HYU-KL-0003,Pallava Hyundai,40,Kozhikode,B,true
+153,HYU-TN-0005,Crown Hyundai Madurai,43,Madurai,C,true
+154,HYU-OD-0001,Trident Hyundai Bhubaneswar,61,Bhubaneswar,B,true
+155,HYU-MH-0010,Royal Hyundai Chhatrapati Sambhajinagar,7,Chhatrapati Sambhajinagar,B,true
+156,HYU-KL-0004,Godavari Hyundai Thrissur,41,Thrissur,C,false
+157,HYU-KA-0004,Vision Hyundai Mysuru,51,Mysuru,B,true
+158,HYU-KA-0005,Unity Hyundai,52,Mangaluru,B,true
+159,HYU-JH-0001,Hooghly Hyundai,59,Ranchi,C,true
+160,HYU-GA-0001,Vision Hyundai Panaji,13,Panaji,B,true
+161,TAT-DL-0001,Premier Tata Motors,14,New Delhi,A,true
+162,TAT-DL-0002,Trident Tata Motors,14,New Delhi,A,true
+163,TAT-DL-0003,Supreme Tata Motors,14,New Delhi,A,true
+164,TAT-MH-0001,Vista Tata Motors,1,Mumbai,A,true
+165,TAT-MH-0002,Crown Tata Motors,1,Mumbai,A,true
+166,TAT-MH-0003,Crown Tata Motors Mumbai,1,Mumbai,A,true
+167,TAT-KA-0001,Supreme Tata Motors Bengaluru,35,Bengaluru,A,true
+168,TAT-KA-0002,Trident Tata Motors Bengaluru,35,Bengaluru,A,true
+169,TAT-TS-0001,Coastal Tata Motors,36,Hyderabad,A,true
+170,TAT-TS-0002,Trident Tata Motors Hyderabad,36,Hyderabad,A,true
+171,TAT-TN-0001,Vijaya Tata Motors,37,Chennai,A,true
+172,TAT-TN-0002,Trident Tata Motors Chennai,37,Chennai,A,true
+173,TAT-MH-0004,Excel Tata Motors,2,Pune,A,true
+174,TAT-MH-0005,Trident Tata Motors Pune,2,Pune,A,true
+175,TAT-GJ-0001,Shivam Tata Motors,9,Ahmedabad,A,true
+176,TAT-WB-0001,Apex Tata Motors,55,Kolkata,B,true
+177,TAT-HR-0001,Elite Tata Motors,15,Gurugram,A,true
+178,TAT-UP-0001,Supreme Tata Motors Noida,16,Noida,A,true
+179,TAT-RJ-0001,Trident Tata Motors Jaipur,20,Jaipur,C,true
+180,TAT-MH-0006,Vista Tata Motors Thane,3,Thane,A,true
+181,TAT-GJ-0002,Konkan Tata Motors,10,Surat,A,true
+182,TAT-UP-0002,Crown Tata Motors Lucknow,21,Lucknow,B,true
+183,TAT-KL-0001,Tungabhadra Tata Motors,38,Kochi,B,true
+184,TAT-MH-0007,Prestige Tata Motors,4,Navi Mumbai,A,true
+185,TAT-TN-0003,Sri Lakshmi Tata Motors,42,Coimbatore,C,true
+186,TAT-CH-0001,Metro Tata Motors,19,Chandigarh,B,true
+187,TAT-MH-0008,Metro Tata Motors Nagpur,5,Nagpur,B,true
+188,TAT-MP-0001,Apex Tata Motors Indore,64,Indore,C,false
+189,TAT-GJ-0003,Trident Tata Motors Vadodara,11,Vadodara,B,true
+190,TAT-UP-0003,Doaba Tata Motors,18,Ghaziabad,B,true
+191,TAT-PB-0001,Himgiri Tata Motors,26,Ludhiana,A,true
+192,TAT-HR-0002,Sterling Tata Motors,17,Faridabad,B,true
+193,TAT-KL-0002,Excel Tata Motors Thiruvananthapuram,39,Thiruvananthapuram,B,true
+194,TAT-MH-0009,Metro Tata Motors Nashik,6,Nashik,A,true
+195,TAT-GJ-0004,Pinnacle Tata Motors,12,Rajkot,B,true
+196,TAT-UP-0004,Supreme Tata Motors Kanpur,22,Kanpur,A,true
+197,TAT-AP-0001,Vijaya Tata Motors Visakhapatnam,46,Visakhapatnam,B,true
+198,TAT-BR-0001,Vision Tata Motors,58,Patna,C,true
+199,TAT-MP-0002,Premier Tata Motors Bhopal,65,Bhopal,B,true
+200,TAT-AP-0002,Chola Tata Motors,47,Vijayawada,B,true
+201,TAT-AS-0001,Royal Tata Motors,63,Guwahati,B,true
+202,TAT-CG-0001,Vista Tata Motors Raipur,68,Raipur,B,true
+203,TAT-UK-0001,Trident Tata Motors Dehradun,29,Dehradun,B,true
+204,TAT-TN-0004,Unity Tata Motors,43,Madurai,B,true
+205,TAT-OD-0001,Sterling Tata Motors Bhubaneswar,61,Bhubaneswar,B,true
+206,TAT-MH-0010,Crown Tata Motors Chhatrapati Sambhajinagar,7,Chhatrapati Sambhajinagar,B,true
+207,TAT-KA-0003,Pinnacle Tata Motors Mysuru,51,Mysuru,B,true
+208,TAT-KA-0004,Krishna Tata Motors,52,Mangaluru,B,true
+209,TAT-JH-0001,Magadh Tata Motors,59,Ranchi,C,false
+210,TAT-GA-0001,Gomantak Tata Motors,13,Panaji,B,true
+211,MAH-DL-0001,Metro Mahindra,14,New Delhi,A,true
+212,MAH-DL-0002,Royal Mahindra,14,New Delhi,A,true
+213,MAH-DL-0003,Pinnacle Mahindra,14,New Delhi,A,true
+214,MAH-MH-0001,Gomantak Mahindra,1,Mumbai,B,true
+215,MAH-MH-0002,Heritage Mahindra,1,Mumbai,A,true
+216,MAH-MH-0003,Metro Mahindra Mumbai,1,Mumbai,A,true
+217,MAH-KA-0001,Tungabhadra Mahindra,35,Bengaluru,B,true
+218,MAH-KA-0002,Tungabhadra Mahindra Bengaluru,35,Bengaluru,A,true
+219,MAH-TS-0001,Sahana Mahindra,36,Hyderabad,A,true
+220,MAH-TN-0001,Sahana Mahindra Chennai,37,Chennai,A,true
+221,MAH-MH-0004,Navkar Mahindra,2,Pune,A,true
+222,MAH-MH-0005,Crown Mahindra,2,Pune,A,true
+223,MAH-GJ-0001,Apex Mahindra,9,Ahmedabad,A,true
+224,MAH-WB-0001,Premier Mahindra,55,Kolkata,A,true
+225,MAH-HR-0001,Rajputana Mahindra,15,Gurugram,A,true
+226,MAH-UP-0001,Supreme Mahindra,16,Noida,A,true
+227,MAH-RJ-0001,Heritage Mahindra Jaipur,20,Jaipur,B,true
+228,MAH-MH-0006,Crown Mahindra Thane,3,Thane,A,true
+229,MAH-GJ-0002,Crown Mahindra Surat,10,Surat,B,true
+230,MAH-UP-0002,Himgiri Mahindra,21,Lucknow,B,true
+231,MAH-KL-0001,Vijaya Mahindra,38,Kochi,B,true
+232,MAH-MH-0007,Vision Mahindra,4,Navi Mumbai,A,true
+233,MAH-TN-0002,Tungabhadra Mahindra Coimbatore,42,Coimbatore,C,true
+234,MAH-CH-0001,Capital Mahindra,19,Chandigarh,B,true
+235,MAH-MH-0008,Unity Mahindra,5,Nagpur,B,true
+236,MAH-MP-0001,Supreme Mahindra Indore,64,Indore,B,true
+237,MAH-GJ-0003,Unity Mahindra Vadodara,11,Vadodara,B,true
+238,MAH-UP-0003,Vision Mahindra Ghaziabad,18,Ghaziabad,B,true
+239,MAH-PB-0001,Unity Mahindra Ludhiana,26,Ludhiana,B,false
+240,MAH-HR-0002,Rana Mahindra,17,Faridabad,A,true
+241,MAH-KL-0002,Heritage Mahindra Thiruvananthapuram,39,Thiruvananthapuram,C,true
+242,MAH-MH-0009,Royal Mahindra Nashik,6,Nashik,B,true
+243,MAH-GJ-0004,Prestige Mahindra,12,Rajkot,B,true
+244,MAH-UP-0004,Heritage Mahindra Kanpur,22,Kanpur,B,true
+245,MAH-AP-0001,Nilgiri Mahindra,46,Visakhapatnam,B,true
+246,MAH-BR-0001,Elite Mahindra,58,Patna,B,true
+247,MAH-MP-0002,Excel Mahindra,65,Bhopal,C,true
+248,MAH-AP-0002,Metro Mahindra Vijayawada,47,Vijayawada,B,true
+249,MAH-AS-0001,Teesta Mahindra,63,Guwahati,B,true
+250,MAH-CG-0001,Trident Mahindra,68,Raipur,B,true
+251,MAH-UK-0001,Galaxy Mahindra,29,Dehradun,B,true
+252,MAH-TN-0003,Heritage Mahindra Madurai,43,Madurai,A,true
+253,MAH-OD-0001,Trident Mahindra Bhubaneswar,61,Bhubaneswar,B,true
+254,MAH-MH-0010,Crown Mahindra Chhatrapati Sambhajinagar,7,Chhatrapati Sambhajinagar,B,true
+255,MAH-KA-0003,Nilgiri Mahindra Mysuru,51,Mysuru,B,true
+256,MAH-KA-0004,Chola Mahindra,52,Mangaluru,A,true
+257,MAH-JH-0001,Kamakhya Mahindra,59,Ranchi,B,true
+258,MAH-GA-0001,Heritage Mahindra Panaji,13,Panaji,B,true
+259,TKM-DL-0001,Kesar Toyota,14,New Delhi,A,true
+260,TKM-DL-0002,Capital Toyota,14,New Delhi,A,true
+261,TKM-MH-0001,Vision Toyota,1,Mumbai,A,false
+262,TKM-MH-0002,Crown Toyota,1,Mumbai,A,true
+263,TKM-KA-0001,Malabar Toyota,35,Bengaluru,A,true
+264,TKM-KA-0002,Pallava Toyota,35,Bengaluru,A,true
+265,TKM-TS-0001,Premier Toyota,36,Hyderabad,A,true
+266,TKM-TS-0002,Sahana Toyota,36,Hyderabad,B,true
+267,TKM-TN-0001,Chola Toyota,37,Chennai,B,true
+268,TKM-TN-0002,Metro Toyota,37,Chennai,A,true
+269,TKM-MH-0003,Ambica Toyota,2,Pune,A,true
+270,TKM-GJ-0001,Pinnacle Toyota,9,Ahmedabad,B,true
+271,TKM-GJ-0002,Prestige Toyota,9,Ahmedabad,A,true
+272,TKM-WB-0001,Brahmaputra Toyota,55,Kolkata,A,true
+273,TKM-WB-0002,Vista Toyota,55,Kolkata,A,true
+274,TKM-HR-0001,Vision Toyota Gurugram,15,Gurugram,A,true
+275,TKM-HR-0002,Himgiri Toyota,15,Gurugram,A,true
+276,TKM-UP-0001,Elite Toyota,16,Noida,A,true
+277,TKM-UP-0002,Royal Toyota,16,Noida,A,true
+278,TKM-RJ-0001,Yamuna Toyota,20,Jaipur,B,true
+279,TKM-RJ-0002,Pinnacle Toyota Jaipur,20,Jaipur,B,true
+280,TKM-MH-0004,Royal Toyota Thane,3,Thane,A,true
+281,TKM-MH-0005,Gomantak Toyota,3,Thane,A,true
+282,TKM-GJ-0003,Shivam Toyota,10,Surat,B,true
+283,TKM-GJ-0004,Metro Toyota Surat,10,Surat,C,true
+284,TKM-UP-0003,Doaba Toyota,21,Lucknow,B,true
+285,TKM-UP-0004,Capital Toyota Lucknow,21,Lucknow,B,true
+286,TKM-KL-0001,Heritage Toyota,38,Kochi,B,true
+287,TKM-KL-0002,Supreme Toyota,38,Kochi,B,true
+288,TKM-TN-0003,Malabar Toyota Coimbatore,42,Coimbatore,B,true
+289,TKM-TN-0004,Supreme Toyota Coimbatore,42,Coimbatore,B,true
+290,TKM-KL-0003,Tungabhadra Toyota,39,Thiruvananthapuram,B,true
+291,KIA-DL-0001,Capital Kia,14,New Delhi,A,true
+292,KIA-DL-0002,Galaxy Kia,14,New Delhi,A,true
+293,KIA-MH-0001,Premier Kia,1,Mumbai,A,true
+294,KIA-MH-0002,Metro Kia,1,Mumbai,A,true
+295,KIA-KA-0001,Pallava Kia,35,Bengaluru,A,true
+296,KIA-KA-0002,Supreme Kia,35,Bengaluru,A,true
+297,KIA-TS-0001,Pinnacle Kia,36,Hyderabad,A,true
+298,KIA-TS-0002,Pallava Kia Hyderabad,36,Hyderabad,A,true
+299,KIA-TN-0001,Trident Kia,37,Chennai,A,true
+300,KIA-MH-0003,Elite Kia,2,Pune,A,true
+301,KIA-GJ-0001,Konkan Kia,9,Ahmedabad,B,true
+302,KIA-GJ-0002,Shreeji Kia,9,Ahmedabad,A,true
+303,KIA-WB-0001,Unity Kia,55,Kolkata,A,true
+304,KIA-WB-0002,Unity Kia Kolkata,55,Kolkata,A,true
+305,KIA-HR-0001,Sterling Kia,15,Gurugram,B,true
+306,KIA-HR-0002,Doaba Kia,15,Gurugram,B,true
+307,KIA-UP-0001,Supreme Kia Noida,16,Noida,A,true
+308,KIA-RJ-0001,Pinnacle Kia Jaipur,20,Jaipur,C,true
+309,KIA-MH-0004,Jalaram Kia,3,Thane,A,true
+310,KIA-MH-0005,Heritage Kia,3,Thane,A,true
+311,KIA-GJ-0003,Vision Kia,10,Surat,C,true
+312,KIA-UP-0002,Crown Kia,21,Lucknow,C,true
+313,KIA-KL-0001,Trident Kia Kochi,38,Kochi,B,true
+314,KIA-TN-0002,Apex Kia,42,Coimbatore,B,true
+315,HCI-DL-0001,Vision Honda,14,New Delhi,A,true
+316,HCI-DL-0002,Royal Honda,14,New Delhi,A,true
+317,HCI-MH-0001,Excel Honda,1,Mumbai,B,true
+318,HCI-MH-0002,Siddhivinayak Honda,1,Mumbai,A,true
+319,HCI-KA-0001,Sahana Honda,35,Bengaluru,A,true
+320,HCI-KA-0002,Vista Honda,35,Bengaluru,A,true
+321,HCI-TS-0001,Srinivasa Honda,36,Hyderabad,A,true
+322,HCI-TN-0001,Sahana Honda Chennai,37,Chennai,A,false
+323,HCI-MH-0003,Metro Honda,2,Pune,A,true
+324,HCI-GJ-0001,Royal Honda Ahmedabad,9,Ahmedabad,A,false
+325,HCI-WB-0001,Kamakhya Honda,55,Kolkata,B,true
+326,HCI-WB-0002,Vista Honda Kolkata,55,Kolkata,B,true
+327,HCI-HR-0001,Pinnacle Honda,15,Gurugram,A,true
+328,HCI-HR-0002,Royal Honda Gurugram,15,Gurugram,A,true
+329,HCI-UP-0001,Yamuna Honda,16,Noida,A,true
+330,HCI-UP-0002,Awadh Honda,16,Noida,A,true
+331,HCI-RJ-0001,Heritage Honda,20,Jaipur,B,false
+332,HCI-RJ-0002,Supreme Honda,20,Jaipur,B,true
+333,HCI-MH-0004,Ambica Honda,3,Thane,A,true
+334,HCI-MH-0005,Ambica Honda Thane,3,Thane,A,true
+335,HCI-GJ-0002,Vista Honda Surat,10,Surat,B,true
+336,HCI-UP-0003,Premier Honda,21,Lucknow,B,true
+337,HCI-UP-0004,Kesar Honda,21,Lucknow,B,true
+338,HCI-KL-0001,Krishna Honda,38,Kochi,B,true
+339,HCI-TN-0002,Apex Honda,42,Coimbatore,B,false
+340,HCI-CH-0001,Doaba Honda,19,Chandigarh,B,true
+341,MGM-DL-0001,Indraprastha MG,14,New Delhi,A,true
+342,MGM-MH-0001,Siddhivinayak MG,1,Mumbai,B,true
+343,MGM-KA-0001,Supreme MG,35,Bengaluru,A,true
+344,MGM-TS-0001,Trident MG,36,Hyderabad,B,true
+345,MGM-TN-0001,Sterling MG,37,Chennai,A,true
+346,MGM-TN-0002,Heritage MG,37,Chennai,A,true
+347,MGM-MH-0002,Trident MG Pune,2,Pune,A,true
+348,MGM-MH-0003,Apex MG,2,Pune,A,true
+349,MGM-GJ-0001,Sahyadri MG,9,Ahmedabad,A,true
+350,MGM-GJ-0002,Unity MG,9,Ahmedabad,A,true
+351,MGM-WB-0001,Prestige MG,55,Kolkata,A,true
+352,MGM-WB-0002,Vista MG,55,Kolkata,A,true
+353,MGM-HR-0001,Metro MG,15,Gurugram,A,true
+354,MGM-HR-0002,Vista MG Gurugram,15,Gurugram,A,true
+355,MGM-UP-0001,Yamuna MG,16,Noida,A,true
+356,MGM-RJ-0001,Capital MG,20,Jaipur,B,true
+357,MGM-UP-0002,Indraprastha MG Lucknow,21,Lucknow,B,true
+358,SKO-DL-0001,Trident Skoda,14,New Delhi,B,true
+359,SKO-DL-0002,Supreme Skoda,14,New Delhi,A,false
+360,SKO-MH-0001,Sai Skoda,1,Mumbai,A,true
+361,SKO-MH-0002,Unity Skoda,1,Mumbai,A,true
+362,SKO-KA-0001,Premier Skoda,35,Bengaluru,B,true
+363,SKO-KA-0002,Vision Skoda,35,Bengaluru,B,true
+364,SKO-TS-0001,Trident Skoda Hyderabad,36,Hyderabad,A,true
+365,SKO-TS-0002,Pinnacle Skoda,36,Hyderabad,A,true
+366,SKO-TN-0001,Excel Skoda,37,Chennai,A,true
+367,SKO-MH-0003,Premier Skoda Pune,2,Pune,A,true
+368,SKO-GJ-0001,Konkan Skoda,9,Ahmedabad,B,true
+369,VWI-DL-0001,Unity Volkswagen,14,New Delhi,A,true
+370,VWI-DL-0002,Crown Volkswagen,14,New Delhi,A,true
+371,VWI-MH-0001,Trident Volkswagen,1,Mumbai,A,true
+372,VWI-MH-0002,Premier Volkswagen,1,Mumbai,A,true
+373,VWI-KA-0001,Trident Volkswagen Bengaluru,35,Bengaluru,A,false
+374,VWI-KA-0002,Heritage Volkswagen,35,Bengaluru,B,true
+375,VWI-TS-0001,Trident Volkswagen Hyderabad,36,Hyderabad,B,true
+376,VWI-TS-0002,Tungabhadra Volkswagen,36,Hyderabad,B,true
+377,VWI-TN-0001,Coastal Volkswagen,37,Chennai,A,true
+378,VWI-MH-0003,Sai Volkswagen,2,Pune,A,true
+379,VWI-GJ-0001,Trident Volkswagen Ahmedabad,9,Ahmedabad,A,true
+380,REN-DL-0001,Paras Renault,14,New Delhi,A,true
+381,REN-MH-0001,Mahalaxmi Renault,1,Mumbai,B,false
+382,REN-KA-0001,Sterling Renault,35,Bengaluru,A,true
+383,REN-KA-0002,Vista Renault,35,Bengaluru,A,true
+384,REN-TS-0001,Kalyani Renault,36,Hyderabad,A,true
+385,REN-TS-0002,Pallava Renault,36,Hyderabad,A,false
+386,REN-TN-0001,Trident Renault,37,Chennai,A,true
+387,REN-MH-0002,Heritage Renault,2,Pune,A,true
+388,REN-MH-0003,Heritage Renault Pune,2,Pune,A,true
+389,REN-GJ-0001,Vista Renault Ahmedabad,9,Ahmedabad,A,true
+390,REN-GJ-0002,Elite Renault,9,Ahmedabad,A,true
+391,REN-WB-0001,Himalaya Renault,55,Kolkata,A,true
+392,REN-WB-0002,Pinnacle Renault,55,Kolkata,B,true
+393,REN-HR-0001,Prestige Renault,15,Gurugram,A,true
+394,REN-HR-0002,Doaba Renault,15,Gurugram,B,true
+395,REN-UP-0001,Doaba Renault Noida,16,Noida,A,true
+396,REN-RJ-0001,Sterling Renault Jaipur,20,Jaipur,B,true
+397,REN-MH-0004,Premier Renault,3,Thane,A,true
+398,REN-GJ-0003,Gomantak Renault,10,Surat,A,true
+399,REN-UP-0002,Doaba Renault Lucknow,21,Lucknow,B,true
+400,REN-KL-0001,Sahana Renault,38,Kochi,B,true
+401,REN-TN-0002,Kalyani Renault Coimbatore,42,Coimbatore,B,false
+402,NIS-DL-0001,Paras Nissan,14,New Delhi,A,true
+403,NIS-DL-0002,Trident Nissan,14,New Delhi,A,true
+404,NIS-MH-0001,Jalaram Nissan,1,Mumbai,A,true
+405,NIS-MH-0002,Vista Nissan,1,Mumbai,B,true
+406,NIS-KA-0001,Krishna Nissan,35,Bengaluru,A,true
+407,NIS-TS-0001,Elite Nissan,36,Hyderabad,A,false
+408,NIS-TN-0001,Krishna Nissan Chennai,37,Chennai,A,false
+409,NIS-TN-0002,Prestige Nissan,37,Chennai,A,true
+410,NIS-MH-0003,Pinnacle Nissan,2,Pune,B,true
+411,NIS-MH-0004,Shivam Nissan,2,Pune,A,true
+412,NIS-GJ-0001,Royal Nissan,9,Ahmedabad,A,true
+413,NIS-GJ-0002,Royal Nissan Ahmedabad,9,Ahmedabad,A,true
+414,NIS-WB-0001,Unity Nissan,55,Kolkata,B,true
+415,NIS-HR-0001,Doaba Nissan,15,Gurugram,A,true
+416,JEP-DL-0001,Trident Jeep,14,New Delhi,A,true
+417,JEP-DL-0002,Vision Jeep,14,New Delhi,A,true
+418,JEP-MH-0001,Vision Jeep Mumbai,1,Mumbai,A,true
+419,JEP-MH-0002,Pinnacle Jeep,1,Mumbai,A,true
+420,JEP-KA-0001,Pinnacle Jeep Bengaluru,35,Bengaluru,A,true
+421,JEP-KA-0002,Pinnacle Jeep Bengaluru 2,35,Bengaluru,A,true
+422,CIT-DL-0001,Pink City Citroen,14,New Delhi,A,true
+423,CIT-DL-0002,Excel Citroen,14,New Delhi,A,true
+424,CIT-MH-0001,Premier Citroen,1,Mumbai,A,true
+425,CIT-KA-0001,Trident Citroen,35,Bengaluru,A,true
+426,CIT-KA-0002,Crown Citroen,35,Bengaluru,A,true
+427,CIT-TS-0001,Sri Lakshmi Citroen,36,Hyderabad,B,true
+428,BYD-DL-0001,Metro BYD,14,New Delhi,A,true
+429,BYD-MH-0001,Shivam BYD,1,Mumbai,A,true
+430,BYD-KA-0001,Pinnacle BYD,35,Bengaluru,A,true
+431,BYD-KA-0002,Royal BYD,35,Bengaluru,A,true
+432,BYD-TS-0001,Elite BYD,36,Hyderabad,A,true
+433,BYD-TN-0001,Pinnacle BYD Chennai,37,Chennai,A,true

@@ -283,7 +283,7 @@ class ChatService:
         self,
         *,
         app_session: AsyncSession,
-        analytics: AsyncConnection,
+        analytics: AsyncConnection | None,
         settings: Settings,
         user: User,
         industry: Industry,

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app.api.deps import get_optional_scoped_analytics
 from app.api.routes.chat import AskRequest
 from app.core.config import Settings
 from app.core.exceptions import ValidationError
@@ -73,6 +74,21 @@ def test_chroma_namespace_separates_embedding_endpoints() -> None:
     b = a.model_copy(update={'rag_embedding_base_url': 'https://b.example/v1'})
     identity = EmbeddingIdentity('openai_compatible', 'embed', 3)
     assert collection_name_for(a, industry='automotive', identity=identity) != collection_name_for(b, industry='automotive', identity=identity)
+
+@pytest.mark.asyncio
+async def test_document_only_chat_allows_missing_analytics_connection() -> None:
+    registry = MagicMock()
+    registry.analytics_connection.side_effect = RuntimeError('warehouse unavailable')
+
+    async def _run() -> None:
+        async for _ in get_optional_scoped_analytics(
+            industry=Settings().default_industry,
+            registry=registry,
+            scope=SimpleNamespace(),
+        ):
+            pass
+
+    await _run()
 
 @pytest.mark.parametrize('enabled, requested', [(True, False), (False, True), (False, False)])
 def test_document_off_gate_precedes_retrieval(monkeypatch, enabled: bool, requested: bool) -> None:

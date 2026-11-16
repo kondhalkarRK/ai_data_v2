@@ -1,0 +1,252 @@
+carline_id,carline_name,make,model,car_type,engine_type,engine_capacity,on_sale_from,on_sale_until,anchor_price_lakh_2024
+1,Alto 0.8 Petrol,Maruti Suzuki,Alto,Hatchback,Petrol,0.8,2015-01-01,2023-03-31,3.6
+2,Alto 1.0 Petrol,Maruti Suzuki,Alto,Hatchback,Petrol,1.0,2015-01-01,,4.5
+3,WagonR 1.0 Petrol,Maruti Suzuki,WagonR,Hatchback,Petrol,1.0,2015-01-01,,5.8
+4,WagonR 1.2 Petrol,Maruti Suzuki,WagonR,Hatchback,Petrol,1.2,2019-01-01,,6.5
+5,Celerio 1.0 Petrol,Maruti Suzuki,Celerio,Hatchback,Petrol,1.0,2015-01-01,,5.7
+6,Celerio 0.8 Diesel,Maruti Suzuki,Celerio,Hatchback,Diesel,0.8,2015-06-01,2017-06-30,6.2
+7,Ritz 1.2 Petrol,Maruti Suzuki,Ritz,Hatchback,Petrol,1.2,2015-01-01,2017-06-30,5.8
+8,Ritz 1.3 Diesel,Maruti Suzuki,Ritz,Hatchback,Diesel,1.3,2015-01-01,2017-06-30,6.5
+9,S-Presso 1.0 Petrol,Maruti Suzuki,S-Presso,Hatchback,Petrol,1.0,2019-09-01,,4.8
+10,Swift 1.2 Petrol,Maruti Suzuki,Swift,Hatchback,Petrol,1.2,2015-01-01,,7.0
+11,Swift 1.3 Diesel,Maruti Suzuki,Swift,Hatchback,Diesel,1.3,2015-01-01,2020-03-31,7.8
+12,Dzire 1.2 Petrol,Maruti Suzuki,Dzire,Compact Sedan,Petrol,1.2,2015-01-01,,7.6
+13,Dzire 1.3 Diesel,Maruti Suzuki,Dzire,Compact Sedan,Diesel,1.3,2015-01-01,2020-03-31,8.4
+14,Baleno 1.2 Petrol,Maruti Suzuki,Baleno,Premium Hatchback,Petrol,1.2,2015-10-01,,7.8
+15,Baleno 1.3 Diesel,Maruti Suzuki,Baleno,Premium Hatchback,Diesel,1.3,2015-10-01,2020-03-31,8.6
+16,Ignis 1.2 Petrol,Maruti Suzuki,Ignis,Hatchback,Petrol,1.2,2017-01-01,,6.5
+17,Ignis 1.3 Diesel,Maruti Suzuki,Ignis,Hatchback,Diesel,1.3,2017-01-01,2018-12-31,7.2
+18,Ciaz 1.4 Petrol,Maruti Suzuki,Ciaz,Premium Sedan,Petrol,1.4,2015-01-01,2018-07-31,9.8
+19,Ciaz 1.5 Petrol,Maruti Suzuki,Ciaz,Premium Sedan,Petrol,1.5,2018-08-01,2025-04-30,10.5
+20,Ciaz 1.3 Diesel,Maruti Suzuki,Ciaz,Premium Sedan,Diesel,1.3,2015-01-01,2020-03-31,11.2
+21,Brezza 1.3 Diesel,Maruti Suzuki,Brezza,Compact SUV,Diesel,1.3,2016-03-01,2020-02-29,9.5
+22,Brezza 1.5 Petrol,Maruti Suzuki,Brezza,Compact SUV,Petrol,1.5,2020-02-01,,11.0
+23,Ertiga 1.4 Petrol,Maruti Suzuki,Ertiga,MPV,Petrol,1.4,2015-01-01,2018-10-31,9.8
+24,Ertiga 1.5 Petrol,Maruti Suzuki,Ertiga,MPV,Petrol,1.5,2018-11-01,,10.5
+25,Ertiga 1.3 Diesel,Maruti Suzuki,Ertiga,MPV,Diesel,1.3,2015-01-01,2020-03-31,11.0
+26,XL6 1.5 Petrol,Maruti Suzuki,XL6,MPV,Petrol,1.5,2019-08-01,,12.5
+27,S-Cross 1.3 Diesel,Maruti Suzuki,S-Cross,Mid SUV,Diesel,1.3,2015-08-01,2020-03-31,10.5
+28,S-Cross 1.6 Diesel,Maruti Suzuki,S-Cross,Mid SUV,Diesel,1.6,2015-08-01,2017-09-30,12.5
+29,S-Cross 1.5 Petrol,Maruti Suzuki,S-Cross,Mid SUV,Petrol,1.5,2020-08-01,2022-11-30,10.5
+30,Grand Vitara 1.5 Petrol,Maruti Suzuki,Grand Vitara,Mid SUV,Petrol,1.5,2022-09-01,,14.0
+31,Grand Vitara 1.5 Hybrid,Maruti Suzuki,Grand Vitara,Mid SUV,Hybrid,1.5,2022-09-01,,18.5
+32,Fronx 1.2 Petrol,Maruti Suzuki,Fronx,Compact SUV,Petrol,1.2,2023-04-01,,8.5
+33,Fronx 1.0 Petrol,Maruti Suzuki,Fronx,Compact SUV,Petrol,1.0,2023-04-01,,11.0
+34,Jimny 1.5 Petrol,Maruti Suzuki,Jimny,SUV,Petrol,1.5,2023-06-01,,13.5
+35,Invicto 2.0 Hybrid,Maruti Suzuki,Invicto,MPV,Hybrid,2.0,2023-07-01,,27.0
+36,Eeco 1.2 Petrol,Maruti Suzuki,Eeco,MUV,Petrol,1.2,2015-01-01,,5.5
+37,Victoris 1.5 Petrol,Maruti Suzuki,Victoris,Mid SUV,Petrol,1.5,2025-09-01,,13.5
+38,Victoris 1.5 Hybrid,Maruti Suzuki,Victoris,Mid SUV,Hybrid,1.5,2025-09-01,,17.5
+39,e Vitara,Maruti Suzuki,e Vitara,Mid SUV,Electric,,2026-01-01,,20.0
+40,Eon 0.8 Petrol,Hyundai,Eon,Hatchback,Petrol,0.8,2015-01-01,2019-12-31,3.6
+41,Santro 1.1 Petrol,Hyundai,Santro,Hatchback,Petrol,1.1,2018-10-01,2022-04-30,5.0
+42,Grand i10 1.2 Petrol,Hyundai,Grand i10,Hatchback,Petrol,1.2,2015-01-01,2020-03-31,6.0
+43,Grand i10 1.1 Diesel,Hyundai,Grand i10,Hatchback,Diesel,1.1,2015-01-01,2020-03-31,6.8
+44,Grand i10 Nios 1.2 Petrol,Hyundai,Grand i10 Nios,Hatchback,Petrol,1.2,2019-08-01,,7.0
+45,Grand i10 Nios 1.2 Diesel,Hyundai,Grand i10 Nios,Hatchback,Diesel,1.2,2019-08-01,2023-03-31,7.8
+46,Xcent 1.2 Petrol,Hyundai,Xcent,Compact Sedan,Petrol,1.2,2015-01-01,2020-03-31,6.8
+47,Xcent 1.1 Diesel,Hyundai,Xcent,Compact Sedan,Diesel,1.1,2015-01-01,2020-03-31,7.6
+48,Aura 1.2 Petrol,Hyundai,Aura,Compact Sedan,Petrol,1.2,2020-01-01,,7.2
+49,Aura 1.2 Diesel,Hyundai,Aura,Compact Sedan,Diesel,1.2,2020-01-01,2023-03-31,8.0
+50,i20 1.2 Petrol,Hyundai,i20,Premium Hatchback,Petrol,1.2,2015-01-01,,8.0
+51,i20 1.4 Diesel,Hyundai,i20,Premium Hatchback,Diesel,1.4,2015-01-01,2022-12-31,9.5
+52,i20 1.0 Petrol,Hyundai,i20,Premium Hatchback,Petrol,1.0,2020-11-01,,10.5
+53,Verna 1.5 Petrol,Hyundai,Verna,Sedan,Petrol,1.5,2015-01-01,,13.0
+54,Verna 1.5 Diesel,Hyundai,Verna,Sedan,Diesel,1.5,2015-01-01,2023-02-28,14.0
+55,Elantra 2.0 Petrol,Hyundai,Elantra,Premium Sedan,Petrol,2.0,2015-01-01,2022-12-31,20.0
+56,Elantra 1.5 Diesel,Hyundai,Elantra,Premium Sedan,Diesel,1.5,2015-01-01,2022-12-31,21.0
+57,Creta 1.5 Petrol,Hyundai,Creta,Mid SUV,Petrol,1.5,2015-07-01,,14.5
+58,Creta 1.5 Diesel,Hyundai,Creta,Mid SUV,Diesel,1.5,2015-07-01,,16.0
+59,Creta Electric,Hyundai,Creta,Mid SUV,Electric,,2025-01-01,,21.0
+60,Venue 1.2 Petrol,Hyundai,Venue,Compact SUV,Petrol,1.2,2019-05-01,,8.5
+61,Venue 1.0 Petrol,Hyundai,Venue,Compact SUV,Petrol,1.0,2019-05-01,,11.0
+62,Venue 1.5 Diesel,Hyundai,Venue,Compact SUV,Diesel,1.5,2019-05-01,,11.5
+63,Tucson 2.0 Petrol,Hyundai,Tucson,Premium SUV,Petrol,2.0,2016-11-01,,30.0
+64,Tucson 2.0 Diesel,Hyundai,Tucson,Premium SUV,Diesel,2.0,2016-11-01,,32.0
+65,Alcazar 1.5 Petrol,Hyundai,Alcazar,Mid SUV,Petrol,1.5,2021-06-01,,17.5
+66,Alcazar 1.5 Diesel,Hyundai,Alcazar,Mid SUV,Diesel,1.5,2021-06-01,,19.0
+67,Kona,Hyundai,Kona,Compact SUV,Electric,,2019-07-01,2024-06-30,24.0
+68,Ioniq 5,Hyundai,Ioniq 5,Premium SUV,Electric,,2023-01-01,,46.0
+69,Exter 1.2 Petrol,Hyundai,Exter,Compact SUV,Petrol,1.2,2023-07-01,,7.5
+70,Nano 0.6 Petrol,Tata,Nano,Hatchback,Petrol,0.6,2015-01-01,2018-12-31,2.8
+71,Indica 1.2 Petrol,Tata,Indica,Hatchback,Petrol,1.2,2015-01-01,2018-03-31,4.8
+72,Indica 1.4 Diesel,Tata,Indica,Hatchback,Diesel,1.4,2015-01-01,2018-03-31,5.4
+73,Zest 1.2 Petrol,Tata,Zest,Compact Sedan,Petrol,1.2,2015-01-01,2019-12-31,6.5
+74,Zest 1.3 Diesel,Tata,Zest,Compact Sedan,Diesel,1.3,2015-01-01,2019-12-31,7.2
+75,Bolt 1.2 Petrol,Tata,Bolt,Hatchback,Petrol,1.2,2015-01-01,2019-12-31,5.8
+76,Bolt 1.3 Diesel,Tata,Bolt,Hatchback,Diesel,1.3,2015-01-01,2019-12-31,6.5
+77,Tiago 1.2 Petrol,Tata,Tiago,Hatchback,Petrol,1.2,2016-04-01,,6.0
+78,Tiago 1.0 Diesel,Tata,Tiago,Hatchback,Diesel,1.0,2016-04-01,2020-03-31,6.8
+79,Tiago EV,Tata,Tiago,Hatchback,Electric,,2023-01-01,,10.0
+80,Tigor 1.2 Petrol,Tata,Tigor,Compact Sedan,Petrol,1.2,2017-03-01,,7.2
+81,Tigor 1.0 Diesel,Tata,Tigor,Compact Sedan,Diesel,1.0,2017-03-01,2020-03-31,8.0
+82,Tigor EV,Tata,Tigor,Compact Sedan,Electric,,2019-10-01,,13.0
+83,Hexa 2.2 Diesel,Tata,Hexa,MUV,Diesel,2.2,2017-01-01,2020-03-31,17.5
+84,Safari 2.2 Diesel,Tata,Safari,Mid SUV,Diesel,2.2,2015-01-01,2019-12-31,13.5
+85,Safari 2.0 Diesel,Tata,Safari,Mid SUV,Diesel,2.0,2021-02-01,,20.5
+86,Nexon 1.2 Petrol,Tata,Nexon,Compact SUV,Petrol,1.2,2017-09-01,,9.5
+87,Nexon 1.5 Diesel,Tata,Nexon,Compact SUV,Diesel,1.5,2017-09-01,,11.0
+88,Nexon EV,Tata,Nexon,Compact SUV,Electric,,2020-01-01,,15.5
+89,Altroz 1.2 Petrol,Tata,Altroz,Premium Hatchback,Petrol,1.2,2020-01-01,,7.8
+90,Altroz 1.5 Diesel,Tata,Altroz,Premium Hatchback,Diesel,1.5,2020-01-01,,9.0
+91,Harrier 2.0 Diesel,Tata,Harrier,Mid SUV,Diesel,2.0,2019-01-01,,20.0
+92,Harrier EV,Tata,Harrier,Mid SUV,Electric,,2025-06-01,,25.0
+93,Punch 1.2 Petrol,Tata,Punch,Compact SUV,Petrol,1.2,2021-10-01,,7.5
+94,Punch EV,Tata,Punch,Compact SUV,Electric,,2024-01-01,,12.0
+95,Curvv 1.2 Petrol,Tata,Curvv,Mid SUV,Petrol,1.2,2024-09-01,,13.5
+96,Curvv 1.5 Diesel,Tata,Curvv,Mid SUV,Diesel,1.5,2024-09-01,,15.0
+97,Curvv EV,Tata,Curvv,Mid SUV,Electric,,2024-08-01,,19.0
+98,Sierra 1.5 Petrol,Tata,Sierra,Mid SUV,Petrol,1.5,2025-11-01,,16.0
+99,Sierra 1.5 Diesel,Tata,Sierra,Mid SUV,Diesel,1.5,2025-11-01,,17.5
+100,Bolero 2.5 Diesel,Mahindra,Bolero,SUV,Diesel,2.5,2015-01-01,2020-03-31,9.0
+101,Bolero 1.5 Diesel,Mahindra,Bolero,SUV,Diesel,1.5,2020-04-01,,10.0
+102,TUV300 1.5 Diesel,Mahindra,TUV300,Compact SUV,Diesel,1.5,2015-09-01,2020-03-31,9.5
+103,Bolero Neo 1.5 Diesel,Mahindra,Bolero Neo,Compact SUV,Diesel,1.5,2021-07-01,,10.5
+104,Scorpio 2.2 Diesel,Mahindra,Scorpio,SUV,Diesel,2.2,2015-01-01,,14.5
+105,Scorpio-N 2.2 Diesel,Mahindra,Scorpio-N,SUV,Diesel,2.2,2022-06-01,,17.0
+106,Scorpio-N 2.0 Petrol,Mahindra,Scorpio-N,SUV,Petrol,2.0,2022-06-01,,16.0
+107,XUV500 2.2 Diesel,Mahindra,XUV500,Mid SUV,Diesel,2.2,2015-01-01,2021-12-31,16.0
+108,XUV500 2.2 Petrol,Mahindra,XUV500,Mid SUV,Petrol,2.2,2017-01-01,2020-03-31,16.5
+109,XUV700 2.2 Diesel,Mahindra,XUV700,Mid SUV,Diesel,2.2,2021-10-01,,20.0
+110,XUV700 2.0 Petrol,Mahindra,XUV700,Mid SUV,Petrol,2.0,2021-10-01,,18.5
+111,XUV3XO 1.2 Petrol,Mahindra,XUV3XO,Compact SUV,Petrol,1.2,2019-02-01,,10.0
+112,XUV3XO 1.5 Diesel,Mahindra,XUV3XO,Compact SUV,Diesel,1.5,2019-02-01,,11.5
+113,XUV400,Mahindra,XUV400,Compact SUV,Electric,,2023-01-01,,16.5
+114,Thar 2.5 Diesel,Mahindra,Thar,SUV,Diesel,2.5,2015-01-01,2020-02-29,9.5
+115,Thar 2.2 Diesel,Mahindra,Thar,SUV,Diesel,2.2,2020-10-01,,15.0
+116,Thar 2.0 Petrol,Mahindra,Thar,SUV,Petrol,2.0,2020-10-01,,14.5
+117,Thar Roxx 2.2 Diesel,Mahindra,Thar Roxx,SUV,Diesel,2.2,2024-10-01,,18.0
+118,Thar Roxx 2.0 Petrol,Mahindra,Thar Roxx,SUV,Petrol,2.0,2024-10-01,,17.0
+119,KUV100 1.2 Petrol,Mahindra,KUV100,Compact SUV,Petrol,1.2,2016-01-01,2022-12-31,6.5
+120,KUV100 1.2 Diesel,Mahindra,KUV100,Compact SUV,Diesel,1.2,2016-01-01,2020-03-31,7.2
+121,Marazzo 1.5 Diesel,Mahindra,Marazzo,MPV,Diesel,1.5,2018-09-01,2024-06-30,15.0
+122,Alturas G4 2.2 Diesel,Mahindra,Alturas G4,Premium SUV,Diesel,2.2,2018-11-01,2022-12-31,30.0
+123,Xylo 2.5 Diesel,Mahindra,Xylo,MUV,Diesel,2.5,2015-01-01,2019-12-31,11.0
+124,BE 6,Mahindra,BE 6,Mid SUV,Electric,,2025-03-01,,22.0
+125,XEV 9e,Mahindra,XEV 9e,Premium SUV,Electric,,2025-03-01,,28.0
+126,Etios 1.5 Petrol,Toyota,Etios,Compact Sedan,Petrol,1.5,2015-01-01,2020-03-31,8.0
+127,Etios 1.4 Diesel,Toyota,Etios,Compact Sedan,Diesel,1.4,2015-01-01,2020-03-31,8.8
+128,Etios Liva 1.2 Petrol,Toyota,Etios Liva,Hatchback,Petrol,1.2,2015-01-01,2020-03-31,6.2
+129,Etios Liva 1.4 Diesel,Toyota,Etios Liva,Hatchback,Diesel,1.4,2015-01-01,2020-03-31,7.0
+130,Corolla Altis 1.8 Petrol,Toyota,Corolla Altis,Premium Sedan,Petrol,1.8,2015-01-01,2021-03-31,17.0
+131,Corolla Altis 1.4 Diesel,Toyota,Corolla Altis,Premium Sedan,Diesel,1.4,2015-01-01,2020-03-31,18.0
+132,Camry 2.5 Petrol,Toyota,Camry,Premium Sedan,Petrol,2.5,2015-01-01,2018-12-31,38.0
+133,Camry 2.5 Hybrid,Toyota,Camry,Premium Sedan,Hybrid,2.5,2015-01-01,,46.0
+134,Innova 2.5 Diesel,Toyota,Innova,MUV,Diesel,2.5,2015-01-01,2016-05-31,14.0
+135,Innova Crysta 2.4 Diesel,Toyota,Innova Crysta,MUV,Diesel,2.4,2016-05-01,,21.0
+136,Innova Crysta 2.8 Diesel,Toyota,Innova Crysta,MUV,Diesel,2.8,2016-05-01,2020-03-31,23.0
+137,Innova Crysta 2.7 Petrol,Toyota,Innova Crysta,MUV,Petrol,2.7,2016-05-01,2022-11-30,19.0
+138,Innova Hycross 2.0 Petrol,Toyota,Innova Hycross,MPV,Petrol,2.0,2022-11-01,,20.0
+139,Innova Hycross 2.0 Hybrid,Toyota,Innova Hycross,MPV,Hybrid,2.0,2022-11-01,,26.0
+140,Fortuner 3.0 Diesel,Toyota,Fortuner,Premium SUV,Diesel,3.0,2015-01-01,2016-10-31,40.0
+141,Fortuner 2.8 Diesel,Toyota,Fortuner,Premium SUV,Diesel,2.8,2016-11-01,,44.0
+142,Fortuner 2.7 Petrol,Toyota,Fortuner,Premium SUV,Petrol,2.7,2015-01-01,,38.0
+143,Glanza 1.2 Petrol,Toyota,Glanza,Premium Hatchback,Petrol,1.2,2019-06-01,,8.0
+144,Urban Cruiser 1.5 Petrol,Toyota,Urban Cruiser,Compact SUV,Petrol,1.5,2020-09-01,2022-06-30,10.5
+145,Hyryder 1.5 Petrol,Toyota,Hyryder,Mid SUV,Petrol,1.5,2022-09-01,,14.0
+146,Hyryder 1.5 Hybrid,Toyota,Hyryder,Mid SUV,Hybrid,1.5,2022-09-01,,18.5
+147,Rumion 1.5 Petrol,Toyota,Rumion,MPV,Petrol,1.5,2023-09-01,,11.5
+148,Taisor 1.2 Petrol,Toyota,Taisor,Compact SUV,Petrol,1.2,2024-04-01,,9.0
+149,Taisor 1.0 Petrol,Toyota,Taisor,Compact SUV,Petrol,1.0,2024-04-01,,11.5
+150,Yaris 1.5 Petrol,Toyota,Yaris,Sedan,Petrol,1.5,2018-05-01,2021-09-30,11.0
+151,Vellfire 2.5 Hybrid,Toyota,Vellfire,MPV,Hybrid,2.5,2020-02-01,,120.0
+152,Seltos 1.5 Petrol,Kia,Seltos,Mid SUV,Petrol,1.5,2019-08-01,,14.0
+153,Seltos 1.5 Diesel,Kia,Seltos,Mid SUV,Diesel,1.5,2019-08-01,,15.5
+154,Sonet 1.2 Petrol,Kia,Sonet,Compact SUV,Petrol,1.2,2020-09-01,,9.0
+155,Sonet 1.0 Petrol,Kia,Sonet,Compact SUV,Petrol,1.0,2020-09-01,,11.5
+156,Sonet 1.5 Diesel,Kia,Sonet,Compact SUV,Diesel,1.5,2020-09-01,,11.5
+157,Carnival 2.2 Diesel,Kia,Carnival,MPV,Diesel,2.2,2020-02-01,,30.0
+158,Carens 1.5 Petrol,Kia,Carens,MPV,Petrol,1.5,2022-02-01,,13.5
+159,Carens 1.5 Diesel,Kia,Carens,MPV,Diesel,1.5,2022-02-01,,15.0
+160,Carens EV,Kia,Carens,MPV,Electric,,2025-07-01,,19.0
+161,EV6,Kia,EV6,Premium SUV,Electric,,2022-06-01,,62.0
+162,Syros 1.0 Petrol,Kia,Syros,Compact SUV,Petrol,1.0,2025-02-01,,12.0
+163,Syros 1.5 Diesel,Kia,Syros,Compact SUV,Diesel,1.5,2025-02-01,,13.5
+164,EV9,Kia,EV9,Premium SUV,Electric,,2024-10-01,,130.0
+165,Brio 1.2 Petrol,Honda,Brio,Hatchback,Petrol,1.2,2015-01-01,2019-03-31,5.5
+166,Jazz 1.2 Petrol,Honda,Jazz,Premium Hatchback,Petrol,1.2,2015-07-01,2023-02-28,8.5
+167,Jazz 1.5 Diesel,Honda,Jazz,Premium Hatchback,Diesel,1.5,2015-07-01,2020-03-31,9.5
+168,WR-V 1.2 Petrol,Honda,WR-V,Compact SUV,Petrol,1.2,2017-03-01,2023-02-28,10.0
+169,WR-V 1.5 Diesel,Honda,WR-V,Compact SUV,Diesel,1.5,2017-03-01,2023-02-28,11.0
+170,Amaze 1.2 Petrol,Honda,Amaze,Compact Sedan,Petrol,1.2,2015-01-01,,8.0
+171,Amaze 1.5 Diesel,Honda,Amaze,Compact Sedan,Diesel,1.5,2015-01-01,2023-03-31,9.0
+172,City 1.5 Petrol,Honda,City,Sedan,Petrol,1.5,2015-01-01,,13.5
+173,City 1.5 Diesel,Honda,City,Sedan,Diesel,1.5,2015-01-01,2023-03-31,14.5
+174,City 1.5 Hybrid,Honda,City,Sedan,Hybrid,1.5,2022-05-01,,20.0
+175,BR-V 1.5 Petrol,Honda,BR-V,MPV,Petrol,1.5,2016-05-01,2020-03-31,11.0
+176,BR-V 1.5 Diesel,Honda,BR-V,MPV,Diesel,1.5,2016-05-01,2020-03-31,12.0
+177,Civic 1.8 Petrol,Honda,Civic,Premium Sedan,Petrol,1.8,2019-03-01,2020-12-31,20.0
+178,Civic 1.6 Diesel,Honda,Civic,Premium Sedan,Diesel,1.6,2019-03-01,2020-12-31,22.0
+179,CR-V 2.0 Petrol,Honda,CR-V,Premium SUV,Petrol,2.0,2015-01-01,2020-12-31,30.0
+180,CR-V 1.6 Diesel,Honda,CR-V,Premium SUV,Diesel,1.6,2018-10-01,2020-12-31,32.0
+181,Elevate 1.5 Petrol,Honda,Elevate,Mid SUV,Petrol,1.5,2023-09-01,,14.0
+182,Hector 1.5 Petrol,MG,Hector,Mid SUV,Petrol,1.5,2019-06-01,,17.0
+183,Hector 2.0 Diesel,MG,Hector,Mid SUV,Diesel,2.0,2019-06-01,,19.0
+184,ZS EV,MG,ZS EV,Mid SUV,Electric,,2020-01-01,,23.0
+185,Gloster 2.0 Diesel,MG,Gloster,Premium SUV,Diesel,2.0,2020-10-01,,40.0
+186,Astor 1.5 Petrol,MG,Astor,Mid SUV,Petrol,1.5,2021-10-01,,13.0
+187,Comet EV,MG,Comet EV,Hatchback,Electric,,2023-05-01,,8.0
+188,Windsor EV,MG,Windsor EV,Mid SUV,Electric,,2024-10-01,,14.0
+189,Rapid 1.6 Petrol,Skoda,Rapid,Sedan,Petrol,1.6,2015-01-01,2020-03-31,10.0
+190,Rapid 1.0 Petrol,Skoda,Rapid,Sedan,Petrol,1.0,2020-04-01,2021-12-31,10.5
+191,Rapid 1.5 Diesel,Skoda,Rapid,Sedan,Diesel,1.5,2015-01-01,2020-03-31,11.0
+192,Octavia 2.0 Petrol,Skoda,Octavia,Premium Sedan,Petrol,2.0,2015-01-01,2023-03-31,27.0
+193,Octavia 2.0 Diesel,Skoda,Octavia,Premium Sedan,Diesel,2.0,2015-01-01,2020-03-31,28.0
+194,Superb 2.0 Petrol,Skoda,Superb,Premium Sedan,Petrol,2.0,2015-01-01,,34.0
+195,Superb 2.0 Diesel,Skoda,Superb,Premium Sedan,Diesel,2.0,2015-01-01,2020-03-31,35.0
+196,Kodiaq 2.0 Diesel,Skoda,Kodiaq,Premium SUV,Diesel,2.0,2017-10-01,2020-03-31,34.0
+197,Kodiaq 2.0 Petrol,Skoda,Kodiaq,Premium SUV,Petrol,2.0,2022-01-01,,39.0
+198,Kushaq 1.0 Petrol,Skoda,Kushaq,Mid SUV,Petrol,1.0,2021-07-01,,13.0
+199,Kushaq 1.5 Petrol,Skoda,Kushaq,Mid SUV,Petrol,1.5,2021-07-01,,17.0
+200,Slavia 1.0 Petrol,Skoda,Slavia,Sedan,Petrol,1.0,2022-03-01,,13.0
+201,Slavia 1.5 Petrol,Skoda,Slavia,Sedan,Petrol,1.5,2022-03-01,,17.0
+202,Kylaq 1.0 Petrol,Skoda,Kylaq,Compact SUV,Petrol,1.0,2025-01-01,,10.5
+203,Polo 1.2 Petrol,Volkswagen,Polo,Premium Hatchback,Petrol,1.2,2015-01-01,2020-03-31,7.5
+204,Polo 1.0 Petrol,Volkswagen,Polo,Premium Hatchback,Petrol,1.0,2019-01-01,2022-06-30,8.0
+205,Polo 1.5 Diesel,Volkswagen,Polo,Premium Hatchback,Diesel,1.5,2015-01-01,2020-03-31,8.5
+206,Vento 1.6 Petrol,Volkswagen,Vento,Sedan,Petrol,1.6,2015-01-01,2020-03-31,11.0
+207,Vento 1.0 Petrol,Volkswagen,Vento,Sedan,Petrol,1.0,2020-04-01,2022-03-31,11.5
+208,Vento 1.5 Diesel,Volkswagen,Vento,Sedan,Diesel,1.5,2015-01-01,2020-03-31,12.0
+209,Ameo 1.2 Petrol,Volkswagen,Ameo,Compact Sedan,Petrol,1.2,2016-06-01,2020-03-31,7.5
+210,Ameo 1.5 Diesel,Volkswagen,Ameo,Compact Sedan,Diesel,1.5,2016-06-01,2020-03-31,8.3
+211,Tiguan 2.0 Diesel,Volkswagen,Tiguan,Premium SUV,Diesel,2.0,2017-05-01,2020-03-31,30.0
+212,Tiguan 2.0 Petrol,Volkswagen,Tiguan,Premium SUV,Petrol,2.0,2020-03-01,,35.0
+213,Taigun 1.0 Petrol,Volkswagen,Taigun,Mid SUV,Petrol,1.0,2021-09-01,,13.0
+214,Taigun 1.5 Petrol,Volkswagen,Taigun,Mid SUV,Petrol,1.5,2021-09-01,,17.0
+215,Virtus 1.0 Petrol,Volkswagen,Virtus,Sedan,Petrol,1.0,2022-06-01,,13.0
+216,Virtus 1.5 Petrol,Volkswagen,Virtus,Sedan,Petrol,1.5,2022-06-01,,17.0
+217,Kwid 0.8 Petrol,Renault,Kwid,Hatchback,Petrol,0.8,2015-09-01,,4.5
+218,Kwid 1.0 Petrol,Renault,Kwid,Hatchback,Petrol,1.0,2016-08-01,,5.0
+219,Duster 1.5 Petrol,Renault,Duster,Mid SUV,Petrol,1.5,2015-01-01,2022-03-31,11.0
+220,Duster 1.5 Diesel,Renault,Duster,Mid SUV,Diesel,1.5,2015-01-01,2020-03-31,12.0
+221,Lodgy 1.5 Diesel,Renault,Lodgy,MPV,Diesel,1.5,2015-01-01,2020-03-31,10.0
+222,Captur 1.5 Petrol,Renault,Captur,Mid SUV,Petrol,1.5,2017-11-01,2020-06-30,12.0
+223,Captur 1.5 Diesel,Renault,Captur,Mid SUV,Diesel,1.5,2017-11-01,2020-03-31,13.0
+224,Triber 1.0 Petrol,Renault,Triber,MPV,Petrol,1.0,2019-08-01,,7.0
+225,Kiger 1.0 Petrol,Renault,Kiger,Compact SUV,Petrol,1.0,2021-02-01,,8.0
+226,Micra 1.2 Petrol,Nissan,Micra,Hatchback,Petrol,1.2,2015-01-01,2020-03-31,6.5
+227,Micra 1.5 Diesel,Nissan,Micra,Hatchback,Diesel,1.5,2015-01-01,2020-03-31,7.3
+228,Sunny 1.5 Petrol,Nissan,Sunny,Sedan,Petrol,1.5,2015-01-01,2020-03-31,9.5
+229,Sunny 1.5 Diesel,Nissan,Sunny,Sedan,Diesel,1.5,2015-01-01,2020-03-31,10.5
+230,Terrano 1.5 Diesel,Nissan,Terrano,Mid SUV,Diesel,1.5,2015-01-01,2020-03-31,12.0
+231,Terrano 1.6 Petrol,Nissan,Terrano,Mid SUV,Petrol,1.6,2015-01-01,2020-03-31,11.0
+232,Kicks 1.5 Petrol,Nissan,Kicks,Mid SUV,Petrol,1.5,2019-01-01,2023-06-30,12.5
+233,Kicks 1.5 Diesel,Nissan,Kicks,Mid SUV,Diesel,1.5,2019-01-01,2020-03-31,13.5
+234,Magnite 1.0 Petrol,Nissan,Magnite,Compact SUV,Petrol,1.0,2020-12-01,,8.0
+235,X-Trail 1.5 Petrol,Nissan,X-Trail,Premium SUV,Petrol,1.5,2024-08-01,,50.0
+236,Wrangler 2.0 Petrol,Jeep,Wrangler,Premium SUV,Petrol,2.0,2016-08-01,,62.0
+237,Grand Cherokee 3.6 Petrol,Jeep,Grand Cherokee,Premium SUV,Petrol,3.6,2016-08-01,2020-12-31,75.0
+238,Grand Cherokee 2.0 Petrol,Jeep,Grand Cherokee,Premium SUV,Petrol,2.0,2022-11-01,,80.0
+239,Compass 2.0 Diesel,Jeep,Compass,Premium SUV,Diesel,2.0,2017-07-01,,25.0
+240,Compass 1.4 Petrol,Jeep,Compass,Premium SUV,Petrol,1.4,2017-07-01,2023-03-31,21.0
+241,Meridian 2.0 Diesel,Jeep,Meridian,Premium SUV,Diesel,2.0,2022-05-01,,33.0
+242,C5 Aircross 2.0 Diesel,Citroen,C5 Aircross,Premium SUV,Diesel,2.0,2021-04-01,,37.0
+243,C3 1.2 Petrol,Citroen,C3,Hatchback,Petrol,1.2,2022-07-01,,7.0
+244,eC3,Citroen,C3,Hatchback,Electric,,2023-02-01,,12.5
+245,C3 Aircross 1.2 Petrol,Citroen,C3 Aircross,Mid SUV,Petrol,1.2,2023-10-01,,12.0
+246,Basalt 1.2 Petrol,Citroen,Basalt,Mid SUV,Petrol,1.2,2024-08-01,,11.0
+247,e6,BYD,e6,MPV,Electric,,2021-11-01,2024-09-30,30.0
+248,eMAX 7,BYD,eMAX 7,MPV,Electric,,2024-10-01,,27.0
+249,Atto 3,BYD,Atto 3,Mid SUV,Electric,,2022-10-01,,34.0
+250,Seal,BYD,Seal,Premium Sedan,Electric,,2024-03-01,,45.0
+251,Sealion 7,BYD,Sealion 7,Premium SUV,Electric,,2025-02-01,,49.0
