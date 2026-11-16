@@ -1,18 +1,17 @@
-Debug AskMe: with “Use knowledge documents” ON, this question gets no answer:
-“How do I escalate a delayed delivery?”
+import os
+from dotenv import load_dotenv
+from google.adk.agents import Agent
+from google.adk.models.lite_llm import LiteLlm
 
-Trace and fix the actual failure:
-1. Frontend sends useDocuments:true; both API endpoints forward it.
-2. API loads RAG enabled + Chroma from the correct environment.
-3. Demo policy was uploaded, is active INDEXED, and matches the user's industry/ACL.
-4. Ingestion and retrieval use the same Chroma path, namespace and embedding model.
-5. Authorized chunks reach generation; response events render correctly.
-6. Check whether a required SQL connection blocks document-only requests.
+load_dotenv()
 
-Reference:
-docs/RAG_IMPLEMENTATION_CHECKPOINT.md
-docs/rag-demo/01_DEMO_AUTOMOTIVE_DELIVERY_POLICY.md
-
-Report the root cause, apply the minimal fix and run a regression test.
-Do not expose secrets, bypass permissions, call live providers or run migrations
-without approval. Do not fabricate a successful answer.
+root_agent = Agent(
+    name="root_agent",
+    description="Assistant using Capgemini Generative Engine",
+    model=LiteLlm(
+        model="openai/google.gemma-3-27b-it",   # "openai/" prefix = OpenAI-compatible API
+        api_base="https://openai.generative.engine.capgemini.com/v1",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    ),
+    instruction="You are a helpful assistant. Answer user questions clearly and concisely.",
+)
