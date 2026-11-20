@@ -43,7 +43,7 @@ export function HomeWorkspace() {
   const pack = industries.data?.industries.find(item => item.id === industry);
   const activeName = industry === "automotive" ? "Automotive" : "Insurance";
   const databaseState = industries.isPending ? "Checking…" : industries.isError || !pack ? "Unavailable" : pack.databaseAvailable ? "Connected" : "Disconnected";
-  const apiState = readiness.isPending ? "Checking…" : readiness.isError ? "Unavailable" : readiness.data?.status === "ready" ? "Ready" : readiness.data?.status === "degraded" ? "Degraded" : "Not ready";
+  const apiState = readiness.isPending ? "Checking…" : readiness.isError ? "Unavailable" : readiness.data?.status === "ready" ? "Ready" : readiness.data?.status === "degraded" ? "active" : "Not ready";
   const refreshing = industries.isFetching || readiness.isFetching;
   const checkedAt = !readiness.isError && readiness.data?.checkedAt ? new Date(readiness.data.checkedAt) : null;
   const checked = checkedAt && Number.isFinite(checkedAt.valueOf()) ? checkedAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null;

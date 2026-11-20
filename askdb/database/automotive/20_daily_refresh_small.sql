@@ -11,6 +11,7 @@
 -- or open it in pgAdmin's Query Tool and execute.
 -- Then open Data Trust and press "Run checks".
 
+
 BEGIN;
 
 WITH anchor AS (
