@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RDD vs DataFrame vs Dataset in Spark</title>
+<style>
+:root{--bg:#EBEFF4;--surface:#FFFFFF;--ink:#172033;--muted:#566176;--rule:#D2DAE5;--accent:#2B47D1;--accent-soft:#E4E9FB;--mark:#FFD84D;
+--rdd:#B25E00;--df:#2B47D1;--ds:#0C8A74;--rdd-soft:#FBEBD6;--df-soft:#E4E9FB;--ds-soft:#D9F2EC;
+--code-bg:#131B2A;--code-ink:#DCE3F0;--c-com:#7D8BA6;--c-str:#8FDDB2;--c-num:#FFC27A;--c-kw:#93A9FF;--c-fn:#80D6F6;--out-bg:#EEF2F7}
+:root[data-theme="dark"]{--bg:#0D131F;--surface:#141C2B;--ink:#E5EAF3;--muted:#9AA6BC;--rule:#26314A;--accent:#8BA3FF;--accent-soft:#1C2742;--mark:#E8BE2F;
+--rdd:#F0A95A;--df:#8BA3FF;--ds:#4FD1B5;--rdd-soft:#3A2A14;--df-soft:#1C2742;--ds-soft:#123530;--code-bg:#0A0F19;--out-bg:#0F1624}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0D131F;--surface:#141C2B;--ink:#E5EAF3;--muted:#9AA6BC;--rule:#26314A;--accent:#8BA3FF;--accent-soft:#1C2742;--mark:#E8BE2F;
+--rdd:#F0A95A;--df:#8BA3FF;--ds:#4FD1B5;--rdd-soft:#3A2A14;--df-soft:#1C2742;--ds-soft:#123530;--code-bg:#0A0F19;--out-bg:#0F1624}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+code{font:0.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--accent-soft);padding:1px 5px;border-radius:3px}
+.topbar{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--rule);display:flex;gap:6px;align-items:center;padding:8px clamp(14px,3vw,40px);overflow-x:auto;white-space:nowrap}
+.topbar a{color:var(--ink);text-decoration:none;font-size:14px;padding:5px 10px;border-radius:4px}
+.topbar a:hover{background:var(--accent-soft)}
+.topbar .sp{flex:1}
+#theme{border:1px solid var(--rule);background:var(--bg);color:var(--ink);border-radius:4px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer}
+main{max-width:1060px;margin:0 auto;padding:36px clamp(16px,4vw,40px) 90px}
+h1,h2{font-family:Georgia,"Iowan Old Style","Palatino Linotype",serif;letter-spacing:-.01em}
+h1{font-size:clamp(30px,4.6vw,46px);line-height:1.12;margin:0 0 12px}
+h2{font-size:28px;line-height:1.2;margin:0 0 6px}
+h3{font-size:18px;margin:0 0 6px}
+.lede{font-size:18px;color:var(--muted);max-width:64ch;margin:0 0 26px}
+section{margin-top:58px}
+.sub{color:var(--muted);max-width:68ch;margin:0 0 20px}
+.sechead{border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:20px}
+
+/* three at a glance */
+.glance{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border:1px solid var(--rule);background:var(--surface)}
+.glance>div{padding:18px 20px;border-top:6px solid}
+.glance>div+div{border-left:1px solid var(--rule)}
+.glance>.g-rdd{border-top-color:var(--rdd)}.glance>.g-df{border-top-color:var(--df)}.glance>.g-ds{border-top-color:var(--ds)}
+.glance h3{font-family:Georgia,serif;font-size:22px;margin:0}
+.glance .tag{font-size:13.5px;color:var(--muted);margin:0 0 10px}
+.glance p{margin:0 0 8px;font-size:15px}
+.glance .verdict{font-weight:600}
+
+/* layer diagram */
+.stack{display:grid;gap:6px;max-width:760px;margin:6px 0 0}
+.stack div{padding:12px 16px;border:1px solid var(--rule);background:var(--surface);font-size:15px}
+.stack .top{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0;border:0;background:none}
+.stack .top div{border-top:5px solid}
+.stack .top .a{border-top-color:var(--df);background:var(--df-soft)}
+.stack .top .b{border-top-color:var(--ds);background:var(--ds-soft)}
+.stack .engine{background:var(--accent-soft)}
+.stack .bot{border-top:5px solid var(--rdd);background:var(--rdd-soft)}
+.stack b{display:block}
+.stack small{color:var(--muted);font-size:13.5px}
+
+/* timeline */
+.timeline{list-style:none;margin:14px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:3px solid var(--ink)}
+.timeline li{padding:18px 14px 0 0;position:relative}
+.timeline li::before{content:"";position:absolute;top:-9px;left:0;width:15px;height:15px;border-radius:50%;background:var(--accent);border:3px solid var(--bg)}
+.timeline .y{font:700 15px Georgia,serif;display:block;margin-top:6px}
+.timeline .v{font-size:13.5px;color:var(--muted);display:block}
+.timeline p{margin:4px 0 0;font-size:14.5px}
+
+/* table */
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);background:var(--surface)}
+table.cmp{border-collapse:collapse;width:100%;min-width:820px;font-size:14.5px}
+.cmp th,.cmp td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--rule)}
+.cmp thead th{background:var(--surface);border-bottom:4px solid;font-family:Georgia,serif;font-size:17px;z-index:2}
+.cmp thead th:first-child{border-bottom-color:var(--ink)}
+.cmp .c-rdd{border-bottom-color:var(--rdd)}.cmp .c-df{border-bottom-color:var(--df)}.cmp .c-ds{border-bottom-color:var(--ds)}
+.cmp tbody th{width:17%;font-weight:600;background:var(--bg)}
+.cmp td{width:27.6%}
+.cmp tbody tr:hover td{background:var(--accent-soft)}
+
+/* code */
+.code{position:relative;margin:0}
+.code pre{margin:0;background:var(--code-bg);color:var(--code-ink);padding:14px 16px;overflow-x:auto;font:13.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border-radius:4px}
+.code pre code{background:none;padding:0;border-radius:0;font:inherit;color:inherit}
+.code .lang{position:absolute;top:8px;right:70px;color:#8794AE;font-size:12px}
+.copy{position:absolute;top:7px;right:8px;background:rgba(255,255,255,.1);color:#DCE3F0;border:1px solid rgba(255,255,255,.22);border-radius:4px;font:12px system-ui;padding:3px 9px;cursor:pointer}
+.copy:hover{background:rgba(255,255,255,.2)}
+.t-com{color:var(--c-com);font-style:italic}.t-str{color:var(--c-str)}.t-num{color:var(--c-num)}.t-kw{color:var(--c-kw)}.t-fn{color:var(--c-fn)}
+.out{margin:6px 0 0;background:var(--out-bg);border:1px solid var(--rule);padding:9px 12px;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:auto;white-space:pre;border-radius:4px}
+.out-l{font-size:13px;color:var(--muted);margin:10px 0 0}
+.three{display:grid;grid-template-columns:minmax(0,1fr);gap:30px}
+.three>div{min-width:0}
+.three h3{border-top:5px solid;padding-top:8px}
+.three .r h3{border-color:var(--rdd)}.three .d h3{border-color:var(--df)}.three .s h3{border-color:var(--ds)}
+.three p.n{font-size:14px;color:var(--muted);margin:0 0 8px}
+
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.two>div{min-width:0}
+.note{border-left:4px solid var(--mark);padding:2px 0 2px 14px;margin:18px 0;max-width:72ch}
+
+/* error timing table */
+table.err{border-collapse:collapse;width:100%;font-size:14.5px;background:var(--surface);border:1px solid var(--rule)}
+.err th,.err td{padding:10px 14px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}
+.err thead th{border-bottom:2px solid var(--ink)}
+.bad{color:#B3261E;font-weight:600}.ok{color:#0C7A3E;font-weight:600}.mid{color:#8A6100;font-weight:600}
+:root[data-theme="dark"] .bad{color:#FF8A80}:root[data-theme="dark"] .ok{color:#6EE0A0}:root[data-theme="dark"] .mid{color:#F5CD62}
+
+/* pick list */
+.pick{display:grid;gap:0;border:1px solid var(--rule);background:var(--surface)}
+.pick>div{display:grid;grid-template-columns:190px 1fr;gap:16px;padding:14px 18px;border-top:1px solid var(--rule);align-items:start}
+.pick>div:first-child{border-top:0}
+.pick b{font-family:Georgia,serif;font-size:18px;border-left:5px solid;padding-left:10px}
+.pick .r b{border-color:var(--rdd)}.pick .d b{border-color:var(--df)}.pick .s b{border-color:var(--ds)}
+.pick ul{margin:0;padding-left:18px}
+
+/* steps */
+ol.steps{margin:0 0 18px;padding-left:22px;max-width:74ch}
+ol.steps li{margin-bottom:6px}
+
+details{background:var(--surface);border:1px solid var(--rule);margin-bottom:8px}
+summary{cursor:pointer;padding:12px 16px;font-weight:600}
+details p{margin:0;padding:0 16px 14px;max-width:74ch;color:var(--muted)}
+details[open] summary{border-bottom:1px solid var(--rule);margin-bottom:10px}
+footer{margin-top:60px;color:var(--muted);font-size:14px}
+
+@media (max-width:900px){
+.glance,.three,.two{grid-template-columns:minmax(0,1fr)}
+.glance>div+div{border-left:0;border-top:1px solid var(--rule)}
+.timeline{grid-template-columns:minmax(0,1fr);border-top:0;border-left:3px solid var(--ink);padding-left:18px}.timeline li{padding:0 0 16px}.timeline li::before{top:2px;left:-27px}
+.pick>div{grid-template-columns:1fr;gap:6px}
+}
+</style>
+</head>
+<body>
+<nav class="topbar" aria-label="Page sections">
+<a href="#glance">At a glance</a><a href="#how">How they relate</a><a href="#table">Full comparison</a><a href="#code">Same task, three ways</a><a href="#errors">Errors</a><a href="#engine">Why DataFrame is faster</a><a href="#convert">Converting</a><a href="#pick">Which to use</a><a href="#qa">Interview Q&amp;A</a>
+<span class="sp"></span><button id="theme" type="button">Dark mode</button>
+</nav>
+<main>
+<h1>RDD vs DataFrame vs Dataset</h1>
+<p class="lede">Three ways Spark represents distributed data. They differ in how much Spark knows about your data, and that decides how much Spark can optimise for you.</p>
+
+<section id="glance" style="margin-top:0">
+<div class="glance">
+<div class="g-rdd"><h3>RDD</h3><p class="tag">Resilient Distributed Dataset, Spark 1.0</p>
+<p>A distributed list of objects. Spark does not know what is inside, so it runs your lambdas exactly as written.</p>
+<p class="verdict">Maximum control, minimum help.</p></div>
+<div class="g-df"><h3>DataFrame</h3><p class="tag">Named columns, Spark 1.3</p>
+<p>A distributed table with a schema. Spark sees columns and types, so Catalyst and Tungsten can optimise the work.</p>
+<p class="verdict">The default choice, and the only structured API in PySpark.</p></div>
+<div class="g-ds"><h3>Dataset</h3><p class="tag">Typed objects, Spark 1.6</p>
+<p>A DataFrame whose rows are typed objects, such as Employee. Same optimizer, plus compile-time type checks.</p>
+<p class="verdict">Scala and Java only.</p></div>
+</div>
+</section>
+
+<section id="how">
+<div class="sechead"><h2>How they relate</h2></div>
+<p class="sub">They are not three separate engines. DataFrames and Datasets are built on RDDs, and since Spark 2.0 a DataFrame is just a Dataset of generic Row objects.</p>
+<div class="stack" aria-label="Layer diagram">
+<div class="top"><div class="a"><b>DataFrame</b><small>Dataset[Row], Python, Scala, Java, R</small></div><div class="b"><b>Dataset[T]</b><small>typed, Scala and Java only</small></div></div>
+<div class="engine"><b>Catalyst optimizer + Tungsten execution</b><small>query planning, code generation, binary row format</small></div>
+<div class="bot"><b>RDD</b><small>the base layer everything finally runs as</small></div>
+</div>
+<h3 style="margin-top:34px">How the API grew</h3>
+<ol class="timeline">
+<li><span class="y">May 2014</span><span class="v">Spark 1.0</span><p>RDD is the only API.</p></li>
+<li><span class="y">March 2015</span><span class="v">Spark 1.3</span><p>DataFrame adds schemas and Catalyst.</p></li>
+<li><span class="y">January 2016</span><span class="v">Spark 1.6</span><p>Dataset adds type safety in Scala and Java.</p></li>
+<li><span class="y">July 2016</span><span class="v">Spark 2.0</span><p>APIs unified: DataFrame = Dataset[Row].</p></li>
+</ol>
+</section>
+
+<section id="table">
+<div class="sechead"><h2>Detailed comparison</h2></div>
+<p class="sub">Scroll sideways on a small screen.</p>
+<div class="tablewrap"><table class="cmp"><thead><tr><th scope="col">Feature</th><th scope="col" class="c-rdd">RDD</th><th scope="col" class="c-df">DataFrame</th><th scope="col" class="c-ds">Dataset</th></tr></thead><tbody>
+<tr><th scope="row">Full name</th><td data-l="RDD">Resilient Distributed Dataset</td><td data-l="DataFrame">Dataset organised into named columns (in Scala it is <code>Dataset[Row]</code>)</td><td data-l="Dataset">Strongly typed <code>Dataset[T]</code>, for example <code>Dataset[Employee]</code></td></tr>
+<tr><th scope="row">Introduced in</th><td data-l="RDD">Spark 1.0 (2014)</td><td data-l="DataFrame">Spark 1.3 (2015)</td><td data-l="Dataset">Spark 1.6 (2016); API merged with DataFrame in Spark 2.0</td></tr>
+<tr><th scope="row">Level</th><td data-l="RDD">Low-level: a distributed collection of plain objects</td><td data-l="DataFrame">High-level: a distributed table with columns</td><td data-l="Dataset">High-level: a distributed table of typed objects</td></tr>
+<tr><th scope="row">Schema</th><td data-l="RDD">None. Spark sees opaque objects and cannot look inside them</td><td data-l="DataFrame">Yes. Column names and data types are known</td><td data-l="Dataset">Yes. Taken from the case class or Java bean</td></tr>
+<tr><th scope="row">Languages</th><td data-l="RDD">Python, Scala, Java</td><td data-l="DataFrame">Python, Scala, Java, R</td><td data-l="Dataset"><strong>Scala and Java only</strong> (no Python)</td></tr>
+<tr><th scope="row">Query optimizer</th><td data-l="RDD">None. You must write the efficient version yourself</td><td data-l="DataFrame">Catalyst optimizer</td><td data-l="Dataset">Catalyst optimizer</td></tr>
+<tr><th scope="row">Memory and serialization</th><td data-l="RDD">Java, Kryo or pickle serialization of whole objects; heavy garbage collection</td><td data-l="DataFrame">Tungsten binary format, compact, can live off-heap, little GC</td><td data-l="Dataset">Tungsten binary format through Encoders; single fields can be read without rebuilding the whole object</td></tr>
+<tr><th scope="row">Type safety</th><td data-l="RDD">Compile-time in Scala and Java; none in Python</td><td data-l="DataFrame">No compile-time check of column names or types</td><td data-l="Dataset">Full compile-time type safety</td></tr>
+<tr><th scope="row">Style of code</th><td data-l="RDD">Functional: <code>map</code>, <code>filter</code>, <code>reduceByKey</code> with lambdas</td><td data-l="DataFrame">Declarative: <code>select</code>, <code>filter</code>, <code>groupBy</code>, or plain SQL</td><td data-l="Dataset">Both: typed lambdas and column expressions</td></tr>
+<tr><th scope="row">SQL support</th><td data-l="RDD">No</td><td data-l="DataFrame">Yes: temp views, <code>spark.sql()</code>, <code>%sql</code></td><td data-l="Dataset">Yes</td></tr>
+<tr><th scope="row">Speed (general)</th><td data-l="RDD">Slowest. In PySpark every row is pickled between the JVM and Python worker processes</td><td data-l="DataFrame">Fastest for most work. In PySpark the plan runs inside the JVM, so it is close to Scala speed (unless you use Python UDFs)</td><td data-l="Dataset">Same engine as DataFrame; typed lambdas can be slower than column expressions because Spark must rebuild the objects</td></tr>
+<tr><th scope="row">Reading files</th><td data-l="RDD"><code>sc.textFile()</code> then parse each line yourself</td><td data-l="DataFrame">Built-in readers: CSV, JSON, Parquet, Delta, JDBC and more</td><td data-l="Dataset">Same readers, then <code>.as[T]</code></td></tr>
+<tr><th scope="row">Partition control</th><td data-l="RDD">Full control: custom partitioner, <code>mapPartitions</code></td><td data-l="DataFrame"><code>repartition(n, col)</code>, <code>coalesce(n)</code></td><td data-l="Dataset">Same as DataFrame</td></tr>
+<tr><th scope="row">Aggregations</th><td data-l="RDD">Manual: <code>reduceByKey</code>, <code>aggregateByKey</code></td><td data-l="DataFrame">Short: <code>groupBy().agg()</code></td><td data-l="Dataset"><code>agg()</code> or <code>groupByKey().mapGroups()</code></td></tr>
+<tr><th scope="row">Best for unstructured data</th><td data-l="RDD">Yes</td><td data-l="DataFrame">Possible, but you lose most benefits</td><td data-l="Dataset">Not really</td></tr>
+<tr><th scope="row">Lazy evaluation and immutability</th><td data-l="RDD">Yes, both</td><td data-l="DataFrame">Yes, both</td><td data-l="Dataset">Yes, both</td></tr>
+<tr><th scope="row">Fault tolerance</th><td data-l="RDD">Rebuilds lost partitions from the lineage graph</td><td data-l="DataFrame">Same, because it is built on RDDs</td><td data-l="Dataset">Same</td></tr>
+<tr><th scope="row">Use in PySpark / Databricks</th><td data-l="RDD">Via <code>spark.sparkContext</code>. Not supported on some compute types such as serverless, so check your cluster</td><td data-l="DataFrame"><strong>The main API. This is what you use.</strong></td><td data-l="Dataset">Not available. In Python the DataFrame is the structured API</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="code">
+<div class="sechead"><h2>The same task, three ways</h2></div>
+<p class="sub">Task: keep employees earning more than 50000 and add up their salary per state. The two Python examples were run on a local Spark session and the output shown is real. The Scala example is for reference.</p>
+<div class="three">
+<div class="r"><h3>RDD (PySpark)</h3><p class="n">Lambdas on tuples, indexes like x[2].</p><div class="code"><span class="lang">python</span><button class="copy" type="button">Copy</button><pre><code>data = [(<span class="t-num">1001</span>, <span class="t-str">&quot;John Smith&quot;</span>, <span class="t-num">50000</span>, <span class="t-str">&quot;CA&quot;</span>),
+        (<span class="t-num">1002</span>, <span class="t-str">&quot;Maria Garcia&quot;</span>, <span class="t-num">72000</span>, <span class="t-str">&quot;NY&quot;</span>),
+        (<span class="t-num">1003</span>, <span class="t-str">&quot;Ravi Patel&quot;</span>, <span class="t-num">65000</span>, <span class="t-str">&quot;TX&quot;</span>),
+        (<span class="t-num">1004</span>, <span class="t-str">&quot;Emily Chen&quot;</span>, <span class="t-num">48000</span>, <span class="t-str">&quot;CA&quot;</span>)]
+
+sc = spark.sparkContext
+rdd = sc.<span class="t-fn">parallelize</span>(data)
+
+<span class="t-com"># x is a plain tuple: Spark does not know what x[2] means</span>
+result = (rdd.<span class="t-fn">filter</span>(<span class="t-kw">lambda</span> x: x[<span class="t-num">2</span>] &gt; <span class="t-num">50000</span>)
+             .<span class="t-fn">map</span>(<span class="t-kw">lambda</span> x: (x[<span class="t-num">3</span>], x[<span class="t-num">2</span>]))
+             .<span class="t-fn">reduceByKey</span>(<span class="t-kw">lambda</span> a, b: a + b))
+
+<span class="t-fn">print</span>(result.<span class="t-fn">collect</span>())</code></pre></div><p class="out-l">Output</p><pre class="out">[(&#x27;NY&#x27;, 72000), (&#x27;TX&#x27;, 65000)]</pre></div>
+<div class="d"><h3>DataFrame (PySpark)</h3><p class="n">Named columns and built-in functions.</p><div class="code"><span class="lang">python</span><button class="copy" type="button">Copy</button><pre><code><span class="t-kw">from</span> pyspark.sql.functions <span class="t-kw">import</span> col
+
+cols = [<span class="t-str">&quot;employee_id&quot;</span>, <span class="t-str">&quot;employee_name&quot;</span>, <span class="t-str">&quot;salary&quot;</span>, <span class="t-str">&quot;state&quot;</span>]
+df = spark.<span class="t-fn">createDataFrame</span>(data, cols)
+
+<span class="t-com"># Spark knows &quot;salary&quot; and &quot;state&quot; are columns, so it can optimise the plan</span>
+result = (df.<span class="t-fn">filter</span>(<span class="t-fn">col</span>(<span class="t-str">&quot;salary&quot;</span>) &gt; <span class="t-num">50000</span>)
+            .<span class="t-fn">groupBy</span>(<span class="t-str">&quot;state&quot;</span>)
+            .<span class="t-fn">sum</span>(<span class="t-str">&quot;salary&quot;</span>))
+
+result.<span class="t-fn">show</span>()</code></pre></div><p class="out-l">Output</p><pre class="out">+-----+-----------+
+|state|sum(salary)|
++-----+-----------+
+|   NY|      72000|
+|   TX|      65000|
++-----+-----------+</pre></div>
+<div class="s"><h3>Dataset (Scala)</h3><p class="n">Typed objects, fields checked by the compiler.</p><div class="code"><span class="lang">scala</span><button class="copy" type="button">Copy</button><pre><code><span class="t-com">// Scala only</span>
+<span class="t-kw">case</span> <span class="t-kw">class</span> <span class="t-fn">Emp</span>(employee_id: Int, employee_name: String, salary: Int, state: String)
+<span class="t-kw">import</span> spark.implicits._
+
+<span class="t-kw">val</span> ds = spark.read.<span class="t-fn">option</span>(<span class="t-str">&quot;header&quot;</span>, <span class="t-str">&quot;true&quot;</span>).<span class="t-fn">option</span>(<span class="t-str">&quot;inferSchema&quot;</span>, <span class="t-str">&quot;true&quot;</span>)
+              .<span class="t-fn">csv</span>(<span class="t-str">&quot;/FileStore/tables/OfficeDataProject-13.csv&quot;</span>)
+              .<span class="t-kw">as</span>[Emp]                      <span class="t-com">// DataFrame -&gt; typed Dataset</span>
+
+<span class="t-kw">val</span> result = ds.<span class="t-fn">filter</span>(e =&gt; e.salary &gt; <span class="t-num">50000</span>)      <span class="t-com">// typed lambda</span>
+               .<span class="t-fn">groupByKey</span>(e =&gt; e.state)
+               .<span class="t-fn">mapGroups</span>((state, rows) =&gt; (state, rows.<span class="t-fn">map</span>(_.salary).sum))
+result.<span class="t-fn">show</span>()
+
+<span class="t-com">// ds.filter(e =&gt; e.salry &gt; 50000)          // does NOT compile: salry is not a field of Emp</span></code></pre></div></div>
+</div>
+<p class="note">All three give the same answer. The DataFrame version is shortest and lets Spark optimise it; the RDD version says <em>how</em> to compute, while the DataFrame version says <em>what</em> you want.</p>
+</section>
+
+<section id="errors">
+<div class="sechead"><h2>When do mistakes show up?</h2></div>
+<p class="sub">Type safety changes how early Spark can tell you something is wrong.</p>
+<div class="tablewrap"><table class="err"><thead><tr><th>Mistake</th><th>RDD</th><th>DataFrame</th><th>Dataset (Scala)</th></tr></thead><tbody>
+<tr><th scope="row">Typo in a method name, such as <code>.fliter()</code></th><td class="ok">Compile time (Scala). In Python, when the line runs</td><td class="ok">Compile time (Scala). In Python, when the line runs</td><td class="ok">Compile time</td></tr>
+<tr><th scope="row">Wrong column or field name, such as <code>salry</code></th><td class="bad">No columns exist; shows up as a runtime failure inside a task</td><td class="mid">Run time, but at once when the line runs, before any data is processed</td><td class="ok">Compile time</td></tr>
+<tr><th scope="row">Wrong data type, such as adding a string to a number</th><td class="bad">Runtime failure inside a task</td><td class="mid">Analysis error at run time, or silent null/cast</td><td class="ok">Compile time</td></tr>
+</tbody></table></div>
+<div style="margin-top:18px"><div class="code"><span class="lang">python</span><button class="copy" type="button">Copy</button><pre><code><span class="t-com"># Wrong column name (typo)</span>
+df.<span class="t-fn">select</span>(<span class="t-str">&quot;salry&quot;</span>).<span class="t-fn">show</span>()</code></pre></div><p class="out-l">Real output from the DataFrame example above</p><pre class="out">AnalysisException: [UNRESOLVED_COLUMN.WITH_SUGGESTION] A column ... with name `salry`
+cannot be resolved. Did you mean one of the following?
+[`salary`, `state`, `employee_id`, `employee_name`]</pre></div>
+</section>
+
+<section id="engine">
+<div class="sechead"><h2>Why DataFrame and Dataset are faster</h2></div>
+<p class="sub">Because Spark knows the schema, every query goes through the Catalyst optimizer before it runs. An RDD lambda is a black box, so none of this can happen.</p>
+<ol class="steps">
+<li><strong>Analysis.</strong> Column names and types are resolved against the schema.</li>
+<li><strong>Logical optimization.</strong> Filters are pushed down, unused columns are dropped, constants are folded.</li>
+<li><strong>Physical planning.</strong> Spark picks the cheapest strategy, for example which join to use.</li>
+<li><strong>Code generation.</strong> Tungsten generates compact Java code that works on its binary row format.</li>
+</ol>
+<p class="sub">Real <code>result.explain(True)</code> output for the DataFrame example, trimmed to the interesting part. The optimizer rewrote the plan by itself:</p>
+<div class="three" style="gap:14px">
+<div><p class="out-l" style="margin-top:0">Analyzed plan (what you wrote)</p><pre class="out" style="margin-top:4px">Aggregate [state], [state, sum(salary) AS sum(salary)]
++- Filter (salary &gt; cast(50000 as bigint))
+   +- LogicalRDD [employee_id, employee_name, salary, state]</pre></div>
+<div><p class="out-l" style="margin-top:0">Optimized plan (what Spark will run)</p><pre class="out" style="margin-top:4px">Aggregate [state], [state, sum(salary) AS sum(salary)]
++- Project [salary, state]                                   &lt;- unused columns dropped
+   +- Filter (isnotnull(salary) AND (salary &gt; 50000))        &lt;- cast removed, null check added
+      +- LogicalRDD [employee_id, employee_name, salary, state]</pre></div>
+</div>
+<p class="note"><strong>Typed Dataset caveat.</strong> A Dataset lambda such as <code>e =&gt; e.salary &gt; 50000</code> is also opaque to Catalyst, and Spark has to rebuild each object to call it. Column expressions such as <code>col("salary") &gt; 50000</code> stay fully optimisable. <strong>PySpark caveat.</strong> DataFrame code runs in the JVM, but Python UDFs and <code>df.rdd.map(lambda ...)</code> move rows to Python and back, which is slow.</p>
+</section>
+
+<section id="convert">
+<div class="sechead"><h2>Converting between them</h2></div>
+<div class="two">
+<div><h3>PySpark</h3><div class="code"><span class="lang">python</span><button class="copy" type="button">Copy</button><pre><code><span class="t-com"># RDD -&gt; DataFrame</span>
+df2 = rdd.<span class="t-fn">toDF</span>([<span class="t-str">&quot;employee_id&quot;</span>, <span class="t-str">&quot;employee_name&quot;</span>, <span class="t-str">&quot;salary&quot;</span>, <span class="t-str">&quot;state&quot;</span>])
+<span class="t-com"># or: df2 = spark.createDataFrame(rdd, schema)</span>
+
+<span class="t-com"># DataFrame -&gt; RDD (each item becomes a Row object)</span>
+rdd2 = df.rdd
+<span class="t-fn">print</span>(rdd2.<span class="t-fn">take</span>(<span class="t-num">1</span>))
+<span class="t-fn">print</span>(df.rdd.<span class="t-fn">map</span>(<span class="t-kw">lambda</span> row: row.salary).<span class="t-fn">collect</span>())</code></pre></div><p class="out-l">Output</p><pre class="out">[Row(employee_id=1001, employee_name=&#x27;John Smith&#x27;, salary=50000, state=&#x27;CA&#x27;)]
+[50000, 72000, 65000, 48000]</pre></div>
+<div><h3>Scala</h3><div class="code"><span class="lang">scala</span><button class="copy" type="button">Copy</button><pre><code><span class="t-com">// Scala</span>
+<span class="t-kw">val</span> ds = df.<span class="t-kw">as</span>[Emp]        <span class="t-com">// DataFrame -&gt; Dataset</span>
+<span class="t-kw">val</span> df3 = ds.<span class="t-fn">toDF</span>()        <span class="t-com">// Dataset   -&gt; DataFrame</span>
+<span class="t-kw">val</span> rdd3 = ds.rdd          <span class="t-com">// Dataset   -&gt; RDD</span></code></pre></div><p class="note">Converting a DataFrame to an RDD and back throws away the schema information the optimizer needs, so do it only when you must.</p></div>
+</div>
+</section>
+
+<section id="pick">
+<div class="sechead"><h2>Which one should you use?</h2></div>
+<ol class="steps">
+<li>Writing <strong>PySpark</strong> (as in your Databricks notebooks)? Use <strong>DataFrames</strong>.</li>
+<li>Writing Scala or Java and want compile-time safety on domain objects? Use <strong>Datasets</strong>.</li>
+<li>Data cannot be given a schema, or you need low-level control? Use <strong>RDDs</strong>.</li>
+</ol>
+<div class="pick">
+<div class="r"><b>RDD</b><ul><li>Unstructured text, logs, binary data</li><li>Custom partitioners and <code>mapPartitions</code> tuning</li><li>Maintaining old Spark 1.x code</li></ul></div>
+<div class="d"><b>DataFrame</b><ul><li>ETL, reading CSV, JSON, Parquet and Delta</li><li>Joins, aggregations, window functions, SQL</li><li>Almost everything you do in Python</li></ul></div>
+<div class="s"><b>Dataset</b><ul><li>Scala or Java applications with case classes or beans</li><li>When a field typo must fail at compile time, not in production</li></ul></div>
+</div>
+<p class="note">Databricks note: some compute types, such as serverless, do not support the RDD API or <code>sparkContext</code>. Another reason to prefer DataFrames.</p>
+</section>
+
+<section id="qa">
+<div class="sechead"><h2>Interview questions</h2></div>
+<details><summary>Is a DataFrame faster than an RDD? Why?</summary><p>Usually yes. A DataFrame has a schema, so the Catalyst optimizer can reorder and prune the plan, and Tungsten stores rows in a compact binary form. An RDD lambda is a black box that Spark can only run as written.</p></details>
+<details><summary>Is the Dataset API available in PySpark?</summary><p>No. Dataset (the typed API) exists only in Scala and Java. In PySpark, DataFrame is the structured API, and it runs on the same engine.</p></details>
+<details><summary>What does 'DataFrame is Dataset[Row]' mean?</summary><p>Since Spark 2.0 a DataFrame is simply a Dataset whose items are generic <code>Row</code> objects. A Dataset[Employee] has the same engine and optimizer but gives you real Employee objects with compile-time checks.</p></details>
+<details><summary>Is a DataFrame built on top of an RDD?</summary><p>Yes. Every DataFrame executes as RDDs underneath, which is why <code>df.rdd</code> works and why lineage-based fault tolerance is the same for all three.</p></details>
+<details><summary>When do you still need RDDs?</summary><p>For unstructured data, custom partitioners, low-level control with <code>mapPartitions</code>, or old code. For tables, joins, aggregations and Delta, use DataFrames.</p></details>
+<details><summary>Does PySpark DataFrame code run in Python?</summary><p>The plan runs in the JVM. Python only builds the plan. It slows down when you add Python UDFs or call <code>.rdd.map(lambda ...)</code>, because rows then travel between the JVM and Python.</p></details>
+</section>
+
+<footer>Python examples were executed on Spark 4.3 (local mode). Version dates are for Spark 1.0, 1.3, 1.6 and 2.0 releases.</footer>
+</main>
+<script>
+(function(){
+var root=document.documentElement,btn=document.getElementById('theme');
+var s=null;try{s=localStorage.getItem('diff-theme')}catch(e){}
+if(s)root.setAttribute('data-theme',s);
+function dark(){var t=root.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches}
+function lab(){btn.textContent=dark()?'Light mode':'Dark mode'}lab();
+btn.addEventListener('click',function(){var n=dark()?'light':'dark';root.setAttribute('data-theme',n);try{localStorage.setItem('diff-theme',n)}catch(e){}lab()});
+document.querySelectorAll('.copy').forEach(function(b){b.addEventListener('click',function(){
+ var t=b.parentNode.querySelector('code').innerText;
+ function done(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1400)}
+ function fb(){var x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();try{document.execCommand('copy')}catch(e){}document.body.removeChild(x);done()}
+ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,fb)}else fb();
+})});
+})();
+</script>
+</body>
+</html>
