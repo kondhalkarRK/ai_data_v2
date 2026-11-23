@@ -84,7 +84,7 @@ export function LogoMark({ size = "md", className, animated = false }: LogoMarkP
           className="relative flex size-full items-center justify-center rounded-[0.4rem] bg-primary font-semibold tracking-tight text-primary-foreground"
           style={{ fontSize: pixels * 0.42 }}
         >
-          AM
+          S
         </span>
       )}
     </span>

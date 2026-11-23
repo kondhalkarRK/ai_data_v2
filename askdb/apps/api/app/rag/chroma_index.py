@@ -1,4 +1,4 @@
-"""Embedded Chroma adapter. Embeddings are always supplied by AskMe."""
+"""Embedded Chroma adapter. Embeddings are always supplied by Soci."""
 
 from __future__ import annotations
 

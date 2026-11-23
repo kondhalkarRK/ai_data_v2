@@ -61,6 +61,8 @@ class QueryHistory(Base):
     trust_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     trust_breakdown: Mapped[dict[str, Any] | None] = mapped_column(JsonDocument, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # One canonical replay of the answer, never copied into feedback rows.
+    response_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JsonDocument, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -58,6 +58,8 @@ it("uploads every chart and PDF separately without sending or dropping context",
   const calls = request.mock.calls as unknown as Array<[string, RequestInit]>;
   const body = JSON.parse(String(calls[0]![1].body));
   expect(body.body.content).toContain("Three");
+  expect(body.subject).toContain("Soci");
+  expect(body.body.content).toContain("Open the saved report in Soci");
   expect(body.body.content).toContain("Unavailable prior comparison");
   expect(body.body.content).toContain("cid:askbi-chart-4");
   expect(body.body.content).toContain("₹8.34 crore");
@@ -93,7 +95,7 @@ it("offers a clear download fallback when image clipboard is unavailable", async
 });
 
 it("packages every numbered image in a stored ZIP directory", () => {
-  const archive = zipReportFiles([{ name: "AskMe-report-1.png", bytes: new TextEncoder().encode("hello") }, { name: "AskMe-report-2.png", bytes: new Uint8Array([1, 2, 3]) }]);
+  const archive = zipReportFiles([{ name: "Soci-report-1.png", bytes: new TextEncoder().encode("hello") }, { name: "Soci-report-2.png", bytes: new Uint8Array([1, 2, 3]) }]);
   const view = new DataView(archive.buffer);
   expect(view.getUint32(0, true)).toBe(0x04034b50);
   expect(view.getUint32(14, true)).toBe(0x3610a686);
@@ -102,7 +104,7 @@ it("packages every numbered image in a stored ZIP directory", () => {
   expect(view.getUint16(end + 10, true)).toBe(2);
   const central = view.getUint32(end + 16, true);
   expect(view.getUint32(central, true)).toBe(0x02014b50);
-  expect(new TextDecoder().decode(archive)).toContain("AskMe-report-2.png");
+  expect(new TextDecoder().decode(archive)).toContain("Soci-report-2.png");
 });
 
 it("rejects a nonempty but completely blank image", () => {

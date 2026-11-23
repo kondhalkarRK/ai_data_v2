@@ -1,6 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
+
+vi.mock("@/hooks/use-chat-ask", () => ({ ChatSessionProvider: ({ children }: { children: ReactNode }) => <>{children}</> }));
 
 vi.mock("@/components/chat/chat-workspace", () => ({
   ChatWorkspace: () => <div data-testid="classic" />,

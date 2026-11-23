@@ -11,6 +11,7 @@ from app.models.audit import AuthAuditEvent
 from app.models.base import Base
 from app.models.bi_report import BiReportRecord
 from app.models.catalog import CatalogChange, CatalogColumn, CatalogRefresh, CatalogValue
+from app.models.chat_rating import ChatRating
 from app.models.enums import AuthEventType, ExecutionMode, Role
 from app.models.governance import AdminAudit, AppSetting, LoginAudit
 from app.models.knowledge import (
@@ -42,6 +43,7 @@ __all__ = [
     "CatalogColumn",
     "CatalogRefresh",
     "CatalogValue",
+    "ChatRating",
     "Conversation",
     "DqRuleRun",
     "DqRuleSetting",

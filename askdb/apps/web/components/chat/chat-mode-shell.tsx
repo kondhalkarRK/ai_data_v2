@@ -11,6 +11,7 @@ import {
   readStoredChatMode,
 } from "@/lib/chat-new-ui";
 import { cn } from "@/lib/utils";
+import { ChatSessionProvider } from "@/hooks/use-chat-ask";
 
 const subscribeNever = () => () => {};
 
@@ -20,11 +21,14 @@ const OPTIONS: Array<{ value: ChatMode; label: string }> = [
 ];
 
 /**
- * Flag off: exactly the Classic workspace. Flag on: a Classic | New toggle (remembered in
- * localStorage) over the same route. The toggle is absolutely positioned so Classic's layout
- * is unchanged.
+ * Both presentations share one controller. The existing feature gate and remembered
+ * Classic/New selection stay compatible with installed clients.
  */
 export function ChatModeShell({ enabled = NEW_CHAT_UI_ENABLED }: { enabled?: boolean }) {
+  return <ChatSessionProvider><ChatModes enabled={enabled} /></ChatSessionProvider>;
+}
+
+function ChatModes({ enabled }: { enabled: boolean }) {
   // null on the server and first client render, then the stored choice (no hydration mismatch,
   // and Classic never mounts first and fires a ?q= deep link when New was the saved mode).
   const stored = useSyncExternalStore<ChatMode | null>(

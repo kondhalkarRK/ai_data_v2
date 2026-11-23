@@ -89,7 +89,7 @@ class QdrantIndex:
             if size is None and isinstance(vectors, dict):
                 # Named vectors unsupported in MVP.
                 raise ValidationError(
-                    f"Qdrant collection '{name}' uses named vectors; Ask Me expects a single vector."
+                    f"Qdrant collection '{name}' uses named vectors; Soci expects a single vector."
                 )
             if int(size) != identity.dimension:
                 raise ValidationError(

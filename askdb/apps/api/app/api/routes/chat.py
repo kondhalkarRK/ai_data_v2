@@ -7,16 +7,17 @@ import logging
 import time
 import uuid
 from collections.abc import AsyncIterator
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import Field
-from sqlalchemy import select
+from pydantic import ConfigDict, Field
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.api.deps import (
     ActiveIndustry,
+    RegionScopeDep,
     RequireAdmin,
     RequireUser,
     get_app_session,
@@ -25,13 +26,21 @@ from app.api.deps import (
     get_semantic_service,
 )
 from app.core.config import Industry, Settings
-from app.core.exceptions import NqlError
+from app.core.exceptions import AuthorizationError, NotFoundError, NqlError
+from app.models import ChatRating, Conversation, QueryHistory
 from app.models.enums import Role
 from app.models.user import User
 from app.schemas.common import ApiModel
 from app.semantic.service import SemanticService
 from app.services.chat.profiler import PROFILER
 from app.services.chat.query_cache import QUERY_CACHE
+from app.services.chat.responses import (
+    check_access,
+    owned_response,
+    rating_payload,
+    save_rating,
+    scope_key,
+)
 from app.services.chat.service import ChatService, recovery_frames
 from app.services.governance import (
     active_llm,
@@ -98,6 +107,36 @@ async def _record_question(
         await session.rollback()
 
 
+async def _save_response(session, service, user, frames):
+    """Persist the rendered answer once, tied to its existing query-history ID."""
+    row = service.last_history
+    if row is None:
+        return
+    events = _sse_events_from_frames(frames)
+    # Progress frames are transient. Fold tokens to avoid thousands of JSON objects.
+    text = "".join(str(e["data"].get("token", "")) for e in events if e["event"] == "token")
+    stored = [e for e in events if e["event"] not in {"token", "progress", "stage"}]
+    if text:
+        stored.insert(0, {"event": "token", "data": {"token": text}})
+    documents = sorted(
+        {
+            str(e["data"]["documentId"])
+            for e in events
+            if e["event"] == "citation" and e["data"].get("documentId")
+        }
+    )
+    row.response_snapshot = {
+        "version": 1,
+        "scope": scope_key(user, service._region_scope),
+        "events": stored,
+        "documents": documents,
+    }
+    conversation = await session.get(Conversation, row.conversation_id)
+    if conversation:
+        conversation.updated_at = func.now()
+    await session.commit()
+
+
 class SaveQuestionRequest(ApiModel):
     title: str = Field(min_length=1, max_length=240)
     question: str = Field(min_length=1, max_length=4000)
@@ -129,6 +168,7 @@ async def chat_ask(
     started = time.perf_counter()
 
     async def event_stream() -> AsyncIterator[bytes]:
+        frames: list[str] = []
         try:
             async for frame in service.ask_stream(
                 body.question,
@@ -137,18 +177,22 @@ async def chat_ask(
                 web_retrieval=body.web_retrieval,
                 use_documents=body.use_documents,
             ):
+                frames.append(frame)
                 yield frame.encode("utf-8")
         except NqlError as exc:
             payload = (
                 f"event: error\ndata: "
                 f'{{"code":"{exc.code}","message":{json_quote(exc.message)}}}\n\n'
             )
+            frames.append(payload)
             yield payload.encode("utf-8")
         except Exception:
             logger.exception("chat_ask failed unexpectedly")
             for frame in recovery_frames(industry):
+                frames.append(frame)
                 yield frame.encode("utf-8")
         finally:
+            await _save_response(session, service, user, frames)
             await _record_question(
                 session,
                 settings,
@@ -217,20 +261,21 @@ async def chat_ask_sync(
             body.conversation_id,
             cancel_requested=_cancel_requested,
             web_retrieval=body.web_retrieval,
-                use_documents=body.use_documents,
+            use_documents=body.use_documents,
         ):
             frames.append(frame)
     except NqlError as exc:
-        return {
-            "events": [
-                {"event": "error", "data": {"code": exc.code, "message": exc.message}},
-                {"event": "done", "data": {"failed": True}},
+        frames.extend(
+            [
+                f"event: error\ndata: {json.dumps({'code': exc.code, 'message': exc.message})}\n\n",
+                'event: done\ndata: {"failed":true}\n\n',
             ]
-        }
+        )
     except Exception:
         logger.exception("chat_ask_sync failed unexpectedly")
-        return {"events": _sse_events_from_frames([*frames, *recovery_frames(industry)])}
+        frames.extend(recovery_frames(industry))
     finally:
+        await _save_response(session, service, user, frames)
         await _record_question(
             session,
             settings,
@@ -241,6 +286,162 @@ async def chat_ask_sync(
             started=started,
         )
     return {"events": _sse_events_from_frames(frames)}
+
+
+class RatingRequest(ApiModel):
+    model_config = ConfigDict(extra="forbid")
+    rating: Literal["up", "down"]
+    reason: Literal["incorrect", "misunderstood", "incomplete", "unclear", "other"] | None = None
+    note: str | None = Field(default=None, max_length=2000)
+
+
+@router.get("/chat/conversations")
+async def conversations(
+    user: RequireUser,
+    industry: ActiveIndustry,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+):
+    rows = (
+        await session.scalars(
+            select(Conversation)
+            .where(
+                Conversation.user_id == user.id,
+                Conversation.industry == industry.value,
+            )
+            .order_by(Conversation.updated_at.desc(), Conversation.id.desc())
+            .limit(201)
+        )
+    ).all()
+    return {
+        "items": [
+            {"id": str(r.id), "title": r.title, "updatedAt": r.updated_at.isoformat()}
+            for r in rows[:200]
+        ],
+        "hasMore": len(rows) > 200,
+    }
+
+
+@router.get("/chat/conversations/{conversation_id}")
+async def conversation_response(
+    conversation_id: uuid.UUID,
+    user: RequireUser,
+    industry: ActiveIndustry,
+    scope: RegionScopeDep,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+):
+    conversation = await session.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user.id,
+            Conversation.industry == industry.value,
+        )
+    )
+    if conversation is None:
+        raise NotFoundError("This conversation is not available.")
+    rows = (
+        await session.scalars(
+            select(QueryHistory)
+            .where(
+                QueryHistory.conversation_id == conversation_id,
+                QueryHistory.user_id == user.id,
+                QueryHistory.industry == industry.value,
+            )
+            .order_by(QueryHistory.created_at.desc(), QueryHistory.id.desc())
+            .limit(201)
+        )
+    ).all()
+    ratings = {
+        r.response_id: rating_payload(r)
+        for r in (
+            await session.scalars(
+                select(ChatRating).where(
+                    ChatRating.user_id == user.id,
+                    ChatRating.response_id.in_([r.id for r in rows[:200]]),
+                )
+            )
+        ).all()
+    }
+    turns = []
+    for row in reversed(rows[:200]):
+        unavailable = None
+        try:
+            await check_access(session, row, user, industry, scope, settings)
+        except AuthorizationError as exc:
+            unavailable = exc.message
+        events = (row.response_snapshot or {}).get("events") if not unavailable else None
+        if events is None:
+            events = [
+                {
+                    "event": "token",
+                    "data": {
+                        "token": unavailable
+                        or "This earlier response has no saved answer content. "
+                        "Ask again to get a current answer."
+                    },
+                },
+                {"event": "meta", "data": {"rowCount": 0}},
+            ]
+        turns.append(
+            {
+                "responseId": str(row.id),
+                "question": row.question,
+                "events": events,
+                "rating": ratings.get(row.id) if not unavailable else None,
+                "canRate": row.status != "running" and not unavailable,
+            }
+        )
+    return {"id": str(conversation.id), "turns": turns, "hasMore": len(rows) > 200}
+
+
+@router.get("/chat/responses/{response_id}/rating")
+async def response_rating(
+    response_id: uuid.UUID,
+    user: RequireUser,
+    industry: ActiveIndustry,
+    scope: RegionScopeDep,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+):
+    row = await owned_response(session, response_id, user, industry)
+    await check_access(session, row, user, industry, scope, settings)
+    return {
+        "responseId": str(row.id),
+        "feedback": rating_payload(await session.get(ChatRating, (row.id, user.id))),
+    }
+
+
+@router.put("/chat/responses/{response_id}/rating")
+async def update_response_rating(
+    response_id: uuid.UUID,
+    body: RatingRequest,
+    user: RequireUser,
+    industry: ActiveIndustry,
+    scope: RegionScopeDep,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+):
+    row = await owned_response(session, response_id, user, industry)
+    await check_access(session, row, user, industry, scope, settings)
+    return {"responseId": str(row.id), "feedback": await save_rating(session, row, user, body)}
+
+
+@router.delete("/chat/responses/{response_id}/rating")
+async def delete_response_rating(
+    response_id: uuid.UUID,
+    user: RequireUser,
+    industry: ActiveIndustry,
+    scope: RegionScopeDep,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+):
+    row = await owned_response(session, response_id, user, industry)
+    await check_access(session, row, user, industry, scope, settings)
+    await session.execute(
+        delete(ChatRating).where(ChatRating.response_id == row.id, ChatRating.user_id == user.id)
+    )
+    await session.commit()
+    return {"responseId": str(row.id), "feedback": None}
 
 
 @router.post("/chat/cancel/{history_id}")
@@ -289,9 +490,7 @@ async def query_history(
     usernames: dict[uuid.UUID, str] = {}
     if user.role == Role.ADMIN and rows:
         user_ids = {row.user_id for row in rows}
-        result = await session.execute(
-            select(User.id, User.username).where(User.id.in_(user_ids))
-        )
+        result = await session.execute(select(User.id, User.username).where(User.id.in_(user_ids)))
         usernames = {uid: name for uid, name in result.all()}
     return [
         {

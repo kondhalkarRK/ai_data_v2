@@ -170,9 +170,9 @@ export async function reportImages(snapshot: ReportSnapshot): Promise<Blob[]> {
 
 export async function downloadReportImages(snapshot: ReportSnapshot) {
   const blobs = await reportImages(snapshot);
-  const blob = blobs.length === 1 ? blobs[0]! : new Blob([zipReportFiles(await Promise.all(blobs.map(async (image, i) => ({ name: `AskMe-report-${i + 1}.png`, bytes: new Uint8Array(await image.arrayBuffer()) })))) as BlobPart], { type: "application/zip" });
+  const blob = blobs.length === 1 ? blobs[0]! : new Blob([zipReportFiles(await Promise.all(blobs.map(async (image, i) => ({ name: `Soci-report-${i + 1}.png`, bytes: new Uint8Array(await image.arrayBuffer()) })))) as BlobPart], { type: "application/zip" });
   const url = URL.createObjectURL(blob);
-  download(url, blobs.length === 1 ? "AskMe-report.png" : "AskMe-report-images.zip");
+  download(url, blobs.length === 1 ? "Soci-report.png" : "Soci-report-images.zip");
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
   return blobs.length;
 }

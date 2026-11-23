@@ -34,7 +34,7 @@ describe("Home product story", () => {
     vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     vi.useFakeTimers();
     render(<HomeStory />);
-    expect(screen.getByRole("region", { name: "Ask Me product story" })).toHaveAttribute("data-story-paused", "true");
+    expect(screen.getByRole("region", { name: "Soci product story" })).toHaveAttribute("data-story-paused", "true");
     expect(screen.getByText(/West 12% · South 8%/)).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(30000));
     expect(screen.getByRole("heading", { name: "Ask naturally. Understand precisely." })).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe("Home product story", () => {
   it("pauses on hover and resumes after the pointer leaves", () => {
     vi.useFakeTimers();
     render(<HomeStory />);
-    const story = screen.getByRole("region", { name: "Ask Me product story" });
+    const story = screen.getByRole("region", { name: "Soci product story" });
     fireEvent.mouseEnter(story);
     expect(story).toHaveAttribute("data-story-paused", "true");
     act(() => vi.advanceTimersByTime(15000));
@@ -55,7 +55,7 @@ describe("Home product story", () => {
   it("stays paused while a story control retains keyboard focus", () => {
     vi.useFakeTimers();
     render(<HomeStory />);
-    const story = screen.getByRole("region", { name: "Ask Me product story" });
+    const story = screen.getByRole("region", { name: "Soci product story" });
     fireEvent.mouseEnter(story);
     fireEvent.focus(screen.getByRole("button", { name: "Next chapter" }));
     fireEvent.mouseLeave(story);

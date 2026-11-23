@@ -66,6 +66,15 @@ export interface UserProfile {
   capabilities?: UserCapabilities;
 }
 
+/** Feedback references the existing query-history response ID; it contains no answer data. */
+export interface ChatResponseRating {
+  rating: "up" | "down";
+  reason: "incorrect" | "misunderstood" | "incomplete" | "unclear" | "other" | null;
+  note: string | null;
+  reportId?: string | null;
+  reportRevision?: number | null;
+}
+
 /** `GET /auth/me/usage` — the caller's AI usage since Monday 00:00 UTC. */
 export interface WeeklyUsage {
   tokenLimit: number | null;

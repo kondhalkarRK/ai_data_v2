@@ -103,6 +103,7 @@ export function applyChatSseEvent(
     case "done":
       return {
         ...message,
+        complete: true,
         latencyMs: Number(data.latencyMs ?? message.latencyMs ?? 0),
         historyId: String(data.historyId ?? message.historyId ?? ""),
         progress: null,

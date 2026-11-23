@@ -1,4 +1,4 @@
-"""Ask Me RAG feature flag (Phase 0+).
+"""Soci RAG feature flag (Phase 0+).
 
 When disabled, mutating document APIs are blocked and chat/Hub keep legacy behaviour.
 Later phases gate Qdrant retrieval and grounded generation on the same flag.

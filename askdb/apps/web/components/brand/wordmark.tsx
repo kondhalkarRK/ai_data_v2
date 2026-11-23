@@ -11,7 +11,7 @@ const SIZE: Record<WordmarkSize, string> = {
 };
 
 /**
- * Product wordmark: Ask (cyan/blue) + Me (teal) — complementary brand treatment.
+ * Soci keeps the complementary blue and teal brand treatment in a single word.
  */
 export function BrandWordmark({
   size = "md",
@@ -22,8 +22,8 @@ export function BrandWordmark({
   withPeriod?: boolean;
   className?: string;
 }) {
-  const [lead, ...rest] = APP_NAME.trim().split(/\s+/);
-  const tail = rest.join(" ") || "Me";
+  const lead = APP_NAME.slice(0, 2);
+  const tail = APP_NAME.slice(2);
 
   return (
     <span
@@ -33,9 +33,10 @@ export function BrandWordmark({
         className,
       )}
       aria-label={APP_NAME}
+      role="img"
     >
-      <span className="brand-ask">{lead}</span>
-      {tail ? <span className="brand-me ml-[0.18em]">{tail}</span> : null}
+      <span aria-hidden="true" className="brand-ask">{lead}</span>
+      {tail ? <span aria-hidden="true" className="brand-me">{tail}</span> : null}
       {withPeriod ? <span className="text-foreground/80">.</span> : null}
     </span>
   );

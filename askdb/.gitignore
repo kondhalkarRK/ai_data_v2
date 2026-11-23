@@ -77,3 +77,6 @@ Thumbs.db
 /.venv-chroma-check/
 /chroma-install-report.json
 /chroma-check-installed.txt
+
+# Local Soci UI/API validation captures and generated SQL (not application source).
+/tmp/soci-qa/

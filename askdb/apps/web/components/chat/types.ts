@@ -1,4 +1,5 @@
 /** Client-side chat response contract — mirrors SSE meta from the API. */
+import type { ChatResponseRating } from "@nql/shared-types";
 
 export type GroundedSource =
   | "Semantic Layer"
@@ -215,6 +216,9 @@ export interface RouteDecision {
 }
 
 export interface ChatMessage {
+  complete?: boolean;
+  ratingDisabled?: boolean;
+  rating?: ResponseRating | null;
   id: string;
   role: "user" | "assistant";
   question?: string;
@@ -245,3 +249,5 @@ export interface ChatMessage {
   meta?: ResponseMeta;
   latencyMs?: number;
 }
+
+export type ResponseRating = ChatResponseRating;

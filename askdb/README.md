@@ -1,4 +1,4 @@
-# NQL Insight
+# Soci
 
 Enterprise natural-language analytics over PostgreSQL with a governed semantic layer.
 Numbers come from SQL; documents add context and are always cited.

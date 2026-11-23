@@ -5,7 +5,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ post: vi.fn() }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
-vi.mock("@/hooks/use-session", () => ({ useActiveIndustry: () => "automotive" }));
+vi.mock("@/hooks/use-session", () => ({ useActiveIndustry: () => "automotive", useSession: () => ({ data: { id: "document-test", fullName: "Test User" } }) }));
 vi.mock("@/lib/api-client", () => ({
   apiClient: { post: mocks.post }, API_BASE_URL: "", ApiError: class extends Error {},
 }));

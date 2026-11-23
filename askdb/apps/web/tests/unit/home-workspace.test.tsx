@@ -80,7 +80,7 @@ it("opens the optional demo and restores focus after Escape", async () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   const trigger = screen.getByRole("button", { name: "Watch demo" });
   await user.click(trigger);
-  expect(screen.getByRole("dialog", { name: "Discover AskMe" })).toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: "Discover Soci" })).toBeInTheDocument();
   expect(screen.getByText("Product walkthrough scenes")).toBeInTheDocument();
   await user.keyboard("{Escape}");
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
