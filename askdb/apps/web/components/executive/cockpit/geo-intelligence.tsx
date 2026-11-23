@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { ChartFrame, Segmented } from "@/components/executive/cockpit/chart-frame";
 import { formatInr, formatPct } from "@/components/executive/cockpit/format";
-import { COCKPIT, growthColour, heatEmptyFill, heatFill } from "@/components/executive/cockpit/palette";
+import { COCKPIT, growthColour, heatEmptyFill, heatFill, vibrantColour } from "@/components/executive/cockpit/palette";
 import type { CockpitData, FilterKey, HeatMatrix, RankedItem, SelectHandler } from "@/components/executive/cockpit/types";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,7 @@ export function GeoIntelligence({
   const items = data[tab].slice(0, 10);
   return (
     <ChartFrame
+      motionKey={JSON.stringify([data.appliedFilters, tab, items, data.heat])}
       title="Geography intelligence"
       subtitle="Top performers ranked by revenue · growth heat vs last year"
       exportName={`geography-${tab}`}
@@ -92,7 +93,7 @@ function RankedGrid({ items, onPick }: { items: RankedItem[]; onPick: (item: Ran
               </span>
               <span className="flex min-w-0 items-center gap-1.5">
                 <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                  <span className="block h-full rounded-full bg-[hsl(var(--chart-1))]" style={{ width: `${(item.revenue / max) * 100}%` }} />
+                  <span data-chart-grow className="block h-full rounded-full" style={{ width: `${(item.revenue / max) * 100}%`, background: vibrantColour(`location:${item.group}:${item.key}`, "hsl(var(--chart-1))") }} />
                 </span>
                 <span className="w-16 shrink-0 text-right text-[10px] font-semibold tabular-nums text-muted-foreground">
                   {formatInr(item.revenue)}

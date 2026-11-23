@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { ChartFrame, Segmented } from "@/components/executive/cockpit/chart-frame";
 import { formatCount, formatInr, formatPct } from "@/components/executive/cockpit/format";
-import { COCKPIT } from "@/components/executive/cockpit/palette";
+import { COCKPIT, vibrantColour } from "@/components/executive/cockpit/palette";
 import type { CockpitData, RankedItem, SelectHandler } from "@/components/executive/cockpit/types";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +23,7 @@ export function RankedModels({
   const items = metric === "revenue" ? data.topModelsByRevenue : data.topModelsByUnits;
   return (
     <ChartFrame
+      motionKey={JSON.stringify([data.appliedFilters, metric, items])}
       title="Top performing models"
       subtitle={`Top 10 by ${metric} · click a model to focus`}
       exportName={`top-models-${metric}`}
@@ -94,13 +95,14 @@ function Bars({
               </span>
               <span className="relative h-5 overflow-hidden rounded-md bg-muted/50">
                 <span
-                  className="absolute inset-y-0 left-0 rounded-md transition-[width] duration-500"
+                  data-chart-grow
+                  className="absolute inset-y-0 left-0 rounded-md transition-[width] duration-500 motion-reduce:transition-none"
                   style={{
                     width: `${Math.max(pct, 2)}%`,
-                    background: `linear-gradient(90deg, ${metric === "revenue" ? COCKPIT.blueSoft : COCKPIT.tealSoft}, ${metric === "revenue" ? COCKPIT.blue : COCKPIT.teal})`,
+                    background: `linear-gradient(90deg, color-mix(in srgb, ${vibrantColour(`model:${item.group}:${item.name}`, metric === "revenue" ? COCKPIT.blue : COCKPIT.teal)} 88%, black), ${vibrantColour(`model:${item.group}:${item.name}`, metric === "revenue" ? COCKPIT.blue : COCKPIT.teal)})`,
                   }}
                 />
-                <span className="absolute inset-y-0 left-2 flex items-center text-[10px] font-semibold text-white mix-blend-normal">
+                <span className="absolute inset-y-0 left-2 flex items-center text-[10px] font-semibold mix-blend-normal" style={{ color: "var(--executive-tile-text, #fff)" }}>
                   {pct > 28 ? (metric === "revenue" ? formatInr(value) : formatCount(value)) : ""}
                 </span>
                 {pct <= 28 ? (

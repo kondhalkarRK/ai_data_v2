@@ -20,7 +20,7 @@
   --ai-foreground: 0 0% 100%;
   --ai-muted: 221 70% 96%;
   --chart-grid: 214 22% 90%;
-  --chart-axis: 215 14% 48%;
+  --chart-axis: 222 12% 30%;
   --overlay: 220 28% 14%;
 
   --background: 220 33% 97%;
@@ -28,9 +28,10 @@
   --surface-raised: 0 0% 100%;
   --surface-sunken: 216 28% 95%;
 
-  --foreground: 222 35% 14%;
+  --foreground: 222 25% 10%;
   --muted: 216 28% 95%;
-  --muted-foreground: 215 14% 48%;
+  /* Charcoal secondary text keeps navigation and captions readable on light surfaces. */
+  --muted-foreground: 222 12% 26%;
 
   --primary: 221 78% 56%;
   --primary-foreground: 0 0% 100%;
@@ -1061,6 +1062,22 @@
   --executive-category-15: #b8c386;
 }
 .executive-cockpit[data-chart-palette="vibrant"] {
+  --executive-tile-text: #ffffff;
+  --executive-vibrant-category-1: var(--executive-category-1);
+  --executive-vibrant-category-2: var(--executive-category-2);
+  --executive-vibrant-category-3: var(--executive-category-3);
+  --executive-vibrant-category-4: var(--executive-category-4);
+  --executive-vibrant-category-5: var(--executive-category-5);
+  --executive-vibrant-category-6: var(--executive-category-6);
+  --executive-vibrant-category-7: var(--executive-category-7);
+  --executive-vibrant-category-8: var(--executive-category-8);
+  --executive-vibrant-category-9: var(--executive-category-9);
+  --executive-vibrant-category-10: var(--executive-category-10);
+  --executive-vibrant-category-11: var(--executive-category-11);
+  --executive-vibrant-category-12: var(--executive-category-12);
+  --executive-vibrant-category-13: var(--executive-category-13);
+  --executive-vibrant-category-14: var(--executive-category-14);
+  --executive-vibrant-category-15: var(--executive-category-15);
   --chart-1: 224 79% 49%; --chart-2: 174 79% 31%;
   --chart-3: 268 67% 53%; --chart-4: 31 89% 43%;
   --chart-5: 344 65% 52%; --chart-6: 192 77% 36%;
@@ -1070,14 +1087,14 @@
   --ai-paint-5b8def: hsl(var(--chart-1)); --ai-paint-14a3a1: hsl(var(--chart-2));
   --ai-paint-7c9cc9: hsl(var(--chart-3)); --ai-paint-9db7f0: hsl(var(--chart-4));
   --ai-paint-6fcfc4: hsl(var(--chart-5)); --ai-paint-5fc4bb: hsl(var(--chart-6));
-  --executive-category-1: #305bd8; --executive-category-2: #079e91;
-  --executive-category-3: #884add; --executive-category-4: #d88617;
-  --executive-category-5: #c34b79; --executive-category-6: #1495b4;
-  --executive-category-7: #689544; --executive-category-8: #a462c7;
-  --executive-category-9: #b75e42; --executive-category-10: #476bbb;
-  --executive-category-11: #408f74; --executive-category-12: #b38b28;
-  --executive-category-13: #9e648a; --executive-category-14: #527d9b;
-  --executive-category-15: #777b46;
+  --executive-category-1: #305bd8; --executive-category-2: #087b74;
+  --executive-category-3: #7f46c6; --executive-category-4: #9d5f0a;
+  --executive-category-5: #a53664; --executive-category-6: #0c718c;
+  --executive-category-7: #55762f; --executive-category-8: #8545a8;
+  --executive-category-9: #a44b32; --executive-category-10: #385ba6;
+  --executive-category-11: #30755e; --executive-category-12: #876716;
+  --executive-category-13: #855173; --executive-category-14: #416780;
+  --executive-category-15: #62662f;
 }
 .dark .executive-cockpit[data-chart-palette="vibrant"] {
   --chart-1: 219 93% 69%; --chart-2: 171 76% 55%;
@@ -1091,6 +1108,7 @@
 }
 .dark .executive-cockpit[data-chart-palette="vibrant"],
 .theme-ai .executive-cockpit[data-chart-palette="vibrant"] {
+  --executive-tile-text: #152335;
   --executive-category-1: #99a8ff; --executive-category-2: #69d5c6;
   --executive-category-3: #c49af0; --executive-category-4: #f2ba6b;
   --executive-category-5: #ed94b4; --executive-category-6: #7bd2e5;
@@ -1138,3 +1156,7 @@
   .askbi-report [data-export-value] > * { display: none !important; }
   .askbi-report [data-export-value]::before { content: attr(data-export-value); }
 }
+
+/* Keep labels readable on filled charts across themes. */
+.executive-cockpit svg[data-chart] text { font-family: inherit; }
+@media print { .executive-cockpit [data-chart-grow], .executive-cockpit [data-chart-line], .executive-cockpit [data-chart-reveal] { animation: none !important; clip-path: none !important; opacity: 1 !important; } }

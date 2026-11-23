@@ -43,6 +43,7 @@ export function TrendChart({ data, className }: { data: CockpitData; className?:
   );
   return (
     <ChartFrame
+      motionKey={JSON.stringify([data.appliedFilters, data.period, data.trend])}
       title="Revenue trend"
       explainMetric="revenue"
       subtitle={
@@ -199,6 +200,7 @@ function TrendSvg({
                   <g key={`rev-${i}`}>
                     <path d={`${path} L${x(last[0])},${baseline} L${x(first[0])},${baseline} Z`} fill="url(#trend-revenue-fill)" />
                     <path
+                      data-chart-line
                       d={path}
                       fill="none"
                       stroke={COCKPIT.blue}
@@ -213,7 +215,7 @@ function TrendSvg({
 
           {visible.units
             ? line((p) => p.units, yUnits).map((d, i) => (
-                <path key={`units-${i}`} d={d} fill="none" stroke={COCKPIT.teal} strokeWidth={1.7} strokeLinecap="round" />
+                <path data-chart-line key={`units-${i}`} d={d} fill="none" stroke={COCKPIT.teal} strokeWidth={1.7} strokeLinecap="round" />
               ))
             : null}
 

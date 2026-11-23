@@ -36,7 +36,8 @@ export const CATEGORY_COLOURS = [
   "#7fd1c7",
 ];
 
-export function categoryColour(index: number): string {
+export function categoryColour(index: number | string): string {
+  if (typeof index === "string") index = categorySlot(index);
   const slot = ((index % CATEGORY_COLOURS.length) + CATEGORY_COLOURS.length) % CATEGORY_COLOURS.length;
   return `var(--executive-category-${slot + 1}, ${CATEGORY_COLOURS[slot]})`;
 }
@@ -76,3 +77,14 @@ export function heatFill(intensity: number, hue: "primary" | "info" = "primary")
 }
 
 export const heatEmptyFill = "hsl(var(--muted) / 0.35)";
+
+/** Identity-based slots stay stable when sorting, filtering or drilling down. */
+export function categorySlot(key: string): number {
+  let hash = 2166136261;
+  for (const c of key.trim().toLowerCase()) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619);
+  return (hash >>> 0) % CATEGORY_COLOURS.length;
+}
+
+export function vibrantColour(key: string, classic: string): string {
+  return `var(--executive-vibrant-category-${categorySlot(key) + 1}, ${classic})`;
+}

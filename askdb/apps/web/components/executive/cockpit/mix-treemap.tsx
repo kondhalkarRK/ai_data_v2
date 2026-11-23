@@ -5,7 +5,7 @@ import * as React from "react";
 import { ChartFrame, ChartTooltip } from "@/components/executive/cockpit/chart-frame";
 import { useElementSize } from "@/components/executive/cockpit/chart-utils";
 import { formatCount, formatInr, formatPct, formatPts } from "@/components/executive/cockpit/format";
-import { COCKPIT, tint } from "@/components/executive/cockpit/palette";
+import { COCKPIT, tint, vibrantColour } from "@/components/executive/cockpit/palette";
 import type { CockpitData, FilterKey, RankedItem, SelectHandler } from "@/components/executive/cockpit/types";
 
 const FUEL_COLOURS: Record<string, string> = {
@@ -92,6 +92,7 @@ export function SalesMix({
 }) {
   return (
     <ChartFrame
+      motionKey={JSON.stringify([data.appliedFilters, data.fuelMix, data.bodyMix])}
       title="Sales mix"
       subtitle={`Share of units · change vs ${data.period.priorLabel}`}
       exportName="sales-mix"
@@ -114,7 +115,7 @@ export function SalesMix({
             title="Fuel mix"
             items={data.fuelMix}
             height={expanded ? 220 : 92}
-            colour={(item) => FUEL_COLOURS[item.name] ?? COCKPIT.greySoft}
+            colour={(item) => vibrantColour(`fuel:${item.name}`, FUEL_COLOURS[item.name] ?? COCKPIT.greySoft)}
             filterKey="engine_type"
             onSelect={onSelect}
           />
@@ -122,7 +123,7 @@ export function SalesMix({
             title="Vehicle type mix"
             items={data.bodyMix}
             height={expanded ? 360 : 150}
-            colour={(item, index) => tint(FAMILY_COLOURS[item.group ?? ""] ?? COCKPIT.grey, Math.min(index, 6) * 0.07)}
+            colour={(item) => vibrantColour(`vehicle:${item.key}`, tint(FAMILY_COLOURS[item.group ?? ""] ?? COCKPIT.grey, 0.1))}
             filterKey="car_type"
             onSelect={onSelect}
           />
@@ -149,6 +150,7 @@ function Treemap({
 }) {
   const [ref, size] = useElementSize<HTMLDivElement>();
   const [hover, setHover] = React.useState<{ rect: Rect; x: number; y: number } | null>(null);
+  const gradientId = React.useId().replace(/:/g, "");
   const rects = squarify(items, 0, 0, size.width, height);
   const colourByKey = new Map(items.map((item, i) => [item.key, colour(item, i)]));
   return (
@@ -157,8 +159,8 @@ function Treemap({
       <div ref={ref} className="relative w-full" style={{ height }}>
         {size.width > 0 ? (
           <svg data-chart width={size.width} height={height} className="block overflow-hidden rounded-lg" role="img" aria-label={title}>
-            {rects.map((r) => {
-              const fill = colourByKey.get(r.item.key) ?? COCKPIT.grey;
+            <defs>{rects.map((r, i) => { const fill = colourByKey.get(r.item.key) ?? COCKPIT.grey; return <linearGradient key={r.item.key} id={`${gradientId}-${i}`} x2="1" y2="1"><stop offset="0%" stopColor={`color-mix(in srgb, ${fill} 88%, black)`} /><stop offset="100%" stopColor={fill} /></linearGradient>; })}</defs>
+            {rects.map((r, i) => {
               const delta = r.item.priorShare == null ? null : r.item.share - r.item.priorShare;
               const roomy = r.w > 64 && r.h > 34;
               const tiny = r.w > 34 && r.h > 18;
@@ -173,19 +175,19 @@ function Treemap({
                   }}
                   onMouseLeave={() => setHover(null)}
                 >
-                  <rect x={r.x + 1} y={r.y + 1} width={Math.max(r.w - 2, 0)} height={Math.max(r.h - 2, 0)} rx={6} fill={fill} opacity={hover && hover.rect.item.key !== r.item.key ? 0.7 : 1} />
+                  <rect x={r.x + 1} y={r.y + 1} width={Math.max(r.w - 2, 0)} height={Math.max(r.h - 2, 0)} rx={6} fill={`url(#${gradientId}-${i})`} data-chart-reveal opacity={hover && hover.rect.item.key !== r.item.key ? 0.7 : 1} />
                   {tiny ? (
-                    <text x={r.x + 8} y={r.y + 15} fontSize={10.5} fontWeight={600} fill="var(--ai-paint-fff, #fff)" pointerEvents="none">
+                    <text x={r.x + 8} y={r.y + 15} fontSize={10.5} fontWeight={600} fill="var(--executive-tile-text, var(--ai-paint-fff, #fff))" pointerEvents="none">
                       {fit(r.item.name, r.w - 14, 10.5)}
                     </text>
                   ) : null}
                   {roomy ? (
                     <>
-                      <text x={r.x + 8} y={r.y + 31} fontSize={13} fontWeight={700} fill="var(--ai-paint-fff, #fff)" pointerEvents="none">
+                      <text x={r.x + 8} y={r.y + 31} fontSize={13} fontWeight={700} fill="var(--executive-tile-text, var(--ai-paint-fff, #fff))" pointerEvents="none">
                         {formatPct(r.item.share)}
                       </text>
                       {delta != null && r.h > 50 ? (
-                        <text x={r.x + 8} y={r.y + 45} fontSize={9.5} fill="var(--ai-paint-fff, #fff)" opacity={0.85} pointerEvents="none">
+                        <text x={r.x + 8} y={r.y + 45} fontSize={9.5} fill="var(--executive-tile-text, var(--ai-paint-fff, #fff))" opacity={0.85} pointerEvents="none">
                           {formatPts(delta)}
                         </text>
                       ) : null}

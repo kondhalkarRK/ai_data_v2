@@ -50,6 +50,7 @@ describe("augmented dashboard", () => {
     const view = setup();
     expect(screen.getByText("Existing revenue chart")).toBeInTheDocument();
     expect(screen.getByText("Revenue increased by 20%.")).toBeInTheDocument();
+    expect(screen.getByText("Existing revenue chart").compareDocumentPosition(screen.getByRole("region", { name: "Executive briefing" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(post).not.toHaveBeenCalled();
     view.rerender(view.content(undefined));
     expect(screen.getByText("Existing revenue chart")).toBeInTheDocument();

@@ -30,6 +30,7 @@ export function BubbleMatrix({
   const items = (level === "state" ? data.states : data.zones).filter((item) => item.revenue > 0);
   return (
     <ChartFrame
+      motionKey={JSON.stringify([data.appliedFilters, level, items])}
       title="Regional performance matrix"
       subtitle="Growth vs revenue contribution · bubble size = units sold"
       exportName="regional-matrix"
@@ -198,7 +199,7 @@ function MatrixSvg({
                   onMouseLeave={() => setHover(null)}
                   onClick={() => onPick(item)}
                 >
-                  <circle cx={cx} cy={cy} r={r} fill={style.fill} fillOpacity={active ? 0.85 : 0.55} stroke={style.stroke} strokeWidth={active ? 2 : 1} />
+                  <circle data-chart-reveal cx={cx} cy={cy} r={r} fill={style.fill} fillOpacity={active ? 0.85 : 0.55} stroke={style.stroke} strokeWidth={active ? 2 : 1} />
                   {labelled.has(item.key) ? (
                     <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={r > 14 ? 10 : 9} fontWeight={600} fill={r > 12 ? "var(--ai-paint-fff, #fff)" : COCKPIT.ink} pointerEvents="none">
                       {item.key.length <= 3 ? item.key : item.name}

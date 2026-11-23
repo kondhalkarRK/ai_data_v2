@@ -103,6 +103,7 @@ export function DashboardIntelligence({ augmentation, updating = false, updateFa
   return (
     <DashboardActions.Provider value={actions}>
       <div className="space-y-6">
+        {children}
         {enabled && augmentation ? (
           <section className="rounded-2xl border border-border bg-surface-raised p-5" aria-label="Executive briefing">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -135,7 +136,6 @@ export function DashboardIntelligence({ augmentation, updating = false, updateFa
             {augmentation.caveats.length ? <details className="mt-3 text-2xs text-muted-foreground"><summary className="cursor-pointer">Comparison and data notes</summary><ul className="mt-2 list-disc space-y-1 pl-4">{augmentation.caveats.map((note) => <li key={note}>{note}</li>)}</ul></details> : null}
           </section>
         ) : null}
-        {children}
       </div>
 
       <Dialog.Root open={Boolean(active) && enabled} onOpenChange={(isOpen) => { if (!isOpen) { request.current?.abort(); request.current = null; setAsking(false); setActive(null); } }}>

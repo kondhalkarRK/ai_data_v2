@@ -56,6 +56,7 @@ export function ResponseCard({
   onAction,
   className,
   initialTab = "table",
+  detailsInInfo = false,
 }: {
   message: ChatMessage;
   busy?: boolean;
@@ -65,6 +66,7 @@ export function ResponseCard({
   className?: string;
   /** Tab shown first; Classic never passes this, so it keeps opening on the table. */
   initialTab?: ResponseTab;
+  detailsInInfo?: boolean;
 }) {
   const [tab, setTab] = React.useState<ResponseTab>(initialTab);
   const [insightDepth, setInsightDepth] = React.useState<InsightDepth>("executive");
@@ -219,13 +221,13 @@ export function ResponseCard({
           />
         ) : null}
 
-        {route && ROUTE_LABEL[route] ? (
+        {!detailsInInfo && route && ROUTE_LABEL[route] ? (
           <p className="text-[11px] font-medium text-muted-foreground">{ROUTE_LABEL[route]}</p>
         ) : null}
 
-        {meta && !execFailed ? <AnswerProvenance meta={meta} /> : null}
+        {!detailsInInfo && meta && !execFailed ? <AnswerProvenance meta={meta} /> : null}
 
-        {meta ? (
+        {!detailsInInfo && meta ? (
           <TrustIndicators
             groundedOn={meta.groundedOn ?? []}
             ambiguityFlag={Boolean(meta.ambiguityFlag)}
@@ -234,9 +236,9 @@ export function ResponseCard({
           />
         ) : null}
 
-        {meta?.queryPlan ? <QueryPlanNote plan={meta.queryPlan} /> : null}
+        {!detailsInInfo && meta?.queryPlan ? <QueryPlanNote plan={meta.queryPlan} /> : null}
 
-        {meta && !meta.ambiguityFlag && meta.alternateInterpretations?.length ? (
+        {!detailsInInfo && meta && !meta.ambiguityFlag && meta.alternateInterpretations?.length ? (
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <span className="font-medium text-muted-foreground">Did you mean:</span>
             {meta.alternateInterpretations.map((item) => (
@@ -253,7 +255,7 @@ export function ResponseCard({
           </div>
         ) : null}
 
-        {!execFailed && !zeroRows && meta?.insights?.narration?.summary && tab !== "narration" ? (
+        {!detailsInInfo && !execFailed && !zeroRows && meta?.insights?.narration?.summary && tab !== "narration" ? (
           <ExecutiveTakeaway text={meta.insights.narration.summary} />
         ) : null}
 
@@ -449,7 +451,7 @@ function planSummary(plan: QueryPlanTrace): string[] {
   return parts;
 }
 
-function QueryPlanNote({ plan }: { plan: QueryPlanTrace }) {
+export function QueryPlanNote({ plan }: { plan: QueryPlanTrace }) {
   const summary = planSummary(plan);
   const mapped = (plan.resolved ?? []).filter(
     (item) => item.method !== "exact" && item.text.toLowerCase() !== item.canonical.toLowerCase(),
@@ -483,7 +485,7 @@ function QueryPlanNote({ plan }: { plan: QueryPlanTrace }) {
   );
 }
 
-function AnswerProvenance({ meta }: { meta: ResponseMeta }) {
+export function AnswerProvenance({ meta }: { meta: ResponseMeta }) {
   const confidence = meta.confidence;
   const corrections = meta.corrections ?? [];
   if (!confidence && !corrections.length && !meta.reinterpretedAs) return null;

@@ -6,7 +6,7 @@ import * as React from "react";
 import { ChartFrame, ChartTooltip } from "@/components/executive/cockpit/chart-frame";
 import { useElementSize } from "@/components/executive/cockpit/chart-utils";
 import { formatInr, formatPct } from "@/components/executive/cockpit/format";
-import { categoryColour, COCKPIT, tint } from "@/components/executive/cockpit/palette";
+import { categoryColour, COCKPIT, tint, vibrantColour } from "@/components/executive/cockpit/palette";
 import type { CockpitData, SelectHandler, SunburstNode } from "@/components/executive/cockpit/types";
 
 const ENGINE_COLOURS: Record<string, string> = {
@@ -41,6 +41,7 @@ export function RevenueSunburst({
   const focused = single ?? (focus && roots.some((r) => r.name === focus) ? focus : null);
   return (
     <ChartFrame
+      motionKey={JSON.stringify([data.appliedFilters, data.sunburst])}
       title="Revenue contribution"
       subtitle="Make → model → engine type · click a make to drill in"
       exportName="revenue-sunburst"
@@ -91,7 +92,6 @@ function SunburstBody({
   const [ref, size] = useElementSize<HTMLDivElement>();
   const [hover, setHover] = React.useState<{ arc: Arc; x: number; y: number } | null>(null);
   const total = roots.reduce((sum, r) => sum + r.revenue, 0);
-  const makeIndex = new Map(roots.map((r, i) => [r.name, i]));
   const focusNode = focused ? roots.find((r) => r.name === focused) ?? null : null;
   const levelNodes = focusNode ? focusNode.children : roots;
   const levelTotal = focusNode ? focusNode.revenue : total;
@@ -112,7 +112,7 @@ function SunburstBody({
       if (node.children.length && depth + 1 < rings.length - 1) {
         layout(node.children, angle, width, depth + 1, [...path, node.name], (child, j) =>
           child.dimension === "engine_type"
-            ? (ENGINE_COLOURS[child.name] ?? COCKPIT.greySoft)
+            ? vibrantColour(`fuel:${child.name}`, ENGINE_COLOURS[child.name] ?? COCKPIT.greySoft)
             : tint(c, 0.15 + Math.min(j, 10) * 0.055),
         );
       }
@@ -121,10 +121,10 @@ function SunburstBody({
   };
   const span = Math.PI * 2;
   if (focusNode) {
-    const base = categoryColour(makeIndex.get(focusNode.name) ?? 0);
+    const base = categoryColour(`make:${focusNode.name}`);
     layout(focusNode.children, 0, span, 0, [focusNode.name], (_n, j) => tint(base, Math.min(j, 10) * 0.06));
   } else {
-    layout(roots, 0, span, 0, [], (n) => categoryColour(makeIndex.get(n.name) ?? 0));
+    layout(roots, 0, span, 0, [], (n) => categoryColour(`make:${n.name}`));
   }
 
   const centre = svgSize / 2;
@@ -174,6 +174,7 @@ function SunburstBody({
               <path
                 key={arc.path.join("/")}
                 d={arcPath(arc)}
+                data-chart-reveal
                 fill={arc.colour}
                 stroke="hsl(var(--surface-raised))"
                 strokeWidth={1}
@@ -232,8 +233,8 @@ function SunburstBody({
                     className="size-2.5 shrink-0 rounded-sm"
                     style={{
                       backgroundColor: focusNode
-                        ? tint(categoryColour(makeIndex.get(focusNode.name) ?? 0), Math.min(i, 10) * 0.06)
-                        : categoryColour(makeIndex.get(node.name) ?? 0),
+                        ? tint(categoryColour(`make:${focusNode.name}`), Math.min(i, 10) * 0.06)
+                        : categoryColour(`make:${node.name}`),
                     }}
                   />
                   <span className="min-w-0 flex-1 truncate text-foreground">{node.name}</span>

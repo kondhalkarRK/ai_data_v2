@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { exportCsv, exportSvgPng } from "@/components/executive/cockpit/chart-utils";
 import { useDashboardActions } from "@/components/executive/dashboard-intelligence";
 import { useChartThemeKey } from "@/hooks/use-chart-theme-key";
+import { animateChart } from "./chart-motion";
 import { interactive, overlay, surface, type as typeScale } from "@/lib/surface";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +23,10 @@ export function ChartFrame({
   bodyClassName,
   children,
   explainMetric,
+  motionKey,
 }: {
   title: string;
+  motionKey?: string;
   explainMetric?: string;
   subtitle?: React.ReactNode;
   controls?: React.ReactNode;
@@ -39,6 +42,10 @@ export function ChartFrame({
   const dashboard = useDashboardActions();
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const themeKey = useChartThemeKey();
+  React.useEffect(() => {
+    if (!bodyRef.current || motionKey == null) return;
+    return animateChart(bodyRef.current);
+  }, [motionKey, themeKey, expanded]);
 
   React.useEffect(() => {
     if (!expanded) return;

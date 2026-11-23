@@ -67,6 +67,7 @@ export function CompactDataAnswer({
           onAsk={onAsk}
           onAction={onAction}
           initialTab={analysisTab(message, requestedTab)}
+          detailsInInfo
         />
       ) : null}
 

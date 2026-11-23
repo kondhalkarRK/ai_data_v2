@@ -60,7 +60,7 @@ function AssistantAnswer({ message, question, mode }: { message: ChatMessage; qu
   const onAsk = (text: string) => { void chat.runAsk(text); };
   const view = assistantView(message);
   return <article className="min-w-0 space-y-2" aria-label="Assistant response">
-    {view === "text" ? <p className="max-w-[85ch] whitespace-pre-wrap break-words text-sm leading-relaxed">{message.narrative || "…"}</p> : mode === "new" && view === "data" ? <CompactDataAnswer message={message} requestedTab={detectAnalysisRequest(question)} busy={chat.busy} onAsk={onAsk} onAction={chat.handleAction} /> : <ResponseCard message={message} busy={chat.busy} onAsk={onAsk} onRetry={() => onAsk(question)} onAction={chat.handleAction} />}
-    <ResponseActions message={message} />
+    {view === "text" ? <p className="max-w-[85ch] whitespace-pre-wrap break-words text-sm leading-relaxed">{message.narrative || "…"}</p> : mode === "new" && view === "data" ? <CompactDataAnswer message={message} requestedTab={detectAnalysisRequest(question)} busy={chat.busy} onAsk={onAsk} onAction={chat.handleAction} /> : <ResponseCard message={message} busy={chat.busy} onAsk={onAsk} onRetry={() => onAsk(question)} onAction={chat.handleAction} detailsInInfo />}
+    <ResponseActions message={message} onAsk={onAsk} busy={chat.busy} />
   </article>;
 }

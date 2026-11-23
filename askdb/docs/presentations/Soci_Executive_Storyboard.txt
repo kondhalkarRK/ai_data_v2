@@ -1,0 +1,154 @@
+SOCI EXECUTIVE PRESENTATION — STORYBOARD
+18 main slides + 3 appendices
+Prepared 23 November 2026
+
+STATUS: The complete dark deck is saved in Spaces: https://chatgpt.com/space/page_4b832114af7481918bb713d883d0df44 . It contains 18 main slides and 3 appendices. The saved deck supersedes the initial review layouts below. It includes an editable ontology diagram, labelled reference/current test screenshots and verified Microsoft pricing attribution. Cover art, presenter details and demo link can be replaced.
+
+1. Soci
+Takeaway: Ask your data anything, in plain English.
+On-slide content: Governed AI analytics for business decisions. [Presenter] · [Team / organisation] · [Date].
+Composition: 55% left title; 40% right replaceable hero image. Minimal cover.
+Evidence/source: apps/web/lib/brand.ts; current Soci wordmark.
+Pending information or boundary: Approved cover image and presenter details.
+
+2. The business problem
+Takeaway: Business questions become requests, extracts and waiting.
+On-slide content: Example: Compare units sold and revenue across two models for a defined period. Business user → analyst → preparation → answer. Friction: unclear scope, repeated extracts, inconsistent definitions.
+Composition: Question at top; one horizontal request process with local friction labels.
+Evidence/source: Reference decks as qualitative problem context; validate with stakeholders.
+Pending information or boundary: Do not claim measured delays or savings.
+
+3. The operational impact
+Takeaway: The same friction affects users, analysts and leadership.
+On-slide content: Business users: access and interpretation depend on specialists. Analysts: repeated requests consume preparation time. Leaders: inconsistent definitions complicate comparison.
+Composition: Three flat editorial columns: difficulty and consequence.
+Evidence/source: Reference business narrative; hypotheses until stakeholder validation.
+Pending information or boundary: No unsupported turnaround-time statistics.
+
+4. What Soci does
+Takeaway: A business interface to governed analytics.
+On-slide content: Soci connects natural-language questions with approved business definitions and controlled PostgreSQL analysis. Users can inspect results, explore supporting context and build reports.
+Composition: 35% concise explanation; 60% actual current screenshot; one value statement below.
+Evidence/source: Current Chat, semantic configuration and Analytics Builder code.
+Pending information or boundary: Current overview screenshot; no fabricated UI.
+
+5. Question to answer
+Takeaway: Business meaning and access stay with the question.
+On-slide content: Question and scope → approved semantic/schema context → governed planning and validation → read-only execution → result and explanation. Clarify ambiguous requests. Reuse supported cached answers where applicable.
+Composition: Editable horizontal process; definitions above planning, controls beneath execution. Avoid implying every request calls a model.
+Evidence/source: apps/api/app/services/chat/; apps/api/app/services/security/region_scope.py.
+Pending information or boundary: Validate exact branching against current handlers before final diagram.
+
+6. Semantic Atlas
+Takeaway: Approved definitions connect business language to calculations.
+On-slide content: Revenue = SUM(total_sales). Units sold = SUM(order_qty). One order can contain multiple units. Apply the same approved measure when comparing models.
+Composition: 40% question and definitions; 55% current semantic screenshot; one business takeaway.
+Evidence/source: apps/api/semantic/packs/automotive/business_glossary.yaml; semantic_model.yaml.
+Pending information or boundary: Screenshot placeholder in review deck; final screenshot pending.
+
+7. Ontology Browser
+Takeaway: Make business relationships easier to explore.
+On-slide content: Explore vehicle, sales, dealer and region relationships. The ontology view helps explain the domain; compiler/schema checks determine which query joins are permitted.
+Composition: Large relationship view; one highlighted path and a short explanation.
+Evidence/source: Automotive semantic_model.yaml; current ontology browser/compiler.
+Pending information or boundary: Capture current view. Do not equate visual links with proven analytical correctness.
+
+8. Data Trust
+Takeaway: Understand the health of the data behind an answer.
+On-slide content: Inspect supported quality checks, dataset health, freshness and incidents. Explain what a selected condition means for the business question. Dataset quality is different from answer correctness.
+Composition: 60% actual Data Trust screen; 35% three business interpretations.
+Evidence/source: apps/web/components/reliability/; current reliability services and rule configuration.
+Pending information or boundary: Select actual checks and screenshot. No invented score or impact.
+
+9. AI Chat
+Takeaway: Ask, refine and inspect the answer.
+On-slide content: Use a defined-period model comparison; demonstrate an appropriate follow-up or clarification. Inspect SQL and supporting details. Show authenticated greeting, feedback and saved history.
+Composition: Large conversation screenshot with three annotations; small history/feedback crop only if readable.
+Evidence/source: apps/web/components/chat/; apps/api/app/api/routes/chat.py; docs/SOCI_CHAT_UPDATE.md.
+Pending information or boundary: Live question verification and current screenshot. Migration status matters for persistence.
+
+10. Executive Intelligence
+Takeaway: Explore KPIs in their business context.
+On-slide content: Use one KPI, one trend and one relevant comparison or supported drill-down. State the period and permitted scope. Explain the question each view helps investigate.
+Composition: Dominant actual dashboard screenshot; three precise callouts.
+Evidence/source: apps/web/components/executive/; current KPI and executive services.
+Pending information or boundary: Capture a coherent current dashboard; do not combine inconsistent filters.
+
+11. Analytics Builder
+Takeaway: Turn a report objective into a scoped analytical view.
+On-slide content: Show supported Custom/Auto report paths, filters, KPI values, charts and briefing. Export options may include PDF, images and configured Outlook draft creation.
+Composition: 30% report objective/scope; 65% actual report; short export line.
+Evidence/source: apps/web/components/analytics-builder/; apps/api/app/services/analytics/bi/.
+Pending information or boundary: Verify feature flags and actual export behavior. Chat's Generate report link opens Builder; do not present it as an Agentic workflow.
+
+12. Admin Center
+Takeaway: Control access, model usage and operations.
+On-slide content: Access: users and permitted roles. AI controls: approved provider/model settings, quotas and recorded usage. Operations: supported catalog refresh and audit visibility.
+Composition: 35% grouped responsibilities; 60% annotated Admin Center screenshot.
+Evidence/source: Current Admin Center and governance code.
+Pending information or boundary: Confirm exposed controls; never show keys or connection strings.
+
+13. Security and governance
+Takeaway: Enforce scope before data is returned.
+On-slide content: Authenticated identity → permitted regional scope → approved read-only query → authorised result. Show a regional user contrasted with administrator access.
+Composition: Simple access matrix beside an enforcement flow.
+Evidence/source: apps/api/app/auth/; app/api/deps.py; app/services/security/region_scope.py.
+Pending information or boundary: Use synthetic accounts and labels. Avoid broad enterprise-certification or SSO claims.
+
+14. Current architecture
+Takeaway: Separate experience, application state and analytical execution.
+On-slide content: Next.js/React → FastAPI services → semantic definitions and SQL safeguards → read-only PostgreSQL analytics. Application DB stores auth/history/feedback. Approved gateway supplies model access. Optional retrieval stays separate.
+Composition: Four editable layers; labelled arrows; application storage visibly separate from analytics.
+Evidence/source: apps/web/package.json; apps/api/pyproject.toml; current services, DB pools and semantic files.
+Pending information or boundary: Validate current dependencies. Exclude the separate Agentic project and historical Streamlit/DuckDB diagrams.
+
+15. Key capabilities
+Takeaway: Connect capabilities to the work they support.
+On-slide content: Ask a question → AI Chat. Define meaning → Semantic Atlas. Explore relationships → Ontology Browser. Review reliability → Data Trust. Build a report → Analytics Builder. Operate responsibly → Admin Center.
+Composition: Six-row editable table: business need / capability / earlier evidence.
+Evidence/source: Earlier feature slides and their verified sources.
+Pending information or boundary: Avoid promising universal connectors, automated repairs or flawless understanding.
+
+16. Cost comparison
+Takeaway: Compare the complete operating scenario.
+On-slide content: Inputs: users, questions/month, model-backed share, region/currency, model token rates, report calls and retries. Compare applicable licensing, AI capacity/inference, hosting, data and operations. Show totals only after validation.
+Composition: Assumptions strip; editable table; visible exclusions and pricing date.
+Evidence/source: Current usage accounting plus official vendor pricing when figures are introduced.
+Pending information or boundary: Review deck intentionally contains placeholders. Do not reuse inconsistent reference-deck savings.
+
+17. Demonstration journey
+Takeaway: Show a short workflow the audience can follow.
+On-slide content: 1 Ask a defined-period comparison. 2 Refine a measure or scope. 3 Inspect SQL and the stated period. 4 Explore a related Builder report. [Demo link].
+Composition: Four numbered steps, each paired with one verified question or action.
+Evidence/source: Current application; selected demo question bank.
+Pending information or boundary: Run live acceptance first. Keep report navigation distinct from Chat execution.
+
+18. Questions and discussion
+Takeaway: Discuss fit, scope and a practical pilot.
+On-slide content: Which business question should the pilot address? What data/access scope is appropriate? What would count as a successful outcome? [Contact / demo link].
+Composition: Large Questions? heading; three short prompts; small contact line.
+Evidence/source: Stakeholder discussion.
+Pending information or boundary: No unsupported business commitments.
+
+19. Appendix: architecture detail
+Takeaway: Explain implementation responsibilities.
+On-slide content: Browser: presentation and interaction. API: identity, orchestration and validation. Semantic configuration: definitions and mappings. PostgreSQL: numerical execution. App DB: durable application state. Gateway: approved model access.
+Composition: Editable component map and concise responsibility labels.
+Evidence/source: Current source files, dependency manifests and DB configuration names only.
+Pending information or boundary: No credentials. Optional services and proposed features clearly marked.
+
+20. Appendix: cost assumptions
+Takeaway: Make the estimate reproducible.
+On-slide content: Model-backed questions × average input/output token cost, plus separately budgeted report/retry usage. Add infrastructure, database, monitoring, engineering and support. Record competitor plan, entitlement, currency and pricing date.
+Composition: Assumption table with editable values, formulas and source fields.
+Evidence/source: Official current pricing and measured Soci usage when available.
+Pending information or boundary: No current rate verified in this review stage; leave entries pending.
+
+21. Appendix: demo questions and status
+Takeaway: Separate sample prompts from proven demo results.
+On-slide content: Revenue by model in [verified period]. Units sold by region in [verified period]. Compare [catalog model A] and [catalog model B] for units and revenue in [verified period]. What is ASP? Open a scoped report in Builder. Inspect feedback/history and restricted-region behavior.
+Composition: Question / capability / expected evidence / verification status table.
+Evidence/source: Automotive semantic/glossary configuration and current app behavior.
+Pending information or boundary: All live demo outcomes pending verification; substitute actual approved catalog values.
+
+

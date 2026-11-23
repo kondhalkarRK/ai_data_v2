@@ -109,6 +109,12 @@ function download(href: string, filename: string): void {
 
 /** Renders an on-page SVG to a PNG download, inlining computed styles. */
 export async function exportSvgPng(svg: SVGSVGElement, filename: string): Promise<void> {
+  // Capture the finished values, even if Download is clicked during the reveal.
+  svg.getAnimations?.({ subtree: true }).forEach(animation => {
+    if (animation.effect?.getTiming().iterations !== Infinity) {
+      try { animation.finish(); } catch { animation.cancel(); }
+    }
+  });
   const rect = svg.getBoundingClientRect();
   const clone = svg.cloneNode(true) as SVGSVGElement;
   const source = [svg, ...Array.from(svg.querySelectorAll("*"))];

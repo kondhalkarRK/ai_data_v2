@@ -86,3 +86,11 @@ it("opens the optional demo and restores focus after Escape", async () => {
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   await waitFor(() => expect(trigger).toHaveFocus());
 });
+
+it("lets the user pause and resume the repeating Quick Look chart", async () => {
+  const user = userEvent.setup(); mount();
+  await user.click(screen.getByRole("button", { name: "Pause chart animation" }));
+  expect(screen.getByRole("button", { name: "Play chart animation" })).toHaveAttribute("aria-pressed", "true");
+  await user.click(screen.getByRole("button", { name: "Play chart animation" }));
+  expect(screen.getByRole("button", { name: "Pause chart animation" })).toHaveAttribute("aria-pressed", "false");
+});

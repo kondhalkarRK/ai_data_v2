@@ -3,7 +3,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import type { IndustryListResponse, ReadinessResponse } from "@nql/shared-types";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, RefreshCw, Play, X } from "lucide-react";
+import { ArrowUpRight, RefreshCw, Play, Pause, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
@@ -37,6 +37,7 @@ export function HomeWorkspace() {
   const [question, setQuestion] = React.useState("");
   const demoTrigger = React.useRef<HTMLButtonElement>(null);
   const [demoOpen, setDemoOpen] = React.useState(false);
+  const [animationPaused, setAnimationPaused] = React.useState(false);
   const [detailsOpen, setDetailsOpen] = React.useState(false);
   const industries = useQuery({ queryKey: ["industries"], queryFn: () => apiClient.get<IndustryListResponse>("/api/v1/industries"), staleTime: 60_000 });
   const readiness = useQuery({ queryKey: ["readiness"], queryFn: () => apiClient.get<ReadinessResponse>("/ready"), refetchInterval: 30_000, staleTime: 0 });
@@ -56,7 +57,10 @@ export function HomeWorkspace() {
 
   return <main className="mx-auto w-full max-w-6xl min-w-0 pb-12 pt-2 sm:pt-5">
     <header className="space-y-5">
-      <div><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{greeting}, {name}</h1><p className="mt-2 text-sm text-muted-foreground">What would you like to explore today?</p></div>
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{greeting}, {name}</h1><p className="mt-2 text-sm text-muted-foreground">What would you like to explore today?</p></div>
+        <p className="ml-auto text-right text-sm font-medium tracking-wide text-muted-foreground sm:pt-1 sm:text-base">Capgemini Invent</p>
+      </div>
       <div aria-label="Current data context" className="flex flex-wrap items-center gap-2 text-xs">
         <StatusChip label="PostgreSQL" state={databaseState} healthy={!industries.isError && pack?.databaseAvailable === true} open={detailsOpen} onClick={() => setDetailsOpen(value => !value)} />
         <StatusChip label={activeName} state="Active" healthy={false} open={detailsOpen} onClick={() => setDetailsOpen(value => !value)} />
@@ -92,7 +96,7 @@ export function HomeWorkspace() {
       <h2 id="home-demo-heading" className="mt-3 text-xl font-semibold tracking-tight">See Soci in action</h2>
       <p className="mt-2 text-sm text-muted-foreground">One question. A clearer picture.</p>
       <div className={styles.demoQuestion}><span className="mb-2 block text-[10px] font-semibold uppercase tracking-widest text-primary">01 / Ask</span>{industry === "automotive" ? "How are sales changing by region?" : "How are premiums changing by region?"}</div>
-      <div className={styles.demoChart}><span className="text-[10px] font-semibold uppercase tracking-widest text-primary">02 / Explore</span>
+      <div className={styles.demoChart} data-animation-paused={animationPaused}><div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-widest text-primary">02 / Explore</span><button type="button" aria-label={animationPaused ? "Play chart animation" : "Pause chart animation"} aria-pressed={animationPaused} onClick={() => setAnimationPaused(value => !value)} className="rounded-md p-1 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary">{animationPaused ? <Play className="size-3.5" aria-hidden="true" /> : <Pause className="size-3.5" aria-hidden="true" />}</button></div>
       <div className={styles.visual} aria-hidden="true">
         <div className={styles.halo} />
         <svg viewBox="0 0 480 180" className={styles.art} fill="none">
