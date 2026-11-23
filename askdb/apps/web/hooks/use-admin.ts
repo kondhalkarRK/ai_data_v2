@@ -147,7 +147,7 @@ const DEFAULT_PRICING: LlmPricingAssumptions = {
   inputTokensPerQuestion: 2000,
   outputTokensPerQuestion: 500,
   monthlyBudgetUsd: 50,
-  source: "config/llm_catalog.py",
+  source: "app/config/llm_catalog.py",
 };
 
 type RawProvider = Omit<ProviderOption, "models"> & { models?: Array<CatalogModel | string> };

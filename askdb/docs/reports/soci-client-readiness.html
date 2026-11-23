@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark"><title>Soci — Client setup review</title>
+<style>
+:root{color-scheme:light;--bg:#f6f7f9;--panel:#fff;--ink:#192334;--muted:#48576b;--border:#ccd5e0;--blue:#24578f;--tint:#eaf0f8;--purple:#70518c;--warn:#80510a;--warnbg:#fff4df;--bad:#a12d36;--badbg:#ffedf0;--good:#21634b;--goodbg:#edf7f2}
+html[data-theme=dark]{color-scheme:dark;--bg:#11161e;--panel:#19222d;--ink:#eef2f7;--muted:#bdc7d5;--border:#3b4a5e;--blue:#adcaef;--tint:#26384f;--purple:#d1bce8;--warn:#f0cd8c;--warnbg:#372c1b;--bad:#f3b2bb;--badbg:#38212a;--good:#a7d7bd;--goodbg:#20352d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Aptos,"Segoe UI",Arial,sans-serif}button,input{font:inherit}button,a,input{outline-offset:4px}button{cursor:pointer}a{color:var(--blue)}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--blue)}.skip{position:fixed;left:1rem;top:-5rem;z-index:20;background:var(--panel);padding:12px}.skip:focus{top:1rem}.layout{display:grid;grid-template-columns:268px minmax(0,1fr);min-height:100vh}.sidebar{position:sticky;top:0;height:100vh;overflow:auto;padding:24px 14px;background:var(--panel);border-right:1px solid var(--border)}.brand{font-size:30px;font-weight:700;letter-spacing:-1px;padding:0 12px}.brand small{display:block;font-size:13px;font-weight:400;letter-spacing:0;color:var(--muted)}.navgroup{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:24px 12px 8px;font-weight:700}.navlink{display:block;width:100%;border:0;border-left:3px solid transparent;border-radius:3px;text-align:left;padding:9px 10px;background:transparent;color:var(--ink);font-size:14px;margin:3px 0}.navlink:hover{background:var(--bg)}.navlink[aria-current=page]{background:var(--tint);border-left-color:var(--blue);color:var(--blue);font-weight:700}.sidebar-note{margin:24px 12px;font-size:12px;color:var(--muted)}main{min-width:0;padding:25px 38px 50px;max-width:1600px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:22px}.eyebrow{font-size:13px;color:var(--muted)}.actions{display:flex;gap:8px;flex-wrap:wrap}.control{border:1px solid var(--border);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:5px;font-size:14px}.control:hover{background:var(--tint)}h1{font-size:29px;line-height:1.2;margin:0 0 10px;letter-spacing:-.5px}h2{font-size:19px;line-height:1.3;margin:26px 0 12px}h3{font-size:16px;margin:18px 0 8px}.intro{margin:0 0 17px;color:var(--muted);max-width:95ch}.notice{padding:12px 15px;border-left:3px solid var(--warn);background:var(--warnbg);font-size:14px;margin:15px 0}.notice.danger{border-color:var(--bad);background:var(--badbg)}.notice.info{background:var(--tint);border-color:var(--blue)}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}.stat{padding:15px 18px;border:1px solid var(--border);border-radius:5px;background:var(--panel)}.stat dt{font-size:13px;color:var(--muted)}.stat dd{margin:3px 0;font-size:26px;font-weight:700;color:var(--blue)}.stat small{font-size:12px;color:var(--muted)}.subnav{display:flex;flex-wrap:wrap;gap:6px;margin:20px 0}.subnav button{border:1px solid var(--border);background:var(--panel);color:var(--ink);border-radius:4px;padding:7px 10px;font-size:13px}.subnav button[aria-pressed=true]{background:var(--tint);border-color:var(--blue);color:var(--blue);font-weight:600}.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:5px;background:var(--panel)}table{border-collapse:collapse;width:100%;font-size:14px;text-align:left}th{background:var(--tint);font-weight:600}th,td{padding:12px 14px;vertical-align:top;border-bottom:1px solid var(--border);overflow-wrap:anywhere}th:first-child{width:19%}tr:last-child td{border-bottom:0}td p{margin:0}td .jump{background:transparent;border:0;color:var(--blue);text-decoration:underline;text-align:left;padding:0;font:inherit}.status{display:inline-block;border:1px solid var(--border);font-size:12px;border-radius:4px;padding:2px 6px;white-space:nowrap}.status.fix{color:var(--bad);background:var(--badbg)}.status.partial,.status.unknown{color:var(--warn);background:var(--warnbg)}.status.code{color:var(--good);background:var(--goodbg)}.fine{font-size:12px;color:var(--muted)}.evidence{margin-top:25px;padding-top:14px;border-top:1px solid var(--border)}.evidence code{display:block;overflow-wrap:anywhere;font:12px/1.8 Aptos,"Segoe UI",sans-serif;color:var(--muted)}.plain-list{margin:8px 0;padding-left:20px}.plain-list li{padding:3px 0}.mobile-nav{display:none}.footer{margin-top:30px;color:var(--muted);font-size:12px}.result-label{margin:8px 0;font-size:12px;color:var(--muted)}[hidden]{display:none!important}
+@media(max-width:1000px){main{padding:24px}.layout{grid-template-columns:225px minmax(0,1fr)}.stats{grid-template-columns:1fr}.stat{padding:10px 15px}.stat dd{font-size:23px}th,td{padding:10px}table{min-width:650px}}
+@media(max-width:700px){.table-wrap::before{content:"Scroll sideways to see all columns";display:block;padding:8px 10px;font-size:12px;color:var(--muted);position:sticky;left:0}.layout{display:block}.sidebar{display:none;position:static;height:auto;border-bottom:1px solid var(--border)}.sidebar.open{display:block}.mobile-nav{display:inline-block}.topbar{align-items:flex-start;flex-wrap:wrap}main{padding:18px}h1{font-size:25px}.brand{font-size:26px}.navlink{padding:11px}table{font-size:13px}}
+@media print{:root{--bg:#fff!important;--panel:#fff!important;--ink:#192334!important;--muted:#48576b!important;--border:#ccd5e0!important;--blue:#24578f!important;--tint:#eaf0f8!important;--warn:#80510a!important;--warnbg:#fff4df!important;--bad:#a12d36!important;--badbg:#ffedf0!important;--good:#21634b!important;--goodbg:#edf7f2!important}html{color-scheme:light!important}body{background:#fff!important;color:#17202c!important;font:11pt/1.4 Aptos,"Segoe UI",Arial,sans-serif}.layout{display:block}.sidebar,.actions,.skip,.subnav{display:none!important}main{padding:0;max-width:none}.topbar{margin-bottom:12px}.table-wrap{overflow:visible}table{min-width:0;font-size:10pt}th{background:#eaf0f8!important;color:#17202c}th,td{border-color:#bbc6d4;padding:7px}.stat{background:#fff;color:#17202c}.stat dd{color:#24578f}.notice{color:#17202c;background:#f5f5f5}.fine,.intro,.footer,.eyebrow,.evidence code{color:#425065!important}tr{break-inside:avoid}thead{display:table-header-group}h2{break-after:avoid}.stats{grid-template-columns:repeat(3,1fr)}@page{size:A4 landscape;margin:12mm}}
+</style>
+</head>
+<body>
+<a href="#content" class="skip">Skip to report</a>
+<div class="layout"><aside class="sidebar" id="sidebar"><div class="brand">Soci<small>Client setup review</small></div><nav aria-label="Soci modules and review topics" id="navigation"></nav><p class="sidebar-note">This is an assessment file. It does not connect to a database, call an AI model or change Soci settings.</p></aside>
+<main id="content" tabindex="-1"><header class="topbar"><div class="eyebrow">Leadership review · 23 November 2026<br>One new client domain · PostgreSQL baseline</div><div class="actions"><button class="control mobile-nav" id="menu" aria-controls="sidebar" aria-expanded="false">Modules</button><button class="control" id="theme" aria-pressed="false">Dark theme</button><button class="control" id="print">Print selected page</button></div></header><div id="view"></div><footer class="footer">Planning estimates, not measured code counts or a security certification. Client access, data and production infrastructure were not tested in this review.</footer></main></div>
+<script>
+'use strict';
+// Row columns: topic, seen in code, client work, challenge / acceptance check.
+const S=(title,rows)=>({title,rows});
+const M=(id,title,effort,change,mapping,intro,sections,sources=[])=>({id,title,effort,change,mapping,intro,sections,sources});
+const modules=[
+M('executive','Executive Intelligence','High','40–70%','High','Charts can be reused. Client calculations and source queries need mapping.',[
+S('KPIs and comparisons',[
+['KPI cards','Automotive SQL uses named sales, vehicle and region tables.','Map each card to an approved client measure and source.','Reconcile totals with client SQL; check orders versus units.'],
+['Periods and targets','Current/prior periods, targets and forecasts have domain rules.','Agree fiscal calendar, timezone, target grain and partial periods.','Do not show forecast or target values if the client has no approved source.']]),
+S('Charts and filters',[
+['Performance and product mix','Trend, matrix, sunburst, ranked models and mix charts exist.','Replace vehicle-specific dimensions with client fields.','Check duplicate joins, sparse periods and category labels.'],
+['Regional performance','Current geography and drill-down rules suit the demo.','Map client geography or business-unit hierarchy.','A hidden filter must not bypass server access checks.'],
+['Colours and motion','Classic/Vibrant styles and short chart reveals exist.','Retain meaning, labels and reduced-motion support.','UI style does not validate a calculation.']]),
+S('Briefing and exports',[
+['Executive briefing','Uses calculated dashboard evidence; displayed after charts.','Map highlights, material warnings and client terminology.','Briefing, charts and KPIs must describe the same published data.'],
+['Export','Chart/data export components exist.','Check client-sensitive fields and destination rules.','Validate files against the displayed filters and values.']])
+],['apps/api/app/services/executive/cockpit.py','apps/api/app/services/kpi/automotive.py','apps/web/components/executive/dashboard-intelligence.tsx']),
+M('chat','AI Chat','High','30–50%','High','Question handling is reusable. Measures, entity resolution and query coverage remain domain-specific.',[
+S('Classic and New Chat',[
+['Conversation','Both layouts share a controller and response content.','Use client examples, names and approved suggestions.','Test greetings, definitions, clarification and analytical answers separately.'],
+['Question understanding','Uses glossary, catalog, governed plans and optional model calls.','Map aliases, business terms, dates and multiple requested measures.','A term appearing in YAML does not prove the requested analysis can execute.'],
+['Follow-ups','Conversation state can refine a question.','Validate measure/filter retention for client questions.','A date-only reply must not discard the earlier entity or grouping.']]),
+S('Analysis and evidence',[
+['Table / Chart / Narration / SQL','Result tabs and SQL viewing exist.','Map formatting, units, currencies and result shapes.','Distinguish zero, no matching data and an execution failure.'],
+['Info panel','Contains confidence, dataset trust, grounding and interpretation details.','Use actual evidence only; distinguish data quality from answer confidence.','No trust score is a security score or an answer-correctness guarantee.'],
+['SQL guardrails','Read-only checks and plan/schema validation exist.','Validate every allowed source and query shape for the client.','Known-table checks and SQL-pattern checks need adversarial testing.']]),
+S('History, feedback and sources',[
+['History and ratings','Stored response IDs, replay and editable feedback exist.','Apply retention, user ownership and scope changes.','Never replay another user’s result or restore revoked access.'],
+['Unstructured data','Knowledge features are gated and not accepted for this client.','Treat document ingestion, permissions and retrieval as separate scope.','Do not promise production document answers from the database pilot.'],
+['Web retrieval','An optional user-facing control exists.','Decide whether external retrieval is permitted.','Disable it when client policy disallows external data sharing.']])
+],['apps/api/app/services/chat/service.py','apps/api/app/services/chat/semantic_analytics.py','apps/web/components/chat/chat-workspace-view.tsx']),
+M('trust','Data Trust','High','30–60%','High','The score display and rule engine are reusable. Dataset checks and thresholds are client-specific.',[
+S('Quality and score',[
+['Quality by dimension','Configured rules feed quality results and scores.','Agree checks, weights and expected behaviour with data owners.','Do not label an unmeasured property as verified accuracy.'],
+['Rules catalog','Rule browsing and management controls exist.','Replace Automotive defaults with client-approved rules.','Rules must run with bounded read access and safe execution limits.']]),
+S('Issues and freshness',[
+['Issues and impact','Failures can show severity and affected assets.','Map owners, severity thresholds and escalation rules.','Displaying an incident is different from notifying an on-call owner.'],
+['Datasets and freshness','Cadence, last checks and data dates are available.','Connect to a successful batch marker and completeness cutoff.','MAX(business_date) alone does not prove a complete daily load.']]),
+S('Monitoring details',[
+['Schema drift and new values','Metadata/value refresh can record changes.','Version mappings; revalidate broken measures and joins.','New values need catalog refresh; changed columns may require code changes.'],
+['Score method and coverage','Coverage depends on configured checks.','Document unchecked tables and thresholds.','A high score must not hide missing checks.']])
+],['apps/api/app/services/reliability/defaults.py','apps/web/components/reliability/trust-center.tsx']),
+M('semantic','Semantic Atlas','Medium','5–15%','Major rewrite of client content','The screen reads a validated YAML-backed model through the API. Execution support is a separate check.',[
+S('Business view — measures',[
+['What you can measure','Measures, labels, formulas and formats come from the pack.','Define revenue, counts, ratios, exclusions and units.','Display in this view does not automatically enable Chat or Builder execution.'],
+['Aggregation','Grain and measure definitions are recorded.','Classify totals, distinct counts, ratios and point-in-time balances.','Avoid averaging averages or summing inventory across reporting dates.']]),
+S('Business view — dimensions and language',[
+['How to group and filter','Dimension cards combine model context and catalog values.','Map client dates, customer/product fields and hierarchies.','A many-to-many join can inflate a total.'],
+['Business language','Definitions, synonyms and aliases come from glossary/model content.','Approve ambiguous terms and spelling variations.','Do not resolve an ambiguous business term by guessing.'],
+['Rules the AI follows','Configured rules appear in the business view.','Separate displayed guidance from enforced server validation.','Prove that an important rule is enforced, not only written in YAML.']]),
+S('Technical view',[
+['Tables and columns','Shows physical names, field types, keys and grain.','Map the client’s actual schema and identifiers.','YAML cross-reference checks do not prove live data constraints are true.'],
+['Relationships and formulas','Declared joins and measure definitions are displayed.','Validate cardinality, historical joins and date logic.','A renamed physical column can break runtime queries.']]),
+S('Publication and refresh',[
+['YAML changes','Backend loads and caches semantic packs.','Validate, approve and publish a version; refresh dependent caches.','A graph-only refresh may still use an older cached pack.'],
+['Browser and workers','Ontology browser caching and process-local backend caches exist.','Coordinate all API workers and browser refetching.','Changing a file does not instantly update every open browser.']])
+],['apps/api/app/semantic/service.py','apps/api/semantic/packs/automotive/semantic_model.yaml','apps/api/semantic/packs/automotive/business_glossary.yaml','apps/web/hooks/use-semantic.ts']),
+M('ontology','Ontology Browser','Low–Medium','5–20%','High relationship validation','The graph is generated from approved semantic content; it does not discover every client relationship by itself.',[
+S('Ontology Map',[
+['Entities and measures','Generated from tables, entities, measures and mappings.','Replace domain names and confirm what each node represents.','A new database table is not automatically an approved business concept.'],
+['Business and technical names','Label controls and node details exist.','Review both client labels and physical mappings.','Friendly names must not hide a wrong source mapping.']]),
+S('Relationship Network',[
+['Connections','Declared relationships become graph edges.','Confirm keys, relationship direction and cardinality.','A graph edge is not proof of a safe or correct analytical join.'],
+['Layouts and node details','Force, centrality, hierarchy and related layout controls exist.','Retain useful layouts; review large-graph readability.','Graph size, exposed metadata and user permissions need checking.']]),
+S('Refresh and limits',[
+['Rebuild','Backend compiles a cached ontology snapshot.','Reload the pack before rebuilding after a YAML change.','Browser caches can keep an old graph visible.'],
+['Glossary changes','Mapped terms and aliases enrich model context.','Maintain explicit term-to-measure/attribute mappings.','Changing prose alone does not infer new joins.']])
+],['apps/api/app/semantic/service.py','apps/web/components/ontology/ontology-browser.tsx']),
+M('home','Home','Low','0–10%','Low','Most changes are client labels, examples and readiness signals.',[
+S('Greeting and question input',[
+['Greeting and brand','Authenticated-name greeting and Soci branding exist.','Confirm client branding and profile fields.','Never hardcode a person’s name.'],
+['Suggested questions','Demo industry examples are configured in the page.','Use questions accepted for the client dataset.','Do not advertise a question that the query engine cannot answer.']]),
+S('Connections and Quick Look',[
+['Connection chips','Existing checks report PostgreSQL/API/pack status.','Show the selected client source and approved health signals.','Connected does not mean data readiness. The current degraded API state is labelled active; correct that wording.'],
+['Quick Look demo','Illustrative charts, repeated animation and pause control exist.','Use approved examples and keep the example-data label.','Example data must not be presented as live client performance.']])
+],['apps/web/components/home/home-workspace.tsx']),
+M('builder','Analytics Builder','High','30–50%','High','The visual builder and report canvas are reusable. Supported metrics and reports need client mappings.',[
+S('Custom Report',[
+['Metrics and dimensions','A capability catalog limits supported combinations.','Align client semantic measures with the catalog and compiler.','Adding a YAML measure alone does not add compiler support.'],
+['Filters and analysis','Period, ranking and other supported analysis choices exist.','Check dates, join paths, grouping and formula compatibility.','Unsupported choices should return a clear message before query execution.'],
+['Charts and inspection','Table, chart and KPI rendering components exist.','Use correct units, currency, labels and accessible colours.','A valid chart can still contain a wrong business calculation.']]),
+S('Auto Report / AskBI',[
+['Starter reports','Current presets and planning are domain-specific; flags select the experience.','Replace Automotive presets with approved client examples.','Presets must reconcile without a model inventing numbers.'],
+['Report changes','Saved reports have revisions and scope checks.','Preserve source, access scope and revision on refinement.','A failed panel must not silently disappear from an export.'],
+['Briefing','Verified facts can be sent to the model for composition.','Agree which business facts may reach the endpoint.','Approved provider access does not automatically approve every payload.']]),
+S('PDF, images and Outlook',[
+['Exports','PDF/image and configured Outlook draft paths exist.','Check recipient rules, report ownership and full snapshot consistency.','Actual client Outlook rendering and permission behaviour need acceptance.'],
+['Saved report access','Ownership/scope logic exists for reports.','Test old links after role or region revocation.','Exported attachments cannot be revoked as easily as an application link.']])
+],['apps/api/app/services/analytics/catalog.py','apps/api/app/services/analytics/compiler.py','apps/api/app/services/analytics/bi/execution.py','apps/web/components/analytics-builder/builder-modes.tsx']),
+M('preview','Data Preview','Medium','10–25%','Medium','A preview is still access to client data, even when no AI model is involved.',[
+S('Tables and rows',[
+['Table selection','Uses the active semantic dataset context.','Expose approved views and columns only.','Hiding a table in the UI is not a server permission check.'],
+['Row preview','Preview/query components exist.','Apply row caps, client scope and sensitive-column masking.','Test direct API requests, paging and unusual filter values.']]),
+S('Access and performance',[
+['Sensitive data','Generic sensitive-column policy was not established by this review.','Classify PII and use approved masked reporting views.','Read-only access still allows data disclosure.'],
+['Performance','Bounded preview behaviour needs client-scale checks.','Use indexed views/queries and limit large text fields.','Avoid expensive full counts on a busy transactional database.']])
+],['apps/api/app/api/routes/data.py']),
+M('knowledge','Knowledge Hub (Beta)','Separate scope','Not estimated','High if enabled','Document/RAG work is not accepted as part of the database pilot.',[
+S('Upload and indexing',[
+['Upload','Document upload/indexing paths exist behind feature gates.','Approve formats, size limits, storage and scanning.','Pending uploads are not searchable; test retries and deletion.'],
+['Indexing and embeddings','Configured vector and embedding services are separate dependencies.','Verify approved model, worker, storage and outbound data rules.','Database onboarding does not make document retrieval ready.']]),
+S('Retrieval and citations',[
+['Search and citations','Document retrieval/citation components exist.','Test ACLs, versions, stale documents and deletion.','A citation does not prove the cited text supports the answer.'],
+['Prompt injection','Document text can contain instructions.','Treat retrieved text as untrusted data; constrain tools and output.','Keep disabled until security and retrieval tests pass.']])
+],['apps/web/app/(workspace)/knowledge/page.tsx','apps/api/app/rag/feature.py']),
+M('saved','Saved Questions','Low','5–15%','Low–Medium','Reuse the interface; review ownership and source binding.',[
+S('Personal and shared questions',[
+['Personal questions','Saved-question functionality exists.','Bind saved items to the client dataset and owner.','A saved question must not switch silently to another source.'],
+['Sharing','Sharing behaviour needs a client permission review.','Agree who may publish and who may open shared items.','Sharing a question must not grant access to its underlying data.']]),
+S('Re-run and access changes',[
+['Re-run','A saved question may request current results.','Recheck current permissions and semantic version.','Do not treat a saved item as permanent authorisation.'],
+['Retention','Client retention policy is not established.','Agree deletion, export and account-removal rules.','Avoid storing sensitive text longer than necessary.']])
+],['apps/api/app/models/activity.py','apps/web/lib/navigation.ts']),
+M('history','Query History','Medium','10–20%','Medium','Historical questions, SQL and response data are sensitive client records.',[
+S('History and replay',[
+['History records','Question, execution and saved-response paths exist.','Define retention and permitted audit access.','SQL and filter values can disclose business information.'],
+['Replay','Saved responses support replay with ownership/scope checks.','Test role changes, revoked regions and deleted sources.','A stored result must not bypass current authorisation.']]),
+S('Errors and investigation',[
+['Failures','Status, request identifiers and SQL are available in relevant paths.','Redact provider errors and restrict diagnostic access.','Do not expose credentials, internal hosts or stack traces.'],
+['Deletion','Retention automation needs client agreement and verification.','Delete linked history/feedback consistently under approved rules.','Application deletion must consider backups and exported copies.']])
+],['apps/api/app/services/chat/responses.py','apps/api/app/observability/redaction.py']),
+M('usage','My AI Usage','Low–Medium','10–20%','Medium','Usage tracking exists; cost figures are estimates unless reconciled with the provider.',[
+S('Calls, tokens and limits',[
+['Personal allowance','Weekly call/token controls and usage display exist.','Agree client/user quotas and exhaustion behaviour.','Test simultaneous requests near the limit.'],
+['Token accounting','Model/provider usage is recorded where available.','Separate actual, estimated and incomplete usage.','A failed response may still consume provider usage.']]),
+S('Account and password — review topic',[
+['Change password','Current-password validation, hashing and a password-change API exist.','Confirm the user-facing flow and client policy.','Password change is different from forgotten-password recovery.'],
+['Session handling','Refresh-token revocation and cookie clearing exist.','Add/test immediate rejection of previously issued access tokens.','Do not claim all sessions immediately stop until that is verified.']])
+],['apps/api/app/auth/service.py','apps/api/app/api/routes/auth.py','apps/api/app/api/deps.py']),
+M('admin','Admin Center','Medium–High','20–40%','High','Admin controls exist. Client-wide policy and production safeguards need validation.',[
+S('LLM Settings',[
+['Provider and model','Configuration and quota-governed calls exist.','Allow approved endpoints/models; restrict editable destinations.','Arbitrary endpoints could send client prompts to an unapproved destination.'],
+['Secrets and TLS','Keys are server settings; provider TLS verification is configurable.','Use a secret store, rotation and TLS verification.','Log redaction is not a substitute for safe secret storage.']]),
+S('Hybrid AI Dashboard',[
+['Overview','Admin overview of execution/usage exists.','Map client labels and define each displayed measure.','Routing or token counts do not measure answer quality.']]),
+S('LLM Usage',[
+['Usage monitoring','Call/token/cost records exist.','Restrict access and reconcile estimates with provider usage.','Usage records can contain question text; apply retention.']]),
+S('Data Trust Admin',[
+['Rules and refresh','Quality refresh/configuration controls exist.','Approve client checks and run costs.','Admin access does not justify arbitrary warehouse write privileges.']]),
+S('Semantic Admin',[
+['Refresh controls','Metadata, graph, catalog and cache operations exist.','Validate a pack; reload all dependencies and API workers.','Graph refresh alone does not guarantee the latest YAML is loaded.']]),
+S('Entity Catalog (Admin)',[
+['Values and aliases','Configured fields and approved values feed lookup.','Choose safe columns, sampling limits and alias owners.','Names and sample values may be sensitive; restrict model context.'],
+['Refresh','Metadata/value refresh can record changes.','Refresh after a successful data publication.','New values and schema changes need different handling.']]),
+S('Audit Center',[
+['Activity','Authentication and admin events are recorded in reviewed paths.','Define complete event coverage and export/access policy.','In-app audit rows are not automatically tamper-resistant.'],
+['Operations','External alerting and log protection are not verified.','Send selected events to an approved, restricted log service.','Audit retention and incident ownership need agreement.']]),
+S('Users and connectors — review topics',[
+['Users','Admin-only create/list APIs and account activation services exist.','Provide approved joiner/leaver and access-review steps.','Do not share an administrator login across users.'],
+['Data connectors','Current registry uses configured industry connections.','Build secure runtime connector management if required.','An Add Connection form alone does not provide schema understanding.']])
+],['apps/web/app/(workspace)/admin/page.tsx','apps/web/components/admin/admin-panels.tsx','apps/api/app/api/routes/admin.py','apps/api/app/auth/service.py'])
+];
+
+// Review-only pages: not additional tabs already implemented in Soci.
+const security=[
+S('Database and network',[
+['Private database','Not verified','No public database port; allow only the Soci backend or approved network. Use private connectivity/VPN and verified TLS.','DBA / platform team','Prove an unauthorised network cannot connect.'],
+['Read-only account','Partial','Use a dedicated SELECT-only account on approved views. No owner/admin, DDL, broad function or filesystem privileges.','DBA','Attempt writes and disallowed reads using the actual service account.'],
+['Separate app database','In code','Keep Soci authentication/history separate from the client analytics source. Limit each account separately.','Backend / DBA','Application migrations must not target client source tables.'],
+['Secrets','Needs setup','Store passwords/keys outside Git and the browser. Prefer an approved secret store; rotate and audit retrieval.','Platform team','Rotate a credential without printing or returning it.'],
+['Backup and patching','Not verified','Patch the host/DB/drivers, encrypt backups and test restore access.','Platform / DBA','Restore test and approved backup retention.']]),
+S('SQL guardrails',[
+['Query validation','In code','Read-only keyword checks and governed-plan checks exist. Strengthen coverage for every enabled dialect and endpoint.','Backend / security','Adversarial SQL suite plus live least-privilege tests.'],
+['Safe parameters','Partial','Use bound values and allowlisted identifiers. Review remaining generated/interpolated SQL paths.','Backend','Quotes, comments, nested queries and unapproved identifiers are rejected safely.'],
+['Row and column access','Partial','Existing regional rewrite is domain-specific. Add client table/column rules; use database views/RLS where suitable.','Backend / DBA','User A cannot read B’s region through joins, subqueries, preview or exports.'],
+['Expensive queries','Partial','Keep timeouts, row caps and bounded pools. Add concurrency and resource controls for the client workload.','Backend / DBA','Cancel slow queries and verify the source stays usable.'],
+['Read-only limits','Important','Read-only does not prevent data theft, expensive reads or side effects of allowed database functions.','Security / DBA','Block unnecessary functions and minimise readable data.']]),
+S('API endpoints',[
+['Authentication and roles','In code','Check session and server role on every protected route. Maintain an endpoint access list.','Backend','Anonymous and ordinary users cannot call admin APIs.'],
+['CSRF coverage','Needs review','CSRF checks exist on selected auth mutations; some reviewed admin writes do not explicitly attach that check. Audit all cookie-authenticated writes.','Backend / security','Reject missing or invalid CSRF tokens on applicable writes.'],
+['HTTPS, cookies and hosts','Partial','Use production mode, strong JWT secret, secure cookies, approved origins/hosts and verified TLS. CORS is not authorisation.','Platform / backend','Wrong host/origin, expired token and invalid issuer/audience fail safely.'],
+['Rate limits','Partial','Current limiter is per process. Use shared/gateway limits for multiple replicas and costly endpoints.','Platform / backend','Flood tests across replicas and users respect global limits.'],
+['Errors and inputs','Partial','Validate sizes/types; hide stack traces and raw provider/database errors. Review security headers and API documentation access.','Backend / security','Malformed and oversized requests fail without secrets or resource exhaustion.'],
+['Connector destinations','Proposed','Allowlist hosts/ports/auth options. Block unapproved destinations and dangerous driver arguments.','Backend / platform','Admin connection testing cannot scan or contact arbitrary internal services.']]),
+S('LLM data sharing',[
+['What leaves the app','Observed','Questions, selected schema/context, prior SQL and some verified report facts can reach the configured endpoint.','Business owner / security','Approve a sample payload from each enabled model-backed flow.'],
+['Credentials','Partial','Database credentials are not included in the reviewed prompt construction. Keys belong on the server. Validate every outgoing path.','Backend / security','No passwords, connection strings or tokens in payloads or errors.'],
+['Sensitive values','Needs setup','Use an explicit field list, masking and aggregate-only facts where required. Scan outgoing payloads; deny unsafe requests.','Data owner / backend','Test names, IDs, small groups and sensitive user-entered questions.'],
+['Provider agreement','Not verified','Approve retention, logging, residency, training use and downstream model routing. An API key is not proof.','Client security / procurement','Written endpoint/data-processing approval before client prompts are enabled.'],
+['Prompt injection','Needs testing','Treat user text, metadata, retrieved text and model output as untrusted. Enforce controls outside prompts.','Backend / security','Instructions in data cannot widen access or authorise new tools.'],
+['Local answers','Proposed','Offer a mode where sensitive results remain local and deterministic narration formats them.','Product / backend','Verify zero outbound calls for the restricted mode.']]),
+S('Users and passwords',[
+['Unique accounts','In code','Use separate accounts for users/admins; reviewed roles are admin and user. Agree finer client roles separately.','Client admin','Run a role/region access matrix with separate logins.'],
+['Password storage','In code','Argon2id hashing and password checks exist; reviewed minimum length is 12. Review policy with client identity requirements.','Backend / security','No plaintext storage or exposure; enforce the approved policy.'],
+['Change password','In code','Requires the current password; updates hash, revokes refresh tokens and clears the caller’s cookies.','Backend','Wrong password fails; successful change forces a fresh sign-in in that browser.'],
+['Old access tokens','Needs fix','The reviewed current-user path validates JWT and active user, but does not compare password_changed_at or a revoked session version.','Backend / security','Reject previously issued access tokens immediately after password change / all-session logout.'],
+['First-login change','Needs fix','A must-change-password flag is stored. Mandatory enforcement was not found in the reviewed UI/API guards.','Backend / frontend','A temporary-password user cannot use protected features before changing it.'],
+['Forgot password','Not found in reviewed routes','Choose an approved recovery flow or client identity provider; use short-lived single-use tokens and safe delivery.','Identity team / backend','No account enumeration; reset invalidates relevant sessions.'],
+['Offboarding','Partial','Inactive users are rejected; a service can disable accounts and revoke refresh tokens. Validate exposed admin workflow.','Client admin / backend','Disabled users lose access to APIs, reports and history.'],
+['SSO and MFA','Separate work','Soci app sign-in is not proven to support client SSO/MFA. Outlook sign-in does not provide Soci SSO.','Identity team','Approve and test client identity-provider integration if required.']]),
+S('Multi-user and operations',[
+['User isolation','Partial','Owner/scope checks exist in reviewed history/report paths. Test every list, detail, export and background task.','QA / backend','Altered IDs and cached results never disclose another user’s data.'],
+['Multiple clients','Not established','Multiple accounts/industries are not tenant isolation. Prefer a separate deployment/app database for the first client unless designed otherwise.','Architecture / security','Explicit tenant boundaries and negative tests before shared hosting.'],
+['Simultaneous use','Needs testing','Size DB pools and provider quotas; test atomic quota/rating/report updates.','QA / DBA','Concurrent users do not mix filters, results or report revisions.'],
+['Audit and alerts','Partial','Redaction and events exist; external log protection and incident alert delivery are not verified.','Security / operations','Prove alert delivery, restricted log access and retention.'],
+['Production release','Needs acceptance','Dependency scans, security tests, backup restore, rollback and model outage behaviour need evidence.','Delivery owner','Named sign-off and rollback plan; no readiness percentage as a substitute.']])
+];
+const dataSetup=[
+S('OLTP and OLAP',[
+['OLTP source','Prefer an approved read replica or reporting views.','Heavy analytics can affect operational transactions.','DBA approves query budget and access.'],
+['OLAP / reporting mart','Usually the easier source for facts, dimensions and historical reporting.','Measures and historical joins still need approval.','Reconcile a representative set of client reports.'],
+['Cube / API','A SQL connector may not support a specialised cube or HTTP API.','Separate query interface and authentication may be needed.','Compatibility check before committing scope.']]),
+S('Daily incremental loads',[
+['Load owner','Keep the client’s existing pipeline responsible for ingestion unless separately scoped.','Connecting Soci does not build an ETL pipeline.','Confirm inserts, updates, deletes and late corrections.'],
+['Publish signal','Use a successful batch/version plus completeness cutoff.','A clock schedule or MAX(sales_date) can miss partial loads and old-record corrections.','Refresh only after all required tables are consistently published.'],
+['Caches and catalog','Invalidate affected results and refresh approved new values.','Current caches and data dates are not a generic batch-version system.','Bind source + scope + semantic version + published data version.'],
+['Failed load','Keep a prior consistent published version, or hold affected analytics.','Do not serve half-loaded tables as fresh.','Display last successful load and data-complete-through separately.']]),
+S('Business mapping and sign-off',[
+['Source inventory','List approved tables, views, columns, keys, history and volumes.','Do not assume every table in a connection is in scope.','Client DBA and business owner approve the inventory.'],
+['Definitions','Approve measure grain, formula, currency, calendar, exclusions and dimensions.','Orders, order lines and delivered transactions can mean different sales totals.','Sign off definitions and reference SQL.'],
+['Semantic publication','Validate YAML, compiler support, joins, scopes and reports together.','Visible metadata may outpace executable coverage.','Publish only after example questions and permission tests pass.']])
+];
+const risks=[
+['Connection status wording','Needs fix','Current Home maps a degraded API state to active. Show degraded status accurately.','Frontend / backend'],
+['Client migrations and feature flags','Needs acceptance','Apply required application migrations and verify enabled features. No client source migration is implied.','Delivery / DBA'],
+['Old access tokens after password change','Needs fix','Compare token issue/session version with current server state; test immediate revocation.','Backend / security'],
+['First-login password enforcement','Needs fix','Enforce the stored must-change flag before protected work.','Backend / frontend'],
+['Cookie-authenticated write coverage','Needs review','Audit CSRF checks across all admin and other write routes.','Backend / security'],
+['Client data sent to the model','Needs approval','Approve payload fields, masking, retention and provider routing.','Data owner / security'],
+['YAML-only onboarding claim','Partial','Display/graph are YAML-backed; KPI, Builder and Chat still contain fixed domain logic.','Product / backend'],
+['Region security for new tables','Needs adaptation','Known-table rewrites must not silently miss a new client source.','Backend / DBA'],
+['Daily load completeness','Needs integration','Use published load versions rather than relying on the latest transaction date.','Data engineering'],
+['Multi-client hosting','Not established','Design isolation before sharing one deployment between organisations.','Architecture / security'],
+['Different database engines','Separate scope','Validate driver, metadata, SQL syntax, read-only mode and cancellation.','Backend / DBA'],
+['Large tables and many users','Not verified','Load-test realistic data, concurrent queries and quotas.','QA / platform'],
+['Cache and worker consistency','Partial','Version and invalidate caches across API processes and browsers.','Backend / platform'],
+['Password recovery / SSO / MFA','Separate work','Choose and validate the client identity approach.','Identity team'],
+['RAG / Knowledge Hub','Not accepted','Keep gated until indexing, ACL, deletion and injection checks pass.','Product / security'],
+['Exports and old links','Needs acceptance','Check permissions, attachment leakage, retention and actual Outlook behaviour.','QA / client IT'],
+['Security and recovery evidence','Not verified','Complete independent tests, backup restore, alert delivery and rollback.','Security / operations']
+];
+const sourceRows=[
+['Product navigation','apps/web/lib/navigation.ts','Product tabs in the report follow this file.'],
+['Semantic and ontology','apps/api/app/semantic/service.py; apps/web/hooks/use-semantic.ts','YAML validation, graph generation and process/browser caching.'],
+['KPI and executive SQL','apps/api/app/services/kpi/automotive.py; apps/api/app/services/executive/cockpit.py','Domain-specific tables and calculations remain.'],
+['Builder','apps/api/app/services/analytics/catalog.py; compiler.py','Capabilities and execution are partly defined in Python.'],
+['Database guardrails','apps/api/app/db/session.py; apps/api/app/analytics/sql_guardrails.py','Read-only transactions and SQL checks. Actual DB grants not tested.'],
+['Access and authentication','apps/api/app/api/deps.py; app/auth/service.py; app/auth/tokens.py','Current user/role checks, password change and refresh-token handling.'],
+['Password policy','apps/api/app/auth/passwords.py; app/api/routes/auth.py','Argon2id, policy, password-change and account APIs.'],
+['Model payloads','apps/api/app/services/llm.py; app/services/analytics/bi/execution.py','Questions/context and report facts may reach the endpoint.'],
+['Caches and daily loads','apps/api/app/services/chat/query_cache.py; app/services/reliability/defaults.py','Expiry/freshness handling and domain quality defaults.'],
+['Production settings','apps/api/app/core/config.py; app/auth/rate_limit.py; app/observability/redaction.py','Production checks, process-local limits and log redaction.']
+];
+const referenceLinks=[
+['Database permissions and network','https://cheatsheetseries.owasp.org/cheatsheets/Database_Security_Cheat_Sheet.html'],
+['SQL injection prevention','https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html'],
+['API endpoint security','https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html'],
+['Authentication and password recovery','https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html'],
+['Secret storage and rotation','https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html'],
+['LLM sensitive information disclosure','https://genai.owasp.org/llmrisk/llm022025-sensitive-information-disclosure/']
+];
+const navGroups=[['Review',['overview']],['Soci workspace',['executive','chat','trust','semantic','ontology']],['Soci — More',['home','builder','preview','knowledge','saved','history','usage']],['Soci — Admin',['admin']],['Additional review topics',['setup','security','risks','sources']]];
+const specialTitles={overview:'Overview',setup:'Client data setup',security:'Security and user setup',risks:'Open points and decisions',sources:'Evidence and assumptions'};
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const titleFor=id=>specialTitles[id]||modules.find(m=>m.id===id)?.title||'Overview';
+const badge=v=>`<span class="status ${v==='In code'?'code':v==='Needs fix'?'fix':v.includes('Partial')||v==='Partial'?'partial':'unknown'}">${esc(v)}</span>`;
+function table(headers,rows){return `<div class="table-wrap" tabindex="0" aria-label="Scrollable report table"><table><thead><tr>${headers.map(h=>`<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;}
+function statusTable(headers,rows){return `<div class="table-wrap" tabindex="0" aria-label="Scrollable report table"><table><thead><tr>${headers.map(h=>`<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td>${i===1?badge(c):esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;}
+let current='overview',section='all';
+function nav(){ $('navigation').innerHTML=navGroups.map(([label,ids])=>`<div class="navgroup">${esc(label)}</div>${ids.map(id=>`<button class="navlink" data-page="${id}"${id===current?' aria-current="page"':''}>${esc(titleFor(id))}</button>`).join('')}`).join(''); }
+function subnav(sections){return `<p class="result-label">Report sections below include product sub-tabs and related review areas.</p><div class="subnav" aria-label="Report sections"><button data-section="all" aria-pressed="${section==='all'}">All sections</button>${sections.map((s,i)=>`<button data-section="${i}" aria-pressed="${section===String(i)}">${esc(s.title)}</button>`).join('')}</div>`;}
+function blocks(sections,headers,status=false){return sections.filter((_,i)=>section==='all'||section===String(i)).map(s=>`<section><h2>${esc(s.title)}</h2>${status?statusTable(headers,s.rows):table(headers,s.rows)}</section>`).join('');}
+function moduleView(m){return `<h1>${esc(m.title)}</h1><p class="intro">${esc(m.intro)}</p><dl class="stats"><div class="stat"><dt>Effort</dt><dd>${esc(m.effort)}</dd><small>Relative work, not a time estimate</small></div><div class="stat"><dt>Estimated module code changes</dt><dd>${esc(m.change)}</dd><small>Planning range; not a measured line count</small></div><div class="stat"><dt>Client mapping / content</dt><dd style="font-size:21px">${esc(m.mapping)}</dd><small>Separate from code changes</small></div></dl>${m.id==='knowledge'?'<div class="notice danger">Keep Knowledge Hub gated. Its effort is outside the database onboarding estimate.</div>':''}${subnav(m.sections)}${blocks(m.sections,['Area','Current position','Work for the client','Challenge / check before acceptance'])}<details class="evidence"><summary>Code reviewed for this module</summary>${m.sources.map(s=>`<code>${esc(s)}</code>`).join('')}</details>`;}
+function overview(){return `<h1>Client setup: what changes?</h1><p class="intro">Reuse the product shell. Adapt business mappings and source logic. Prove security and numerical results before client use.</p><div class="notice">All percentages are planning ranges for one new domain on PostgreSQL. They are not readiness scores, code measurements or a delivery commitment.</div><dl class="stats"><div class="stat"><dt>Overall application code adaptation</dt><dd>25–40%</dd><small>New domain, existing UI and PostgreSQL</small></div><div class="stat"><dt>Overall application code reuse</dt><dd>60–75%</dd><small>Planning assumption; confirm in discovery</small></div><div class="stat"><dt>Security acceptance</dt><dd style="font-size:21px;color:var(--warn)">Not established</dd><small>No security score or production sign-off</small></div></dl><h2>Module view</h2><div class="table-wrap" tabindex="0" aria-label="Scrollable report table"><table><thead><tr><th scope="col">Soci tab</th><th scope="col">Effort</th><th scope="col">Code changes</th><th scope="col">Client mapping / content</th></tr></thead><tbody>${modules.map(m=>`<tr><td><button class="jump" data-page="${m.id}">${esc(m.title)}</button></td><td>${esc(m.effort)}</td><td>${esc(m.change)}</td><td>${esc(m.mapping)}</td></tr>`).join('')}</tbody></table></div><h2>Decisions for leadership</h2>${table(['Decision','Recommended starting point','Confirm with'],[['Pilot boundary','One client, one domain, curated reporting data; keep Knowledge Hub separate.','Client sponsor'],['Business meaning','Named owners approve formulas, grain, dates and example answers.','Client business owner'],['Model data sharing','Approve what may leave Soci before enabling client prompts.','Client security / data owner'],['Security fixes','Resolve token revocation, first-login enforcement and write-route protection review.','Backend / security'],['Acceptance','Reference SQL reconciliation, permission-denial tests, realistic concurrency and recovery checks.','QA / DBA / operations']])}`;}
+function setupView(){return `<h1>Client data setup</h1><p class="intro">Additional review topic. Configuration proposed for onboarding; not a claim that a complete connector wizard already exists.</p>${subnav(dataSetup)}${blocks(dataSetup,['Area','Configuration / action','Challenge','Acceptance check'])}`;}
+function securityView(){return `<h1>Security and user setup</h1><p class="intro">Controls seen in code are different from controls proven in a client environment.</p><div class="notice danger">No system is guaranteed attack-proof. A read-only connection can still expose readable data. No security certification is claimed.</div>${subnav(security)}${blocks(security,['Control','Review status','Action / limit','Owner','Evidence required'],true)}`;}
+function risksView(){return `<h1>Open points and decisions</h1><p class="intro">These are visible delivery risks and review findings. They are not confirmed attack results.</p>${statusTable(['Open point','Status','Next action','Owner'],risks)}<h2>Release conditions</h2>${table(['Condition','Required evidence'],[['Correct answers','Client reference queries and agreed business definitions match outputs.'],['Access boundaries','Direct API, joins, exports, saved reports and caches obey current user permissions.'],['Model boundary','Approved payload list and tested masking; approved provider terms.'],['Identity','Password/reset/revocation policy works, including old access tokens.'],['Operations','Freshness, alert delivery, restoration, rollback and support ownership are tested.']])}`;}
+function sourcesView(){return `<h1>Evidence and assumptions</h1><div class="notice info">Reviewed on 23 November 2026 against the AskDB checkout. Agentic setup was outside scope. This HTML file contains no client data or credentials.</div><h2>How to read the estimates</h2>${table(['Term','Meaning'],[['Code change percentage','Estimated adaptation of the module’s implementation, not a source-line count. Not a percentage of security or functional readiness.'],['Client mapping / content','Business definitions, YAML, aliases, dataset rules and permission mappings to author or approve.'],['Effort: Low','Mostly labels and small configuration changes, with validation.'],['Effort: Medium','Source mappings or integration changes plus targeted testing.'],['Effort: High','Business calculations, joins, permissions or several linked workflows need adaptation and reconciliation.'],['Overall 25–40%','Judgment-based planning range for a new PostgreSQL domain. Not an average of the module rows.'],['Scope assumption','One client deployment/domain; existing visual experience retained; data and subject experts available.'],['Different engine / new ingestion / RAG','Separate assessment. Do not apply the baseline range without checking compatibility and dependencies.'],['Not tested','Live client database, credentials, deployment, network controls, model contract, production load and penetration resistance.']])}<h2>Status labels</h2>${table(['Label','Meaning'],[['In code','Implementation found in reviewed source; still needs integration/acceptance tests.'],['Partial','Some controls exist, but coverage or client mapping needs work.'],['Needs fix','A specific code-level gap was observed; confirm and address before release.'],['Not verified / Not established','No evidence of working client deployment or acceptance was obtained.'],['Proposed / Separate work','A recommendation or additional scope, not an implemented capability.']])}<h2>Source files</h2>${table(['Area','Files reviewed','What they establish'],sourceRows)}<h2>Security references</h2><p class="fine">References inform recommended controls. They do not certify Soci. Links open only when clicked.</p><ul class="plain-list">${referenceLinks.map(([label,url])=>`<li><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)} — OWASP</a></li>`).join('')}</ul>`;}
+function render(){nav();const m=modules.find(m=>m.id===current);$('view').innerHTML=m?moduleView(m):current==='setup'?setupView():current==='security'?securityView():current==='risks'?risksView():current==='sources'?sourcesView():overview();document.title=`Soci — ${titleFor(current)} — Client setup review`;}
+function openPage(id,updateHash=true){const valid=modules.some(m=>m.id===id)||Object.hasOwn(specialTitles,id);current=valid?id:'overview';section='all';if(updateHash)history.replaceState(null,'','#'+current);render();$('sidebar').classList.remove('open');$('menu').setAttribute('aria-expanded','false');window.scrollTo({top:0,behavior:'instant'});$('content').focus({preventScroll:true});}
+document.addEventListener('click',e=>{const page=e.target.closest('[data-page]');if(page){openPage(page.dataset.page);return;}const sub=e.target.closest('[data-section]');if(sub){section=sub.dataset.section;render();$('view').querySelector(`[data-section="${section}"]`)?.focus();}});
+function setTheme(t){document.documentElement.dataset.theme=t;$('theme').textContent=t==='dark'?'Light theme':'Dark theme';$('theme').setAttribute('aria-pressed',String(t==='dark'));try{localStorage.setItem('soci-report-theme',t);}catch{}}
+let theme='light';try{theme=localStorage.getItem('soci-report-theme')||'light';}catch{}setTheme(theme==='dark'?'dark':'light');
+$('theme').addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
+$('print').addEventListener('click',()=>window.print());
+$('menu').addEventListener('click',()=>{const open=$('sidebar').classList.toggle('open');$('menu').setAttribute('aria-expanded',String(open));});
+window.addEventListener('hashchange',()=>openPage(location.hash.slice(1),false));
+openPage(location.hash.slice(1)||'overview',false);
+</script>
+</body>
+</html>

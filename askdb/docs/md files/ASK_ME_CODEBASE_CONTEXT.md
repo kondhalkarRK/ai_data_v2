@@ -255,9 +255,9 @@ verification limitations and outstanding Phase 4 live/pilot gates.
   Important switches: auth bypass (development only on API), New Chat UI, RAG,
   chat router/classifier/general knowledge, LLM reasoning mode and web retrieval.
 - Admin-governed LLM settings feed HTTP chat completions with timeouts, retries,
-  fallback and circuit breaker. Default provider/model/pricing catalog path is
-  outside this application: `../config/llm_catalog.py`; portability must account
-  for it. Credentials stay server-side.
+  fallback and circuit breaker. Default provider/model/pricing catalog is bundled inside this application at
+  `apps/api/app/config/llm_catalog.py` (updated 2026-11-23). It is resolved from
+  the installed app package, including Docker. Credentials stay server-side.
 - API startup performs schema repairs and catalog refreshes; starting it is not
   read-only. Do not use it for casual inspection of a shared database.
 - Frontend Vitest covers UI, routing, graphs, formatting, SSE and API helpers.

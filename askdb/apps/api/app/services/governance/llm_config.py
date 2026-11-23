@@ -1,6 +1,6 @@
 """Admin-governed LLM configuration: provider, model, temperature and max tokens.
 
-Providers and models come from ``config/llm_catalog.py`` (see ``llm_catalog``). The
+Providers and models come from ``app/config/llm_catalog.py`` (see ``llm_catalog``). The
 choice lives in ``app_settings`` (key ``llm``). Each API process keeps a copy that the
 chat routes re-read once per question, so every worker follows the admin's latest choice.
 Without a saved choice the environment defaults apply.
@@ -175,7 +175,7 @@ def llm_settings_payload(settings: Settings) -> dict[str, Any]:
             "inputTokensPerQuestion": catalog.input_tokens_per_question,
             "outputTokensPerQuestion": catalog.output_tokens_per_question,
             "monthlyBudgetUsd": settings.llm_monthly_budget_usd,
-            "source": "config/llm_catalog.py",
+            "source": "app/config/llm_catalog.py",
         },
     }
 
@@ -222,7 +222,7 @@ async def update_llm_config(
     catalog = load_catalog(settings)
     entry = catalog.provider(provider)
     if entry is None:
-        raise ValidationError(f"Unknown provider '{provider}'. Add it to config/llm_catalog.py.")
+        raise ValidationError(f"Unknown provider '{provider}'. Add it to app/config/llm_catalog.py.")
     if endpoint(settings, provider) is None:
         raise ValidationError(
             f"{entry.label} is not configured on the server. "
@@ -235,7 +235,7 @@ async def update_llm_config(
     before = await sync_llm_config(session, settings)
     known = {m.id for m in entry.models}
     if known and model not in known and not (provider == before.provider and model == before.model):
-        raise ValidationError(f"'{model}' is not a {entry.label} model in config/llm_catalog.py.")
+        raise ValidationError(f"'{model}' is not a {entry.label} model in app/config/llm_catalog.py.")
     after = GovernedLlm(
         provider=provider,
         model=model,

@@ -1,4 +1,4 @@
-"""Providers, models and indicative pricing loaded from ``config/llm_catalog.py``.
+"""Providers, models and indicative pricing loaded from ``app/config/llm_catalog.py``.
 
 The catalog file is the only place providers and models are defined. It is re-read when
 its modification time changes, so a new provider appears in LLM Settings without a
@@ -14,11 +14,13 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from app.core.config import REPO_ROOT, Settings
+from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CATALOG_PATH = REPO_ROOT.parent / "config" / "llm_catalog.py"
+# Resolve from the installed app package, including wheels and /app in Docker.
+# Do not depend on the checkout's parent or the process working directory.
+DEFAULT_CATALOG_PATH = Path(__file__).resolve().parents[2] / "config" / "llm_catalog.py"
 DEFAULT_INPUT_TOKENS = 2_000
 DEFAULT_OUTPUT_TOKENS = 500
 

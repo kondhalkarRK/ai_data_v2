@@ -95,7 +95,7 @@ const RESPONSES: Record<string, unknown> = {
       inputTokensPerQuestion: 2000,
       outputTokensPerQuestion: 500,
       monthlyBudgetUsd: 50,
-      source: "config/llm_catalog.py",
+      source: "app/config/llm_catalog.py",
     },
   },
   "/api/v1/admin/governance?days=30": {
