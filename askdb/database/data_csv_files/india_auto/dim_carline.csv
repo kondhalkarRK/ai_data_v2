@@ -1,0 +1,252 @@
+carline_id,carline_name,model,make,car_type,engine_capacity,engine_type
+1,Alto 0.8 Petrol,Alto,Maruti Suzuki,Hatchback,0.8,Petrol
+2,Alto 1.0 Petrol,Alto,Maruti Suzuki,Hatchback,1.0,Petrol
+3,WagonR 1.0 Petrol,WagonR,Maruti Suzuki,Hatchback,1.0,Petrol
+4,WagonR 1.2 Petrol,WagonR,Maruti Suzuki,Hatchback,1.2,Petrol
+5,Celerio 1.0 Petrol,Celerio,Maruti Suzuki,Hatchback,1.0,Petrol
+6,Celerio 0.8 Diesel,Celerio,Maruti Suzuki,Hatchback,0.8,Diesel
+7,Ritz 1.2 Petrol,Ritz,Maruti Suzuki,Hatchback,1.2,Petrol
+8,Ritz 1.3 Diesel,Ritz,Maruti Suzuki,Hatchback,1.3,Diesel
+9,S-Presso 1.0 Petrol,S-Presso,Maruti Suzuki,Hatchback,1.0,Petrol
+10,Swift 1.2 Petrol,Swift,Maruti Suzuki,Hatchback,1.2,Petrol
+11,Swift 1.3 Diesel,Swift,Maruti Suzuki,Hatchback,1.3,Diesel
+12,Dzire 1.2 Petrol,Dzire,Maruti Suzuki,Compact Sedan,1.2,Petrol
+13,Dzire 1.3 Diesel,Dzire,Maruti Suzuki,Compact Sedan,1.3,Diesel
+14,Baleno 1.2 Petrol,Baleno,Maruti Suzuki,Premium Hatchback,1.2,Petrol
+15,Baleno 1.3 Diesel,Baleno,Maruti Suzuki,Premium Hatchback,1.3,Diesel
+16,Ignis 1.2 Petrol,Ignis,Maruti Suzuki,Hatchback,1.2,Petrol
+17,Ignis 1.3 Diesel,Ignis,Maruti Suzuki,Hatchback,1.3,Diesel
+18,Ciaz 1.4 Petrol,Ciaz,Maruti Suzuki,Premium Sedan,1.4,Petrol
+19,Ciaz 1.5 Petrol,Ciaz,Maruti Suzuki,Premium Sedan,1.5,Petrol
+20,Ciaz 1.3 Diesel,Ciaz,Maruti Suzuki,Premium Sedan,1.3,Diesel
+21,Brezza 1.3 Diesel,Brezza,Maruti Suzuki,Compact SUV,1.3,Diesel
+22,Brezza 1.5 Petrol,Brezza,Maruti Suzuki,Compact SUV,1.5,Petrol
+23,Ertiga 1.4 Petrol,Ertiga,Maruti Suzuki,MPV,1.4,Petrol
+24,Ertiga 1.5 Petrol,Ertiga,Maruti Suzuki,MPV,1.5,Petrol
+25,Ertiga 1.3 Diesel,Ertiga,Maruti Suzuki,MPV,1.3,Diesel
+26,XL6 1.5 Petrol,XL6,Maruti Suzuki,MPV,1.5,Petrol
+27,S-Cross 1.3 Diesel,S-Cross,Maruti Suzuki,Mid SUV,1.3,Diesel
+28,S-Cross 1.6 Diesel,S-Cross,Maruti Suzuki,Mid SUV,1.6,Diesel
+29,S-Cross 1.5 Petrol,S-Cross,Maruti Suzuki,Mid SUV,1.5,Petrol
+30,Grand Vitara 1.5 Petrol,Grand Vitara,Maruti Suzuki,Mid SUV,1.5,Petrol
+31,Grand Vitara 1.5 Hybrid,Grand Vitara,Maruti Suzuki,Mid SUV,1.5,Hybrid
+32,Fronx 1.2 Petrol,Fronx,Maruti Suzuki,Compact SUV,1.2,Petrol
+33,Fronx 1.0 Petrol,Fronx,Maruti Suzuki,Compact SUV,1.0,Petrol
+34,Jimny 1.5 Petrol,Jimny,Maruti Suzuki,SUV,1.5,Petrol
+35,Invicto 2.0 Hybrid,Invicto,Maruti Suzuki,MPV,2.0,Hybrid
+36,Eeco 1.2 Petrol,Eeco,Maruti Suzuki,MUV,1.2,Petrol
+37,Victoris 1.5 Petrol,Victoris,Maruti Suzuki,Mid SUV,1.5,Petrol
+38,Victoris 1.5 Hybrid,Victoris,Maruti Suzuki,Mid SUV,1.5,Hybrid
+39,e Vitara,e Vitara,Maruti Suzuki,Mid SUV,,Electric
+40,Eon 0.8 Petrol,Eon,Hyundai,Hatchback,0.8,Petrol
+41,Santro 1.1 Petrol,Santro,Hyundai,Hatchback,1.1,Petrol
+42,Grand i10 1.2 Petrol,Grand i10,Hyundai,Hatchback,1.2,Petrol
+43,Grand i10 1.1 Diesel,Grand i10,Hyundai,Hatchback,1.1,Diesel
+44,Grand i10 Nios 1.2 Petrol,Grand i10 Nios,Hyundai,Hatchback,1.2,Petrol
+45,Grand i10 Nios 1.2 Diesel,Grand i10 Nios,Hyundai,Hatchback,1.2,Diesel
+46,Xcent 1.2 Petrol,Xcent,Hyundai,Compact Sedan,1.2,Petrol
+47,Xcent 1.1 Diesel,Xcent,Hyundai,Compact Sedan,1.1,Diesel
+48,Aura 1.2 Petrol,Aura,Hyundai,Compact Sedan,1.2,Petrol
+49,Aura 1.2 Diesel,Aura,Hyundai,Compact Sedan,1.2,Diesel
+50,i20 1.2 Petrol,i20,Hyundai,Premium Hatchback,1.2,Petrol
+51,i20 1.4 Diesel,i20,Hyundai,Premium Hatchback,1.4,Diesel
+52,i20 1.0 Petrol,i20,Hyundai,Premium Hatchback,1.0,Petrol
+53,Verna 1.5 Petrol,Verna,Hyundai,Sedan,1.5,Petrol
+54,Verna 1.5 Diesel,Verna,Hyundai,Sedan,1.5,Diesel
+55,Elantra 2.0 Petrol,Elantra,Hyundai,Premium Sedan,2.0,Petrol
+56,Elantra 1.5 Diesel,Elantra,Hyundai,Premium Sedan,1.5,Diesel
+57,Creta 1.5 Petrol,Creta,Hyundai,Mid SUV,1.5,Petrol
+58,Creta 1.5 Diesel,Creta,Hyundai,Mid SUV,1.5,Diesel
+59,Creta Electric,Creta,Hyundai,Mid SUV,,Electric
+60,Venue 1.2 Petrol,Venue,Hyundai,Compact SUV,1.2,Petrol
+61,Venue 1.0 Petrol,Venue,Hyundai,Compact SUV,1.0,Petrol
+62,Venue 1.5 Diesel,Venue,Hyundai,Compact SUV,1.5,Diesel
+63,Tucson 2.0 Petrol,Tucson,Hyundai,Premium SUV,2.0,Petrol
+64,Tucson 2.0 Diesel,Tucson,Hyundai,Premium SUV,2.0,Diesel
+65,Alcazar 1.5 Petrol,Alcazar,Hyundai,Mid SUV,1.5,Petrol
+66,Alcazar 1.5 Diesel,Alcazar,Hyundai,Mid SUV,1.5,Diesel
+67,Kona,Kona,Hyundai,Compact SUV,,Electric
+68,Ioniq 5,Ioniq 5,Hyundai,Premium SUV,,Electric
+69,Exter 1.2 Petrol,Exter,Hyundai,Compact SUV,1.2,Petrol
+70,Nano 0.6 Petrol,Nano,Tata,Hatchback,0.6,Petrol
+71,Indica 1.2 Petrol,Indica,Tata,Hatchback,1.2,Petrol
+72,Indica 1.4 Diesel,Indica,Tata,Hatchback,1.4,Diesel
+73,Zest 1.2 Petrol,Zest,Tata,Compact Sedan,1.2,Petrol
+74,Zest 1.3 Diesel,Zest,Tata,Compact Sedan,1.3,Diesel
+75,Bolt 1.2 Petrol,Bolt,Tata,Hatchback,1.2,Petrol
+76,Bolt 1.3 Diesel,Bolt,Tata,Hatchback,1.3,Diesel
+77,Tiago 1.2 Petrol,Tiago,Tata,Hatchback,1.2,Petrol
+78,Tiago 1.0 Diesel,Tiago,Tata,Hatchback,1.0,Diesel
+79,Tiago EV,Tiago,Tata,Hatchback,,Electric
+80,Tigor 1.2 Petrol,Tigor,Tata,Compact Sedan,1.2,Petrol
+81,Tigor 1.0 Diesel,Tigor,Tata,Compact Sedan,1.0,Diesel
+82,Tigor EV,Tigor,Tata,Compact Sedan,,Electric
+83,Hexa 2.2 Diesel,Hexa,Tata,MUV,2.2,Diesel
+84,Safari 2.2 Diesel,Safari,Tata,Mid SUV,2.2,Diesel
+85,Safari 2.0 Diesel,Safari,Tata,Mid SUV,2.0,Diesel
+86,Nexon 1.2 Petrol,Nexon,Tata,Compact SUV,1.2,Petrol
+87,Nexon 1.5 Diesel,Nexon,Tata,Compact SUV,1.5,Diesel
+88,Nexon EV,Nexon,Tata,Compact SUV,,Electric
+89,Altroz 1.2 Petrol,Altroz,Tata,Premium Hatchback,1.2,Petrol
+90,Altroz 1.5 Diesel,Altroz,Tata,Premium Hatchback,1.5,Diesel
+91,Harrier 2.0 Diesel,Harrier,Tata,Mid SUV,2.0,Diesel
+92,Harrier EV,Harrier,Tata,Mid SUV,,Electric
+93,Punch 1.2 Petrol,Punch,Tata,Compact SUV,1.2,Petrol
+94,Punch EV,Punch,Tata,Compact SUV,,Electric
+95,Curvv 1.2 Petrol,Curvv,Tata,Mid SUV,1.2,Petrol
+96,Curvv 1.5 Diesel,Curvv,Tata,Mid SUV,1.5,Diesel
+97,Curvv EV,Curvv,Tata,Mid SUV,,Electric
+98,Sierra 1.5 Petrol,Sierra,Tata,Mid SUV,1.5,Petrol
+99,Sierra 1.5 Diesel,Sierra,Tata,Mid SUV,1.5,Diesel
+100,Bolero 2.5 Diesel,Bolero,Mahindra,SUV,2.5,Diesel
+101,Bolero 1.5 Diesel,Bolero,Mahindra,SUV,1.5,Diesel
+102,TUV300 1.5 Diesel,TUV300,Mahindra,Compact SUV,1.5,Diesel
+103,Bolero Neo 1.5 Diesel,Bolero Neo,Mahindra,Compact SUV,1.5,Diesel
+104,Scorpio 2.2 Diesel,Scorpio,Mahindra,SUV,2.2,Diesel
+105,Scorpio-N 2.2 Diesel,Scorpio-N,Mahindra,SUV,2.2,Diesel
+106,Scorpio-N 2.0 Petrol,Scorpio-N,Mahindra,SUV,2.0,Petrol
+107,XUV500 2.2 Diesel,XUV500,Mahindra,Mid SUV,2.2,Diesel
+108,XUV500 2.2 Petrol,XUV500,Mahindra,Mid SUV,2.2,Petrol
+109,XUV700 2.2 Diesel,XUV700,Mahindra,Mid SUV,2.2,Diesel
+110,XUV700 2.0 Petrol,XUV700,Mahindra,Mid SUV,2.0,Petrol
+111,XUV3XO 1.2 Petrol,XUV3XO,Mahindra,Compact SUV,1.2,Petrol
+112,XUV3XO 1.5 Diesel,XUV3XO,Mahindra,Compact SUV,1.5,Diesel
+113,XUV400,XUV400,Mahindra,Compact SUV,,Electric
+114,Thar 2.5 Diesel,Thar,Mahindra,SUV,2.5,Diesel
+115,Thar 2.2 Diesel,Thar,Mahindra,SUV,2.2,Diesel
+116,Thar 2.0 Petrol,Thar,Mahindra,SUV,2.0,Petrol
+117,Thar Roxx 2.2 Diesel,Thar Roxx,Mahindra,SUV,2.2,Diesel
+118,Thar Roxx 2.0 Petrol,Thar Roxx,Mahindra,SUV,2.0,Petrol
+119,KUV100 1.2 Petrol,KUV100,Mahindra,Compact SUV,1.2,Petrol
+120,KUV100 1.2 Diesel,KUV100,Mahindra,Compact SUV,1.2,Diesel
+121,Marazzo 1.5 Diesel,Marazzo,Mahindra,MPV,1.5,Diesel
+122,Alturas G4 2.2 Diesel,Alturas G4,Mahindra,Premium SUV,2.2,Diesel
+123,Xylo 2.5 Diesel,Xylo,Mahindra,MUV,2.5,Diesel
+124,BE 6,BE 6,Mahindra,Mid SUV,,Electric
+125,XEV 9e,XEV 9e,Mahindra,Premium SUV,,Electric
+126,Etios 1.5 Petrol,Etios,Toyota,Compact Sedan,1.5,Petrol
+127,Etios 1.4 Diesel,Etios,Toyota,Compact Sedan,1.4,Diesel
+128,Etios Liva 1.2 Petrol,Etios Liva,Toyota,Hatchback,1.2,Petrol
+129,Etios Liva 1.4 Diesel,Etios Liva,Toyota,Hatchback,1.4,Diesel
+130,Corolla Altis 1.8 Petrol,Corolla Altis,Toyota,Premium Sedan,1.8,Petrol
+131,Corolla Altis 1.4 Diesel,Corolla Altis,Toyota,Premium Sedan,1.4,Diesel
+132,Camry 2.5 Petrol,Camry,Toyota,Premium Sedan,2.5,Petrol
+133,Camry 2.5 Hybrid,Camry,Toyota,Premium Sedan,2.5,Hybrid
+134,Innova 2.5 Diesel,Innova,Toyota,MUV,2.5,Diesel
+135,Innova Crysta 2.4 Diesel,Innova Crysta,Toyota,MUV,2.4,Diesel
+136,Innova Crysta 2.8 Diesel,Innova Crysta,Toyota,MUV,2.8,Diesel
+137,Innova Crysta 2.7 Petrol,Innova Crysta,Toyota,MUV,2.7,Petrol
+138,Innova Hycross 2.0 Petrol,Innova Hycross,Toyota,MPV,2.0,Petrol
+139,Innova Hycross 2.0 Hybrid,Innova Hycross,Toyota,MPV,2.0,Hybrid
+140,Fortuner 3.0 Diesel,Fortuner,Toyota,Premium SUV,3.0,Diesel
+141,Fortuner 2.8 Diesel,Fortuner,Toyota,Premium SUV,2.8,Diesel
+142,Fortuner 2.7 Petrol,Fortuner,Toyota,Premium SUV,2.7,Petrol
+143,Glanza 1.2 Petrol,Glanza,Toyota,Premium Hatchback,1.2,Petrol
+144,Urban Cruiser 1.5 Petrol,Urban Cruiser,Toyota,Compact SUV,1.5,Petrol
+145,Hyryder 1.5 Petrol,Hyryder,Toyota,Mid SUV,1.5,Petrol
+146,Hyryder 1.5 Hybrid,Hyryder,Toyota,Mid SUV,1.5,Hybrid
+147,Rumion 1.5 Petrol,Rumion,Toyota,MPV,1.5,Petrol
+148,Taisor 1.2 Petrol,Taisor,Toyota,Compact SUV,1.2,Petrol
+149,Taisor 1.0 Petrol,Taisor,Toyota,Compact SUV,1.0,Petrol
+150,Yaris 1.5 Petrol,Yaris,Toyota,Sedan,1.5,Petrol
+151,Vellfire 2.5 Hybrid,Vellfire,Toyota,MPV,2.5,Hybrid
+152,Seltos 1.5 Petrol,Seltos,Kia,Mid SUV,1.5,Petrol
+153,Seltos 1.5 Diesel,Seltos,Kia,Mid SUV,1.5,Diesel
+154,Sonet 1.2 Petrol,Sonet,Kia,Compact SUV,1.2,Petrol
+155,Sonet 1.0 Petrol,Sonet,Kia,Compact SUV,1.0,Petrol
+156,Sonet 1.5 Diesel,Sonet,Kia,Compact SUV,1.5,Diesel
+157,Carnival 2.2 Diesel,Carnival,Kia,MPV,2.2,Diesel
+158,Carens 1.5 Petrol,Carens,Kia,MPV,1.5,Petrol
+159,Carens 1.5 Diesel,Carens,Kia,MPV,1.5,Diesel
+160,Carens EV,Carens,Kia,MPV,,Electric
+161,EV6,EV6,Kia,Premium SUV,,Electric
+162,Syros 1.0 Petrol,Syros,Kia,Compact SUV,1.0,Petrol
+163,Syros 1.5 Diesel,Syros,Kia,Compact SUV,1.5,Diesel
+164,EV9,EV9,Kia,Premium SUV,,Electric
+165,Brio 1.2 Petrol,Brio,Honda,Hatchback,1.2,Petrol
+166,Jazz 1.2 Petrol,Jazz,Honda,Premium Hatchback,1.2,Petrol
+167,Jazz 1.5 Diesel,Jazz,Honda,Premium Hatchback,1.5,Diesel
+168,WR-V 1.2 Petrol,WR-V,Honda,Compact SUV,1.2,Petrol
+169,WR-V 1.5 Diesel,WR-V,Honda,Compact SUV,1.5,Diesel
+170,Amaze 1.2 Petrol,Amaze,Honda,Compact Sedan,1.2,Petrol
+171,Amaze 1.5 Diesel,Amaze,Honda,Compact Sedan,1.5,Diesel
+172,City 1.5 Petrol,City,Honda,Sedan,1.5,Petrol
+173,City 1.5 Diesel,City,Honda,Sedan,1.5,Diesel
+174,City 1.5 Hybrid,City,Honda,Sedan,1.5,Hybrid
+175,BR-V 1.5 Petrol,BR-V,Honda,MPV,1.5,Petrol
+176,BR-V 1.5 Diesel,BR-V,Honda,MPV,1.5,Diesel
+177,Civic 1.8 Petrol,Civic,Honda,Premium Sedan,1.8,Petrol
+178,Civic 1.6 Diesel,Civic,Honda,Premium Sedan,1.6,Diesel
+179,CR-V 2.0 Petrol,CR-V,Honda,Premium SUV,2.0,Petrol
+180,CR-V 1.6 Diesel,CR-V,Honda,Premium SUV,1.6,Diesel
+181,Elevate 1.5 Petrol,Elevate,Honda,Mid SUV,1.5,Petrol
+182,Hector 1.5 Petrol,Hector,MG,Mid SUV,1.5,Petrol
+183,Hector 2.0 Diesel,Hector,MG,Mid SUV,2.0,Diesel
+184,ZS EV,ZS EV,MG,Mid SUV,,Electric
+185,Gloster 2.0 Diesel,Gloster,MG,Premium SUV,2.0,Diesel
+186,Astor 1.5 Petrol,Astor,MG,Mid SUV,1.5,Petrol
+187,Comet EV,Comet EV,MG,Hatchback,,Electric
+188,Windsor EV,Windsor EV,MG,Mid SUV,,Electric
+189,Rapid 1.6 Petrol,Rapid,Skoda,Sedan,1.6,Petrol
+190,Rapid 1.0 Petrol,Rapid,Skoda,Sedan,1.0,Petrol
+191,Rapid 1.5 Diesel,Rapid,Skoda,Sedan,1.5,Diesel
+192,Octavia 2.0 Petrol,Octavia,Skoda,Premium Sedan,2.0,Petrol
+193,Octavia 2.0 Diesel,Octavia,Skoda,Premium Sedan,2.0,Diesel
+194,Superb 2.0 Petrol,Superb,Skoda,Premium Sedan,2.0,Petrol
+195,Superb 2.0 Diesel,Superb,Skoda,Premium Sedan,2.0,Diesel
+196,Kodiaq 2.0 Diesel,Kodiaq,Skoda,Premium SUV,2.0,Diesel
+197,Kodiaq 2.0 Petrol,Kodiaq,Skoda,Premium SUV,2.0,Petrol
+198,Kushaq 1.0 Petrol,Kushaq,Skoda,Mid SUV,1.0,Petrol
+199,Kushaq 1.5 Petrol,Kushaq,Skoda,Mid SUV,1.5,Petrol
+200,Slavia 1.0 Petrol,Slavia,Skoda,Sedan,1.0,Petrol
+201,Slavia 1.5 Petrol,Slavia,Skoda,Sedan,1.5,Petrol
+202,Kylaq 1.0 Petrol,Kylaq,Skoda,Compact SUV,1.0,Petrol
+203,Polo 1.2 Petrol,Polo,Volkswagen,Premium Hatchback,1.2,Petrol
+204,Polo 1.0 Petrol,Polo,Volkswagen,Premium Hatchback,1.0,Petrol
+205,Polo 1.5 Diesel,Polo,Volkswagen,Premium Hatchback,1.5,Diesel
+206,Vento 1.6 Petrol,Vento,Volkswagen,Sedan,1.6,Petrol
+207,Vento 1.0 Petrol,Vento,Volkswagen,Sedan,1.0,Petrol
+208,Vento 1.5 Diesel,Vento,Volkswagen,Sedan,1.5,Diesel
+209,Ameo 1.2 Petrol,Ameo,Volkswagen,Compact Sedan,1.2,Petrol
+210,Ameo 1.5 Diesel,Ameo,Volkswagen,Compact Sedan,1.5,Diesel
+211,Tiguan 2.0 Diesel,Tiguan,Volkswagen,Premium SUV,2.0,Diesel
+212,Tiguan 2.0 Petrol,Tiguan,Volkswagen,Premium SUV,2.0,Petrol
+213,Taigun 1.0 Petrol,Taigun,Volkswagen,Mid SUV,1.0,Petrol
+214,Taigun 1.5 Petrol,Taigun,Volkswagen,Mid SUV,1.5,Petrol
+215,Virtus 1.0 Petrol,Virtus,Volkswagen,Sedan,1.0,Petrol
+216,Virtus 1.5 Petrol,Virtus,Volkswagen,Sedan,1.5,Petrol
+217,Kwid 0.8 Petrol,Kwid,Renault,Hatchback,0.8,Petrol
+218,Kwid 1.0 Petrol,Kwid,Renault,Hatchback,1.0,Petrol
+219,Duster 1.5 Petrol,Duster,Renault,Mid SUV,1.5,Petrol
+220,Duster 1.5 Diesel,Duster,Renault,Mid SUV,1.5,Diesel
+221,Lodgy 1.5 Diesel,Lodgy,Renault,MPV,1.5,Diesel
+222,Captur 1.5 Petrol,Captur,Renault,Mid SUV,1.5,Petrol
+223,Captur 1.5 Diesel,Captur,Renault,Mid SUV,1.5,Diesel
+224,Triber 1.0 Petrol,Triber,Renault,MPV,1.0,Petrol
+225,Kiger 1.0 Petrol,Kiger,Renault,Compact SUV,1.0,Petrol
+226,Micra 1.2 Petrol,Micra,Nissan,Hatchback,1.2,Petrol
+227,Micra 1.5 Diesel,Micra,Nissan,Hatchback,1.5,Diesel
+228,Sunny 1.5 Petrol,Sunny,Nissan,Sedan,1.5,Petrol
+229,Sunny 1.5 Diesel,Sunny,Nissan,Sedan,1.5,Diesel
+230,Terrano 1.5 Diesel,Terrano,Nissan,Mid SUV,1.5,Diesel
+231,Terrano 1.6 Petrol,Terrano,Nissan,Mid SUV,1.6,Petrol
+232,Kicks 1.5 Petrol,Kicks,Nissan,Mid SUV,1.5,Petrol
+233,Kicks 1.5 Diesel,Kicks,Nissan,Mid SUV,1.5,Diesel
+234,Magnite 1.0 Petrol,Magnite,Nissan,Compact SUV,1.0,Petrol
+235,X-Trail 1.5 Petrol,X-Trail,Nissan,Premium SUV,1.5,Petrol
+236,Wrangler 2.0 Petrol,Wrangler,Jeep,Premium SUV,2.0,Petrol
+237,Grand Cherokee 3.6 Petrol,Grand Cherokee,Jeep,Premium SUV,3.6,Petrol
+238,Grand Cherokee 2.0 Petrol,Grand Cherokee,Jeep,Premium SUV,2.0,Petrol
+239,Compass 2.0 Diesel,Compass,Jeep,Premium SUV,2.0,Diesel
+240,Compass 1.4 Petrol,Compass,Jeep,Premium SUV,1.4,Petrol
+241,Meridian 2.0 Diesel,Meridian,Jeep,Premium SUV,2.0,Diesel
+242,C5 Aircross 2.0 Diesel,C5 Aircross,Citroen,Premium SUV,2.0,Diesel
+243,C3 1.2 Petrol,C3,Citroen,Hatchback,1.2,Petrol
+244,eC3,C3,Citroen,Hatchback,,Electric
+245,C3 Aircross 1.2 Petrol,C3 Aircross,Citroen,Mid SUV,1.2,Petrol
+246,Basalt 1.2 Petrol,Basalt,Citroen,Mid SUV,1.2,Petrol
+247,e6,e6,BYD,MPV,,Electric
+248,eMAX 7,eMAX 7,BYD,MPV,,Electric
+249,Atto 3,Atto 3,BYD,Mid SUV,,Electric
+250,Seal,Seal,BYD,Premium Sedan,,Electric
+251,Sealion 7,Sealion 7,BYD,Premium SUV,,Electric

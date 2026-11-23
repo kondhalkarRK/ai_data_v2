@@ -22,7 +22,7 @@ from app.api.deps import (
     RequireUser,
     get_app_session,
     get_app_settings,
-    get_scoped_analytics,
+    get_optional_scoped_analytics,
     get_semantic_service,
 )
 from app.core.config import Industry, Settings
@@ -143,7 +143,7 @@ class SaveQuestionRequest(ApiModel):
     sql_text: str | None = None
 
 
-AnalyticsConnection = Annotated[AsyncConnection, Depends(get_scoped_analytics)]
+OptionalAnalyticsConnection = Annotated[AsyncConnection | None, Depends(get_optional_scoped_analytics)]
 
 
 @router.post("/chat/ask")
@@ -153,7 +153,7 @@ async def chat_ask(
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: AnalyticsConnection,
+    analytics: OptionalAnalyticsConnection,
     semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
 ) -> StreamingResponse:
     await _prepare_question(session, settings, user)
@@ -240,7 +240,7 @@ async def chat_ask_sync(
     industry: ActiveIndustry,
     session: Annotated[AsyncSession, Depends(get_app_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    analytics: AnalyticsConnection,
+    analytics: OptionalAnalyticsConnection,
     semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
 ) -> dict[str, Any]:
     """One JSON response for hosts (Vercel) that buffer SSE and never paint tokens."""

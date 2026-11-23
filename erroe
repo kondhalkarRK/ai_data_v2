@@ -1,3 +1,7 @@
+cd "E:\ai_data_rag\ai_data_v2\askme-agentic\apps\api"
+.\.venv\Scripts\python.exe -m alembic -x target=app upgrade head
+.\.venv\Scripts\python.exe -m alembic -x target=app current
+
 import os
 from dotenv import load_dotenv
 from google.adk.agents import Agent

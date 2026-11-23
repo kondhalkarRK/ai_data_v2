@@ -3,10 +3,10 @@
 -- Does not change passwords, usernames, roles, industry or regional grants.
 -- No automatic startup execution. Custom names are preserved.
 BEGIN;
+UPDATE auth_users SET full_name = 'Arpit'
+WHERE email_normalized = 'admin@askdb.local' AND role = 'admin';
+
 UPDATE auth_users SET full_name = 'Rahul'
-WHERE email_normalized = 'admin@askdb.local' AND role = 'admin'
-  AND full_name = 'PoC Administrator';
-UPDATE auth_users SET full_name = 'Aditi'
 WHERE email_normalized = 'user1@askdb.local' AND role = 'user'
   AND full_name = 'PoC User';
 UPDATE auth_users SET full_name = 'Aarav'

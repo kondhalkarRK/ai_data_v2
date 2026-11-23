@@ -1,0 +1,25 @@
+colour_id,colour_name,rcg_combination,patent_number
+1,Pearl White,PWT | Mono-tone,
+2,Ivory,IVR | Mono-tone,
+3,Arctic Silver,ASV | Mono-tone,
+4,Midnight Black,MBK | Mono-tone,
+5,Graphite Grey,GGR | Mono-tone,
+6,Titanium,TTN | Mono-tone,
+7,Nardo Grey,NDG | Mono-tone,IN-DES-2019-311472
+8,Storm Grey,"STG | Dual-tone, black roof",
+9,Fire Red,FRD | Mono-tone,
+10,Crimson Metallic,"CRM | Dual-tone, black roof",IN-DES-2016-282931
+11,Cosmic Blue,CBL | Mono-tone,
+12,Ocean Blue,OBL | Mono-tone,
+13,Ice Blue,"IBL | Dual-tone, black roof",
+14,Sky Cyan,"SCY | Dual-tone, black roof",IN-DES-2020-330815
+15,Aurora Green,"AGR | Dual-tone, black roof",IN-DES-2021-345127
+16,Forest Green,FGR | Mono-tone,
+17,Emerald Pearl,EMP | Mono-tone,IN-DES-2018-301266
+18,Lava Orange,"LOR | Dual-tone, black roof",
+19,Sunburst Orange,SOR | Mono-tone,
+20,Champagne Gold,CGD | Mono-tone,
+21,Desert Beige,DBG | Mono-tone,
+22,Coral Pink,CPK | Mono-tone,
+23,Royal Purple,RPL | Mono-tone,
+24,Matte Bronze,"MBZ | Dual-tone, black roof",IN-DES-2022-356904
