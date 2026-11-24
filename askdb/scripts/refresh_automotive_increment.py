@@ -70,6 +70,22 @@ def inventory_db(conn) -> Inventory:
     return inv
 
 
+def validate_snapshot_schema(schema: list) -> None:
+    # The generator exports business columns, not the forecast surrogate key.
+    # Both the migration-created table and a CSV-contract-only table are supported.
+    optional_columns = {"fact_forecast_monthly": {"forecast_id"}}
+    for table, columns in TABLE_COLUMNS.items():
+        required = set(columns) | ({"total_sales"} if table == "fact_sales" else set())
+        actual = {r[1] for r in schema if r[0] == table}
+        missing = required - actual
+        unexpected = actual - required - optional_columns.get(table, set())
+        if missing or unexpected:
+            raise ValueError(
+                f"Review live schema drift in {table} before exporting: "
+                f"missing columns={sorted(missing)}; unexpected columns={sorted(unexpected)}"
+            )
+
+
 def export_snapshot(folder: Path) -> None:
     if folder.exists():
         raise ValueError("Use a new snapshot directory")
@@ -80,14 +96,7 @@ def export_snapshot(folder: Path) -> None:
             "FROM information_schema.columns "
             "WHERE table_schema='automotive' ORDER BY table_name, ordinal_position"
         ).fetchall()
-        for table, columns in TABLE_COLUMNS.items():
-            actual = {r[1] for r in schema if r[0] == table}
-            if actual != set(columns) | (
-                {"total_sales"} if table == "fact_sales" else set()
-            ):
-                raise ValueError(
-                    f"Review live schema drift in {table} before exporting"
-                )
+        validate_snapshot_schema(schema)
         folder.mkdir(parents=True)
         for table in TABLE_COLUMNS:
             statement = sql.SQL(

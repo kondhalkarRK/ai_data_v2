@@ -278,6 +278,25 @@ def test_make_and_fuel_calibration_are_fitted_together():
     assert weights[4] == pytest.approx(0.3, abs=0.001)
 
 
+@pytest.mark.parametrize("with_forecast_id", [False, True])
+def test_snapshot_accepts_supported_forecast_schemas(with_forecast_id):
+    cli = runpy.run_path(str(ROOT / "scripts/refresh_automotive_increment.py"))
+    schema = [
+        (table, col, "text", "NEVER") for table, columns in TABLE_COLUMNS.items() for col in columns
+    ]
+    schema.append(("fact_sales", "total_sales", "numeric", "ALWAYS"))
+    if with_forecast_id:
+        schema.append(("fact_forecast_monthly", "forecast_id", "bigint", "NEVER"))
+    cli["validate_snapshot_schema"](schema)
+    missing = [r for r in schema if r[1] != "forecast_units"]
+    with pytest.raises(ValueError, match=r"missing columns=.*forecast_units"):
+        cli["validate_snapshot_schema"](missing)
+    with pytest.raises(ValueError, match=r"unexpected columns=.*unreviewed_column"):
+        cli["validate_snapshot_schema"](
+            [*schema, ("fact_forecast_monthly", "unreviewed_column", "text", "NEVER")]
+        )
+
+
 async def test_refreshed_vehicle_values_use_existing_governed_planner():
     from app.core.config import Industry, Settings
     from app.semantic.service import SemanticService
