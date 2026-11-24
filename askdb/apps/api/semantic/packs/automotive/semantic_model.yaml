@@ -186,6 +186,16 @@ value_domains:
       Jeep: [Jeep India, Stellantis Jeep]
       Citroen: [Citroën, Citroen India]
       BYD: [BYD Auto, BYD India, Build Your Dreams]
+  # Variant identity is separate from the model family. Values are refreshed from
+  # the warehouse; these are business aliases, not question-specific routing rules.
+  carline:
+    table: dim_carline
+    column: carline_name
+    label: Vehicle Variant
+    max_values: 500
+    aliases: [variant, carline, car line, trim]
+    value_aliases:
+      Triber 100PS 1.0 Petrol: [Triber 100PS, Triber 100 PS]
   # A shared alias ("Innova", "Thar", "Grand i10") names every model that lists it.
   model:
     table: dim_carline
@@ -224,6 +234,7 @@ value_domains:
       Verna: []
       Elantra: []
       Creta: [Hyundai Creta, Creta Electric]
+      Bayon: [Hyundai Bayon]
       Venue: []
       Tucson: []
       Alcazar: []

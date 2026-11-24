@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "orders_checked": 48992,
+  "protected_history_writes": 0,
+  "checks": [
+    "identity",
+    "cutoff",
+    "future_dates",
+    "launch_windows",
+    "foreign_keys",
+    "active_roster",
+    "brand_relationship",
+    "positive_quantity_price"
+  ],
+  "not_verified": [
+    "live PostgreSQL and office gateway",
+    "UI acceptance",
+    "national model-level actuals"
+  ]
+}

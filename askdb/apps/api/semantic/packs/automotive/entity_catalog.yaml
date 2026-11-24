@@ -9,6 +9,7 @@ schemas: [automotive]
 groups:
   make: Vehicle
   model: Vehicle
+  carline: Vehicle
   car_type: Vehicle
   engine_type: Vehicle
   colour: Vehicle

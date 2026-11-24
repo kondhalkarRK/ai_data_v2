@@ -80,3 +80,6 @@ Thumbs.db
 
 # Local Soci UI/API validation captures and generated SQL (not application source).
 /tmp/soci-qa/
+
+# Private office database snapshots, review batches and backups.
+/data/staging/

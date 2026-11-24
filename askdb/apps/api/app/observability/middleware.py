@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 from collections.abc import Awaitable, Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
 from app.core.config import Industry, Settings
@@ -34,7 +35,11 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        request_id = request.headers.get(REQUEST_ID_HEADER) or uuid.uuid4().hex[:16]
+        supplied_id = request.headers.get(REQUEST_ID_HEADER, "")
+        request_id = (
+            supplied_id if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", supplied_id)
+            else uuid.uuid4().hex[:16]
+        )
 
         industry = self._settings.default_industry
         header_industry = request.headers.get("x-industry")
@@ -93,30 +98,54 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp, *, settings: Settings) -> None:
         super().__init__(app)
         self._settings = settings
-        # The API serves JSON and SSE only, never HTML or scripts, so the strictest
-        # possible policy is correct here. The frontend sets its own policy.
-        self._csp = (
-            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
-        )
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        response = await call_next(request)
-        headers = response.headers
-        headers.setdefault("X-Content-Type-Options", "nosniff")
-        headers.setdefault("X-Frame-Options", "DENY")
-        headers.setdefault("Referrer-Policy", "no-referrer")
-        headers.setdefault("Content-Security-Policy", self._csp)
-        headers.setdefault(
-            "Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()"
-        )
-        headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
-        headers.setdefault("Cross-Origin-Resource-Policy", "same-site")
-        # Authenticated API responses must never be cached by an intermediary.
-        headers.setdefault("Cache-Control", "no-store")
-        if self._settings.cookie_secure:
-            headers.setdefault(
-                "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+        # Browser-origin checks also protect login/refresh, which do not have an
+        # existing authenticated session or an echoed CSRF token at first login.
+        origin = request.headers.get("origin")
+        if (
+            request.method not in {"GET", "HEAD", "OPTIONS"}
+            and origin is not None
+            and origin not in self._settings.cors_allowed_origins
+        ):
+            response = JSONResponse(
+                {"error": {"code": "csrf_failed", "message": "Request origin is not allowed."}},
+                status_code=403,
             )
-        return response
+            return apply_security_headers(response, self._settings)
+        if (
+            request.method not in {"GET", "HEAD", "OPTIONS"}
+            and origin is None
+            and request.headers.get("sec-fetch-site") == "cross-site"
+        ):
+            return apply_security_headers(JSONResponse(
+                {"error": {"code": "csrf_failed", "message": "Cross-site request is not allowed."}},
+                status_code=403,
+            ), self._settings)
+        response = await call_next(request)
+        return apply_security_headers(response, self._settings)
+
+
+def apply_security_headers(response: Response, settings: Settings) -> Response:
+    """Also used by the outermost unexpected-error handler."""
+    headers = response.headers
+    headers.setdefault("X-Content-Type-Options", "nosniff")
+    headers.setdefault("X-Frame-Options", "DENY")
+    headers.setdefault("Referrer-Policy", "no-referrer")
+    headers.setdefault("Content-Security-Policy", (
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    ))
+    headers.setdefault(
+        "Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    )
+    headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    headers.setdefault("Cross-Origin-Resource-Policy", "same-site")
+    # Authenticated API responses must never be cached by an intermediary.
+    headers.setdefault("Cache-Control", "no-store")
+    if settings.cookie_secure:
+        headers.setdefault(
+            "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+        )
+    return response

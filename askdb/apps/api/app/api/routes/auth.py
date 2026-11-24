@@ -137,6 +137,7 @@ async def logout(
         user_id=user.id,
         fingerprint=fingerprint,
         all_sessions=payload.all_sessions,
+        session_id=getattr(request.state, "session_id", None),
     )
     clear_session_cookies(response, settings)
     response.status_code = status.HTTP_204_NO_CONTENT

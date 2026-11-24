@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator, Callable, Coroutine
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
-from app.auth.cookies import read_access_token, read_csrf_cookie
+from app.auth.cookies import ACCESS_COOKIE, read_access_token, read_csrf_cookie
 from app.auth.rate_limit import FixedWindowRateLimiter, client_ip
 from app.auth.service import AuthService, RequestFingerprint
 from app.auth.tokens import constant_time_equals, decode_access_token
@@ -21,12 +22,14 @@ from app.core.exceptions import (
     AuthorizationError,
     CsrfError,
     DependencyUnavailableError,
+    RateLimitedError,
     ValidationError,
 )
-from app.rag.feature import require_rag_mutations
 from app.db.session import DatabaseRegistry
 from app.models.enums import Role
+from app.models.refresh_token import RefreshToken
 from app.models.user import User
+from app.rag.feature import require_rag_mutations
 from app.semantic.service import SemanticService
 from app.services.security.region_scope import (
     RegionScope,
@@ -102,7 +105,7 @@ def get_fingerprint(request: Request) -> RequestFingerprint:
     return RequestFingerprint(
         request_id=get_request_context(request).request_id,
         ip_address=client_ip(
-            request.headers.get("x-forwarded-for"),
+            None,
             request.client.host if request.client else None,
         ),
         user_agent=request.headers.get("user-agent"),
@@ -132,7 +135,7 @@ async def verify_csrf(
         return
 
     authorization = request.headers.get("authorization", "")
-    if authorization.lower().startswith("bearer "):
+    if authorization.lower().startswith("bearer ") and not request.cookies.get(ACCESS_COOKIE):
         return
 
     cookie_token = read_csrf_cookie(request)
@@ -168,6 +171,25 @@ async def get_current_user(
         # The token is valid but the account no longer is. Treated as unauthenticated so
         # the client clears its session rather than retrying.
         raise AuthenticationError("This account is no longer active.")
+
+    # sid is the refresh family, not the JWT id. A live successor keeps rotated
+    # sessions usable, while logout/password reset/reuse revocation ends access now.
+    live_session = await session.scalar(
+        select(RefreshToken.id).where(
+            RefreshToken.family_id == claims.session_id,
+            RefreshToken.user_id == user.id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.rotated_at.is_(None),
+            RefreshToken.expires_at > datetime.now(UTC),
+        ).limit(1)
+    )
+    if live_session is None:
+        raise AuthenticationError("This session has ended. Sign in again.")
+
+    decision = await request.app.state.api_limiter.check(f"user:{user.id}")
+    if not decision.allowed:
+        raise RateLimitedError(decision.retry_after_seconds)
+    request.state.session_id = claims.session_id
 
     context.user_id = user.id
     context.role = user.role
@@ -266,7 +288,8 @@ async def get_optional_scoped_analytics(
             yield RegionScopedConnection(connection, industry, scope)  # type: ignore[misc]
     except Exception:
         logging.getLogger(__name__).warning(
-            "Analytics SQL connection unavailable; continuing without SQL for document-only routes.",
+            "Analytics SQL connection unavailable; "
+            "continuing without SQL for document-only routes.",
             exc_info=True,
         )
         yield None

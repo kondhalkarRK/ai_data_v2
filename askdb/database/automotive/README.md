@@ -4,7 +4,7 @@
 --   python scripts/migrate.py automotive upgrade head
 --   python scripts/seed_automotive.py --rows 1000000 --replace
 --
--- Before a demo, keep Data Trust freshness green with a small top-up (about 100 orders
--- dated yesterday, plus a rollup refresh):
---
---   psql -U askdb_owner -h localhost -d askdb_automotive -f database/automotive/20_daily_refresh_small.sql
+-- September-November 2026: use the append-only inspection/staging workflow in
+-- docs/automotive-increment-2026.md. Preserve existing history and review the increment.
+-- 20_daily_refresh_small.sql no longer clones rows: it deliberately refuses writes.
+-- Do not use --replace for an incremental refresh.

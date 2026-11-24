@@ -70,14 +70,10 @@ class FixedWindowRateLimiter:
 
 
 def client_ip(forwarded_for: str | None, direct_host: str | None) -> str:
-    """Best-effort client address.
+    """Use the ASGI peer; trusted proxy processing belongs to the ASGI server.
 
-    Only trust ``X-Forwarded-For`` when the API sits behind a proxy that sets it, which is
-    why Uvicorn runs with ``--proxy-headers`` and an explicit trusted-proxy list in
-    deployment.
+    A raw forwarding header is attacker-controlled. Uvicorn may update the ASGI
+    peer only for a configured trusted proxy; never parse the header again here.
+    The first argument remains for compatibility with existing callers.
     """
-    if forwarded_for:
-        first = forwarded_for.split(",")[0].strip()
-        if first:
-            return first
     return direct_host or "unknown"

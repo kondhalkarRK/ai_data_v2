@@ -1,0 +1,58 @@
+month,dimension,value,existing_units,added_units,after_units,after_pct,published_pct,conditional_supported_fuel_pct,basis
+2026-09,engine_type,Diesel,3430,720,4150,19.852,17.74,23.069,Published reference vs synthetic sample; variances retained
+2026-09,engine_type,Electric,896,706,1602,7.663,8.45,10.988,Published reference vs synthetic sample; variances retained
+2026-09,engine_type,Hybrid,542,995,1537,7.352,9.44,12.276,Published reference vs synthetic sample; variances retained
+2026-09,engine_type,Petrol,13500,116,13616,65.133,41.27,53.667,Published reference vs synthetic sample; variances retained
+2026-09,make,BYD,44,0,44,0.21,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Citroen,38,6,44,0.21,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Honda,293,15,308,1.473,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Hyundai,2577,220,2797,13.38,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Jeep,18,4,22,0.105,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Kia,1176,157,1333,6.376,,,Published reference vs synthetic sample; variances retained
+2026-09,make,MG,370,3,373,1.784,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Mahindra,2252,333,2585,12.365,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Maruti Suzuki,7147,978,8125,38.866,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Nissan,99,18,117,0.56,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Renault,227,0,227,1.086,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Skoda,336,26,362,1.732,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Tata,2348,564,2912,13.93,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Toyota,1308,203,1511,7.228,,,Published reference vs synthetic sample; variances retained
+2026-09,make,Volkswagen,135,10,145,0.694,,,Published reference vs synthetic sample; variances retained
+2026-10,engine_type,Diesel,70,5390,5460,21.974,16.57,21.973,Published reference vs synthetic sample; variances retained
+2026-10,engine_type,Electric,19,2387,2406,9.683,7.3,9.68,Published reference vs synthetic sample; variances retained
+2026-10,engine_type,Hybrid,17,3257,3274,13.177,9.94,13.181,Published reference vs synthetic sample; variances retained
+2026-10,engine_type,Petrol,286,13421,13707,55.166,41.6,55.165,Published reference vs synthetic sample; variances retained
+2026-10,make,BYD,1,35,36,0.145,0.145,,Published reference vs synthetic sample; variances retained
+2026-10,make,Citroen,1,47,48,0.193,,,Published reference vs synthetic sample; variances retained
+2026-10,make,Honda,5,265,270,1.087,1.074,,Published reference vs synthetic sample; variances retained
+2026-10,make,Hyundai,54,2821,2875,11.571,11.442,,Published reference vs synthetic sample; variances retained
+2026-10,make,Jeep,1,26,27,0.109,,,Published reference vs synthetic sample; variances retained
+2026-10,make,Kia,29,1495,1524,6.134,6.066,,Published reference vs synthetic sample; variances retained
+2026-10,make,MG,4,346,350,1.409,1.395,,Published reference vs synthetic sample; variances retained
+2026-10,make,Mahindra,47,3169,3216,12.943,12.798,,Published reference vs synthetic sample; variances retained
+2026-10,make,Maruti Suzuki,140,10347,10487,42.206,41.751,,Published reference vs synthetic sample; variances retained
+2026-10,make,Nissan,1,161,162,0.652,0.645,,Published reference vs synthetic sample; variances retained
+2026-10,make,Renault,8,166,174,0.7,0.69,,Published reference vs synthetic sample; variances retained
+2026-10,make,Skoda,5,436,441,1.775,,,Published reference vs synthetic sample; variances retained
+2026-10,make,Tata,56,3579,3635,14.63,14.465,,Published reference vs synthetic sample; variances retained
+2026-10,make,Toyota,37,1384,1421,5.719,5.658,,Published reference vs synthetic sample; variances retained
+2026-10,make,Volkswagen,3,178,181,0.728,,,Published reference vs synthetic sample; variances retained
+2026-11,engine_type,Diesel,0,5365,5365,21.973,,,No November monthly actual; modelled scenario
+2026-11,engine_type,Electric,0,2366,2366,9.69,,,No November monthly actual; modelled scenario
+2026-11,engine_type,Hybrid,0,3218,3218,13.18,,,No November monthly actual; modelled scenario
+2026-11,engine_type,Petrol,0,13467,13467,55.156,,,No November monthly actual; modelled scenario
+2026-11,make,BYD,0,36,36,0.147,,,No November monthly actual; modelled scenario
+2026-11,make,Citroen,0,46,46,0.188,,,No November monthly actual; modelled scenario
+2026-11,make,Honda,0,265,265,1.085,,,No November monthly actual; modelled scenario
+2026-11,make,Hyundai,0,2825,2825,11.57,,,No November monthly actual; modelled scenario
+2026-11,make,Jeep,0,27,27,0.111,,,No November monthly actual; modelled scenario
+2026-11,make,Kia,0,1498,1498,6.135,,,No November monthly actual; modelled scenario
+2026-11,make,MG,0,344,344,1.409,,,No November monthly actual; modelled scenario
+2026-11,make,Mahindra,0,3157,3157,12.93,,,No November monthly actual; modelled scenario
+2026-11,make,Maruti Suzuki,0,10308,10308,42.218,,,No November monthly actual; modelled scenario
+2026-11,make,Nissan,0,160,160,0.655,,,No November monthly actual; modelled scenario
+2026-11,make,Renault,0,170,170,0.696,,,No November monthly actual; modelled scenario
+2026-11,make,Skoda,0,432,432,1.769,,,No November monthly actual; modelled scenario
+2026-11,make,Tata,0,3574,3574,14.638,,,No November monthly actual; modelled scenario
+2026-11,make,Toyota,0,1396,1396,5.718,,,No November monthly actual; modelled scenario
+2026-11,make,Volkswagen,0,178,178,0.729,,,No November monthly actual; modelled scenario

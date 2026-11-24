@@ -1,0 +1,175 @@
+SOCI AUTOMOTIVE REFRESH - OFFICE LAPTOP STEPS
+Prepared: 24 November 2026
+
+PURPOSE
+Preserve every existing record and add only the reviewed synthetic demo increment
+from 1 September through 23 November 2026. History through 31 August is protected.
+November is month-to-date (MTD). Generated transactions are not real market actuals.
+Insurance is not changed.
+
+Run the commands in PowerShell on the office laptop where PostgreSQL is available.
+No package reinstall, virtual-environment activation or Alembic migration is needed.
+Each Python command explicitly uses the project's existing virtual environment.
+
+STEP 1 - OPEN THE PROJECT
+
+cd "E:\ai_data_rag\ai_data_v2\askdb"
+
+Use your actual office project path if different.
+Check that apps\api\.venv\Scripts\python.exe exists.
+
+STEP 2 - CHECK THE PROJECT .env
+
+Confirm PostgreSQL is running. Confirm these values target the intended database:
+AUTOMOTIVE_DATABASE_URL         - reader connection for snapshots
+AUTOMOTIVE_MIGRATE_DATABASE_URL - owner connection for approved writes
+
+Keep real passwords in your local .env. Do not share or commit it.
+
+STEP 3 - EXPORT A READ-ONLY SNAPSHOT
+
+.\apps\api\.venv\Scripts\python.exe scripts/refresh_automotive_increment.py --snapshot-db data/staging/automotive_live_20261124
+
+CHECK:
+- The command completes without an error.
+- snapshot.json and coverage.json exist in the output directory.
+- Nothing has been changed in PostgreSQL.
+
+Open the coverage summary:
+
+notepad data/staging/automotive_live_20261124/coverage.json
+
+If the command fails, stop. If its folder already exists, use a fresh folder name
+and use that same snapshot folder in Step 4. Do not overwrite an earlier snapshot.
+
+STEP 4 - GENERATE THE PROPOSED ADDITIONS
+
+.\apps\api\.venv\Scripts\python.exe scripts/refresh_automotive_increment.py --stage-from data/staging/automotive_live_20261124 --out data/staging/automotive_review_20261124 --as-of 2026-11-24
+
+CHECK:
+- Output includes a batch ID, new orders, new units and vehicle additions.
+- This stages files only; it does not load the database.
+- Counts may differ from the local candidate because office coverage may differ.
+
+If the review folder already exists, use a fresh review folder name in every
+remaining command. The research is pinned to 24 November 2026; do not simply change
+the as-of date to extend coverage without updating and reviewing source evidence.
+
+STEP 5 - REVIEW THE FILES BEFORE ANY LOAD
+
+Start-Process "data/staging/automotive_review_20261124/review.html"
+
+Get-Content data/staging/automotive_review_20261124/validation.json
+
+CHECK:
+- "passed": true
+- "protected_history_writes": 0
+- Sales end on 23 November 2026.
+- November is MTD, not a complete month.
+- Monthly before/after totals and the festive pattern are plausible.
+- Review bucket_conflicts.json for retained existing allocations above the plan.
+- Review sources.json and reference_model_calendar.csv for assumptions.
+
+STOP FOR REVIEW HERE.
+Share the batch summary and validation results for approval. Do not share the
+private source snapshot. Do not apply the local CSV-based candidate: only a batch
+restaged from the office database snapshot can be loaded.
+
+STEP 6 - AFTER REVIEW, TAKE A BACKUP
+
+The example below assumes the usual local database. Check the actual host, port,
+database and owner against your configuration before running it.
+The PostgreSQL command-line utilities must be available in PowerShell. If they
+are not on PATH, use their full paths from your PostgreSQL installation's bin folder.
+
+pg_dump --host localhost --port 5432 --username askdb_owner --dbname askdb_automotive --schema automotive --format custom --file data/staging/automotive_before_increment.dump
+
+Enter the database password when prompted. Do not put it in the command.
+Use a new backup filename if this one already exists.
+
+Immediately check the exit status:
+
+$LASTEXITCODE
+
+It must be 0. Then inspect the archive:
+
+pg_restore --list data/staging/automotive_before_increment.dump
+
+CHECK: The archive lists the expected Automotive schema objects without an error.
+This is an Automotive schema backup, not a backup of the entire PostgreSQL server.
+If either check fails, do not load.
+
+STEP 7 - APPLY ONLY THE APPROVED BATCH
+
+Read its exact batch ID in the same PowerShell terminal:
+
+$reviewedBatch = Get-Content "data/staging/automotive_review_20261124/manifest.json" -Raw | ConvertFrom-Json
+$reviewedBatch.batch_id
+
+Confirm this is the ID reviewed and approved. Then run:
+
+.\apps\api\.venv\Scripts\python.exe scripts/refresh_automotive_increment.py --apply data/staging/automotive_review_20261124 --approve-batch $reviewedBatch.batch_id
+
+CHECK:
+- "status": "applied" (or "already_applied" on an identical repeated load).
+- Protected history is unchanged.
+- Metadata refresh completes.
+- Inspect post_refresh.json, including any Data Trust incidents.
+
+The loader refuses database drift after staging. If that happens, create a fresh
+snapshot and review batch; do not bypass the check.
+
+IF METADATA REFRESH FAILS:
+The data may already be committed. Do not run a replacement loader.
+Fix the reported connectivity/configuration issue, then retry metadata only:
+
+.\apps\api\.venv\Scripts\python.exe scripts/refresh_automotive_increment.py --refresh-metadata data/staging/automotive_review_20261124 --approve-batch $reviewedBatch.batch_id
+
+STEP 8 - RESTART AND CHECK SOCI
+
+Restart all API/backend workers using your usual startup command, then refresh
+the browser. The CLI cannot clear caches in an already running API process.
+
+CHECK:
+- September and October sales and November MTD through 23 November.
+- Daily sales around the Diwali window.
+- Newly added vehicle names in Chat and the SQL/results they produce.
+- KPI Dashboard, Analytics Builder and Executive Intelligence.
+- Regional permissions and Data Trust incidents.
+- Actual sales remain distinct from targets and forecasts.
+
+Current limitation: the schema has no CNG category. CNG is not relabelled as petrol.
+Live database loading, rollback and application behavior require office acceptance;
+local fixture tests are not proof of those live behaviors.
+
+OPTIONAL - SCOPED ROLLBACK, ONLY IF NEEDED AND APPROVED
+
+If using a new PowerShell terminal, first read the reviewedBatch variable again
+using Step 7. Then run:
+
+.\apps\api\.venv\Scripts\python.exe scripts/refresh_automotive_increment.py --rollback data/staging/automotive_review_20261124 --approve-batch $reviewedBatch.batch_id
+
+Rollback removes only the verified rows belonging to that batch. Modified rows or
+later foreign-key dependencies can block rollback rather than delete unrelated data.
+Restart API workers after a successful rollback and recheck the application.
+Do not restore a full backup casually; that can overwrite later work.
+
+WHY SNAPSHOTS AND BACKUPS STAY OUT OF GIT
+
+1. They copy database contents, potentially including employee names, emails and
+   confidential business information. Even a private repository is another copy
+   shared with repository users and integrations.
+2. Deleting a committed file does not remove it from earlier Git history.
+3. Large CSV snapshots and binary dumps make clones and repository history heavier.
+4. Git is for source versioning; it does not replace controlled backup storage and
+   retention. Keep backups in an IT-approved location with appropriate access and
+   encryption controls.
+
+The project ignores data/staging/ so new files there are excluded from normal Git
+adds. Ignore rules do not protect files already tracked or force-added to Git.
+
+Safe to commit: scripts, tests, source configuration and this guide, after review
+for secrets. Only publish synthetic demo CSVs after verifying that they contain no
+real employee/customer information or other confidential content.
+
+Detailed technical runbook: docs/automotive-increment-2026.md

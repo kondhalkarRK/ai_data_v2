@@ -1,0 +1,534 @@
+[
+  {
+    "month": "2026-09",
+    "carline_id": 3,
+    "existing_units": 379,
+    "nominal_bucket_units": 362,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 10,
+    "existing_units": 725,
+    "nominal_bucket_units": 701,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 12,
+    "existing_units": 783,
+    "nominal_bucket_units": 729,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 14,
+    "existing_units": 637,
+    "nominal_bucket_units": 584,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 16,
+    "existing_units": 100,
+    "nominal_bucket_units": 79,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 22,
+    "existing_units": 684,
+    "nominal_bucket_units": 673,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 24,
+    "existing_units": 682,
+    "nominal_bucket_units": 670,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 26,
+    "existing_units": 144,
+    "nominal_bucket_units": 131,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 32,
+    "existing_units": 506,
+    "nominal_bucket_units": 497,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 33,
+    "existing_units": 153,
+    "nominal_bucket_units": 125,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 34,
+    "existing_units": 29,
+    "nominal_bucket_units": 28,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 36,
+    "existing_units": 499,
+    "nominal_bucket_units": 443,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 37,
+    "existing_units": 354,
+    "nominal_bucket_units": 343,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 44,
+    "existing_units": 242,
+    "nominal_bucket_units": 174,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 48,
+    "existing_units": 209,
+    "nominal_bucket_units": 160,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 50,
+    "existing_units": 222,
+    "nominal_bucket_units": 180,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 53,
+    "existing_units": 107,
+    "nominal_bucket_units": 64,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 57,
+    "existing_units": 498,
+    "nominal_bucket_units": 333,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 60,
+    "existing_units": 239,
+    "nominal_bucket_units": 180,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 61,
+    "existing_units": 147,
+    "nominal_bucket_units": 115,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 69,
+    "existing_units": 303,
+    "nominal_bucket_units": 193,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 77,
+    "existing_units": 170,
+    "nominal_bucket_units": 128,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 80,
+    "existing_units": 51,
+    "nominal_bucket_units": 38,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 86,
+    "existing_units": 478,
+    "nominal_bucket_units": 324,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 89,
+    "existing_units": 131,
+    "nominal_bucket_units": 84,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 93,
+    "existing_units": 549,
+    "nominal_bucket_units": 421,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 95,
+    "existing_units": 61,
+    "nominal_bucket_units": 56,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 98,
+    "existing_units": 122,
+    "nominal_bucket_units": 70,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 106,
+    "existing_units": 65,
+    "nominal_bucket_units": 44,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 110,
+    "existing_units": 110,
+    "nominal_bucket_units": 65,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 111,
+    "existing_units": 207,
+    "nominal_bucket_units": 107,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 116,
+    "existing_units": 66,
+    "nominal_bucket_units": 36,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 135,
+    "existing_units": 264,
+    "nominal_bucket_units": 207,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 138,
+    "existing_units": 102,
+    "nominal_bucket_units": 25,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 141,
+    "existing_units": 88,
+    "nominal_bucket_units": 82,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 143,
+    "existing_units": 199,
+    "nominal_bucket_units": 61,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 145,
+    "existing_units": 170,
+    "nominal_bucket_units": 60,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 148,
+    "existing_units": 105,
+    "nominal_bucket_units": 34,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 149,
+    "existing_units": 22,
+    "nominal_bucket_units": 6,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 152,
+    "existing_units": 164,
+    "nominal_bucket_units": 109,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 154,
+    "existing_units": 146,
+    "nominal_bucket_units": 98,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 155,
+    "existing_units": 107,
+    "nominal_bucket_units": 80,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 158,
+    "existing_units": 160,
+    "nominal_bucket_units": 119,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 162,
+    "existing_units": 133,
+    "nominal_bucket_units": 92,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 170,
+    "existing_units": 130,
+    "nominal_bucket_units": 101,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 172,
+    "existing_units": 44,
+    "nominal_bucket_units": 19,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 181,
+    "existing_units": 115,
+    "nominal_bucket_units": 73,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 182,
+    "existing_units": 42,
+    "nominal_bucket_units": 10,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 183,
+    "existing_units": 22,
+    "nominal_bucket_units": 14,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 188,
+    "existing_units": 217,
+    "nominal_bucket_units": 201,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 200,
+    "existing_units": 28,
+    "nominal_bucket_units": 23,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 213,
+    "existing_units": 42,
+    "nominal_bucket_units": 40,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 217,
+    "existing_units": 30,
+    "nominal_bucket_units": 22,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 218,
+    "existing_units": 47,
+    "nominal_bucket_units": 35,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 224,
+    "existing_units": 122,
+    "nominal_bucket_units": 61,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 225,
+    "existing_units": 28,
+    "nominal_bucket_units": 27,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 118,
+    "existing_units": 57,
+    "nominal_bucket_units": 31,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 142,
+    "existing_units": 18,
+    "nominal_bucket_units": 6,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 147,
+    "existing_units": 59,
+    "nominal_bucket_units": 20,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 186,
+    "existing_units": 26,
+    "nominal_bucket_units": 4,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 243,
+    "existing_units": 11,
+    "nominal_bucket_units": 9,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 246,
+    "existing_units": 13,
+    "nominal_bucket_units": 8,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 248,
+    "existing_units": 18,
+    "nominal_bucket_units": 11,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 251,
+    "existing_units": 10,
+    "nominal_bucket_units": 6,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 52,
+    "existing_units": 37,
+    "nominal_bucket_units": 23,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 64,
+    "existing_units": 7,
+    "nominal_bucket_units": 6,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 65,
+    "existing_units": 40,
+    "nominal_bucket_units": 23,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 199,
+    "existing_units": 20,
+    "nominal_bucket_units": 16,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 201,
+    "existing_units": 15,
+    "nominal_bucket_units": 6,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 245,
+    "existing_units": 11,
+    "nominal_bucket_units": 7,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 249,
+    "existing_units": 13,
+    "nominal_bucket_units": 10,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 185,
+    "existing_units": 4,
+    "nominal_bucket_units": 2,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 68,
+    "existing_units": 9,
+    "nominal_bucket_units": 6,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 236,
+    "existing_units": 3,
+    "nominal_bucket_units": 0,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 63,
+    "existing_units": 2,
+    "nominal_bucket_units": 1,
+    "action": "preserved"
+  },
+  {
+    "month": "2026-09",
+    "carline_id": 238,
+    "existing_units": 1,
+    "nominal_bucket_units": 0,
+    "action": "preserved"
+  }
+]

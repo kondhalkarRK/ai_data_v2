@@ -57,7 +57,7 @@ class JsonFormatter(logging.Formatter):
             "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": redact_text(record.getMessage()),
             "request_id": getattr(record, "request_id", "-"),
         }
 
@@ -70,9 +70,14 @@ class JsonFormatter(logging.Formatter):
             payload["context"] = redact(extras)
 
         if record.exc_info:
-            payload["exception"] = self.formatException(record.exc_info)
+            payload["exception"] = redact_text(self.formatException(record.exc_info))
 
         return json.dumps(payload, default=str, ensure_ascii=False)
+
+
+class RedactedTextFormatter(logging.Formatter):
+    def formatException(self, exc_info: Any) -> str:  # noqa: N802 - logging API
+        return redact_text(super().formatException(exc_info))
 
 
 def configure_logging(level: str = "INFO", *, json_output: bool = True) -> None:
@@ -80,7 +85,7 @@ def configure_logging(level: str = "INFO", *, json_output: bool = True) -> None:
     handler.setFormatter(
         JsonFormatter()
         if json_output
-        else logging.Formatter(
+        else RedactedTextFormatter(
             "%(asctime)s %(levelname)-7s [%(request_id)s] %(name)s: %(message)s"
         )
     )

@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-# Windows: must run before uvicorn creates the event loop / psycopg connects.
-import app.compat  # noqa: F401
-
 import asyncio
 import logging
 from collections.abc import AsyncIterator
@@ -18,6 +15,8 @@ from sqlalchemy.exc import DBAPIError
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+# Windows: must run before uvicorn creates the event loop / psycopg connects.
+import app.compat
 from app.api.router import api_v1_router
 from app.api.routes import system
 from app.auth.rate_limit import FixedWindowRateLimiter
@@ -28,7 +27,11 @@ from app.db.errors import classify_database_error
 from app.db.schema_repair import repair_auth_user_industry_values, repair_llm_usage
 from app.db.session import DatabaseRegistry
 from app.observability.logging import configure_logging
-from app.observability.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.observability.middleware import (
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+    apply_security_headers,
+)
 from app.schemas.common import ErrorBody, ErrorResponse
 from app.semantic.service import SemanticService
 from app.services.catalog import EntityCatalogService
@@ -130,13 +133,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=None if resolved.is_production else "/openapi.json",
     )
     app.state.settings = resolved
+    app.state.api_limiter = FixedWindowRateLimiter(
+        limit=resolved.rate_limit_api_per_minute, window_seconds=60
+    )
     # Pure file-backed service; safe to create before lifespan and therefore available
     # to ASGI test transports that intentionally skip external database startup.
     app.state.semantic_service = SemanticService(resolved)
 
     # Middleware runs in reverse registration order, so security headers are applied
     # last and therefore end up on every response, including error responses.
-    app.add_middleware(SecurityHeadersMiddleware, settings=resolved)
     app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.add_middleware(
         CORSMiddleware,
@@ -150,6 +155,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if resolved.trusted_hosts:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=resolved.trusted_hosts)
     app.add_middleware(RequestContextMiddleware, settings=resolved)
+    app.add_middleware(SecurityHeadersMiddleware, settings=resolved)
 
     app.include_router(system.router)
     app.include_router(api_v1_router)
@@ -232,7 +238,10 @@ def _register_exception_handlers(app: FastAPI) -> None:
                 request_id=current_request_id(),
             )
         )
-        return JSONResponse(status_code=500, content=body.model_dump(by_alias=True))
+        return apply_security_headers(
+            JSONResponse(status_code=500, content=body.model_dump(by_alias=True)),
+            request.app.state.settings,
+        )
 
 
 app = create_app()

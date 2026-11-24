@@ -247,9 +247,12 @@ class AuthService:
         user_id: uuid.UUID | None,
         fingerprint: RequestFingerprint,
         all_sessions: bool = False,
+        session_id: uuid.UUID | None = None,
     ) -> None:
         if all_sessions and user_id is not None:
             await self.tokens.revoke_all_for_user(user_id, reason="logout_all")
+        elif session_id is not None:
+            await self.tokens.revoke_family(session_id, reason="logout")
         elif refresh_token:
             stored = await self.tokens.get_by_hash(hash_refresh_token(refresh_token))
             if stored is not None:
@@ -279,6 +282,9 @@ class AuthService:
         new_password: str,
         fingerprint: RequestFingerprint,
     ) -> None:
+        decision = await self._login_limiter.check(f"reauth:{user.id}")
+        if not decision.allowed:
+            raise RateLimitedError(decision.retry_after_seconds)
         if not passwords.verify_password(current_password, user.password_hash):
             await self.audit.record(
                 AuthEventType.PASSWORD_CHANGED,

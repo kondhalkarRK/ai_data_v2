@@ -1,0 +1,106 @@
+{
+  "version": "1.0",
+  "as_of": "2026-11-24",
+  "start": "2026-09-01",
+  "end": "2026-11-23",
+  "protected_cutoff": "2026-08-31",
+  "seed": 20261124,
+  "source_kind": "csv_reference",
+  "live_database_verified": false,
+  "database_identity": null,
+  "baseline": {
+    "tables": {
+      "dim_region": {
+        "rows": 69,
+        "sha256_multiset": "78b9afc5c6606f78b59e3c0da2003cebcacc8d5624e80b759642ec6909418428"
+      },
+      "dim_carline": {
+        "rows": 251,
+        "sha256_multiset": "7eb90ea8bac1b0d3b5676e17e9098a012342bf6a77204df6d7c19bdc9134be83"
+      },
+      "dim_color": {
+        "rows": 24,
+        "sha256_multiset": "f78dc0a47137546cfd7b5246d8af25ea6f3d68f3af1277c8333548b2344032f9"
+      },
+      "dim_salesman": {
+        "rows": 3760,
+        "sha256_multiset": "f0fb44b6a24114294c211af7d25313acc28cfb23f74d52f1a425e20e262844fa"
+      },
+      "dim_dealer": {
+        "rows": 433,
+        "sha256_multiset": "9adcd1894b680a350e92acf80aff29b8335351dd2fe772a0a5725d33302ff0ee"
+      },
+      "dim_targets": {
+        "rows": 1936,
+        "sha256_multiset": "a8a779d0daf1d9809cebbdaeaa2f4c6d2facb3dc118775626df7c8f7b35ff3ba"
+      },
+      "fact_sales": {
+        "rows": 2101557,
+        "sha256_multiset": "0414c401b0748b8371490bd0e674b33a4852d95e7f572771f97a67bac7b8ab1b"
+      },
+      "fact_forecast_monthly": {
+        "rows": 431076,
+        "sha256_multiset": "bc03ed358fe1e54a37898d2a1ad4347e42eddc579c05c550658852ab9f8d19d3"
+      }
+    },
+    "protected": {
+      "rows": 2083521,
+      "sha256_multiset": "c511e34baa4bb69b2624c8b3a84378545ca27538f59b45f5eb7d4c9af6122d17"
+    },
+    "max_order_id": 2101557
+  },
+  "allocations": [
+    {
+      "month": "2026-09",
+      "period_end": "2026-09-30",
+      "status": "complete synthetic",
+      "nominal_units": 20905,
+      "existing_units": 18368,
+      "additional_units": 2537,
+      "after_units": 20905
+    },
+    {
+      "month": "2026-10",
+      "period_end": "2026-10-31",
+      "status": "complete synthetic",
+      "nominal_units": 24847,
+      "existing_units": 392,
+      "additional_units": 24455,
+      "after_units": 24847
+    },
+    {
+      "month": "2026-11",
+      "period_end": "2026-11-23",
+      "status": "MTD synthetic",
+      "nominal_units": 24416,
+      "existing_units": 0,
+      "additional_units": 24416,
+      "after_units": 24416
+    }
+  ],
+  "new_carlines": 2,
+  "new_orders": 48992,
+  "new_units": 51408,
+  "warnings": [
+    "Synthetic sample, not genuine transactions or national totals.",
+    "The existing warehouse does not represent CNG/LPG. Its published share is excluded and remaining fuel weights are renormalised; this is NOT full-market fuel coverage.",
+    "Targets and forecasts are preserved unchanged.",
+    "Existing bucket overshoots preserved; see bucket_conflicts.json.",
+    "Substantial September coverage exists; all those rows are preserved.",
+    "CSV candidate only: export live database and restage before approval/load."
+  ],
+  "files": {
+    "benchmark_comparison.csv": "89e06752c51c5177d99b1dfe2cb35568504b40d9dd3ae4cd22982aa735cbdc60",
+    "bucket_conflicts.json": "ae8a03105965d6abd454fb1082610912b38711a599af7518fab3ceabdac6a669",
+    "coverage_before.json": "fe78b9908898cf3629c57295ae087bcdf86235a336db6b6bfd83f9e4cabf7007",
+    "daily_after.csv": "8a22a836bdb98a138b33ea27013e507a73aa9dac1893f320ebff26d9c9a6c7f3",
+    "dim_carline.csv": "fc139373a51371a135694163052834f4974b5a43180786835e493b8b52626601",
+    "fact_sales.csv": "1648e9e1faa43149358ea4e8c900a8f1a8e62227c2c31fdcdc99a53d029d611e",
+    "monthly_after.csv": "8570daa28594bfa15a6811e26776997d209fd1ec3cbd973f90ddc66d2a110e4c",
+    "reference_model_calendar.csv": "f396d3fffe43de1e41759bcd1fe58518415426114b0573d9778033f5ddace76f",
+    "review.html": "224a670a7aaf490b96a09be1428791e02c1db7991999ef08c6e682f8551f8127",
+    "sources.json": "7bfc89d22bff7de8619b2f4eb433e0e037cd70a8fb1e0ea6ff1130c317a77611",
+    "validation.json": "9f6e3bfed08b5e8c751e339d6834c835a183458a988cfcc1d9de44cb82d466da"
+  },
+  "batch_id": "auto-a24af3d946b36fc5cc00"
+}

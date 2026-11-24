@@ -176,7 +176,8 @@ class Settings(BaseSettings):
     llm_default_model: str = "openai.gpt-5.1"
     llm_temperature: float = Field(default=0.2, ge=0.0, le=1.5)
     llm_max_completion_tokens: int = Field(default=600, ge=1)
-    llm_timeout_seconds: int = Field(default=55, ge=1)  # Non-NLQ callers; NLQ uses nlq_llm_timeout_seconds
+    # Non-NLQ callers; NLQ uses nlq_llm_timeout_seconds.
+    llm_timeout_seconds: int = Field(default=55, ge=1)
     llm_monthly_budget_usd: float = Field(default=50.0, ge=0.0)
 
     # Optional alias — some setups only export OPENAI_API_KEY.
@@ -280,7 +281,7 @@ class Settings(BaseSettings):
             object.__setattr__(self, "cors_allowed_origins", origins)
 
             hosts = list(self.trusted_hosts)
-            for host in ("localhost", "127.0.0.1", "0.0.0.0", "::1", "testserver"):
+            for host in ("localhost", "127.0.0.1", "0.0.0.0", "::1", "testserver"):  # noqa: S104
                 if host not in hosts:
                     hosts.append(host)
             object.__setattr__(self, "trusted_hosts", hosts)
@@ -299,10 +300,18 @@ class Settings(BaseSettings):
                 problems.append("JWT_SECRET_KEY must be at least 32 characters")
             if not self.cookie_secure:
                 problems.append("COOKIE_SECURE must be true")
+            if not self.ssl_verify and not self.ssl_cert_file.strip():
+                problems.append(
+                    "SSL_VERIFY must be true or SSL_CERT_FILE must provide a trusted CA"
+                )
+            if not self.trusted_hosts or any("*" in host for host in self.trusted_hosts):
+                problems.append("TRUSTED_HOSTS must list exact hostnames without wildcards")
             if not self.cors_allowed_origins:
                 problems.append("CORS_ALLOWED_ORIGINS must list at least one origin")
             if "*" in self.cors_allowed_origins:
                 problems.append("CORS_ALLOWED_ORIGINS must not contain '*'")
+            if any(not origin.startswith("https://") for origin in self.cors_allowed_origins):
+                problems.append("CORS_ALLOWED_ORIGINS must use HTTPS in production")
             if self.cookie_samesite == "none" and not self.cookie_secure:
                 problems.append("COOKIE_SAMESITE=none requires COOKIE_SECURE=true")
             if problems:

@@ -1,0 +1,34 @@
+{
+  "as_of": "2026-11-24",
+  "basis": "FADA domestic passenger-vehicle retail registrations; scaled synthetic dealer-network sample",
+  "sources": [
+    {"id":"fada_oct","url":"https://www.fada.in/images/press-release/16aed49cca8e14FADA_Press_Release_Oct_26.pdf","published":"2026-11-06","period":"2026-10","coverage":"PV retail, 1468/1469 RTOs; not OEM wholesales or exports","pages":[5,13]},
+    {"id":"fada_festive","url":"https://fada.in/images/press-release/16b03c447ab70cFADA_Press_Release_42%20Days%20Festive%20Vehicle%20Retail%20Data%202026_FINAL.pdf","published":"2026-11-23","period":"42-day festive 2026","coverage":"Retail festive-window context, not a November monthly total"},
+    {"id":"diwali","url":"https://www.indiapost.gov.in/holidays-list","published":null,"period":"2026","coverage":"Government holiday calendar: Diwali 8 November"},
+    {"id":"triber","url":"https://cdn.group.renault.com/ren/in/pressrelease2026/september/Press%20release.pdf.asset.pdf/1790597861979.pdf","published":"2026-09-28","period":"launch","coverage":"Manufacturer India launch; ex-showroom prices, not realised revenue"},
+    {"id":"bayon","url":"https://org3.hyundai.com/in/en/hyundai-story/media-center/press-release/hmi-launches-hyundai-bayon-price","published":"2026-10-26","period":"launch","coverage":"Manufacturer India launch; 1.5L petrol, starting ex-showroom INR 999900"}
+  ],
+  "benchmarks": {
+    "2026-09":{"pv_units":427213,"fuel_pct":{"Petrol":41.27,"Diesel":17.74,"Hybrid":9.44,"Electric":8.45,"CNG/LPG":23.11},"source":"fada_oct"},
+    "2026-10":{"pv_units":507768,"fuel_pct":{"Petrol":41.60,"Diesel":16.57,"Hybrid":9.94,"Electric":7.30,"CNG/LPG":24.59},"source":"fada_oct"}
+  },
+  "october_make_units":{"Maruti Suzuki":211996,"Tata":73449,"Mahindra":64982,"Hyundai":58099,"Kia":30799,"Toyota":28727,"MG":7082,"Honda":5455,"Renault":3505,"Nissan":3273,"BYD":737},
+  "assumptions": {
+    "september_vs_august_sample":1.03,
+    "november_vs_october_full_month_scenario":1.15,
+    "dhanteras":"2026-11-06",
+    "diwali":"2026-11-08",
+    "unsupported_fuel":"The existing warehouse does not represent CNG/LPG. Its published share is excluded and remaining fuel weights are renormalised; this is NOT full-market fuel coverage.",
+    "regional_model_mix":"Model, region, daily allocation and realised prices are synthetic assumptions. Existing overshoots are preserved and reported, never erased.",
+    "november":"Synthetic month-to-date scenario; no published full-November actual is claimed.",
+    "prices":"Historical sample transaction prices with 0.2% monthly assumed drift and bounded variation; new vehicle means below are modelling assumptions, not reported realised sales."
+  },
+  "additions":[
+    {"make":"Renault","model":"Triber","carline_name":"Triber 100PS 1.0 Petrol","car_type":"MPV","engine_type":"Petrol","engine_capacity":"1.0","announced":"2026-09-28","launched":"2026-09-28","verified_delivery_date":null,"available_from":"2026-10-01","availability_basis":"Conservative synthetic delivery start after confirmed launch; precise first delivery not verified","mean_price_inr":"845000.00","within_make_weight":0.20,"source":"triber"},
+    {"make":"Hyundai","model":"Bayon","carline_name":"Bayon 1.5 Petrol","car_type":"Mid SUV","engine_type":"Petrol","engine_capacity":"1.5","announced":"2026-09-14","launched":"2026-10-26","verified_delivery_date":null,"available_from":"2026-11-01","availability_basis":"Conservative synthetic delivery start after confirmed launch; precise first delivery not verified","mean_price_inr":"1200000.00","within_make_weight":0.08,"source":"bayon"}
+  ],
+  "not_added":[
+    {"candidate":"Kia Sorento","reason":"Official premiere located, but a sufficiently verified source bundle for India delivery date, engine/variant identity and price was not established in this review; no speculative sales added."},
+    {"candidate":"Renault Duster hybrid","reason":"Pre-debut official announcement located; completed launch, specification and delivery evidence needs further verification before adding sales."}
+  ]
+}
