@@ -6,13 +6,19 @@
 .demoInsight { animation: appear 700ms 700ms ease-out both; }
 @media (min-width: 1024px) { .workspaceGrid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 48px; padding-top: 56px; } }
 @media (max-width: 639px) { .workspaceGrid { padding-top: 32px; gap: 28px; } .demoCard { padding: 18px; } }
-.brandIntro { position: relative; isolation: isolate; animation: appear 800ms ease-out both; }
+.brandIntro { position: relative; isolation: isolate; margin-top: -24px; }
 .brandIntro::before { content: ""; position: absolute; z-index: -1; inset: -35% -30%; border-radius: 50%; background: radial-gradient(ellipse, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 68%); pointer-events: none; }
-.wordmark { --wordmark-green: hsl(var(--success)); --wordmark-purple: #7952b3; color: var(--wordmark-green); animation: wordmarkColour 10s ease-in-out infinite; font-size: clamp(3.75rem, 8vw, 5.5rem); line-height: 1.05; font-weight: 700; letter-spacing: -.065em; }
-:global(.dark) .wordmark, :global(.theme-ai) .wordmark { --wordmark-purple: #b39aee; }
-.wordmark :global(.brand-ask), .wordmark :global(.brand-me) { color: inherit; }
-.wordmark :global(.brand-me) { margin-left: .025em; text-transform: none; }
+.wordmark { --wordmark-green: hsl(var(--success)); --wordmark-purple: #7952b3; --wordmark-glow: 14%; position: relative; display: inline-flex; align-items: baseline; color: var(--wordmark-green); animation: wordmarkColour 7s 1s ease-in-out infinite; font-size: clamp(3.75rem, 8vw, 5.5rem); line-height: 1.05; font-weight: 700; letter-spacing: -.065em; }
+:global(.dark) .wordmark { --wordmark-purple: #b39aee; --wordmark-glow: 25%; }
+:global(.theme-ai) .wordmark { --wordmark-purple: #b39aee; --wordmark-glow: 30%; }
+.wordmark::before { content: "Soci"; position: absolute; inset: 0; color: inherit; font: inherit; letter-spacing: inherit; filter: blur(10px); opacity: 0; pointer-events: none; animation: wordmarkGlow 7s 1s ease-in-out infinite; }
+.wordmarkLetter { display: inline-block; color: inherit; animation: wordmarkReveal 480ms cubic-bezier(.22, 1, .36, 1) both; }
+.wordmarkLetter:nth-child(3) { margin-left: .025em; }
+/* The desktop column is vertically centred: twice the margin yields a 76–96px visual lift. */
+@media (min-width: 1024px) { .brandIntro { margin-top: calc(-2 * clamp(76px, 6vw, 96px)); } }
 @keyframes wordmarkColour { 0%, 100% { color: var(--wordmark-green); } 50% { color: var(--wordmark-purple); } }
+@keyframes wordmarkReveal { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: blur(0); } }
+@keyframes wordmarkGlow { 0%, 100% { opacity: 0; } 50% { opacity: var(--wordmark-glow); } }
 .tagline { margin-top: 12px; color: var(--color-muted-foreground); font-size: clamp(.8rem, 2vw, .95rem); letter-spacing: .09em; }
 .visual { position: relative; width: min(100%, 480px); height: 160px; margin-top: 12px; display: grid; place-items: center; color: var(--color-primary); }
 .art { position: relative; width: 100%; height: 160px; color: inherit; }
@@ -23,7 +29,7 @@
 @keyframes connect { from { stroke-dashoffset: 500; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
 @keyframes appear { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes grow { from { transform: scaleY(.05); } to { transform: scaleY(1); } }
-@media (prefers-reduced-motion: reduce) { .wordmark, .brandIntro, .connector, .point, .bar, .demoQuestion, .demoInsight { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .wordmark, .wordmarkLetter, .wordmark::before, .brandIntro, .connector, .point, .bar, .demoQuestion, .demoInsight { animation: none; } .wordmarkLetter { opacity: 1; filter: none; } .wordmark::before { content: none; } }
 
 @keyframes demoConnect { 0%, 8% { stroke-dashoffset: 500; opacity: .25; } 50%, 90% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: .25; } }
 @keyframes demoPoint { 0%, 8%, 100% { opacity: .35; } 45%, 90% { opacity: 1; } }

@@ -7,7 +7,6 @@ import { ArrowUpRight, RefreshCw, Play, Pause, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
-import { BrandWordmark } from "@/components/brand/wordmark";
 import { HomeStory } from "@/components/home/home-story";
 import { Button } from "@/components/ui/button";
 import { useActiveIndustry, useRegionAccess, useSession } from "@/hooks/use-session";
@@ -78,7 +77,9 @@ export function HomeWorkspace() {
     <div className={styles.workspaceGrid}>
     <section aria-labelledby="home-ask-heading" className="flex min-w-0 flex-col items-start text-left">
       <div className={styles.brandIntro}>
-        <BrandWordmark size="hero" className={styles.wordmark} />
+        <span className={styles.wordmark} role="img" aria-label="Soci">
+          {Array.from("Soci").map((letter, index) => <span key={index} aria-hidden="true" className={styles.wordmarkLetter} style={{ animationDelay: `${index * 140}ms` }}>{letter}</span>)}
+        </span>
         <p className={styles.tagline}>Your data. Explained.</p>
       </div>
       <h2 id="home-ask-heading" className="mt-8 text-3xl font-semibold tracking-tight sm:text-4xl">Ask anything about your data</h2>
