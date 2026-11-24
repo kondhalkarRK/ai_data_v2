@@ -1,9 +1,23 @@
-PS C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb> .\apps\api\.venv\Scripts\python.exe scripts/refresh_automotive_increment.py --snapshot-db data/staging/automotive_live_20261124
-Traceback (most recent call last):
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\scripts\refresh_automotive_increment.py", line 502, in <module>
-    main()
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\scripts\refresh_automotive_increment.py", line 432, in main
-    export_snapshot(args.snapshot_db)
-  File "C:\Users\rdashara\OneDrive - Capgemini\Desktop\RK_GIT\ai_data_v2\askdb\scripts\refresh_automotive_increment.py", line 88, in export_snapshot
-    raise ValueError(
-ValueError: Review live schema drift in fact_forecast_monthly before exporting
+Business Problem
+▪Insights depend on SQL experts and data teams, slowing business decisions.
+▪Multiple definitions of key metrics create conflicting answers and erode trust.
+▪Enterprise data is siloed, making discovery and analysis difficult.
+▪Existing AI platforms often require costly data movement and vendor lock-in.
+▪Users lack confidence in AI answers due to poor transparency and data quality visibility.
+Approach
+▪Ask in plain English, get answers in seconds. No SQL, dashboards, or analyst dependency.
+▪Create a single source of truth through a governed semantic layer for metrics, business terms, and relationships.
+▪Bring AI to the data, not data to the AI, eliminating costly data movement and reducing governance risk.
+▪Embed trust into every answer with explainability, lineage, data quality scores, and confidence indicators.
+▪Optimize AI costs through intelligent model routing, using the right LLM for the right question.
+▪Enable enterprise-scale self-service, empowering every employee to access data-driven insights securely.
+VALUEDELIVERED
+•Configurable, model-agnostic AI platform with intelligent LLM routing, governance, and cost controls.
+•Admin console for AI usage monitoring, budget management, and policy enforcement.
+•Only schema metadata (DDL) is shared with LLMs, minimizing data exposure risks.
+•Supports fully private/local LLM deployments for maximum data security.
+•Data Trust Center provides trust scores and data quality insights to improve answer confidence.
+•Enables business users to self-serve analytics through natural language queries.
+•Scales to 20K+ monthly questions for 100 users while maintaining low operational costs.
+•Pay-per-question pricing reduces annual AI costs to $3.5K–$17.8K, significantly below comparable Power BI deployments.
+ 
