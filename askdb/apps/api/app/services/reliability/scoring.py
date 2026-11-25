@@ -183,11 +183,14 @@ def quality_drops(points: list[TrendPoint], *, min_drop: float = 0.5) -> list[Tr
 
 def window_delta(values: list[float | None], window: int = 7) -> float | None:
     """Mean of the last ``window`` values minus the mean of the ``window`` before them."""
-    clean = [v for v in values if v is not None]
-    if len(clean) < window * 2:
+    if len(values) < window * 2:
         return None
+    measured = values[-2 * window :]
+    if any(v is None for v in measured):
+        return None
+    clean = [v for v in measured if v is not None]
     recent = clean[-window:]
-    prior = clean[-2 * window : -window]
+    prior = clean[:-window]
     return round(statistics.fmean(recent) - statistics.fmean(prior), 2)
 
 

@@ -1,10 +1,10 @@
-# Soci branding and Chat update
+# Scio branding and Chat update
 
 Implemented in AskDB on 2026-11-23. No Agentic project files were inspected, imported, or changed for this update.
 
 ## What changed
 
-- The product name is **Soci** on Home, navigation, metadata, Chat, active public help guides, report canvases, report downloads and Outlook draft content. The existing brain mark, blue/teal wordmark treatment, tagline and three themes remain. Technical environment variables, API routes, package names, database names, old migration identifiers and the stored Chat-mode key remain compatible. Historical planning documents retain their original titles where they describe past work.
+- The product name is **Scio** on Home, navigation, metadata, Chat, active public help guides, report canvases, report downloads and Outlook draft content. The existing brain mark, blue/teal wordmark treatment, tagline and three themes remain. Technical environment variables, API routes, package names, database names, old migration identifiers and the stored Chat-mode key remain compatible. Historical planning documents retain their original titles where they describe past work.
 - Classic and New Chat now share one conversation controller, draft and source selections. Their empty state greets the currently authenticated profile's first name, with **Hi there.** for a blank or missing name. No demo name is hardcoded. Changing accounts or access scope resets the visible conversation.
 - An empty conversation centers the greeting and composer. After a message, the composer sits below the scrolling conversation. New Chat uses up to 1,200px of the available canvas; prose retains a readable line length and wide tables scroll inside their card.
 - The composer keeps report navigation, Unstructured data and Web retrieval in one wrapping row. **Generate report** opens the existing Analytics Builder; it does not add a new report-generation Chat mode. The existing document capability disables document selection where unavailable. Both Chat layouts now submit the same document/web options through the existing Chat endpoint.

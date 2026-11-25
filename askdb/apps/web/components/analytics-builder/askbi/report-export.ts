@@ -1,8 +1,10 @@
+import { DISPLAY_FX } from "@/lib/display-currency";
 import { zipReportFiles } from "./report-zip";
 import type { BiReport } from "@nql/shared-types";
 import { reportReady, type PanelResult } from "./use-askbi";
 
 export type ReportSnapshot = {
+  displayFx: typeof DISPLAY_FX;
   report: BiReport; results: Record<string, PanelResult>; briefing: string[];
   scopeLabel: string; liftPercent: number; root: HTMLElement;
 };
@@ -17,7 +19,7 @@ function freeze<T>(value: T): T {
 /** Synchronous snapshot: no auth, saving, narration or analytical requests. */
 export function createReportSnapshot(report: BiReport, results: Record<string, PanelResult>, briefing: string[], root: HTMLElement, scopeLabel: string, liftPercent: number): ReportSnapshot {
   if (!reportReady(report.state.plan, results)) throw new Error("Wait for all current panels before exporting.");
-  const data = freeze(structuredClone({ report, results, briefing, scopeLabel, liftPercent }));
+  const data = freeze(structuredClone({ report, results, briefing, scopeLabel, liftPercent, displayFx: DISPLAY_FX }));
   const clone = root.cloneNode(true) as HTMLElement;
   clone.querySelectorAll<HTMLElement>("[data-export-value]").forEach(node => { node.textContent = node.dataset.exportValue ?? "—"; });
   clone.querySelectorAll("button, select, details, input[type=range]").forEach(node => node.remove());
@@ -170,9 +172,9 @@ export async function reportImages(snapshot: ReportSnapshot): Promise<Blob[]> {
 
 export async function downloadReportImages(snapshot: ReportSnapshot) {
   const blobs = await reportImages(snapshot);
-  const blob = blobs.length === 1 ? blobs[0]! : new Blob([zipReportFiles(await Promise.all(blobs.map(async (image, i) => ({ name: `Soci-report-${i + 1}.png`, bytes: new Uint8Array(await image.arrayBuffer()) })))) as BlobPart], { type: "application/zip" });
+  const blob = blobs.length === 1 ? blobs[0]! : new Blob([zipReportFiles(await Promise.all(blobs.map(async (image, i) => ({ name: `Scio-report-${i + 1}.png`, bytes: new Uint8Array(await image.arrayBuffer()) })))) as BlobPart], { type: "application/zip" });
   const url = URL.createObjectURL(blob);
-  download(url, blobs.length === 1 ? "Soci-report.png" : "Soci-report-images.zip");
+  download(url, blobs.length === 1 ? "Scio-report.png" : "Scio-report-images.zip");
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
   return blobs.length;
 }

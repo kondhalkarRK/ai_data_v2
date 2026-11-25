@@ -56,10 +56,11 @@ from app.services.reliability.service import (
     _snapshot_payload,
     build_response,
     bulk_change,
+    recorded_score_trend,
     rescore,
     validate_monitor,
 )
-from app.services.reliability.store import _MEMORY, ReliabilityStore, Setting
+from app.services.reliability.store import _MEMORY, ReliabilityStore, Setting, Snapshot
 
 NOW = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 
@@ -388,6 +389,74 @@ async def test_store_falls_back_to_memory_without_a_session() -> None:
 # --------------------------------------------------------------------------- response
 
 
+def test_recorded_trend_uses_latest_actual_daily_score_and_preserves_gaps():
+    old = Snapshot(NOW - timedelta(days=2), 92.0, {"accuracy": 90.0}, 3, 1)
+    early = Snapshot(NOW - timedelta(hours=1), 94.0, {"accuracy": 94.0}, 3, 1)
+    latest = Snapshot(NOW, 81.0, {"accuracy": 80.0}, 2, 2)
+    # Unordered input must still select the latest actual run of each day.
+    points = recorded_score_trend([latest, old, early], end=NOW.date())
+    assert len(points) == 90
+    assert [p.score for p in points[-3:]] == [92.0, None, 81.0]
+    assert points[-1].dimensions == {"accuracy": 80.0}
+    assert points[-2].dimensions == {}
+    assert points[0].score is None
+    assert not recorded_score_trend([], end=NOW.date())
+    assert window_delta([90.0] * 7 + [None] + [95.0] * 7) is None
+
+
+def test_recorded_trend_keeps_real_flat_scores_and_does_not_reuse_failed_run():
+    snapshots = [Snapshot(NOW - timedelta(days=i), 95.0, {}, 1, 0) for i in range(3)]
+    points = recorded_score_trend(snapshots, end=NOW.date())
+    assert [p.score for p in points[-3:]] == [95.0, 95.0, 95.0]
+    snapshots.append(Snapshot(NOW + timedelta(hours=1), None, {}, 0, 0))
+    assert recorded_score_trend(snapshots, end=NOW.date())[-1].score is None
+
+
+async def test_recorded_history_survives_a_new_session_and_is_industry_scoped(
+    reliability_session: AsyncSession,
+):
+    for industry, scores in [(Industry.AUTOMOTIVE, [92.0, 81.0]), (Industry.INSURANCE, [55.0])]:
+        store = ReliabilityStore(reliability_session, industry)
+        for i, score in enumerate(scores):
+            await store.record_run(
+                ran_at=NOW - timedelta(days=1 - i),
+                results={"r": passing("r", score)},
+                score=score,
+                dimensions={"accuracy": score},
+                datasets={},
+                duration_ms=1,
+                triggered_by=None,
+            )
+    await reliability_session.commit()
+    _MEMORY.clear()
+    async with async_sessionmaker(reliability_session.bind, expire_on_commit=False)() as fresh:
+        store = ReliabilityStore(fresh, Industry.AUTOMOTIVE)
+        points = recorded_score_trend(await store.snapshots(now=NOW), end=NOW.date())
+        assert store.mode == "database"
+        assert [p.score for p in points[-2:]] == [92.0, 81.0]
+
+
+async def test_snapshot_history_does_not_truncate_newest_runs_after_5000(
+    reliability_session: AsyncSession,
+):
+    reliability_session.add_all(
+        [
+            DqScoreSnapshot(
+                industry="automotive",
+                ran_at=NOW - timedelta(seconds=i),
+                score=90.0 if i else 75.0,
+                dimensions={},
+                datasets={},
+            )
+            for i in range(5001)
+        ]
+    )
+    await reliability_session.flush()
+    snapshots = await ReliabilityStore(reliability_session, Industry.AUTOMOTIVE).snapshots(now=NOW)
+    assert len(snapshots) == 5001
+    assert recorded_score_trend(snapshots, end=NOW.date())[-1].score == 75.0
+
+
 def test_build_response_assembles_executive_view() -> None:
     datasets = {
         "sales": DatasetSpec(
@@ -456,6 +525,7 @@ def test_build_response_assembles_executive_view() -> None:
         storage="memory",
     )
     hero = response.hero
+    assert response.trend.points == []  # No invented history from today's rule results.
     assert hero.available and hero.rules_failing == 1 and hero.critical_issues == 1
     assert hero.rules_errored == 1 and hero.datasets_monitored == 2
     assert [a.rule_id for a in response.alerts] == ["auto.rev", "auto.broken"]
@@ -486,3 +556,27 @@ def test_build_response_assembles_executive_view() -> None:
     )
     assert not unmeasured.hero.available
     assert "no rows yet" in (unmeasured.hero.unavailable_reason or "")
+
+
+def test_response_charts_recorded_runs_even_when_transaction_dates_are_old():
+    rules = [rule("r")]
+    results = {"r": passing("r", 99.0)}
+    response = build_response(
+        industry=Industry.AUTOMOTIVE,
+        rules=rules,
+        results=results,
+        outcome=RunOutcome(NOW, results, latest={"sales": date(2020, 1, 1)}),
+        datasets=DATASETS,
+        history={},
+        snapshots=[
+            Snapshot(NOW - timedelta(days=1), 80.0, {"accuracy": 80.0}, 1, 0),
+            Snapshot(NOW, 95.0, {"accuracy": 95.0}, 1, 0),
+        ],
+        drift=SchemaDrift(status="stable", label="Stable"),
+        entities=EntityChanges(available=False),
+        columns={},
+        storage="database",
+    )
+    assert [p.score for p in response.trend.points[-2:]] == [80.0, 95.0]
+    assert response.trend.end_date == NOW.date().isoformat()
+    assert response.trend.measured_runs == 2

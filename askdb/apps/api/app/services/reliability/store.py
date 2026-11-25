@@ -296,9 +296,9 @@ class ReliabilityStore:
                         .where(
                             DqScoreSnapshot.industry == self._industry,
                             DqScoreSnapshot.ran_at >= since,
+                            DqScoreSnapshot.ran_at <= now,
                         )
                         .order_by(DqScoreSnapshot.ran_at)
-                        .limit(5_000)
                     )
                 ).scalars()
                 return [
@@ -313,4 +313,4 @@ class ReliabilityStore:
                 ]
             except Exception as exc:
                 await self._fallback(exc)
-        return [s for s in self._memory.snapshots if s.ran_at >= since]
+        return [s for s in self._memory.snapshots if since <= s.ran_at <= now]

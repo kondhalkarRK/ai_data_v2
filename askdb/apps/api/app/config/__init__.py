@@ -1,1 +1,1 @@
-"""Configuration shipped with the Soci API; no parent-project files required."""
+"""Configuration shipped with the Scio API; no parent-project files required."""

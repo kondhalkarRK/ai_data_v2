@@ -19,6 +19,7 @@ import { AnimatedNumber } from "@/components/ui/animated-number";
 import { useDashboardActions } from "@/components/executive/dashboard-intelligence";
 import { EmptyState } from "@/components/ui/status-pill";
 import { cn } from "@/lib/utils";
+import { DISPLAY_FX_NOTE } from "@/lib/display-currency";
 
 function formatKpiAnim(n: number, card: ExecKpiCard): string {
   const fmt = (card.format || "").toLowerCase();
@@ -70,6 +71,7 @@ export function KpiCardsGrid({
 
   return (
     <div className={cn("grid gap-3", cols)}>
+      {cards.some(card => /currency|money/i.test(card.format) || card.formatted.includes("₹")) && <p className="col-span-full text-[11px] text-muted-foreground">{DISPLAY_FX_NOTE}</p>}
       {cards.map((card, index) => {
         const Icon = KPI_ICONS[index % KPI_ICONS.length]!;
         const featured = index === 0;
@@ -103,7 +105,7 @@ export function KpiCardsGrid({
               <AnimatedNumber
                 value={card.value}
                 format={(n) =>
-                  Math.abs(n - card.value!) < 1e-6 ? card.formatted : formatKpiAnim(n, card)
+                  formatKpiAnim(n, card)
                 }
                 className={cn(
                   "kpi-metric mt-2 block font-semibold tracking-tight text-foreground",

@@ -1,3 +1,4 @@
+import { formatRevenueUsd, isMonetaryColumn } from "@/lib/display-currency";
 import type { AnalyticsFix, AnalyticsSpec, AnalyticsVizKind } from "@nql/shared-types";
 
 const ANALYSIS_PHRASE: Partial<Record<AnalyticsSpec["analysis"], string>> = {
@@ -215,9 +216,8 @@ export function formatCell(value: unknown, column: string, metricFormat?: string
     return String(value);
   }
   const currency =
-    metricFormat === "currency" &&
-    !/(units|orders|count|salespeople)/.test(column) &&
-    Math.abs(value) >= 1000;
+    (metricFormat === "currency" || isMonetaryColumn(column)) &&
+    !/(units|orders|count|salespeople)/.test(column);
   if (currency) return formatInr(value);
   return Number.isInteger(value)
     ? value.toLocaleString("en-IN")
@@ -225,11 +225,7 @@ export function formatCell(value: unknown, column: string, metricFormat?: string
 }
 
 export function formatInr(value: number): string {
-  const size = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (size >= 1e7) return `${sign}₹${(size / 1e7).toFixed(2)} Cr`;
-  if (size >= 1e5) return `${sign}₹${(size / 1e5).toFixed(2)} L`;
-  return `${sign}₹${size.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  return formatRevenueUsd(value);
 }
 
 export function columnLabel(column: string): string {

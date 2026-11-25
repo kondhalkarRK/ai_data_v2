@@ -1,3 +1,4 @@
+import { DISPLAY_FX_NOTE } from "@/lib/display-currency";
 import type { BiPlan, BiReport } from "@nql/shared-types";
 import { createStandardPublicClientApplication, type IPublicClientApplication } from "@azure/msal-browser";
 import { type PanelResult } from "./use-askbi";
@@ -71,7 +72,7 @@ export function buildOutlookBody(plan: BiPlan, results: Record<string, PanelResu
     const notes = [...(result?.meta.notes ?? []), ...(result?.meta.warnings ?? [])];
     return `<p><strong>${html(panel.title)}:</strong> ${html(panel.rationale)}. Period: ${html(panel.spec.dateFrom)} to ${html(panel.spec.dateTo)}. Data as of: ${html(result?.meta.dataAsOf ?? "Unknown")}.${notes.map(note => ` ${html(note)}`).join("")}</p>`;
   }).join("");
-  return `<html><body style="margin:0;padding:20px;font-family:Arial,sans-serif;color:#1c273b;background:#fff"><table role="presentation" width="100%" style="max-width:720px;border-collapse:collapse"><tr><td><p>Soci · Automotive</p><h1 style="font-size:26px">${html(plan.title)}</h1>${question ? `<p><strong>Your question:</strong> ${html(question)}</p>` : ""}<p>${html(scope)}</p><table role="presentation" width="100%" style="border-collapse:collapse">${kpis}</table>${scenario}</td></tr>${images}${briefing.length ? `<tr><td style="padding:18px 0"><h2 style="font-size:18px">Executive Intelligence</h2>${paragraphs}</td></tr>` : ""}<tr><td><h2 style="font-size:18px">Assumptions and definitions</h2>${plan.assumptions.map(text => `<p>${html(text)}</p>`).join("")}${definitions}<p>The complete report is attached as a PDF. <a href="${html(reportUrl)}">Open the saved report in Soci</a>. This link requires the report owner's account and permitted scope; emailing it does not grant access.</p></td></tr></table></body></html>`;
+  return `<html><body style="margin:0;padding:20px;font-family:Arial,sans-serif;color:#1c273b;background:#fff"><table role="presentation" width="100%" style="max-width:720px;border-collapse:collapse"><tr><td><p>Scio · Automotive</p><p>${html(DISPLAY_FX_NOTE)}</p><h1 style="font-size:26px">${html(plan.title)}</h1>${question ? `<p><strong>Your question:</strong> ${html(question)}</p>` : ""}<p>${html(scope)}</p><table role="presentation" width="100%" style="border-collapse:collapse">${kpis}</table>${scenario}</td></tr>${images}${briefing.length ? `<tr><td style="padding:18px 0"><h2 style="font-size:18px">Executive Intelligence</h2>${paragraphs}</td></tr>` : ""}<tr><td><h2 style="font-size:18px">Assumptions and definitions</h2>${plan.assumptions.map(text => `<p>${html(text)}</p>`).join("")}${definitions}<p>The complete report is attached as a PDF. <a href="${html(reportUrl)}">Open the saved report in Scio</a>. This link requires the report owner's account and permitted scope; emailing it does not grant access.</p></td></tr></table></body></html>`;
 }
 
 export async function createOutlookDraft(report: BiReport, results: Record<string, PanelResult>, briefing: string[], root: HTMLElement, scopeLabel: string, token: string, liftPercent = 10, existingSnapshot?: ReportSnapshot): Promise<string> {
@@ -88,7 +89,7 @@ export async function createOutlookDraft(report: BiReport, results: Record<strin
   const reportUrl = `${window.location.origin}/analytics-builder?askbiReport=${encodeURIComponent(report.id)}${isRevenueLift(plan) ? `&lift=${snapshot.liftPercent}` : ""}`;
   const question = snapshot.report.state.turns.find(turn => turn.question)?.question ?? "";
   const body = buildOutlookBody(plan, snapshot.results, snapshot.briefing, pictures, reportUrl, snapshot.scopeLabel, snapshot.liftPercent, question);
-  const payload = JSON.stringify({ subject: `Soci · ${plan.title}`, body: { contentType: "HTML", content: body } });
+  const payload = JSON.stringify({ subject: `Scio · ${plan.title}`, body: { contentType: "HTML", content: body } });
   if (new TextEncoder().encode(payload).length >= 2_800_000) throw new Error("The complete email body is too large. Use the PDF export; no draft was created.");
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   let response: Response;

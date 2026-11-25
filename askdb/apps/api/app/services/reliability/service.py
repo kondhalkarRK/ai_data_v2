@@ -69,6 +69,7 @@ from app.services.reliability.model import (
     band_for,
 )
 from app.services.reliability.scoring import (
+    TrendPoint,
     dataset_score,
     dimension_scores,
     effective_weights,
@@ -77,7 +78,6 @@ from app.services.reliability.scoring import (
     impact_text,
     overall_score,
     quality_drops,
-    record_date_trend,
     window_delta,
 )
 from app.services.reliability.store import ReliabilityStore, Setting, Snapshot
@@ -738,8 +738,10 @@ def build_response(
     failing = [r for r in enabled if results.get(r.id) and results[r.id].status == "failing"]
     errored = [r for r in enabled if results.get(r.id) and results[r.id].status == "error"]
 
-    trend_end = _trend_end(outcome, datasets)
-    points = record_date_trend(rules, results, end=trend_end) if trend_end else []
+    # Use what checks measured at the time, not today's results projected onto
+    # historical transaction dates.
+    trend_end = outcome.ran_at.astimezone(UTC).date()
+    points = recorded_score_trend(snapshots, end=trend_end)
     delta = window_delta([p.score for p in points])
 
     by_dataset: dict[str, list[RuleSpec]] = defaultdict(list)
@@ -822,15 +824,6 @@ def build_response(
         ),
         capabilities=_capabilities(),
     )
-
-
-def _trend_end(outcome: RunOutcome, datasets: dict[str, DatasetSpec]) -> date | None:
-    days = [
-        v.date() if isinstance(v, datetime) else v
-        for name, v in outcome.latest.items()
-        if v is not None and datasets.get(name) and datasets[name].cadence == "daily"
-    ]
-    return max(days) if days else None
 
 
 def _data_as_of(outcome: RunOutcome, datasets: dict[str, DatasetSpec]) -> date | datetime | None:
@@ -1120,6 +1113,26 @@ def _dimension_cards(
     return cards
 
 
+def recorded_score_trend(snapshots: list[Snapshot], *, end: date) -> list[TrendPoint]:
+    """Latest recorded run per UTC day; never backfill or carry scores across gaps."""
+    start = end - timedelta(days=89)
+    daily: dict[date, Snapshot] = {}
+    for snap in sorted(snapshots, key=lambda s: s.ran_at):
+        day = snap.ran_at.astimezone(UTC).date()
+        if start <= day <= end:
+            daily[day] = snap
+    if not daily:
+        return []
+    points = []
+    for offset in range(90):
+        day = start + timedelta(days=offset)
+        snap = daily.get(day)
+        points.append(
+            TrendPoint(day, snap.score if snap else None, dict(snap.dimensions) if snap else {})
+        )
+    return points
+
+
 def _trend(
     points: list[Any],
     failing: list[RuleSpec],
@@ -1130,10 +1143,6 @@ def _trend(
     end: date | None,
 ) -> TrustTrend:
     names = {r.id: r.name for r in rules}
-    measured: dict[date, float] = {}
-    for snap in snapshots:
-        if snap.score is not None:
-            measured[snap.ran_at.date()] = snap.score
     out_points = [
         TrendPointOut(
             date=p.day.isoformat(),
@@ -1141,7 +1150,7 @@ def _trend(
             dimensions={
                 k: (round(v, 2) if v is not None else None) for k, v in p.dimensions.items()
             },
-            measured=measured.get(p.day),
+            measured=p.score,
         )
         for p in points
     ]
@@ -1191,8 +1200,9 @@ def _trend(
         points=out_points,
         events=events[-60:],
         basis=(
-            "Trust score by business date: row-level, volume and forecast checks use that day's "
-            "or month's records; other checks contribute their latest result."
+            "Recorded check history: latest run per UTC day, including the dimensions measured "
+            "in that run. Dates without a recorded score stay empty. History accumulates when "
+            "checks run; opening cached results does not create another measurement."
         ),
         measured_runs=len(snapshots),
         end_date=end.isoformat() if end else None,
@@ -1356,8 +1366,7 @@ def _insights(
                     f"{abs(delta):.1f} points week on week"
                 ),
                 detail=(
-                    "Average record-date trust over the last 7 days compared with "
-                    "the 7 days before."
+                    "Average recorded trust over the last 7 days compared with the 7 days before."
                 ),
             )
         )
@@ -1366,7 +1375,7 @@ def _insights(
             InsightItem(
                 id="trend",
                 tone="info",
-                title="Record quality is steady week on week",
+                title="Recorded trust is steady week on week",
                 detail="The last 7 days scored within 0.2 points of the week before.",
             )
         )

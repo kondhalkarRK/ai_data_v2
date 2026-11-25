@@ -11,7 +11,7 @@
 .wordmark { --wordmark-green: hsl(var(--success)); --wordmark-purple: #7952b3; --wordmark-glow: 14%; position: relative; display: inline-flex; align-items: baseline; color: var(--wordmark-green); animation: wordmarkColour 7s 1s ease-in-out infinite; font-size: clamp(3.75rem, 8vw, 5.5rem); line-height: 1.05; font-weight: 700; letter-spacing: -.065em; }
 :global(.dark) .wordmark { --wordmark-purple: #b39aee; --wordmark-glow: 25%; }
 :global(.theme-ai) .wordmark { --wordmark-purple: #b39aee; --wordmark-glow: 30%; }
-.wordmark::before { content: "Soci"; position: absolute; inset: 0; color: inherit; font: inherit; letter-spacing: inherit; filter: blur(10px); opacity: 0; pointer-events: none; animation: wordmarkGlow 7s 1s ease-in-out infinite; }
+.wordmark::before { content: attr(data-wordmark); position: absolute; inset: 0; color: inherit; font: inherit; letter-spacing: inherit; filter: blur(10px); opacity: 0; pointer-events: none; animation: wordmarkGlow 7s 1s ease-in-out infinite; }
 .wordmarkLetter { display: inline-block; color: inherit; animation: wordmarkReveal 480ms cubic-bezier(.22, 1, .36, 1) both; }
 .wordmarkLetter:nth-child(3) { margin-left: .025em; }
 /* The desktop column is vertically centred: twice the margin yields a 76–96px visual lift. */

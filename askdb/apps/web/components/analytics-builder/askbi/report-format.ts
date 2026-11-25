@@ -1,15 +1,13 @@
+import { formatRevenueUsd } from "@/lib/display-currency";
+
 /** Presentation only: never use rounded labels as calculation inputs. */
 export function formatReportValue(value: unknown, metricFormat?: string, compact = true): string {
   if (value == null || (typeof value === "number" && !Number.isFinite(value))) return "—";
   if (typeof value !== "number") return String(value);
-  const currency = metricFormat === "currency";
+  if (metricFormat === "currency") return formatRevenueUsd(value, compact);
   const percent = metricFormat === "percent" || metricFormat === "percentage";
-  const absolute = Math.abs(value);
-  const rounded = Math.round(absolute * 100) / 100;
-  const unit = currency && compact ? rounded >= 10_000_000 ? { divisor: 10_000_000, label: " crore" } : rounded >= 100_000 ? { divisor: 100_000, label: " lakh" } : null : null;
-  const digits = compact ? 2 : 20;
-  const text = new Intl.NumberFormat("en-IN", { maximumFractionDigits: digits }).format(unit ? absolute / unit.divisor : absolute);
-  return `${value < 0 ? "−" : ""}${currency ? "₹" : ""}${text}${unit?.label ?? ""}${percent ? "%" : ""}`;
+  const text = new Intl.NumberFormat("en-IN", { maximumFractionDigits: compact ? 2 : 20 }).format(Math.abs(value));
+  return `${value < 0 ? "−" : ""}${text}${percent ? "%" : ""}`;
 }
 
 const CATEGORY_COLORS = ["#3468c0", "#148075", "#8954b3", "#a56519", "#bf5269", "#427c9b"];

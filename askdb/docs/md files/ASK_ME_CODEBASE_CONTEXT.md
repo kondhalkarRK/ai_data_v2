@@ -1,4 +1,4 @@
-# Soci — verified codebase context
+# Scio — verified codebase context
 
 Verified against implementation on 2026-11-06. This describes code, not a claim that
 the configured warehouse, LLM providers or hosted deployment were tested live.

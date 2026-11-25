@@ -61,9 +61,9 @@ export function ResponseActions({ message, onAsk, busy }: { message: ChatMessage
   return <div className="space-y-2">
     <div className="flex items-center gap-1 text-muted-foreground" aria-label="Response actions">
       <Dialog.Root>
-        <Dialog.Trigger asChild><button type="button" className="icon-btn-ghost" aria-label="How Soci handled this"><Info className="size-4" /></button></Dialog.Trigger>
+        <Dialog.Trigger asChild><button type="button" className="icon-btn-ghost" aria-label="How Scio handled this"><Info className="size-4" /></button></Dialog.Trigger>
         <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[80] bg-black/30" /><Dialog.Content className="fixed left-1/2 top-1/2 z-[81] max-h-[85dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl border border-border bg-surface-raised p-5 shadow-overlay">
-          <Dialog.Title className="font-semibold">How Soci handled this</Dialog.Title>
+          <Dialog.Title className="font-semibold">How Scio handled this</Dialog.Title>
           <Dialog.Description className="mt-2 text-sm text-muted-foreground">Sources, interpretation and query details for this response.</Dialog.Description>
           <dl className="my-4 space-y-2 break-words text-xs"><div><dt>Source</dt><dd>{message.route ?? message.meta?.route ?? (message.sql ? "Business data" : "Conversation")}</dd></div>{id && <div><dt>Response ID</dt><dd>{id}</dd></div>}</dl>
           {message.meta && <div className="mb-4 space-y-4">

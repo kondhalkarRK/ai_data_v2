@@ -18,10 +18,10 @@ export async function refine({presentation}){
  if(n==='Panel title 3'&&i===10)sh.text='Audit and operations';
  }
  const arch=presentation.slides.insert({after:original[3],width:1280,height:720}).slide;arch.background.fill='#10151C';
- text(arch,'Section label','SOCI  /  GOVERNED AI ANALYTICS',72,37,1100,25,15,P,true);
- text(arch,'Slide title','Soci architecture',72,90,1136,65,44,B,true);
+ text(arch,'Section label','SCIO  /  GOVERNED AI ANALYTICS',72,37,1100,25,15,P,true);
+ text(arch,'Slide title','Scio architecture',72,90,1136,65,44,B,true);
  text(arch,'Slide context','The API coordinates meaning, model assistance and controlled data access.',74,177,1130,60,25,M);
- const ui=block(arch,'Web client','Soci web app','Next.js / React\nChat and analytics',72,377,265,125,B);
+ const ui=block(arch,'Web client','Scio web app','Next.js / React\nChat and analytics',72,377,265,125,B);
  const api=block(arch,'Application API','FastAPI backend','Authentication, RBAC\nPlanning and SQL validation',465,377,350,125,P);
  const llm=block(arch,'Model gateway','Approved LLM endpoint','Interpretation and narration',465,251,350,95,B);
  const sql=block(arch,'Analytics database','Analytics PostgreSQL','Read-only queries\nPermitted regional scope',943,377,265,125,B);
@@ -36,7 +36,7 @@ export async function refine({presentation}){
  for(const [i,s] of presentation.slides.items.entries()){
  const pg=s.shapes.items.find(x=>x.toSnapshot().name==='Page');if(pg)pg.text=String(i+1).padStart(2,'0');
  }
- text(arch,'Brand footer','Soci',72,680,150,25,17,P,true);text(arch,'Page','05',1160,680,48,25,17,M);
+ text(arch,'Brand footer','Scio',72,680,150,25,17,P,true);text(arch,'Page','05',1160,680,48,25,17,M);
  await presentation.render();return {slides:presentation.slides.items.length};
 }
 

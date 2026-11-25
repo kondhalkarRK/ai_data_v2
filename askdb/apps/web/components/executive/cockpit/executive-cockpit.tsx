@@ -1,5 +1,7 @@
 "use client";
 
+import { DISPLAY_FX_NOTE } from "@/lib/display-currency";
+
 import type { Industry } from "@nql/shared-types";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Download, Loader2, RefreshCw, SlidersHorizontal } from "lucide-react";
@@ -249,6 +251,7 @@ export function ExecutiveCockpit({ industry }: { industry: Industry }) {
             onApplyFilters={(patch) => setFilters((current) => mergeDashboardFilters({ ...current }, patch))}
             onRefresh={() => { refreshNext.current = true; void cockpit.refetch(); }}
           >
+          <p className="text-[11px] text-muted-foreground">{DISPLAY_FX_NOTE}</p>
           <KpiStrip data={data} onSelect={select} />
 
           <ModuleSection

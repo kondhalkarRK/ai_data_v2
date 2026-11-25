@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { formatRevenueUsd } from "@/lib/display-currency";
 
 /** Merge conditional class names, with later Tailwind utilities winning conflicts. */
 export function cn(...inputs: ClassValue[]): string {
@@ -18,6 +19,7 @@ export function formatCount(value: number): string {
 }
 
 export function formatCurrency(value: number, currency = "INR"): string {
+  if (currency === "INR") return formatRevenueUsd(value);
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,

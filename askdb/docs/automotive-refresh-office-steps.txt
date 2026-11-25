@@ -1,4 +1,4 @@
-SOCI AUTOMOTIVE REFRESH - OFFICE LAPTOP STEPS
+SCIO AUTOMOTIVE REFRESH - OFFICE LAPTOP STEPS
 Prepared: 24 November 2026
 
 PURPOSE
@@ -125,7 +125,7 @@ Fix the reported connectivity/configuration issue, then retry metadata only:
 
 .\apps\api\.venv\Scripts\python.exe scripts/refresh_automotive_increment.py --refresh-metadata data/staging/automotive_review_20261124 --approve-batch $reviewedBatch.batch_id
 
-STEP 8 - RESTART AND CHECK SOCI
+STEP 8 - RESTART AND CHECK SCIO
 
 Restart all API/backend workers using your usual startup command, then refresh
 the browser. The CLI cannot clear caches in an already running API process.

@@ -122,7 +122,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging(resolved.log_level, json_output=resolved.is_production)
 
     app = FastAPI(
-        title="Soci API",
+        title="Scio API",
         version=system.SERVICE_VERSION,
         description=DESCRIPTION,
         lifespan=lifespan,

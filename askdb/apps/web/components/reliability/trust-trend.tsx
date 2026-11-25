@@ -45,8 +45,8 @@ export function TrustTrendChart({
       title="Trust score trend"
       subtitle={
         dimension
-          ? `Overall score with ${DIMENSION_LABEL[dimension]} overlaid · by business date`
-          : "Daily trust score by business date · drops, incidents and schema changes marked"
+          ? `Recorded score with ${DIMENSION_LABEL[dimension]} overlaid · latest check per UTC day`
+          : "Recorded trust score · latest check per UTC day · missing days remain empty"
       }
       exportName={`trust-trend-${range}d`}
       className={className}
@@ -78,11 +78,16 @@ export function TrustTrendChart({
         points.some((p) => p.score != null) ? (
           <>
             <TrendPlot points={points} events={events} dimension={dimension} height={expanded ? 520 : 236} />
+            <p className="mt-2 text-xs text-muted-foreground">
+              {points.filter(p => p.score != null).length === 1
+                ? "One recorded day so far. More daily points appear as checks run on later days."
+                : data.trend.basis}
+            </p>
             <EventStrip events={events} onOpenRule={onOpenRule} />
           </>
         ) : (
           <EmptyNote>
-            No dated history yet. The trend fills in as checks run against daily data or as runs are recorded.
+            No recorded scores in this period. Run checks to start collecting history; past days are not reconstructed.
           </EmptyNote>
         )
       }

@@ -168,7 +168,7 @@ function TrendSvg({
             <g key={t}>
               <line x1={margin.left} x2={width - margin.right} y1={yRev(t)} y2={yRev(t)} stroke="hsl(var(--chart-grid))" strokeDasharray={t === 0 ? undefined : "3 4"} />
               <text x={margin.left - 8} y={yRev(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="hsl(var(--chart-axis))">
-                {t === 0 ? "0" : `₹${formatCompact(t)}`}
+                {formatInr(t)}
               </text>
               {visible.units ? (
                 <text x={width - margin.right + 8} y={yRev(t)} dominantBaseline="middle" fontSize={10} fill={COCKPIT.teal} opacity={0.8}>

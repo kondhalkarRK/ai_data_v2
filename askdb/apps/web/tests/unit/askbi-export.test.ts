@@ -15,21 +15,21 @@ function fixture(count = 4) {
   const report = { id: "report", revision: 4, saved: true, state: { plan: { title: "Sales", panels, assumptions: ["Last completed month"] }, turns: [{ question: "Sales by region" }] } } as unknown as BiReport;
   const results = Object.fromEntries(report.state.plan!.panels.map(panel => [panel.id, { scope: panelScope(panel), result: { columns: ["region", "revenue"], rows: [{ region: "West", revenue: 83402902 }], meta: { metricFormat: "currency", valueColumn: "revenue" } } }])) as unknown as Record<string, PanelResult>;
   const root = document.createElement("div");
-  root.innerHTML = '<header data-askbi-pdf>Sales</header>' + panels.map(p => `<section id="askbi-panel-${p.id}" data-askbi-pdf><h3>${p.title}</h3><div data-export-value="₹8.34 crore">0</div><button>Options</button></section>`).join("");
+  root.innerHTML = '<header data-askbi-pdf>Sales</header>' + panels.map(p => `<section id="askbi-panel-${p.id}" data-askbi-pdf><h3>${p.title}</h3><div data-export-value="$877.93K">0</div><button>Options</button></section>`).join("");
   return { report, results, root };
 }
 
 describe("report number semantics", () => {
   it.each([
-    [83402902, "currency", "₹8.34 crore"], [834029, "currency", "₹8.34 lakh"],
-    [45200, "currency", "₹45,200"], [0, "currency", "₹0"],
-    [-83402902, "currency", "−₹8.34 crore"], [100000, "currency", "₹1 lakh"],
-    [10000000, "currency", "₹1 crore"], [99999.999, "currency", "₹1 lakh"],
+    [83402902, "currency", "$877.93K"], [834029, "currency", "$8.78K"],
+    [45200, "currency", "$475.79"], [0, "currency", "$0"],
+    [-83402902, "currency", "-$877.93K"], [100000, "currency", "$1.05K"],
+    [10000000, "currency", "$105.26K"], [99999.999, "currency", "$1.05K"],
     [83402902, "number", "8,34,02,902"], [12.5, "percentage", "12.5%"],
     [null, "currency", "—"], [NaN, "currency", "—"], [Infinity, "currency", "—"],
   ])("formats %s as %s", (value, kind, expected) => expect(formatReportValue(value, kind)).toBe(expected));
-  it("retains exact Indian-grouped values and stable category colors", () => {
-    expect(formatReportValue(83402902.125, "currency", false)).toBe("₹8,34,02,902.125");
+  it("formats converted USD tooltips without changing raw source precision or category colors", () => {
+    expect(formatReportValue(83402902.125, "currency", false)).toBe("$877,925.29");
     expect(reportCategoryColor("West")).toBe(reportCategoryColor("West"));
   });
 });
@@ -40,7 +40,8 @@ it("freezes results and settles animated values without mutating the screen", ()
   results["panel-0"]!.result!.rows[0]!.revenue = 1;
   root.textContent = "New report";
   expect(snapshot.results["panel-0"]!.result!.rows[0]!.revenue).toBe(83402902);
-  expect(snapshot.root.textContent).toContain("₹8.34 crore");
+  expect(snapshot.root.textContent).toContain("$877.93K");
+  expect(snapshot.displayFx.inrPerUsd).toBe(95);
   expect(snapshot.root.querySelector("button")).toBeNull();
   expect(Object.isFrozen(snapshot.results)).toBe(true);
 });
@@ -58,11 +59,11 @@ it("uploads every chart and PDF separately without sending or dropping context",
   const calls = request.mock.calls as unknown as Array<[string, RequestInit]>;
   const body = JSON.parse(String(calls[0]![1].body));
   expect(body.body.content).toContain("Three");
-  expect(body.subject).toContain("Soci");
-  expect(body.body.content).toContain("Open the saved report in Soci");
+  expect(body.subject).toContain("Scio");
+  expect(body.body.content).toContain("Open the saved report in Scio");
   expect(body.body.content).toContain("Unavailable prior comparison");
   expect(body.body.content).toContain("cid:askbi-chart-4");
-  expect(body.body.content).toContain("₹8.34 crore");
+  expect(body.body.content).toContain("$877.93K");
   expect(body).not.toHaveProperty("toRecipients");
   expect(calls.some(([url]) => url.includes("/send"))).toBe(false);
 });
@@ -95,7 +96,7 @@ it("offers a clear download fallback when image clipboard is unavailable", async
 });
 
 it("packages every numbered image in a stored ZIP directory", () => {
-  const archive = zipReportFiles([{ name: "Soci-report-1.png", bytes: new TextEncoder().encode("hello") }, { name: "Soci-report-2.png", bytes: new Uint8Array([1, 2, 3]) }]);
+  const archive = zipReportFiles([{ name: "Scio-report-1.png", bytes: new TextEncoder().encode("hello") }, { name: "Scio-report-2.png", bytes: new Uint8Array([1, 2, 3]) }]);
   const view = new DataView(archive.buffer);
   expect(view.getUint32(0, true)).toBe(0x04034b50);
   expect(view.getUint32(14, true)).toBe(0x3610a686);
@@ -104,7 +105,7 @@ it("packages every numbered image in a stored ZIP directory", () => {
   expect(view.getUint16(end + 10, true)).toBe(2);
   const central = view.getUint32(end + 16, true);
   expect(view.getUint32(central, true)).toBe(0x02014b50);
-  expect(new TextDecoder().decode(archive)).toContain("Soci-report-2.png");
+  expect(new TextDecoder().decode(archive)).toContain("Scio-report-2.png");
 });
 
 it("rejects a nonempty but completely blank image", () => {

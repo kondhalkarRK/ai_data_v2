@@ -1,5 +1,8 @@
 "use client";
 
+import { DISPLAY_FX_NOTE, formatRevenueUsd, isMonetaryColumn } from "@/lib/display-currency";
+import type { Industry } from "@nql/shared-types";
+
 import type { ExecutiveIntelligence } from "@/components/executive/types";
 import { IndiaRegionMap } from "@/components/executive/india-region-map";
 import { CHART_SERIES } from "@/lib/design";
@@ -12,7 +15,7 @@ export function PerformanceAnalytics({
   onFilter,
 }: {
   data: ExecutiveIntelligence;
-  industry: import("@nql/shared-types").Industry;
+  industry: Industry;
   presenterMode?: boolean;
   onFilter: (dimension: string, name: string) => void;
   windowId?: string;
@@ -26,6 +29,7 @@ export function PerformanceAnalytics({
 
   return (
     <div className="space-y-4">
+      {metrics.some(isMonetaryColumn) && <p className="text-[11px] text-muted-foreground">{DISPLAY_FX_NOTE}</p>}
       <div className="grid gap-4 lg:grid-cols-2">
         {metrics.slice(0, 2).map((metric, index) => (
           <SeriesCard
@@ -62,9 +66,10 @@ export function PerformanceAnalytics({
 
 function formatAxisValue(value: number, metric: string): string {
   const isMoney =
-    /revenue|premium|sales|amount|aov|severity|incurred|paid/i.test(metric);
+    isMonetaryColumn(metric);
+  if (isMoney) return formatRevenueUsd(value);
   const abs = Math.abs(value);
-  const prefix = isMoney ? "₹" : "";
+  const prefix = "";
   if (abs >= 1_00_00_000) return `${prefix}${(value / 1_00_00_000).toFixed(1)}Cr`;
   if (abs >= 1_00_000) return `${prefix}${(value / 1_00_000).toFixed(1)}L`;
   if (abs >= 1_000) return `${prefix}${(value / 1_000).toFixed(1)}k`;
@@ -102,8 +107,8 @@ function SeriesCard({
   const dataMax = Math.max(...values, 0);
   const ticks = niceTicks(dataMax || 1);
   const axisMax = ticks[ticks.length - 1] || 1;
-  const unitHint = /revenue|premium|sales|amount|aov|severity|incurred|paid/i.test(metric)
-    ? "₹"
+  const unitHint = isMonetaryColumn(metric)
+    ? "USD"
     : "count";
 
   if (!series.length) {
@@ -214,7 +219,7 @@ function BreakdownCard({
             <button type="button" className="w-full text-left" onClick={() => onSelect(item.name)}>
               <div className="mb-1 flex justify-between gap-2 text-xs">
                 <span className="truncate underline-offset-2 hover:underline">{item.name}</span>
-                <span className="tabular-nums text-muted-foreground">{item.formatted}</span>
+                <span className="tabular-nums text-muted-foreground">{/₹|INR/.test(item.formatted) ? formatRevenueUsd(item.value) : item.formatted}</span>
               </div>
               <div className="h-1.5 rounded-full bg-muted">
                 <div

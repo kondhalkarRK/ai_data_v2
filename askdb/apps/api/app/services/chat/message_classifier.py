@@ -200,7 +200,7 @@ def template_scope_declined(industry: Industry) -> str:
         else "units sold by state or revenue by month"
     )
     return (
-        "Soci is built for your business data and analytics, so I can't help with general "
+        "Scio is built for your business data and analytics, so I can't help with general "
         "knowledge or programming questions. I'm happy to help with something like "
         f"\u201c{examples}\u201d."
     )

@@ -1,14 +1,14 @@
-SOCI EXECUTIVE PRESENTATION — STORYBOARD
+SCIO EXECUTIVE PRESENTATION — STORYBOARD
 18 main slides + 3 appendices
 Prepared 23 November 2026
 
 STATUS: The complete dark deck is saved in Spaces: https://chatgpt.com/space/page_4b832114af7481918bb713d883d0df44 . It contains 18 main slides and 3 appendices. The saved deck supersedes the initial review layouts below. It includes an editable ontology diagram, labelled reference/current test screenshots and verified Microsoft pricing attribution. Cover art, presenter details and demo link can be replaced.
 
-1. Soci
+1. Scio
 Takeaway: Ask your data anything, in plain English.
 On-slide content: Governed AI analytics for business decisions. [Presenter] · [Team / organisation] · [Date].
 Composition: 55% left title; 40% right replaceable hero image. Minimal cover.
-Evidence/source: apps/web/lib/brand.ts; current Soci wordmark.
+Evidence/source: apps/web/lib/brand.ts; current Scio wordmark.
 Pending information or boundary: Approved cover image and presenter details.
 
 2. The business problem
@@ -25,9 +25,9 @@ Composition: Three flat editorial columns: difficulty and consequence.
 Evidence/source: Reference business narrative; hypotheses until stakeholder validation.
 Pending information or boundary: No unsupported turnaround-time statistics.
 
-4. What Soci does
+4. What Scio does
 Takeaway: A business interface to governed analytics.
-On-slide content: Soci connects natural-language questions with approved business definitions and controlled PostgreSQL analysis. Users can inspect results, explore supporting context and build reports.
+On-slide content: Scio connects natural-language questions with approved business definitions and controlled PostgreSQL analysis. Users can inspect results, explore supporting context and build reports.
 Composition: 35% concise explanation; 60% actual current screenshot; one value statement below.
 Evidence/source: Current Chat, semantic configuration and Analytics Builder code.
 Pending information or boundary: Current overview screenshot; no fabricated UI.
@@ -141,7 +141,7 @@ Pending information or boundary: No credentials. Optional services and proposed 
 Takeaway: Make the estimate reproducible.
 On-slide content: Model-backed questions × average input/output token cost, plus separately budgeted report/retry usage. Add infrastructure, database, monitoring, engineering and support. Record competitor plan, entitlement, currency and pricing date.
 Composition: Assumption table with editable values, formulas and source fields.
-Evidence/source: Official current pricing and measured Soci usage when available.
+Evidence/source: Official current pricing and measured Scio usage when available.
 Pending information or boundary: No current rate verified in this review stage; leave entries pending.
 
 21. Appendix: demo questions and status

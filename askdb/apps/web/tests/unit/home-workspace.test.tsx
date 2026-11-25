@@ -31,6 +31,9 @@ beforeEach(() => {
 describe("Home workspace", () => {
   it("greets the user and submits suggestions through the existing chat flow", async () => {
     const user = userEvent.setup(); mount();
+    const wordmark = screen.getByRole("img", { name: "Scio" });
+    expect([...wordmark.children].map(letter => letter.textContent)).toEqual(["S", "c", "i", "o"]);
+    expect(wordmark).toHaveAttribute("data-wordmark", "Scio");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/Good (morning|afternoon|evening), Rahul/);
     await user.click(screen.getByRole("button", { name: "Revenue by month" }));
     expect(mocks.push).not.toHaveBeenCalled();
@@ -80,7 +83,7 @@ it("opens the optional demo and restores focus after Escape", async () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   const trigger = screen.getByRole("button", { name: "Watch demo" });
   await user.click(trigger);
-  expect(screen.getByRole("dialog", { name: "Discover Soci" })).toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: "Discover Scio" })).toBeInTheDocument();
   expect(screen.getByText("Product walkthrough scenes")).toBeInTheDocument();
   await user.keyboard("{Escape}");
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());

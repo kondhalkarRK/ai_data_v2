@@ -11,6 +11,7 @@ import { HomeStory } from "@/components/home/home-story";
 import { Button } from "@/components/ui/button";
 import { useActiveIndustry, useRegionAccess, useSession } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
+import { APP_NAME } from "@/lib/brand";
 import styles from "./home-workspace.module.css";
 
 const EXAMPLES = {
@@ -77,8 +78,8 @@ export function HomeWorkspace() {
     <div className={styles.workspaceGrid}>
     <section aria-labelledby="home-ask-heading" className="flex min-w-0 flex-col items-start text-left">
       <div className={styles.brandIntro}>
-        <span className={styles.wordmark} role="img" aria-label="Soci">
-          {Array.from("Soci").map((letter, index) => <span key={index} aria-hidden="true" className={styles.wordmarkLetter} style={{ animationDelay: `${index * 140}ms` }}>{letter}</span>)}
+        <span className={styles.wordmark} role="img" aria-label={APP_NAME} data-wordmark={APP_NAME}>
+          {Array.from(APP_NAME).map((letter, index) => <span key={index} aria-hidden="true" className={styles.wordmarkLetter} style={{ animationDelay: `${index * 140}ms` }}>{letter}</span>)}
         </span>
         <p className={styles.tagline}>Your data. Explained.</p>
       </div>
@@ -94,7 +95,7 @@ export function HomeWorkspace() {
     </section>
     <section aria-labelledby="home-demo-heading" className={styles.demoCard}>
       <div className="flex items-center justify-between gap-3"><span className="text-[11px] font-semibold uppercase tracking-[.16em] text-primary">A quick look</span><span className="rounded-full border border-border px-2 py-1 text-[10px] text-muted-foreground">Example data</span></div>
-      <h2 id="home-demo-heading" className="mt-3 text-xl font-semibold tracking-tight">See Soci in action</h2>
+      <h2 id="home-demo-heading" className="mt-3 text-xl font-semibold tracking-tight">See Scio in action</h2>
       <p className="mt-2 text-sm text-muted-foreground">One question. A clearer picture.</p>
       <div className={styles.demoQuestion}><span className="mb-2 block text-[10px] font-semibold uppercase tracking-widest text-primary">01 / Ask</span>{industry === "automotive" ? "How are sales changing by region?" : "How are premiums changing by region?"}</div>
       <div className={styles.demoChart} data-animation-paused={animationPaused}><div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-widest text-primary">02 / Explore</span><button type="button" aria-label={animationPaused ? "Play chart animation" : "Pause chart animation"} aria-pressed={animationPaused} onClick={() => setAnimationPaused(value => !value)} className="rounded-md p-1 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary">{animationPaused ? <Play className="size-3.5" aria-hidden="true" /> : <Pause className="size-3.5" aria-hidden="true" />}</button></div>
@@ -116,7 +117,7 @@ export function HomeWorkspace() {
     <Dialog.Root open={demoOpen} onOpenChange={setDemoOpen}><Dialog.Portal>
       <Dialog.Overlay className="fixed inset-0 z-40 bg-black/65" />
       <Dialog.Content onCloseAutoFocus={event => { event.preventDefault(); demoTrigger.current?.focus(); }} className="fixed inset-3 z-50 overflow-y-auto rounded-2xl border border-border bg-background p-3 shadow-[var(--shadow-raised)] outline-none sm:inset-6 sm:p-5" aria-describedby="home-demo-description">
-        <div className="mb-4 flex items-start justify-between gap-3"><div><Dialog.Title className="text-lg font-semibold">Discover Soci</Dialog.Title><Dialog.Description id="home-demo-description" className="text-xs text-muted-foreground">Explore the product with illustrative scenes. Figures are examples, not live results.</Dialog.Description></div><Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close demo"><X aria-hidden="true" /></Button></Dialog.Close></div>
+        <div className="mb-4 flex items-start justify-between gap-3"><div><Dialog.Title className="text-lg font-semibold">Discover Scio</Dialog.Title><Dialog.Description id="home-demo-description" className="text-xs text-muted-foreground">Explore the product with illustrative scenes. Figures are examples, not live results.</Dialog.Description></div><Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close demo"><X aria-hidden="true" /></Button></Dialog.Close></div>
         <HomeStory />
       </Dialog.Content>
     </Dialog.Portal></Dialog.Root>

@@ -7,10 +7,10 @@ function text(s,name,value,x,y,w,h,size=27,color=C.fg,bold=false){
 }
 function rule(s,x,y,w,color=C.line){s.shapes.add({geometry:'line',name:'Alignment rule',position:{left:x,top:y,width:w,height:0},fill:'none',line:{fill:color,width:1}});}
 function box(s,name,x,y,w,h,fill=C.surface){return s.shapes.add({geometry:'rect',name,position:{left:x,top:y,width:w,height:h},fill,line:{fill:C.line,width:1}});}
-function foot(s,n,caption=''){rule(s,72,665,1136);text(s,'Product footer','Soci',72,680,80,22,16,C.teal,true);text(s,'Page number',String(n).padStart(2,'0'),1170,678,38,24,17,C.muted);if(caption)text(s,'Evidence caption',caption,175,678,960,24,15,C.muted);}
+function foot(s,n,caption=''){rule(s,72,665,1136);text(s,'Product footer','Scio',72,680,80,22,16,C.teal,true);text(s,'Page number',String(n).padStart(2,'0'),1170,678,38,24,17,C.muted);if(caption)text(s,'Evidence caption',caption,175,678,960,24,15,C.muted);}
 function heading(s,n,title,subtitle='',caption=''){text(s,'Slide title',title,72,57,1136,70,48,C.fg,true);if(subtitle)text(s,'Slide explanation',subtitle,74,139,1132,68,26,C.muted);foot(s,n,caption);}
 function note(s,value){s.speakerNotes.text=value;}
-function image(s,file,x,y,w,h,crop){return s.images.add({path:ASSET+file,alt:file.startsWith('reference')?'Reference product interface; illustrative historical data':'Soci interface with synthetic test data',fit:'contain',position:{left:x,top:y,width:w,height:h},...(crop?{crop}:{})});}
+function image(s,file,x,y,w,h,crop){return s.images.add({path:ASSET+file,alt:file.startsWith('reference')?'Reference product interface; illustrative historical data':'Scio interface with synthetic test data',fit:'contain',position:{left:x,top:y,width:w,height:h},...(crop?{crop}:{})});}
 function table(s,values,x,y,w,h,widths,size=23){
  const t=s.tables.add({rows:values.length,columns:values[0].length,left:x,top:y,width:w,height:h,columnWidths:widths,values});
  t.borders.assign({style:'solid',fill:C.line,width:1});
@@ -30,11 +30,11 @@ export async function build({presentation,input}){
   switch(n){
    case 1:
     image(s,'soci-architectural-hero.png',715,0,565,720);
-    text(s,'Soci cover title','Soci',72,115,620,130,110,C.fg,true);
+    text(s,'Scio cover title','Scio',72,115,620,130,110,C.fg,true);
     text(s,'Cover tagline','Ask your data anything,\nin plain English.',76,292,650,150,44,C.fg);
     text(s,'Cover descriptor','Governed AI analytics\nfor business decisions',76,475,610,86,27,C.teal);
     text(s,'Editable presenter details','[Presenter name]  ·  [Team / organisation]\n[Presentation date]',76,625,625,50,17,C.muted);
-    note(s,'Cover: conceptual architectural image generated for Soci. The right-hand image is intentionally replaceable, not a product screenshot. Product tagline: apps/web/lib/brand.ts. Presenter/team/date remain editable. Dark editorial system, restrained teal and navy.');break;
+    note(s,'Cover: conceptual architectural image generated for Scio. The right-hand image is intentionally replaceable, not a product screenshot. Product tagline: apps/web/lib/brand.ts. Presenter/team/date remain editable. Dark editorial system, restrained teal and navy.');break;
    case 2:
     text(s,'Problem title','A simple question.\nA fragmented path to an answer.',72,72,1136,140,55,C.fg,true);
     text(s,'Running business question','“How do units sold and revenue compare\nacross two vehicle models?”',76,248,1080,105,35,C.teal);
@@ -46,12 +46,12 @@ export async function build({presentation,input}){
     columns(s,[['Business users','Questions depend on specialist availability and clear interpretation.'],['Analysts','Repeated requests recreate extracts, filters and explanations.'],['Leadership','Different definitions make comparisons harder to defend.']],245);
     note(s,'Stakeholder hypotheses from reference decks. No turnaround-time, productivity or revenue-improvement statistics are claimed. Speaker: connect each difficulty to a real audience example during discussion.');break;
    case 4:
-    heading(s,n,'Soci brings the question closer to the data','A business interface supported by meaning, scope and evidence.');
+    heading(s,n,'Scio brings the question closer to the data','A business interface supported by meaning, scope and evidence.');
     text(s,'Product explanation','Ask in familiar\nbusiness language.',72,240,400,110,38,C.fg,true);
     text(s,'Product detail','Use approved definitions.\nQuery permitted data.\nInspect the result.',76,389,370,150,28,C.muted);
     image(s,'soci-chat-empty.png',495,224,715,365,{left:0.175,top:0.15,right:0.02,bottom:0.16});
     text(s,'Value statement','For business users, analysts and decision-makers.',76,600,1100,42,27,C.teal);
-    note(s,'Current Soci Chat screenshot captured during UI tests; Anita is a synthetic authenticated profile, not a hardcoded product greeting. Source: apps/web/components/chat/chat-workspace-view.tsx, hooks/use-chat-ask.ts, lib/chat-greeting.ts; docs/SOCI_CHAT_UPDATE.md. The screenshot demonstrates layout, not live warehouse/model accuracy.');break;
+    note(s,'Current Scio Chat screenshot captured during UI tests; Anita is a synthetic authenticated profile, not a hardcoded product greeting. Source: apps/web/components/chat/chat-workspace-view.tsx, hooks/use-chat-ask.ts, lib/chat-greeting.ts; docs/SOCI_CHAT_UPDATE.md. The screenshot demonstrates layout, not live warehouse/model accuracy.');break;
    case 5:
     heading(s,n,'How a question becomes an answer','The result keeps its business meaning and permitted scope.');
     text(s,'Semantic input','Approved measures · glossary · catalog values · dates and grouping',76,238,1120,48,25,C.teal);
@@ -78,9 +78,9 @@ export async function build({presentation,input}){
     const trust=[['Freshness','Is the reporting period current?'],['Completeness','Are expected values present?'],['Rule results','Which checks need attention?']];
     trust.forEach((it,i)=>{let y=240+i*126;text(s,'Trust label '+i,it[0],850,y,350,42,28,C.teal,true);text(s,'Trust meaning '+i,it[1],850,y+50,350,67,24,C.fg);});
     text(s,'Trust boundary','Dataset quality is not a guarantee that an AI answer is correct.',76,609,1130,42,24,C.amber);
-    note(s,'Reference image: Dummy_2.pptx slide 7; values are not current Soci production measurements. Capability sources: current reliability UI/services and configured quality rules. Explain freshness, completeness and rule outcomes; do not use the depicted score as model confidence. Current screenshot replacement is possible without altering the editable slide text.');break;
+    note(s,'Reference image: Dummy_2.pptx slide 7; values are not current Scio production measurements. Capability sources: current reliability UI/services and configured quality rules. Explain freshness, completeness and rule outcomes; do not use the depicted score as model confidence. Current screenshot replacement is possible without altering the editable slide text.');break;
    case 9:
-    heading(s,n,'AI Chat','Ask, refine and inspect the answer.','Current Soci interface excerpt • synthetic test values');
+    heading(s,n,'AI Chat','Ask, refine and inspect the answer.','Current Scio interface excerpt • synthetic test values');
     image(s,'soci-chat-answer.png',72,225,720,405,{left:0.185,top:0.13,right:0.32,bottom:0.18});
     [['Ask in business terms','Make the measure and period clear.'],['Read the result','Tables, charts and explanation.'],['Inspect and respond','SQL, feedback and saved history.']].forEach((it,i)=>{let y=238+i*129;text(s,'Chat sequence '+i,String(i+1).padStart(2,'0'),844,y,52,48,34,C.teal,true);text(s,'Chat heading '+i,it[0],912,y,295,58,27,C.fg,true);text(s,'Chat detail '+i,it[1],912,y+62,295,58,23,C.muted);});
     note(s,'Sources: current Chat UI/SSE contracts and docs/SOCI_CHAT_UPDATE.md. Screenshot captured in browser acceptance with fixture data; not a live LLM/warehouse answer. History/feedback require the application migration. Greeting uses authenticated fullName first token with a neutral fallback. Clarification and SQL inspection remain part of the existing Chat workflow.');break;
@@ -118,23 +118,23 @@ export async function build({presentation,input}){
     note(s,'Verified current stack: apps/web/package.json, apps/api/pyproject.toml, DB/service modules and semantic pack files. Optional document retrieval is configuration dependent and not required for structured SQL answers. Do not use older reference-deck Streamlit/DuckDB/LangChain architecture as the current implementation. No dependency on the separate Agentic project.');break;
    case 15:
     heading(s,n,'Key capabilities','Each capability supports a specific piece of business work.');
-    table(s,[['Business need','Soci capability','Evidence to inspect'],['Ask a business question','AI Chat','Answer, scope and SQL'],['Agree what a metric means','Semantic Atlas','Definition and calculation'],['Explore relationships','Ontology Browser','Entities and links'],['Review data reliability','Data Trust','Freshness and rule outcomes'],['Create a scoped report','Analytics Builder','KPIs, charts and briefing'],['Control and operate AI','Admin Center','Access, usage and audit']],72,231,1136,378,[350,295,491],23);
+    table(s,[['Business need','Scio capability','Evidence to inspect'],['Ask a business question','AI Chat','Answer, scope and SQL'],['Agree what a metric means','Semantic Atlas','Definition and calculation'],['Explore relationships','Ontology Browser','Entities and links'],['Review data reliability','Data Trust','Freshness and rule outcomes'],['Create a scoped report','Analytics Builder','KPIs, charts and briefing'],['Control and operate AI','Admin Center','Access, usage and audit']],72,231,1136,378,[350,295,491],23);
     note(s,'Capability synthesis of earlier slides. Source modules are cited in their respective notes. Avoid expanding the list into unimplemented auto-remediation, arbitrary database connectors or Agentic capabilities. Semantic meaning, relationship exploration, data quality and answer correctness are separate responsibilities.');break;
    case 16:
     heading(s,n,'Cost comparison','Compare the complete operating scenario.');
-    table(s,[['Cost component','Soci','Power BI / Copilot scenario'],['Access / licensing','Confirm commercial terms','Pro: US$14/user/month*'],['AI / model services','Approved gateway usage','Eligible capacity / entitlements'],['Infrastructure and operations','Application, DB and support','Capacity, integration and support'],['Total cost','Workload and quotes required','Entitlements and scope required']],72,240,1136,300,[300,390,446],23);
+    table(s,[['Cost component','Scio','Power BI / Copilot scenario'],['Access / licensing','Confirm commercial terms','Pro: US$14/user/month*'],['AI / model services','Approved gateway usage','Eligible capacity / entitlements'],['Infrastructure and operations','Application, DB and support','Capacity, integration and support'],['Total cost','Workload and quotes required','Entitlements and scope required']],72,240,1136,300,[300,390,446],23);
     text(s,'Cost footnote','*US advertised Pro price, billed yearly. Existing E5, region/tax and Copilot requirements affect incremental cost.',76,575,1125,65,21,C.muted);
-    note(s,'Official pricing checked 23 November 2026: https://www.microsoft.com/en-us/microsoft-fabric/features/power-bi/pricing . Pro advertised at US$14/user/month paid yearly and included in Microsoft 365 E5 / Office 365 E5. Actual price and taxes vary. Copilot requirements: https://learn.microsoft.com/en-us/power-bi/create-reports/copilot-introduction and https://learn.microsoft.com/en-us/fabric/enterprise/fabric-copilot-capacity . Eligible paid capacity and tenant/region configuration matter; a Pro price is not a complete Copilot TCO. Soci model rates, hosting, support and commercial terms need approved quotes. No savings percentage is asserted. See appendix for an explicitly hypothetical inference calculation.');break;
+    note(s,'Official pricing checked 23 November 2026: https://www.microsoft.com/en-us/microsoft-fabric/features/power-bi/pricing . Pro advertised at US$14/user/month paid yearly and included in Microsoft 365 E5 / Office 365 E5. Actual price and taxes vary. Copilot requirements: https://learn.microsoft.com/en-us/power-bi/create-reports/copilot-introduction and https://learn.microsoft.com/en-us/fabric/enterprise/fabric-copilot-capacity . Eligible paid capacity and tenant/region configuration matter; a Pro price is not a complete Copilot TCO. Scio model rates, hosting, support and commercial terms need approved quotes. No savings percentage is asserted. See appendix for an explicitly hypothetical inference calculation.');break;
    case 17:
     heading(s,n,'Demonstration journey','Keep one business question visible throughout the demo.');
     flow(s,['Ask a comparison','Refine the scope','Inspect SQL / evidence','Explore a report'],290);
     text(s,'Demo question','“Compare units sold and revenue for [model A] and [model B] in [period].”',76,231,1120,45,25,C.teal);
     text(s,'Demo discipline','Use actual catalog values and a verified data period. Rehearse the full sequence before presenting.',76,482,1100,100,28,C.fg);
-    text(s,'Editable demo link','[Insert approved Soci demo link]',76,603,1100,39,23,C.muted);
+    text(s,'Editable demo link','[Insert approved Scio demo link]',76,603,1100,39,23,C.muted);
     note(s,'This is a rehearsal sequence, not a claim that the example has passed a live-provider test. Substitute real permitted catalog values and available dates. Verify the follow-up, SQL disclosure, region behavior and report navigation before a live audience. No extra model usage merely to inspect existing SQL or rate a saved response.');break;
    case 18:
     text(s,'Discussion heading','Questions?',72,170,750,130,94,C.fg,true);
-    text(s,'Discussion supporting line','Where could Soci help\nyour team make a better decision?',78,350,620,112,34,C.teal);
+    text(s,'Discussion supporting line','Where could Scio help\nyour team make a better decision?',78,350,620,112,34,C.teal);
     [['Business fit','Which question should a pilot address?'],['Governance scope','Which data and permissions apply?'],['Pilot success','What evidence would show value?']].forEach((it,i)=>{let y=187+i*139;text(s,'Discussion topic '+i,it[0],832,y,360,46,27,C.fg,true);text(s,'Discussion prompt '+i,it[1],832,y+57,360,73,25,C.muted);});
     text(s,'Contact placeholder','[Contact details / approved demo link]',78,611,1100,35,21,C.muted);foot(s,n);
     note(s,'Main-deck close. Invite discussion of scope and success criteria rather than promising unsupported business outcomes. Presenter/contact placeholder remains editable. The following three slides are appendix material.');break;
@@ -145,7 +145,7 @@ export async function build({presentation,input}){
    case 20:
     heading(s,n,'Cost assumptions and calculation','Appendix · Hypothetical inference arithmetic, not a gateway quote.');
     table(s,[['Scenario input','Assumed value'],['Monthly questions / model-backed share','20,000 questions / 60%'],['Model-backed questions','12,000'],['Average input / output per call','1,500 / 300 tokens'],['Illustrative input / output rates','US$1 / US$4 per million tokens'],['Inference subtotal','18M × $1/M + 3.6M × $4/M = $32.40']],72,226,1136,323,[570,566],24);
-    text(s,'Cost exclusions','Add reports, retries, hosting, database, monitoring, engineering and support.\nThis subtotal is not Soci total cost and is not compared with BI licence spend.',76,581,1120,68,23,C.amber);
+    text(s,'Cost exclusions','Add reports, retries, hosting, database, monitoring, engineering and support.\nThis subtotal is not Scio total cost and is not compared with BI licence spend.',76,581,1120,68,23,C.amber);
     note(s,'Every workload and unit-rate figure on this slide is a stated hypothetical assumption. Arithmetic: 20,000×0.60=12,000 calls; 12,000×1,500=18,000,000 input tokens; 12,000×300=3,600,000 output tokens; 18×1+3.6×4=32.4 USD. Not an approved Capgemini endpoint quote, measured app usage or ROI result. Excludes additional report/narration/correction calls and all platform/operational costs. Use approved real inputs before business approval.');break;
    case 21:
     heading(s,n,'Demo questions and acceptance','Appendix · Separate a sample prompt from a verified demo outcome.');

@@ -1,16 +1,9 @@
-/** Indian number formatting for executive read-outs (₹ Cr / L, lakh grouping). */
+import { formatRevenueUsd } from "@/lib/display-currency";
+
+/** Source amounts are INR; this legacy function name is retained for callers. */
 
 export function formatInr(value: number | null | undefined, digits?: number): string {
-  if (value == null || Number.isNaN(value)) return "—";
-  const abs = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (abs >= 1e7) {
-    const crore = abs / 1e7;
-    const d = digits ?? (crore >= 100 ? 0 : 1);
-    return `${sign}₹${crore.toLocaleString("en-IN", { maximumFractionDigits: d, minimumFractionDigits: d })} Cr`;
-  }
-  if (abs >= 1e5) return `${sign}₹${(abs / 1e5).toFixed(digits ?? 1)} L`;
-  return `${sign}₹${Math.round(abs).toLocaleString("en-IN")}`;
+  return formatRevenueUsd(value, true, digits ?? 2);
 }
 
 export function formatCount(value: number | null | undefined): string {

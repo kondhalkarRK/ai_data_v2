@@ -6,10 +6,11 @@ import type { AnomalyMarker } from "@/components/chat/types";
 import { useChartThemeKey } from "@/hooks/use-chart-theme-key";
 import { CHART_SERIES } from "@/lib/design";
 import { formatChatCell } from "@/lib/format-chat-cell";
+import { DISPLAY_FX_NOTE, formatRevenueUsd, isMonetaryColumn } from "@/lib/display-currency";
 import { cn } from "@/lib/utils";
 
 /** Optional report-only formatting; ordinary chat charts retain existing defaults. */
-export const ChartValueFormatContext = React.createContext<{ compact: (value: number) => string; exact: (value: number) => string; categoryColor?: (label: string) => string } | null>(null);
+export const ChartValueFormatContext = React.createContext<{ compact: (value: number) => string; exact: (value: number) => string; categoryColor?: (label: string) => string; currency?: boolean } | null>(null);
 
 export type ChartKind = "bar" | "line" | "area" | "pie" | "scatter";
 
@@ -45,6 +46,7 @@ export function ResultChart({
   hideTypeSelect = false,
   hideControls = false,
   hideHeading = false,
+  metricFormat,
 }: {
   xKey: string;
   yKey: string;
@@ -58,7 +60,9 @@ export function ResultChart({
   hideHeading?: boolean;
   /** Auto boards edit validated specifications through AskChart instead. */
   hideControls?: boolean;
+  metricFormat?: string;
 }) {
+  const inheritedFormat = React.useContext(ChartValueFormatContext);
   const keys = React.useMemo(() => {
     if (columns?.length) return columns;
     return Object.keys(rows[0] ?? {});
@@ -80,7 +84,14 @@ export function ResultChart({
     [series, numericKeys],
   );
   const [showAll, setShowAll] = React.useState(true);
-  const multi = showAll && seriesKeys.length > 1 && chartType !== "pie";
+  const mixedCurrency = seriesKeys.some(isMonetaryColumn) && !seriesKeys.every(isMonetaryColumn);
+  const multi = showAll && seriesKeys.length > 1 && chartType !== "pie" && !mixedCurrency;
+  const currency = isMonetaryColumn(yKey) || (metricFormat === "currency" && yKey === initialY && !/(growth|percent|pct|share|ratio|rank|count|units|qty|orders|salespeople|year|month|_id$)/i.test(yKey));
+  const valueFormat = inheritedFormat ?? (currency ? {
+    compact: (value: number) => formatRevenueUsd(value),
+    exact: (value: number) => formatRevenueUsd(value, false),
+    currency: true,
+  } : null);
   const themeKey = useChartThemeKey();
 
   React.useEffect(() => {
@@ -133,7 +144,7 @@ export function ResultChart({
           label="Y Axis"
           value={multi ? ALL_SERIES : yKey}
           options={[
-            ...(seriesKeys.length > 1 ? [ALL_SERIES] : []),
+            ...(seriesKeys.length > 1 && !mixedCurrency ? [ALL_SERIES] : []),
             ...(numericKeys.length ? numericKeys : keys),
           ]}
           labels={{ [ALL_SERIES]: "All series" }}
@@ -154,7 +165,9 @@ export function ResultChart({
         )}
       </div>}
 
-      <React.Fragment key={themeKey}>
+      {mixedCurrency && <p className="text-xs text-muted-foreground">These metrics have different units. Select a metric using Y Axis to view it without mixing currency and counts.</p>}
+      {(currency || valueFormat?.currency) && <p className="text-[11px] text-muted-foreground">{DISPLAY_FX_NOTE}</p>}
+      <ChartValueFormatContext.Provider value={valueFormat}><React.Fragment key={themeKey}>
         {multi ? (
           <MultiSeriesChart
             rows={rows.slice(0, 48)}
@@ -175,7 +188,7 @@ export function ResultChart({
             anomalies={anomalies}
           />
         )}
-      </React.Fragment>
+      </React.Fragment></ChartValueFormatContext.Provider>
     </div>
   );
 }

@@ -33,6 +33,7 @@ export function useChatAsk() {
   const historyIdRef = useRef<string | null>(null);
   const bootstrapped = useRef(false);
   // Only a conversation selection is stored here; authentication stays in HttpOnly cookies.
+  // Keep this legacy key stable across display-name changes to preserve selections.
   const storageKey = `soci-chat:${user?.id ?? "anonymous"}:${industry}`;
   const question = drafts[conversationId ?? "new"] ?? "";
   const setQuestion = (text: string) => setDrafts(previous => ({ ...previous, [conversationId ?? "new"]: text }));
@@ -178,7 +179,7 @@ export function useChatAsk() {
         const body = message.rows
           .map((row) => columns.map((c) => csvEscape(String(row[c] ?? ""))).join(","))
           .join("\n");
-        downloadText(`Soci-${message.id}.csv`, `${columns.join(",")}\n${body}`);
+        downloadText(`Scio-${message.id}.csv`, `${columns.join(",")}\n${body}`);
         flash("CSV downloaded");
       } else if (key === "save") {
         const title = (message.narrative || "Saved insight").slice(0, 80);

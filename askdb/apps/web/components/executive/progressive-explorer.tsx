@@ -7,6 +7,7 @@ import * as React from "react";
 import type { Industry } from "@nql/shared-types";
 
 import type { ExecutiveIntelligence } from "@/components/executive/types";
+import { formatRevenueUsd } from "@/lib/display-currency";
 import { CHART_SERIES } from "@/lib/design";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -306,7 +307,7 @@ export function ProgressiveExplorer({
                 )}
                 onClick={() => setMetric(option)}
               >
-                {option === "revenue" ? "Revenue (₹)" : "Units"}
+                {option === "revenue" ? "Revenue (USD)" : "Units"}
               </button>
             ))}
           </div>
@@ -347,13 +348,13 @@ export function ProgressiveExplorer({
           <GeoHeatmap
             title={`Cities in ${selectedState}`}
             subtitle="Click a city or market to open dealers and product mix"
-            unit={metric === "revenue" ? "Revenue (₹)" : "Units sold"}
+            unit={metric === "revenue" ? "Revenue (USD)" : "Units sold"}
             cells={cityRows.map((r) => ({
               id: String(r.regionId),
               label: r.city || r.regionName,
               detail: r.regionName,
               value: metric === "revenue" ? r.revenue : r.unitsSold,
-              formatted: metric === "revenue" ? r.revenueFormatted : r.unitsFormatted,
+              formatted: metric === "revenue" ? formatRevenueUsd(r.revenue) : r.unitsFormatted,
             }))}
             onSelect={(id) => {
               const point = cityRows.find((r) => String(r.regionId) === id);
@@ -366,7 +367,7 @@ export function ProgressiveExplorer({
           <GeoHeatmap
             title="Revenue heatmap by state"
             subtitle="Click a state to drill into cities, then dealers"
-            unit={metric === "revenue" ? "Revenue (₹)" : "Units sold"}
+            unit={metric === "revenue" ? "Revenue (USD)" : "Units sold"}
             cells={stateBuckets.map((s) => ({
               id: s.state,
               label: s.state,
@@ -387,7 +388,7 @@ export function ProgressiveExplorer({
           <ContextBanner
             title={selectedRegion.regionName}
             stats={[
-              { label: "Revenue", value: selectedRegion.revenueFormatted },
+              { label: "Revenue", value: formatRevenueUsd(selectedRegion.revenue) },
               { label: "Units", value: selectedRegion.unitsFormatted },
               { label: "Dealers", value: String(selectedRegion.dealerCount) },
               {
@@ -407,7 +408,7 @@ export function ProgressiveExplorer({
                   label: d.dealerName,
                   detail: [d.city, d.dealerGrade].filter(Boolean).join(" · "),
                   value: metric === "revenue" ? d.revenue : d.unitsSold,
-                  formatted: metric === "revenue" ? d.revenueFormatted : d.unitsFormatted,
+                  formatted: metric === "revenue" ? formatRevenueUsd(d.revenue) : d.unitsFormatted,
                   meta: d.topMake ? `Top · ${d.topMake}` : undefined,
                 }))}
                 onSelect={(id) => {
@@ -445,7 +446,7 @@ export function ProgressiveExplorer({
               <ContextBanner
                 title={selectedDealer.dealerName}
                 stats={[
-                  { label: "Revenue", value: selectedDealer.revenueFormatted },
+                  { label: "Revenue", value: formatRevenueUsd(selectedDealer.revenue) },
                   { label: "Units", value: selectedDealer.unitsFormatted },
                   { label: "City", value: selectedDealer.city ?? "—" },
                   { label: "Grade", value: selectedDealer.dealerGrade ?? "—" },
@@ -480,7 +481,7 @@ export function ProgressiveExplorer({
                     label: m.model,
                     detail: [m.make, m.carType].filter(Boolean).join(" · "),
                     value: metric === "revenue" ? m.revenue : m.unitsSold,
-                    formatted: metric === "revenue" ? m.revenueFormatted : m.unitsFormatted,
+                    formatted: metric === "revenue" ? formatRevenueUsd(m.revenue) : m.unitsFormatted,
                   }))}
                   presenterMode={Boolean(presenterMode)}
                   loading={models.isPending}
@@ -811,7 +812,7 @@ function RowBar({
     <>
       <div className="mb-1 flex justify-between gap-2 text-xs">
         <span className="truncate">{item.name}</span>
-        <span className="tabular-nums text-muted-foreground">{item.formatted}</span>
+        <span className="tabular-nums text-muted-foreground">{/₹|INR/.test(item.formatted) ? formatRevenueUsd(item.value) : item.formatted}</span>
       </div>
       <div className="h-1.5 rounded-full bg-muted">
         <div
@@ -1064,8 +1065,9 @@ function prettyMetric(metric: string): string {
 }
 
 function formatCompact(value: number, money: boolean): string {
+  if (money) return formatRevenueUsd(value);
   const abs = Math.abs(value);
-  const prefix = money ? "₹" : "";
+  const prefix = "";
   if (abs >= 1_00_00_000) return `${prefix}${(value / 1_00_00_000).toFixed(1)}Cr`;
   if (abs >= 1_00_000) return `${prefix}${(value / 1_00_000).toFixed(1)}L`;
   if (abs >= 1_000) return `${prefix}${(value / 1_000).toFixed(1)}k`;

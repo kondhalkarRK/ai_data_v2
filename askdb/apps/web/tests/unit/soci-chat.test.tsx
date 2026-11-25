@@ -23,7 +23,7 @@ const frames = [
   { event: "done", data: { historyId: "response-1", conversationId: "conversation-1" } },
 ];
 beforeEach(() => {
-  localStorage.clear(); sessionStorage.clear();
+  window.localStorage.clear(); window.sessionStorage.clear();
   mocks.profile = { id: "owner", fullName: "Anita Sharma", role: "admin", regionAccess: { unrestricted: true, zones: [] }, capabilities: { ragEnabled: true } };
   mocks.get.mockReset().mockImplementation(async (path: string) => {
     if (path === "/api/v1/chat/conversations") return { items: [{ id: "conversation-1", title: "Earlier chat", updatedAt: "2026-11-23T10:00:00Z" }], hasMore: false };
@@ -41,9 +41,9 @@ function setup() {
   return { ...view, client, user: userEvent.setup(), renderAgain: () => view.rerender(<QueryClientProvider client={client}><ChatModeShell enabled /></QueryClientProvider>) };
 }
 
-it("renders Soci as one word and derives greetings only from the authenticated name", () => {
+it("renders Scio as one word and derives greetings only from the authenticated name", () => {
   render(<BrandWordmark />);
-  expect(screen.getByLabelText("Soci").textContent).toBe("Soci");
+  expect(screen.getByLabelText("Scio").textContent).toBe("Scio");
   expect(chatGreeting("  Anita  Sharma ")).toBe("Hi, Anita");
   expect(chatGreeting(" ")).toBe("Hi there.");
   expect(chatGreeting(null)).toBe("Hi there.");
@@ -71,7 +71,7 @@ it("shares conversation, draft, mode choices and ratings across layouts", async 
 });
 
 it("history is hidden initially, restores focus, keeps drafts and opens persisted ratings", async () => {
-  localStorage.setItem("askMeChatMode", "new");
+  window.localStorage.setItem("askMeChatMode", "new");
   const e = setup();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   await e.user.type(screen.getByRole("textbox"), "Keep this draft");

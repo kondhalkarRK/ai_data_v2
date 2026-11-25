@@ -1612,6 +1612,7 @@ export function ResultPreview({
     <div>
       <ResultChart
         rows={points}
+        metricFormat={metricFormat}
         columns={pointKeys}
         xKey={chart.x}
         yKey={chart.y}

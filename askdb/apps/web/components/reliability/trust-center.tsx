@@ -262,8 +262,8 @@ export function TrustCenter({ industry }: { industry: Industry }) {
           ) : null}
           {data.storage === "memory" ? (
             <p className="rounded-[var(--radius-control)] border border-border bg-muted px-3 py-2 text-2xs text-muted-foreground">
-              Run history and rule changes are being kept in memory because the reliability tables are not migrated yet.
-              Run the database migration to keep trend history and monitor edits across restarts.
+              Run history and rule changes are being kept in server memory and will be lost on restart.
+              Check application-database connectivity, permissions and migrations to enable persistent history.
             </p>
           ) : null}
 

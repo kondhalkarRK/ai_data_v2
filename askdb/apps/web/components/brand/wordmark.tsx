@@ -11,7 +11,7 @@ const SIZE: Record<WordmarkSize, string> = {
 };
 
 /**
- * Soci keeps the complementary blue and teal brand treatment in a single word.
+ * Scio keeps the complementary blue and teal brand treatment in a single word.
  */
 export function BrandWordmark({
   size = "md",

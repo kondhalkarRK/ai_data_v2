@@ -38,9 +38,9 @@ it.each(["classic", "new"] as const)("%s keeps tabs clear and all supporting det
   expect(screen.queryByText("Grounded on")).not.toBeInTheDocument();
   expect(screen.queryByText(/Dataset Trust/)).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Thumbs up" })).not.toBeInTheDocument();
-  const trigger = screen.getByRole("button", { name: "How Soci handled this" });
+  const trigger = screen.getByRole("button", { name: "How Scio handled this" });
   await user.click(trigger);
-  const panel = within(screen.getByRole("dialog", { name: "How Soci handled this" }));
+  const panel = within(screen.getByRole("dialog", { name: "How Scio handled this" }));
   expect(panel.getByText("High confidence")).toBeInTheDocument();
   expect(panel.getByText("Approved measure")).toBeInTheDocument();
   expect(panel.getByText("Grounded on")).toBeInTheDocument();

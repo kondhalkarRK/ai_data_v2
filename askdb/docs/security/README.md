@@ -1,9 +1,9 @@
-# Soci security baseline and ASVS Level 2 register
+# Scio security baseline and ASVS Level 2 register
 
 Updated: 2026-11-24. Scope: `askdb` only, including its API and web application.
 
 **Status: application hardening implemented; ASVS Level 2 verification is incomplete.**
-Do not describe Soci as ASVS certified, fully compliant, or protected against every attack.
+Do not describe Scio as ASVS certified, fully compliant, or protected against every attack.
 The attached register contains all **253 Level 1 and Level 2 requirements** from ASVS
 5.0.0. Level 2 includes applicable Level 1 requirements. An unassessed requirement is
 not a pass; a partial implementation is not a pass either. Applicability decisions,
@@ -58,7 +58,7 @@ verification across all relevant workflows; their presence alone does not close 
 | High | Retention/deletion policy, protected audit collection, alerting, backup restoration, incident response and access reviews | Client operations/security teams; exercised procedures |
 | Required | Review every remaining register row, justify non-applicability and verify applicable controls | Named control owners and independent reviewer |
 
-Provider compliance does not establish Soci compliance. Private model endpoints still
+Provider compliance does not establish Scio compliance. Private model endpoints still
 process the prompt/context sent to them. ASVS application controls also do not replace
 AI-specific prompt-injection, data-leakage and grounding evaluations.
 
@@ -76,8 +76,8 @@ ENVIRONMENT=production
 AUTH_BYPASS=false
 COOKIE_SECURE=true
 JWT_SECRET_KEY=<new-cryptographically-random-secret-at-least-32-characters>
-CORS_ALLOWED_ORIGINS=https://soci.client.example
-TRUSTED_HOSTS=soci.client.example,soci-api.client.example
+CORS_ALLOWED_ORIGINS=https://scio.client.example
+TRUSTED_HOSTS=scio.client.example,scio-api.client.example
 SSL_VERIFY=true
 # Set only when an approved private CA is needed:
 SSL_CERT_FILE=
