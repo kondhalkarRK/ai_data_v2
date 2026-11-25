@@ -2,6 +2,7 @@
 
 import type { UserProfile } from "@nql/shared-types";
 import { LogOut, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
@@ -130,7 +131,7 @@ export function Sidebar({ user }: { user: UserProfile }) {
         ))}
       </nav>
 
-      <div className="border-t border-sidebar-border/80 p-2">
+      <div className="shrink-0 border-t border-sidebar-border/80 p-2">
         {compact ? (
           <div className="flex flex-col items-center gap-2">
             <Button
@@ -195,6 +196,17 @@ export function Sidebar({ user }: { user: UserProfile }) {
             </div>
           </>
         )}
+        <div className={cn("mt-2 flex border-t border-sidebar-border/60 pt-2", compact ? "justify-center" : "justify-start px-1.5")}>
+          <Image
+            src="/brand/capgemini-invent.png"
+            alt="Capgemini Invent"
+            title="Capgemini Invent"
+            width={64}
+            height={64}
+            sizes={compact ? "36px" : "64px"}
+            className={cn("h-16 w-16 rounded-xl object-contain", compact && "h-9 w-9 rounded-lg")}
+          />
+        </div>
       </div>
     </aside>
   );

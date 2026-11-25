@@ -59,7 +59,6 @@ export function HomeWorkspace() {
     <header className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{greeting}, {name}</h1><p className="mt-2 text-sm text-muted-foreground">What would you like to explore today?</p></div>
-        <p className="ml-auto text-right text-sm font-medium tracking-wide text-muted-foreground sm:pt-1 sm:text-base">Capgemini Invent</p>
       </div>
       <div aria-label="Current data context" className="flex flex-wrap items-center gap-2 text-xs">
         <StatusChip label="PostgreSQL" state={databaseState} healthy={!industries.isError && pack?.databaseAvailable === true} open={detailsOpen} onClick={() => setDetailsOpen(value => !value)} />
