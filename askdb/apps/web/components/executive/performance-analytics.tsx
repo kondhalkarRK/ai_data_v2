@@ -1,6 +1,6 @@
 "use client";
 
-import { DISPLAY_FX_NOTE, formatRevenueUsd, isMonetaryColumn } from "@/lib/display-currency";
+import { DISPLAY_CURRENCY_NOTE, formatRevenueInr, isMonetaryColumn } from "@/lib/display-currency";
 import type { Industry } from "@nql/shared-types";
 
 import type { ExecutiveIntelligence } from "@/components/executive/types";
@@ -29,7 +29,7 @@ export function PerformanceAnalytics({
 
   return (
     <div className="space-y-4">
-      {metrics.some(isMonetaryColumn) && <p className="text-[11px] text-muted-foreground">{DISPLAY_FX_NOTE}</p>}
+      {metrics.some(isMonetaryColumn) && <p className="text-[11px] text-muted-foreground">{DISPLAY_CURRENCY_NOTE}</p>}
       <div className="grid gap-4 lg:grid-cols-2">
         {metrics.slice(0, 2).map((metric, index) => (
           <SeriesCard
@@ -67,7 +67,7 @@ export function PerformanceAnalytics({
 function formatAxisValue(value: number, metric: string): string {
   const isMoney =
     isMonetaryColumn(metric);
-  if (isMoney) return formatRevenueUsd(value);
+  if (isMoney) return formatRevenueInr(value);
   const abs = Math.abs(value);
   const prefix = "";
   if (abs >= 1_00_00_000) return `${prefix}${(value / 1_00_00_000).toFixed(1)}Cr`;
@@ -108,7 +108,7 @@ function SeriesCard({
   const ticks = niceTicks(dataMax || 1);
   const axisMax = ticks[ticks.length - 1] || 1;
   const unitHint = isMonetaryColumn(metric)
-    ? "USD"
+    ? "INR"
     : "count";
 
   if (!series.length) {
@@ -219,7 +219,7 @@ function BreakdownCard({
             <button type="button" className="w-full text-left" onClick={() => onSelect(item.name)}>
               <div className="mb-1 flex justify-between gap-2 text-xs">
                 <span className="truncate underline-offset-2 hover:underline">{item.name}</span>
-                <span className="tabular-nums text-muted-foreground">{/₹|INR/.test(item.formatted) ? formatRevenueUsd(item.value) : item.formatted}</span>
+                <span className="tabular-nums text-muted-foreground">{/₹|INR/.test(item.formatted) ? formatRevenueInr(item.value) : item.formatted}</span>
               </div>
               <div className="h-1.5 rounded-full bg-muted">
                 <div

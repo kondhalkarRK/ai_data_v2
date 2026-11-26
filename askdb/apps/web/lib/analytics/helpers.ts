@@ -1,4 +1,4 @@
-import { formatRevenueUsd, isMonetaryColumn } from "@/lib/display-currency";
+import { formatRevenueInr, isMonetaryColumn } from "@/lib/display-currency";
 import type { AnalyticsFix, AnalyticsSpec, AnalyticsVizKind } from "@nql/shared-types";
 
 const ANALYSIS_PHRASE: Partial<Record<AnalyticsSpec["analysis"], string>> = {
@@ -225,7 +225,7 @@ export function formatCell(value: unknown, column: string, metricFormat?: string
 }
 
 export function formatInr(value: number): string {
-  return formatRevenueUsd(value);
+  return formatRevenueInr(value);
 }
 
 export function columnLabel(column: string): string {

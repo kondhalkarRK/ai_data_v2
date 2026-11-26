@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { DISPLAY_FX, DISPLAY_FX_NOTE, formatRevenueUsd, isMonetaryColumn } from "@/lib/display-currency";
+import { DISPLAY_CURRENCY, DISPLAY_CURRENCY_NOTE, formatRevenueInr, isMonetaryColumn } from "@/lib/display-currency";
 import { formatReportValue } from "@/components/analytics-builder/askbi/report-format";
 import { ResultChart } from "@/components/chat/result-chart";
 import { formatInr, formatCount, formatPct } from "@/components/executive/cockpit/format";
@@ -8,16 +8,16 @@ import { formatInr, formatCount, formatPct } from "@/components/executive/cockpi
 describe("Approved INR to USD display", () => {
   it("divides by 95, discloses provenance and leaves source values unchanged", () => {
     const row = { revenue: 95000000, units: 95 };
-    expect(formatRevenueUsd(row.revenue)).toBe("$1M");
+    expect(formatRevenueInr(row.revenue)).toBe("$1M");
     expect(formatInr(95000)).toBe("$1K");
     expect(formatReportValue(-95000, "currency")).toBe("-$1K");
-    expect(formatRevenueUsd(9500, false)).toBe("$100.00");
-    expect(formatRevenueUsd(0)).toBe("$0");
-    expect(formatRevenueUsd(Infinity)).toBe("—");
+    expect(formatRevenueInr(9500, false)).toBe("$100.00");
+    expect(formatRevenueInr(0)).toBe("$0");
+    expect(formatRevenueInr(Infinity)).toBe("—");
     expect(row).toEqual({ revenue: 95000000, units: 95 });
-    expect(DISPLAY_FX.inrPerUsd).toBe(95);
-    expect(DISPLAY_FX_NOTE).toContain(DISPLAY_FX.configuredOn);
-    expect(DISPLAY_FX_NOTE).toContain("not a live market rate");
+    expect(DISPLAY_CURRENCY.inrPerUsd).toBe(95);
+    expect(DISPLAY_CURRENCY_NOTE).toContain(DISPLAY_CURRENCY.configuredOn);
+    expect(DISPLAY_CURRENCY_NOTE).toContain("not a live market rate");
     expect(formatCount(95)).toBe("95");
     expect(formatPct(0.25)).toBe("25.0%");
     expect(formatReportValue(95, "integer")).toBe("95");
@@ -31,7 +31,7 @@ describe("Approved INR to USD display", () => {
 
   it("shows USD axes and exact USD tooltips for revenue charts", () => {
     const { container } = render(<ResultChart rows={[{ model: "A", revenue: 95000 }]} xKey="model" yKey="revenue" />);
-    expect(screen.getByText(DISPLAY_FX_NOTE)).toBeVisible();
+    expect(screen.getByText(DISPLAY_CURRENCY_NOTE)).toBeVisible();
     expect(container.querySelector("svg")?.textContent).toContain("$");
     const bar = container.querySelector("svg rect[rx]");
     expect(bar).not.toBeNull();
@@ -41,7 +41,7 @@ describe("Approved INR to USD display", () => {
 
   it("keeps count charts in their original units", () => {
     const { container } = render(<ResultChart rows={[{ model: "A", units_sold: 95 }]} xKey="model" yKey="units_sold" />);
-    expect(screen.queryByText(DISPLAY_FX_NOTE)).toBeNull();
+    expect(screen.queryByText(DISPLAY_CURRENCY_NOTE)).toBeNull();
     expect(container.querySelector("svg")?.textContent).not.toContain("$");
   });
 
@@ -50,6 +50,6 @@ describe("Approved INR to USD display", () => {
     expect(screen.queryByRole("option", { name: "All series" })).toBeNull();
     fireEvent.change(screen.getByLabelText("Y Axis"), { target: { value: "units_sold" } });
     expect(container.querySelector("svg")?.textContent).not.toContain("$");
-    expect(screen.queryByText(DISPLAY_FX_NOTE)).toBeNull();
+    expect(screen.queryByText(DISPLAY_CURRENCY_NOTE)).toBeNull();
   });
 });

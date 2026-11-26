@@ -1,6 +1,6 @@
 "use client";
 
-import { formatRevenueUsd } from "@/lib/display-currency";
+import { formatRevenueInr } from "@/lib/display-currency";
 
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MapPin } from "lucide-react";
@@ -325,7 +325,7 @@ function DrillDetail({
         <div>
           <h4 className="text-sm font-semibold">{selectedDealer.dealerName}</h4>
           <p className="text-xs text-muted-foreground">
-            {selectedDealer.unitsFormatted} units · {formatRevenueUsd(selectedDealer.revenue)}
+            {selectedDealer.unitsFormatted} units · {formatRevenueInr(selectedDealer.revenue)}
           </p>
         </div>
         {modelsLoading ? (
@@ -348,7 +348,7 @@ function DrillDetail({
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  {formatRevenueUsd(row.revenue)}
+                  {formatRevenueInr(row.revenue)}
                   {row.carType ? ` · ${row.carType}` : ""}
                 </div>
               </li>
@@ -370,7 +370,7 @@ function DrillDetail({
         <div>
           <h4 className="text-sm font-semibold">{selectedRegion.regionName}</h4>
           <p className="text-xs text-muted-foreground">
-            {selectedRegion.unitsFormatted} units · {formatRevenueUsd(selectedRegion.revenue)}
+            {selectedRegion.unitsFormatted} units · {formatRevenueInr(selectedRegion.revenue)}
             {selectedRegion.topMake
               ? ` · Top make ${selectedRegion.topMake}${
                   selectedRegion.topModel ? ` ${selectedRegion.topModel}` : ""
@@ -403,7 +403,7 @@ function DrillDetail({
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  {formatRevenueUsd(row.revenue)}
+                  {formatRevenueInr(row.revenue)}
                   {row.topMake
                     ? ` · Top ${row.topMake}${row.topModel ? ` ${row.topModel}` : ""}`
                     : ""}

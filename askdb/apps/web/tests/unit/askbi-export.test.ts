@@ -41,7 +41,7 @@ it("freezes results and settles animated values without mutating the screen", ()
   root.textContent = "New report";
   expect(snapshot.results["panel-0"]!.result!.rows[0]!.revenue).toBe(83402902);
   expect(snapshot.root.textContent).toContain("$877.93K");
-  expect(snapshot.displayFx.inrPerUsd).toBe(95);
+  expect(snapshot.displayCurrency.inrPerUsd).toBe(95);
   expect(snapshot.root.querySelector("button")).toBeNull();
   expect(Object.isFrozen(snapshot.results)).toBe(true);
 });

@@ -1,10 +1,10 @@
-import { DISPLAY_FX } from "@/lib/display-currency";
+import { DISPLAY_CURRENCY } from "@/lib/display-currency";
 import { zipReportFiles } from "./report-zip";
 import type { BiReport } from "@nql/shared-types";
 import { reportReady, type PanelResult } from "./use-askbi";
 
 export type ReportSnapshot = {
-  displayFx: typeof DISPLAY_FX;
+  displayCurrency: typeof DISPLAY_CURRENCY;
   report: BiReport; results: Record<string, PanelResult>; briefing: string[];
   scopeLabel: string; liftPercent: number; root: HTMLElement;
 };
@@ -19,7 +19,7 @@ function freeze<T>(value: T): T {
 /** Synchronous snapshot: no auth, saving, narration or analytical requests. */
 export function createReportSnapshot(report: BiReport, results: Record<string, PanelResult>, briefing: string[], root: HTMLElement, scopeLabel: string, liftPercent: number): ReportSnapshot {
   if (!reportReady(report.state.plan, results)) throw new Error("Wait for all current panels before exporting.");
-  const data = freeze(structuredClone({ report, results, briefing, scopeLabel, liftPercent, displayFx: DISPLAY_FX }));
+  const data = freeze(structuredClone({ report, results, briefing, scopeLabel, liftPercent, displayCurrency: DISPLAY_CURRENCY }));
   const clone = root.cloneNode(true) as HTMLElement;
   clone.querySelectorAll<HTMLElement>("[data-export-value]").forEach(node => { node.textContent = node.dataset.exportValue ?? "—"; });
   clone.querySelectorAll("button, select, details, input[type=range]").forEach(node => node.remove());

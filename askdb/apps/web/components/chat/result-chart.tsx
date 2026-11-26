@@ -6,7 +6,7 @@ import type { AnomalyMarker } from "@/components/chat/types";
 import { useChartThemeKey } from "@/hooks/use-chart-theme-key";
 import { CHART_SERIES } from "@/lib/design";
 import { formatChatCell } from "@/lib/format-chat-cell";
-import { DISPLAY_FX_NOTE, formatRevenueUsd, isMonetaryColumn } from "@/lib/display-currency";
+import { DISPLAY_CURRENCY_NOTE, formatRevenueInr, isMonetaryColumn } from "@/lib/display-currency";
 import { cn } from "@/lib/utils";
 
 /** Optional report-only formatting; ordinary chat charts retain existing defaults. */
@@ -88,8 +88,8 @@ export function ResultChart({
   const multi = showAll && seriesKeys.length > 1 && chartType !== "pie" && !mixedCurrency;
   const currency = isMonetaryColumn(yKey) || (metricFormat === "currency" && yKey === initialY && !/(growth|percent|pct|share|ratio|rank|count|units|qty|orders|salespeople|year|month|_id$)/i.test(yKey));
   const valueFormat = inheritedFormat ?? (currency ? {
-    compact: (value: number) => formatRevenueUsd(value),
-    exact: (value: number) => formatRevenueUsd(value, false),
+    compact: (value: number) => formatRevenueInr(value),
+    exact: (value: number) => formatRevenueInr(value, false),
     currency: true,
   } : null);
   const themeKey = useChartThemeKey();
@@ -166,7 +166,7 @@ export function ResultChart({
       </div>}
 
       {mixedCurrency && <p className="text-xs text-muted-foreground">These metrics have different units. Select a metric using Y Axis to view it without mixing currency and counts.</p>}
-      {(currency || valueFormat?.currency) && <p className="text-[11px] text-muted-foreground">{DISPLAY_FX_NOTE}</p>}
+      {(currency || valueFormat?.currency) && <p className="text-[11px] text-muted-foreground">{DISPLAY_CURRENCY_NOTE}</p>}
       <ChartValueFormatContext.Provider value={valueFormat}><React.Fragment key={themeKey}>
         {multi ? (
           <MultiSeriesChart

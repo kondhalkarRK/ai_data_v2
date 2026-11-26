@@ -1,10 +1,10 @@
-import { formatRevenueUsd } from "@/lib/display-currency";
+import { formatRevenueInr } from "@/lib/display-currency";
 
 /** Presentation only: never use rounded labels as calculation inputs. */
 export function formatReportValue(value: unknown, metricFormat?: string, compact = true): string {
   if (value == null || (typeof value === "number" && !Number.isFinite(value))) return "—";
   if (typeof value !== "number") return String(value);
-  if (metricFormat === "currency") return formatRevenueUsd(value, compact);
+  if (metricFormat === "currency") return formatRevenueInr(value, compact);
   const percent = metricFormat === "percent" || metricFormat === "percentage";
   const text = new Intl.NumberFormat("en-IN", { maximumFractionDigits: compact ? 2 : 20 }).format(Math.abs(value));
   return `${value < 0 ? "−" : ""}${text}${percent ? "%" : ""}`;

@@ -1,9 +1,9 @@
-import { formatRevenueUsd } from "@/lib/display-currency";
+import { formatRevenueInr } from "@/lib/display-currency";
 
 /** Source amounts are INR; this legacy function name is retained for callers. */
 
 export function formatInr(value: number | null | undefined, digits?: number): string {
-  return formatRevenueUsd(value, true, digits ?? 2);
+  return formatRevenueInr(value, true, digits ?? 2);
 }
 
 export function formatCount(value: number | null | undefined): string {
