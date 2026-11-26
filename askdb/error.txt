@@ -1,198 +1,21 @@
-Use this prompt. It **extends the existing five-batch foundation** and introduces the new approach in four controlled batches.
-
----
-
-## Implementation prompt
-
-Work only in:
-
-`E:\ai_data_rag\ai_data_v2\askdb`
-
-Focus on **Automotive Scio AI Chat**. Keep Insurance, `askme-agentic`, unrelated application modules and existing uncommitted work unchanged.
-
-Implement **bounded, dependency-aware analytical planning** for compound questions. Reuse the existing interpretation, semantic model, glossary, entity catalog, compiler, execution guards, conversation state, narration, AskBI and shared Chat UI.
-
-Do not introduce another agent framework or create question-, make- or model-specific patches.
-
-**The primary acceptance rule:** every requested part must be answered correctly or explicitly identified as unanswered. Valid SQL alone is insufficient.
-
-### 1. Preserve the current fast path
-
-Keep straightforward totals, rankings, comparisons and supported windows on the existing workflow.
-
-Use multi-step planning when an operation depends on an earlier result, for example:
-
-- Find an extreme period, then investigate its contributors.
-- Identify a region, then rank models inside that region.
-- Select a cohort, then compare its members with their history.
-
-Route by meaning and required operations. Do not rely solely on words such as “why,” “then” or “contribution.”
-
-Keep the new path behind a default-off feature flag. Preserve the existing rollback path.
-
-### 2. Extend the typed request into an executable plan
-
-Represent a bounded ordered plan containing:
-
-- Plan/version and original question.
-- Requested outcomes and individual requirements.
-- Step IDs, operations and dependencies.
-- Approved measures, dimensions, filters and exclusions.
-- Periods, grain, baseline and partial-period policy.
-- Ranking basis, direction, limits and tie handling.
-- Required output columns and output types.
-- Typed bindings to earlier step results.
-- Assumptions, ambiguities and unsupported requirements.
-- A coverage map connecting each requirement to its steps and outputs.
-
-An evidence list containing `depends_on` is not sufficient. Dependencies must control execution.
-
-Initially support reusable operations such as aggregate, select extreme, filter by previous result, compare, rank and retrieve history. Reject unsupported combinations explicitly.
-
-Start with a configurable maximum of **four analytical steps**.
-
-### 3. Bind dependent results correctly
-
-A later step must consume the authorized output of its declared predecessor.
-
-Examples:
-
-- The selected month becomes the later date filter.
-- The selected region becomes the later geographic filter.
-- Ranked item IDs become the fixed cohort for historical analysis.
-
-Use canonical identities and typed values. Never concatenate returned strings into executable SQL.
-
-Prefer CTEs when the complete operation can execute safely in one statement. Otherwise, use bounded sequential queries with a coherent data snapshot.
-
-Do not change transaction isolation after queries have already started.
-
-Define behavior for ties, multiple selected values, missing results and oversized cohorts. Never arbitrarily choose one tied result or broaden the scope.
-
-### 4. Make business meaning explicit
-
-Use approved semantic policies for comparison defaults, ranking and incomplete periods.
-
-Distinguish:
-
-- Lowest value from largest decline.
-- Absolute change from percentage change.
-- Contribution to a decline from a positive offset.
-- Separate region/model breakdowns from combined region–model groups.
-
-Clarify material ambiguity when no approved default applies.
-
-For extreme-period selection, apply the approved completeness rule. Excluding a partial period and flagging a partial period are different policies.
-
-Do not infer completeness from `MAX(date)` or observed date coverage alone.
-
-### 5. Reuse the governed compiler and enforce budgets
-
-Compile each step through approved formulas, joins, grain and operations.
-
-Preserve:
-
-- Authentication, industry and regional restrictions.
-- Read-only execution and SQL guards.
-- Ownership and permission revalidation.
-- Query timeouts, row caps and cancellation.
-- Scope-aware caching and semantic-version checks.
-
-Recheck permissions before dependent execution and before returning results.
-
-Keep ordinary Chat budgets unchanged. Target one interpretation/planning call. Allow an additional planning call only for a documented unresolved problem within the compound-request budget.
-
-Do not add an LLM call per step. Do not retry permission denials.
-
-Bound analytical queries, total time, selected values and corrective attempts. If the plan exceeds its budget, clarify or offer a smaller scope rather than truncating it silently.
-
-### 6. Add independent coverage and result validation
-
-Before execution, verify:
-
-- Every requirement has a supported step or an explicit limitation.
-- Dependencies are valid and acyclic.
-- Bindings match their declared types.
-- Required outputs are representable.
-- Measures, dimensions, periods and scope are approved.
-- The plan retains comparisons, exclusions and requested groupings.
-
-After compilation, verify that SQL implements the plan, including dependency filters, ranking basis and required columns.
-
-After execution, verify:
-
-- Expected columns and result types.
-- Correct selected period, region or cohort.
-- Current and baseline coverage.
-- Missing observations versus verified zero.
-- Contribution calculations and reconciliation.
-- Caps, ties and partial results.
-
-Do not claim reconciliation merely because “Other” was calculated as the difference. Validate the underlying decomposition and use an independently obtained headline where appropriate.
-
-Rank contributors across the eligible result **before** applying display limits. Separate negative contributors from positive offsets when explaining a decline.
-
-A failed check must block a successful-looking answer. Use a bounded correction, focused clarification or clearly labelled partial result.
-
-### 7. Return the whole answer and show the plan compactly
-
-Extend the shared backend response with ordered step results and their verification status.
-
-In both Classic and New Chat:
-
-- Lead with the complete answer.
-- Show the selected extreme or cohort and the subsequent analysis.
-- State periods, baseline, scope and limitations.
-- Identify unanswered requirements explicitly.
-- Put the concise business plan and checks inside the existing info/Expand panel.
-- Keep SQL tied to the relevant step/result.
-- Preserve history, ratings, cancellation, accessibility and three themes.
-
-Show concise workflow decisions, not private model reasoning.
-
-### 8. Enforce the cloud/private data boundary
-
-Review the existing payload before making security claims. Current interpretation context includes more than DDL.
-
-Define and enforce the allowed payload for each approved provider:
-
-- No query results, intermediate results or retrieved candidate values to an unapproved cloud model.
-- Apply the approved policy to user text and business metadata.
-- If strict DDL-only mode is required, enforce that restriction explicitly.
-- Use an approved private/local model when additional sensitive context is necessary, or return a clear limitation.
-- Do not classify an endpoint as private merely from its name or URL.
-
-Keep deterministic calculation and narration local wherever supported.
-
-### 9. Verify five general dependency shapes
-
-Create synthetic fixtures with independently written reference SQL:
-
-| Shape | Required structure and outputs |
-|---|---|
-| Extreme period → contributors | Period totals → selected period → baseline → dimension changes. Return period, headline, baseline, dimensions and contributions. |
-| Extreme region → models inside it | Region totals → selected region → model ranking filtered to that region. Return both selections. |
-| Period comparison → decliners | Current/baseline values → changes → explicit amount/percentage ranking. |
-| Growth in one measure, decline in another | Calculate both changes against the same approved baseline, then filter their directions. |
-| Ranked cohort → own history | Select cohort first, then obtain history for those same identities. Do not independently rerank every historical period. |
-
-Include paraphrases, misspellings, multiple measures, exclusions, ties, incomplete periods, missing baselines, zero/negative values, empty steps, caps, revoked access and cancellation.
-
-Test route, interpretation, dependencies, SQL, numbers, narration and visible output separately. A correct route with incorrect numbers fails.
-
-Keep reference SQL and holdout questions out of runtime context. Label mocked, SQLite and native PostgreSQL evidence accurately.
-
-### 10. Extend the audit trail
-
-Record plan/version, requirement coverage, step dependencies, resolved bindings, semantic version, scope fingerprint, SQL fingerprints, row counts, checks, failures, residuals, partial completion, usage and timings.
-
-Avoid credentials, private reasoning and unnecessary result duplication.
-
-## Implement in four batches
-
-1. **Plan contract and coverage:** review current gaps, define executable steps, dependency bindings and routing-only tests.
-2. **Execution and validation:** compile steps, bind results, enforce budgets and verify against reference SQL.
-3. **Narration and UI:** return all step results, add compact plan/check views and preserve both layouts.
-4. **Acceptance and rollout:** regression, unseen holdouts, security checks, matched performance comparison and rollback review.
-
-**Start with Batch 1 only.** Finish with files changed, tests run, supported shapes, unresolved gaps and a handoff for Batch 2. Keep incomplete execution gated.
+ADDITIONS
+
+1. Before coding, produce a gap report (current flow, where plans, bindings and
+   validation would fit, and the existing LLM payload contents). Stop and wait
+   for review.
+2. Batch 1 contains no execution code. Create a checkpoint commit or branch first.
+3. Source of period completeness: propose options (semantic pack rule or load
+   status table). Do not default to MAX(date).
+4. Defaults unless the semantic pack says otherwise: ties return all tied
+   values and flag them; cohort cap 50; no eligible result gives a clear message.
+5. Include this named regression: "Which month in the last 12 months had the
+   lowest revenue, and which region and model contributed most to that dip?"
+   Expected: month totals, selected month, baseline, region-model changes,
+   independent reconciliation.
+6. Acceptance targets: 100% reference-SQL match on fixtures; zero silently
+   dropped requirements; at most 2 LLM calls per compound question; no
+   regression on the existing simple-question set.
+7. Show step progress in the UI ("Step 1 of 3"), with cancellation preserved.
+8. For partial answers, state clearly what was answered, what was not, and why.
+9. The reference SQL and holdout questions will be reviewed and supplied by a
+   human; do not generate your own holdouts.
