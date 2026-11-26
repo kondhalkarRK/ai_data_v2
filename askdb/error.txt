@@ -1,27 +1,84 @@
-3. Automatic narrative explaining why a number moved (e.g., "Revenue is down
-   6%, mainly in Region X due to lower SUV volumes"). Calculate drivers with SQL,
-   check that every number in the text matches the result, and label it
-   "contributing factors".
+# Feedback to Give ChatGPT
 
-TEST QUESTIONS (show how each enhancement applies to them)
-Headline: 1) Total revenue and units sold last quarter. 2) Top 5 models by
-revenue this year. 3) Total revenue this month so far.
-Comparisons: 4) Revenue this quarter vs last quarter. 5) Units sold this year
-vs same period last year. 6) Best and worst region last quarter.
-Drill-down: 7) Revenue by region last quarter. 8) Top dealers in [Region].
-9) Models declining the most vs last quarter. 10) Follow-ups: "Now show only
-[Region]", "Split that by model".
-Trends: 11) Monthly revenue, last 12 months. 12) Sales trend by model, last
-4 quarters.
-Trust: 13) How is revenue defined? 14) Show the SQL. 15) Is any region's data
-incomplete?
-Governance: 16) Regional user asks for all regions and sees only their own.
-17) "Net profit margin" (undefined) gets a clear "cannot answer".
-Edge cases: 18) "Show me sales" gets a clarifying question. 19) "How are we
-doing?" gets a KPI summary. 20) "Turnover" and "volume" return the same results
-as "revenue" and "units".
+Copy the block below. It is written for the general pattern, with your example as evidence only.
 
-Board-Ready Outputs
-One-click export to PowerPoint, PDF or email, with branded formatting and source and date stamps.
-Saved and shareable views through the Analytics Builder, using the same access rules.
-Scheduled reports for recurring reviews (weekly business review, monthly board pack).
+```
+FEEDBACK ON SCIO: MULTI-PART / MULTI-HOP QUESTIONS
+
+OBSERVED PROBLEM
+For a question with dependent parts (find X, then explain X using Y), Scio
+generated one simple query that answered a different question. It silently
+dropped parts of the question, and the answer looked plausible but was wrong.
+Example (for evidence only): "Which month had the lowest revenue, and which
+region and model contributed most to that dip?" returned the 10 lowest
+region-model totals over 12 months, with no month, no baseline and no dip.
+
+PATTERN TO FIX (applies to any question like this)
+"Find the [highest/lowest/biggest change] of A, then show which B and C
+contributed most to it."
+
+REQUIRED BEHAVIOUR
+1. Decompose first: before writing SQL, break the question into ordered steps
+   and list them (identify, compare, drill down, rank). Show the plan in the
+   "Expand" section.
+2. Dependent steps: a later step must use the result of an earlier step (for
+   example, filter to the month or region found in step 1). Use CTEs or
+   separate sequential queries.
+3. Cover every part: check that each part of the question maps to a step and
+   to output columns. If any part cannot be answered, say which part is
+   missing. Never silently simplify.
+4. Define comparison terms: "dip", "decline", "growth" and "contribution" need
+   an explicit baseline (previous period, same period last year, or average of
+   other periods). Use the default from the semantic pack, and state the
+   baseline in the answer.
+5. Rank by what was asked: rank contributors by change versus baseline, not by
+   total value.
+6. Handle incomplete periods: exclude the latest period if it is partial, or
+   flag it clearly.
+7. Validate before answering: contributions should add up to the total change,
+   the result must contain the columns each part asked for, and the periods
+   and scope must be stated. If a check fails, retry or ask a clarifying
+   question.
+8. Fallback: if the question cannot be answered reliably in one pass, split it
+   into sub-questions and answer them in order, or ask the user to confirm.
+9. Return all parts: the answer shows the result of each step (for example,
+   the lowest month, then the contributors), not just the final query.
+
+KEEP THESE RULES
+- Only schema metadata (DDL) goes to a cloud LLM. Result data goes only to a
+  private/local LLM.
+- Read-only access, SQL validation and regional scoping stay in place.
+- All measures come from the semantic pack. If something is missing, say so.
+
+DELIVERABLES
+- Proposed planner/decomposition step (prompt design or code) in the FastAPI
+  flow, with where it sits before SQL generation.
+- A post-generation checker that compares the SQL and result against the
+  planned steps.
+- 5 test cases of different shapes (see below) with expected SQL structure and
+  expected output columns.
+- What to log in the audit trail (plan, steps, checks passed or failed).
+
+TEST SHAPES
+a) Find the extreme period, then explain it by dimensions.
+b) Find the top or bottom region, then rank models inside it.
+c) Compare two periods, then list the biggest decliners.
+d) Find items that grew in one measure but declined in another.
+e) Rank items, then compare each one with its own history.
+
+ACCEPTANCE CRITERIA
+- Every part of the question is answered or clearly flagged as not answered.
+- The baseline, period and scope are stated.
+- Results match a manually written reference SQL for each test.
+- An incomplete or unsupported question gets a clarification, not a guess.
+```
+
+## Why This Wording Works
+- **It describes a pattern, not one question,** so the fix is a planning layer rather than a patch for one example.
+- **It states the failure clearly:** silent simplification is the real risk, because the answer looks right.
+- **It asks for checks, not only better prompts,** because prompt tweaks alone will not catch every case.
+
+## Tips
+- Add 2 or 3 of your own failed questions to the TEST SHAPES section so the fixes are tested against real cases.
+- Ask for a reference SQL for each test case, so you can compare Scio's output against it.
+- Treat the generated design as a draft and validate it on your data before showing it to leaders.
