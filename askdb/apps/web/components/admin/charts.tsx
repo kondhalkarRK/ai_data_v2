@@ -5,8 +5,8 @@ import { CHART_SERIES } from "@/lib/design";
 export const MODE_COLOR: Record<ExecutionMode, string> = {
   SCHEMA: CHART_SERIES.positive,
   LLM: CHART_SERIES.ai,
-  HYBRID: CHART_SERIES.primary,
-  CACHE: CHART_SERIES.secondary,
+  HYBRID: CHART_SERIES.attention,
+  CACHE: "#8b5cf6",
 };
 
 export const MODE_LABEL: Record<ExecutionMode, string> = {
