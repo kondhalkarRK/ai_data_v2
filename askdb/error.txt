@@ -1,84 +1,198 @@
-# Feedback to Give ChatGPT
+Use this prompt. It **extends the existing five-batch foundation** and introduces the new approach in four controlled batches.
 
-Copy the block below. It is written for the general pattern, with your example as evidence only.
+---
 
-```
-FEEDBACK ON SCIO: MULTI-PART / MULTI-HOP QUESTIONS
+## Implementation prompt
 
-OBSERVED PROBLEM
-For a question with dependent parts (find X, then explain X using Y), Scio
-generated one simple query that answered a different question. It silently
-dropped parts of the question, and the answer looked plausible but was wrong.
-Example (for evidence only): "Which month had the lowest revenue, and which
-region and model contributed most to that dip?" returned the 10 lowest
-region-model totals over 12 months, with no month, no baseline and no dip.
+Work only in:
 
-PATTERN TO FIX (applies to any question like this)
-"Find the [highest/lowest/biggest change] of A, then show which B and C
-contributed most to it."
+`E:\ai_data_rag\ai_data_v2\askdb`
 
-REQUIRED BEHAVIOUR
-1. Decompose first: before writing SQL, break the question into ordered steps
-   and list them (identify, compare, drill down, rank). Show the plan in the
-   "Expand" section.
-2. Dependent steps: a later step must use the result of an earlier step (for
-   example, filter to the month or region found in step 1). Use CTEs or
-   separate sequential queries.
-3. Cover every part: check that each part of the question maps to a step and
-   to output columns. If any part cannot be answered, say which part is
-   missing. Never silently simplify.
-4. Define comparison terms: "dip", "decline", "growth" and "contribution" need
-   an explicit baseline (previous period, same period last year, or average of
-   other periods). Use the default from the semantic pack, and state the
-   baseline in the answer.
-5. Rank by what was asked: rank contributors by change versus baseline, not by
-   total value.
-6. Handle incomplete periods: exclude the latest period if it is partial, or
-   flag it clearly.
-7. Validate before answering: contributions should add up to the total change,
-   the result must contain the columns each part asked for, and the periods
-   and scope must be stated. If a check fails, retry or ask a clarifying
-   question.
-8. Fallback: if the question cannot be answered reliably in one pass, split it
-   into sub-questions and answer them in order, or ask the user to confirm.
-9. Return all parts: the answer shows the result of each step (for example,
-   the lowest month, then the contributors), not just the final query.
+Focus on **Automotive Scio AI Chat**. Keep Insurance, `askme-agentic`, unrelated application modules and existing uncommitted work unchanged.
 
-KEEP THESE RULES
-- Only schema metadata (DDL) goes to a cloud LLM. Result data goes only to a
-  private/local LLM.
-- Read-only access, SQL validation and regional scoping stay in place.
-- All measures come from the semantic pack. If something is missing, say so.
+Implement **bounded, dependency-aware analytical planning** for compound questions. Reuse the existing interpretation, semantic model, glossary, entity catalog, compiler, execution guards, conversation state, narration, AskBI and shared Chat UI.
 
-DELIVERABLES
-- Proposed planner/decomposition step (prompt design or code) in the FastAPI
-  flow, with where it sits before SQL generation.
-- A post-generation checker that compares the SQL and result against the
-  planned steps.
-- 5 test cases of different shapes (see below) with expected SQL structure and
-  expected output columns.
-- What to log in the audit trail (plan, steps, checks passed or failed).
+Do not introduce another agent framework or create question-, make- or model-specific patches.
 
-TEST SHAPES
-a) Find the extreme period, then explain it by dimensions.
-b) Find the top or bottom region, then rank models inside it.
-c) Compare two periods, then list the biggest decliners.
-d) Find items that grew in one measure but declined in another.
-e) Rank items, then compare each one with its own history.
+**The primary acceptance rule:** every requested part must be answered correctly or explicitly identified as unanswered. Valid SQL alone is insufficient.
 
-ACCEPTANCE CRITERIA
-- Every part of the question is answered or clearly flagged as not answered.
-- The baseline, period and scope are stated.
-- Results match a manually written reference SQL for each test.
-- An incomplete or unsupported question gets a clarification, not a guess.
-```
+### 1. Preserve the current fast path
 
-## Why This Wording Works
-- **It describes a pattern, not one question,** so the fix is a planning layer rather than a patch for one example.
-- **It states the failure clearly:** silent simplification is the real risk, because the answer looks right.
-- **It asks for checks, not only better prompts,** because prompt tweaks alone will not catch every case.
+Keep straightforward totals, rankings, comparisons and supported windows on the existing workflow.
 
-## Tips
-- Add 2 or 3 of your own failed questions to the TEST SHAPES section so the fixes are tested against real cases.
-- Ask for a reference SQL for each test case, so you can compare Scio's output against it.
-- Treat the generated design as a draft and validate it on your data before showing it to leaders.
+Use multi-step planning when an operation depends on an earlier result, for example:
+
+- Find an extreme period, then investigate its contributors.
+- Identify a region, then rank models inside that region.
+- Select a cohort, then compare its members with their history.
+
+Route by meaning and required operations. Do not rely solely on words such as “why,” “then” or “contribution.”
+
+Keep the new path behind a default-off feature flag. Preserve the existing rollback path.
+
+### 2. Extend the typed request into an executable plan
+
+Represent a bounded ordered plan containing:
+
+- Plan/version and original question.
+- Requested outcomes and individual requirements.
+- Step IDs, operations and dependencies.
+- Approved measures, dimensions, filters and exclusions.
+- Periods, grain, baseline and partial-period policy.
+- Ranking basis, direction, limits and tie handling.
+- Required output columns and output types.
+- Typed bindings to earlier step results.
+- Assumptions, ambiguities and unsupported requirements.
+- A coverage map connecting each requirement to its steps and outputs.
+
+An evidence list containing `depends_on` is not sufficient. Dependencies must control execution.
+
+Initially support reusable operations such as aggregate, select extreme, filter by previous result, compare, rank and retrieve history. Reject unsupported combinations explicitly.
+
+Start with a configurable maximum of **four analytical steps**.
+
+### 3. Bind dependent results correctly
+
+A later step must consume the authorized output of its declared predecessor.
+
+Examples:
+
+- The selected month becomes the later date filter.
+- The selected region becomes the later geographic filter.
+- Ranked item IDs become the fixed cohort for historical analysis.
+
+Use canonical identities and typed values. Never concatenate returned strings into executable SQL.
+
+Prefer CTEs when the complete operation can execute safely in one statement. Otherwise, use bounded sequential queries with a coherent data snapshot.
+
+Do not change transaction isolation after queries have already started.
+
+Define behavior for ties, multiple selected values, missing results and oversized cohorts. Never arbitrarily choose one tied result or broaden the scope.
+
+### 4. Make business meaning explicit
+
+Use approved semantic policies for comparison defaults, ranking and incomplete periods.
+
+Distinguish:
+
+- Lowest value from largest decline.
+- Absolute change from percentage change.
+- Contribution to a decline from a positive offset.
+- Separate region/model breakdowns from combined region–model groups.
+
+Clarify material ambiguity when no approved default applies.
+
+For extreme-period selection, apply the approved completeness rule. Excluding a partial period and flagging a partial period are different policies.
+
+Do not infer completeness from `MAX(date)` or observed date coverage alone.
+
+### 5. Reuse the governed compiler and enforce budgets
+
+Compile each step through approved formulas, joins, grain and operations.
+
+Preserve:
+
+- Authentication, industry and regional restrictions.
+- Read-only execution and SQL guards.
+- Ownership and permission revalidation.
+- Query timeouts, row caps and cancellation.
+- Scope-aware caching and semantic-version checks.
+
+Recheck permissions before dependent execution and before returning results.
+
+Keep ordinary Chat budgets unchanged. Target one interpretation/planning call. Allow an additional planning call only for a documented unresolved problem within the compound-request budget.
+
+Do not add an LLM call per step. Do not retry permission denials.
+
+Bound analytical queries, total time, selected values and corrective attempts. If the plan exceeds its budget, clarify or offer a smaller scope rather than truncating it silently.
+
+### 6. Add independent coverage and result validation
+
+Before execution, verify:
+
+- Every requirement has a supported step or an explicit limitation.
+- Dependencies are valid and acyclic.
+- Bindings match their declared types.
+- Required outputs are representable.
+- Measures, dimensions, periods and scope are approved.
+- The plan retains comparisons, exclusions and requested groupings.
+
+After compilation, verify that SQL implements the plan, including dependency filters, ranking basis and required columns.
+
+After execution, verify:
+
+- Expected columns and result types.
+- Correct selected period, region or cohort.
+- Current and baseline coverage.
+- Missing observations versus verified zero.
+- Contribution calculations and reconciliation.
+- Caps, ties and partial results.
+
+Do not claim reconciliation merely because “Other” was calculated as the difference. Validate the underlying decomposition and use an independently obtained headline where appropriate.
+
+Rank contributors across the eligible result **before** applying display limits. Separate negative contributors from positive offsets when explaining a decline.
+
+A failed check must block a successful-looking answer. Use a bounded correction, focused clarification or clearly labelled partial result.
+
+### 7. Return the whole answer and show the plan compactly
+
+Extend the shared backend response with ordered step results and their verification status.
+
+In both Classic and New Chat:
+
+- Lead with the complete answer.
+- Show the selected extreme or cohort and the subsequent analysis.
+- State periods, baseline, scope and limitations.
+- Identify unanswered requirements explicitly.
+- Put the concise business plan and checks inside the existing info/Expand panel.
+- Keep SQL tied to the relevant step/result.
+- Preserve history, ratings, cancellation, accessibility and three themes.
+
+Show concise workflow decisions, not private model reasoning.
+
+### 8. Enforce the cloud/private data boundary
+
+Review the existing payload before making security claims. Current interpretation context includes more than DDL.
+
+Define and enforce the allowed payload for each approved provider:
+
+- No query results, intermediate results or retrieved candidate values to an unapproved cloud model.
+- Apply the approved policy to user text and business metadata.
+- If strict DDL-only mode is required, enforce that restriction explicitly.
+- Use an approved private/local model when additional sensitive context is necessary, or return a clear limitation.
+- Do not classify an endpoint as private merely from its name or URL.
+
+Keep deterministic calculation and narration local wherever supported.
+
+### 9. Verify five general dependency shapes
+
+Create synthetic fixtures with independently written reference SQL:
+
+| Shape | Required structure and outputs |
+|---|---|
+| Extreme period → contributors | Period totals → selected period → baseline → dimension changes. Return period, headline, baseline, dimensions and contributions. |
+| Extreme region → models inside it | Region totals → selected region → model ranking filtered to that region. Return both selections. |
+| Period comparison → decliners | Current/baseline values → changes → explicit amount/percentage ranking. |
+| Growth in one measure, decline in another | Calculate both changes against the same approved baseline, then filter their directions. |
+| Ranked cohort → own history | Select cohort first, then obtain history for those same identities. Do not independently rerank every historical period. |
+
+Include paraphrases, misspellings, multiple measures, exclusions, ties, incomplete periods, missing baselines, zero/negative values, empty steps, caps, revoked access and cancellation.
+
+Test route, interpretation, dependencies, SQL, numbers, narration and visible output separately. A correct route with incorrect numbers fails.
+
+Keep reference SQL and holdout questions out of runtime context. Label mocked, SQLite and native PostgreSQL evidence accurately.
+
+### 10. Extend the audit trail
+
+Record plan/version, requirement coverage, step dependencies, resolved bindings, semantic version, scope fingerprint, SQL fingerprints, row counts, checks, failures, residuals, partial completion, usage and timings.
+
+Avoid credentials, private reasoning and unnecessary result duplication.
+
+## Implement in four batches
+
+1. **Plan contract and coverage:** review current gaps, define executable steps, dependency bindings and routing-only tests.
+2. **Execution and validation:** compile steps, bind results, enforce budgets and verify against reference SQL.
+3. **Narration and UI:** return all step results, add compact plan/check views and preserve both layouts.
+4. **Acceptance and rollout:** regression, unseen holdouts, security checks, matched performance comparison and rollback review.
+
+**Start with Batch 1 only.** Finish with files changed, tests run, supported shapes, unresolved gaps and a handoff for Batch 2. Keep incomplete execution gated.
