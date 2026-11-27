@@ -111,11 +111,11 @@ it("uses completed KPI values and active scope in a complete escaped Outlook bod
   const body = buildOutlookBody(scoped, results, ["Revenue increased from verified data."], Array.from({ length: 4 }, (_, i) => ({ title: i === 0 ? "Revenue by region" : `Chart ${i + 1}`, cid: `chart-${i + 1}` })), "https://ask.example/analytics-builder?askbiReport=1");
   expect(body).toContain("CEO &lt;Sales&gt;");
   expect(body).toContain("2026-10-01 to 2026-10-31 · Tata");
-  expect(body).toContain("$12,995.45");
+  expect(body).toContain("₹12,34,567.4");
   expect(body).toContain("No data");
   expect(body).toContain("West");
-  expect(body).toContain("$1.26");
-  expect(body).toContain("$13K");
+  expect(body).toContain("₹120");
+  expect(body).toContain("₹12.35 Lakh");
   expect(body).toContain("cid:chart-3");
   expect(body).toContain("cid:chart-4");
   expect(body).toContain("askbiReport=1");

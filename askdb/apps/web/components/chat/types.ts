@@ -171,6 +171,15 @@ export interface ResultProfile {
 }
 
 export interface ResponseMeta {
+  analyticalExecution?: AnalyticalExecution;
+  analyticalPlan?: AnalyticalPlanSnapshot;
+  analyticalPresentation?: AnalyticalPresentation | null;
+  analyticalAudit?: Record<string, unknown>;
+  responseKind?: "conversation" | "definition" | "clarification" | "data" | "report" | "partial" | "unavailable" | "denied" | "empty" | "cancelled" | "failed";
+  runId?: string;
+  runUsage?: Record<string, number | boolean | string | string[] | null>;
+  typedRequest?: { outcome: string; measures: Array<{ id: string }>; group_by: string[]; filters: unknown[]; period: unknown };
+  limitations?: string[];
   resultProfile?: ResultProfile | null;
   groundedOn: GroundedSource[];
   ambiguityFlag: boolean;
@@ -216,6 +225,8 @@ export interface RouteDecision {
 }
 
 export interface ChatMessage {
+  analysisProgress?: AnalyticalProgress | null;
+  report?: ChatReportPreview;
   complete?: boolean;
   ratingDisabled?: boolean;
   rating?: ResponseRating | null;
@@ -250,4 +261,73 @@ export interface ChatMessage {
   latencyMs?: number;
 }
 
+export interface AnalyticalProgress {
+  version: 1;
+  planId: string;
+  phase: "running" | "checking";
+  total: number;
+  completed: number;
+  message: string;
+  steps: Array<{ id: string; label: string; status: string }>;
+}
+
+export interface AnalyticalColumn {
+  key: string;
+  label: string;
+  kind: "currency" | "percent" | "number" | "date" | "text";
+  role?: string;
+  semanticId?: string;
+}
+
+export interface AnalyticalStepView {
+  id: string;
+  title: string;
+  operation: string;
+  dependsOn: string[];
+  status: string;
+  verified: boolean;
+  completenessVerified?: boolean | null;
+  summary: string;
+  columns: AnalyticalColumn[];
+  displayedRows: number;
+  totalGroups: number;
+  selectedGroups: number;
+  notes: string[];
+  searchPeriod?: { label: string; start: string | null; endExclusive: string | null };
+  comparisonPeriods: Array<{ currentStart: string; currentEnd: string; baselineStart: string; baselineEnd: string }>;
+  baseline?: { kind: string; origin: string } | null;
+  filters?: Array<{ field: string; label: string; operator: string; values: string[] }>;
+}
+
+export interface AnalyticalPresentation {
+  version: 1;
+  status: string;
+  summary: string;
+  scope: string[];
+  steps: AnalyticalStepView[];
+  unanswered: Array<{ id: string; reason: string; status: string }>;
+  notes: string[];
+  checks: Array<{ passed: boolean; measure?: string; headlineStep?: string; contributorStep?: string }>;
+  legacy?: boolean;
+}
+
+export interface AnalyticalExecution {
+  status: string;
+  message: string;
+  scope_labels?: string[];
+  steps: Array<{ id: string; status: string; columns: string[]; rows: Array<Record<string, unknown>>;
+    verified: boolean; completeness_verified?: boolean | null; total_groups: number;
+    selected_groups?: number; notes: string[] }>;
+}
+
+export interface AnalyticalPlanSnapshot {
+  steps: Array<{ id: string; label: string; operation: string; depends_on: string[];
+    outputs: Array<{ name: string; role: string; semantic_id: string; value_type: string }> }>;
+}
+
 export type ResponseRating = ChatResponseRating;
+
+export interface ChatReportPreview {
+  reportId: string; revision: number; partial: boolean; briefing: string;
+  panels: Array<{id: string; title?: string; kind?: string; status: string; result?: {result: {sql?: string; columns: string[]; rows: Array<Record<string, unknown>>; meta?: Record<string, unknown>}}}>;
+}

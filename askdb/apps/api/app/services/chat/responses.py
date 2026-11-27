@@ -14,6 +14,24 @@ def scope_key(user, scope) -> str:
     return f"{user.role.value}:{scope.cache_key()}"
 
 
+def snapshot_report(snapshot):
+    report = snapshot.get("report")
+    if not report:
+        event = next(
+            (e["data"] for e in snapshot.get("events", []) if e.get("event") == "report"), None
+        )
+        if event:
+            report = {"id": event.get("reportId"), "revision": event.get("revision")}
+    if report:
+        try:
+            uuid.UUID(report["id"])
+            if type(report["revision"]) is not int or report["revision"] < 1:
+                raise ValueError("Invalid revision")
+        except (KeyError, ValueError, TypeError, AttributeError) as exc:
+            raise AuthorizationError("This saved report reference is unavailable.") from exc
+    return report
+
+
 async def owned_response(session, response_id, user, industry):
     row = await session.scalar(
         select(QueryHistory).where(
@@ -46,7 +64,7 @@ async def check_access(session, row, user, industry, scope, settings):
             raise AuthorizationError(
                 "Document evidence for this response is no longer available to you."
             )
-    report = snapshot.get("report")
+    report = snapshot_report(snapshot)
     if report:
         saved = await session.get(BiReportRecord, uuid.UUID(report["id"]))
         if saved is None or saved.user_id != user.id or saved.scope_key != scope_key(user, scope):
@@ -77,7 +95,7 @@ async def save_rating(session: AsyncSession, row, user, body):
         from sqlalchemy.dialects.sqlite import insert
     from sqlalchemy import func
 
-    report = (row.response_snapshot or {}).get("report") or {}
+    report = snapshot_report(row.response_snapshot or {}) or {}
     values = {
         "rating": body.rating,
         "reason": body.reason if body.rating == "down" else None,

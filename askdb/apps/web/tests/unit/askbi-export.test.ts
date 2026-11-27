@@ -15,21 +15,21 @@ function fixture(count = 4) {
   const report = { id: "report", revision: 4, saved: true, state: { plan: { title: "Sales", panels, assumptions: ["Last completed month"] }, turns: [{ question: "Sales by region" }] } } as unknown as BiReport;
   const results = Object.fromEntries(report.state.plan!.panels.map(panel => [panel.id, { scope: panelScope(panel), result: { columns: ["region", "revenue"], rows: [{ region: "West", revenue: 83402902 }], meta: { metricFormat: "currency", valueColumn: "revenue" } } }])) as unknown as Record<string, PanelResult>;
   const root = document.createElement("div");
-  root.innerHTML = '<header data-askbi-pdf>Sales</header>' + panels.map(p => `<section id="askbi-panel-${p.id}" data-askbi-pdf><h3>${p.title}</h3><div data-export-value="$877.93K">0</div><button>Options</button></section>`).join("");
+  root.innerHTML = '<header data-askbi-pdf>Sales</header>' + panels.map(p => `<section id="askbi-panel-${p.id}" data-askbi-pdf><h3>${p.title}</h3><div data-export-value="₹8.34 Cr">0</div><button>Options</button></section>`).join("");
   return { report, results, root };
 }
 
 describe("report number semantics", () => {
   it.each([
-    [83402902, "currency", "$877.93K"], [834029, "currency", "$8.78K"],
-    [45200, "currency", "$475.79"], [0, "currency", "$0"],
-    [-83402902, "currency", "-$877.93K"], [100000, "currency", "$1.05K"],
-    [10000000, "currency", "$105.26K"], [99999.999, "currency", "$1.05K"],
+    [83402902, "currency", "₹8.34 Cr"], [834029, "currency", "₹8.34 Lakh"],
+    [45200, "currency", "₹45,200"], [0, "currency", "₹0"],
+    [-83402902, "currency", "−₹8.34 Cr"], [100000, "currency", "₹1 Lakh"],
+    [10000000, "currency", "₹1 Cr"], [99999.999, "currency", "₹1 Lakh"],
     [83402902, "number", "8,34,02,902"], [12.5, "percentage", "12.5%"],
     [null, "currency", "—"], [NaN, "currency", "—"], [Infinity, "currency", "—"],
   ])("formats %s as %s", (value, kind, expected) => expect(formatReportValue(value, kind)).toBe(expected));
-  it("formats converted USD tooltips without changing raw source precision or category colors", () => {
-    expect(formatReportValue(83402902.125, "currency", false)).toBe("$877,925.29");
+  it("formats original INR tooltips without changing raw source precision or category colors", () => {
+    expect(formatReportValue(83402902.125, "currency", false)).toBe("₹8,34,02,902.125");
     expect(reportCategoryColor("West")).toBe(reportCategoryColor("West"));
   });
 });
@@ -40,8 +40,8 @@ it("freezes results and settles animated values without mutating the screen", ()
   results["panel-0"]!.result!.rows[0]!.revenue = 1;
   root.textContent = "New report";
   expect(snapshot.results["panel-0"]!.result!.rows[0]!.revenue).toBe(83402902);
-  expect(snapshot.root.textContent).toContain("$877.93K");
-  expect(snapshot.displayCurrency.inrPerUsd).toBe(95);
+  expect(snapshot.root.textContent).toContain("₹8.34 Cr");
+  expect(snapshot.displayCurrency.displayCurrency).toBe("INR");
   expect(snapshot.root.querySelector("button")).toBeNull();
   expect(Object.isFrozen(snapshot.results)).toBe(true);
 });
@@ -63,7 +63,7 @@ it("uploads every chart and PDF separately without sending or dropping context",
   expect(body.body.content).toContain("Open the saved report in Scio");
   expect(body.body.content).toContain("Unavailable prior comparison");
   expect(body.body.content).toContain("cid:askbi-chart-4");
-  expect(body.body.content).toContain("$877.93K");
+  expect(body.body.content).toContain("₹8.34 Cr");
   expect(body).not.toHaveProperty("toRecipients");
   expect(calls.some(([url]) => url.includes("/send"))).toBe(false);
 });

@@ -157,6 +157,7 @@ class AnalyticsService:
         self._user = user
         self._industry = industry
         self._semantic = semantic_service
+        self.analytical_query_count = 0
 
     # -- capabilities --
 
@@ -208,11 +209,12 @@ class AnalyticsService:
         if prepare:
             await self._prepare()
         try:
+            self.analytical_query_count += 1
             result = await self._analytics.execute(text(query.sql))
             mappings = result.mappings().fetchmany(MAX_ROWS + 1)
             columns = list(result.keys())
         except Exception as exc:
-            logger.exception("Analytics Builder SQL failed")
+            logger.warning("Analytics Builder SQL failed (%s)", type(exc).__name__)
             raise AnalyticsRunError(_friendly_failure(exc), code="analytics_query_failed") from exc
 
         truncated = len(mappings) > MAX_ROWS

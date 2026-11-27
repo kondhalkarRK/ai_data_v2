@@ -1,4 +1,5 @@
 /** Format chat result table/chart values; period columns show YYYY-MM not YYYY-MM-DD. */
+import { formatRevenueInr, isMonetaryColumn } from "@/lib/display-currency";
 
 const PERIOD_COLUMN = /^(month|quarter|half|period|year_month|time_period)$/i;
 const PERIOD_COLUMN_SUFFIX = /_(month|quarter|half|period)$/i;
@@ -13,9 +14,12 @@ export function isPeriodColumn(column: string): boolean {
   return false;
 }
 
-export function formatChatCell(value: unknown, column: string): string {
+export function formatChatCell(value: unknown, column: string, kind?: "currency" | "percent" | "number"): string {
   if (value == null || value === "") return "—";
   const text = String(value);
+  if ((kind === "currency" || (!kind && isMonetaryColumn(column))) && Number.isFinite(Number(value))) {
+    return formatRevenueInr(Number(value));
+  }
   if (!isPeriodColumn(column)) return text;
   if (/^\d{4}-\d{2}$/.test(text)) return text;
   const match = ISO_DATE.exec(text);

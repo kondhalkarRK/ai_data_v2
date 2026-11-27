@@ -1,0 +1,128 @@
+SCIO AI CHAT - BATCH 1 CHECKPOINT
+26 November 2026
+Scope: AskDB Automotive; approved plan points 1-4 only.
+
+WHAT THIS BATCH PROVIDES
+1. Versioned InterpretedRequest contract with multiple approved measures, canonical
+   entity references, typed filters, exclusions, grouping, explicit/relative periods,
+   comparison baselines, partitions/windows/resets, post-aggregation operations,
+   measure filters, ranking/ties/both ends, clarification and ordered evidence tasks.
+   Original question, run ID and semantic fingerprint belong to the server envelope.
+2. Dynamic context gathering from the Automotive pack and an authorized catalog.
+   All measures are searched. Relevant model values and approved aliases are included.
+   Measure phrases are protected against fuzzy entity confusion. Context overflow
+   fails explicitly instead of dropping requested measures/comparison members.
+3. One compact LLM interpretation call returning this contract directly, with no
+   English restatement/reparse. Server checks references and immutable base formulas.
+   Unknown IDs, authority fields, executable SQL and invalid structure are rejected.
+4. Pure routing decisions for conversation, general knowledge, definitions, analytics,
+   investigation, implications, reports, data quality, prior SQL and gated documents.
+   Compound outcomes and unavailable document/report evidence remain explicit.
+5. Authenticated first-name greeting fast path; approved definitions use the existing
+   metadata lookup. General-knowledge and AskBI flags are respected.
+
+IMPORTANT: THIS IS ROUTING PREVIEW, NOT NEW ANALYTICAL EXECUTION
+The new path is disabled by default. Normal /chat/ask and synchronous Chat remain on
+the existing shared service. No SQL compiler bridge, new driver calculations,
+report creation, retrieval, conversation-state migration or UI redesign is included.
+status=ready means valid for routing review, NOT a verified analytical answer.
+Every preview returns preview_only=true and execution_enabled=false.
+Old Chat interpretation failures are not claimed to be fixed in the live Chat UI yet.
+
+PREVIEW ENTRY POINT
+POST /api/v1/chat/route-preview
+Body: {"question":"How is revenue defined?"}
+Requires a signed-in administrator and the existing auth/CSRF headers.
+Gate: CHAT_REQUEST_PREVIEW_ENABLED=false (default; documented in .env.example).
+Setting this gate true exposes only the admin preview, not a new execution path.
+Insurance returns unavailable/404 and remains unchanged.
+
+The endpoint has NO analytics-connection dependency. It performs no warehouse
+queries, retrieval, LLM SQL generation or report creation. It may read the existing
+cached entity dictionary for unrestricted admins. With an empty cache, the preview
+has semantic context but cannot validate arbitrary entity values. It does not fetch
+warehouse values to warm that cache. Restricted admins never consume the global
+catalog cache. Scoped catalog acquisition is a required Batch 2 integration task.
+The core interpreter accepts an explicitly owner/scope-bound catalog for tests and
+future server integration; the HTTP client cannot submit its own catalog or authority.
+
+BUDGETS AND METERING
+- One complete_text call, no automatic correction loop or SQL fallback.
+- Existing interactive NLQ timeout; existing LLM completion cap, at most 600 tokens.
+- Approved context is bounded to 9000 serialized characters; total interpretation
+  instructions/input are capped at 16000 characters. These are character bounds,
+  not exact provider-token limits. No requested context is silently truncated.
+- Provider token usage is retained; missing counts are explicitly marked estimated
+  in the preview. Elapsed time, model and call count are exposed for testing.
+- Existing quota preparation runs first. Model-backed previews write an existing
+  LlmUsage row labelled '[Routing preview]'; no conversation or query result is copied.
+- Provider failures return unavailable, not a false missing-measure clarification.
+- Cancellation propagates. Outer timeout bounds the call. No live gateway calls were
+  performed here; provider compatibility, real latency and token use remain unverified.
+
+BASELINE REPRODUCTION (OLD PLANNER, SYNTHETIC CATALOG)
+Replayed eight questions through existing rules/offline planning:
+- Hello: existing conversational route.
+- Revenue definition: still falls through to an analytical template.
+- Revenue and units last quarter: contradictory single-metric validation failure.
+- ASP by region: approved aggregate ratio is generated.
+- Running units by month: window SQL is generated.
+- This quarter versus last quarter: comparison is reduced to an inadequate plan.
+- Why revenue declined: basic planner exposes lexical/entity handling limitations;
+  the full live service has additional rewrites/recovery not exercised by this probe.
+- So what should we do: no deterministic analytical plan without suitable context.
+The replay does not execute SQL or evaluate the live LLM. Raw local output is in
+tmp/soci-qa/batch1-legacy-baseline.json (ignored test artifact, not customer data).
+
+VERIFICATION
+New focused command, from the AskDB root:
+.\apps\api\.venv\Scripts\python.exe -m pytest apps/api/tests/unit/test_request_interpretation.py apps/api/tests/test_chat_request_preview.py -o addopts='' -q --disable-warnings
+
+Result: 52 passed. Tests cover contract preservation, dynamic measure/model context,
+paraphrases/typos, profile greeting, approved definitions, all routing outcomes,
+mixed document requests, scoped prior context, invalid output, invented IDs,
+authentication/admin access, quota, timeout/cancellation, usage and no downstream work.
+LLM responses are fixtures. This is NOT a measured live-model routing accuracy score.
+
+Existing regression command:
+.\apps\api\.venv\Scripts\python.exe -m pytest apps/api/tests/unit/test_chat_service_memory.py apps/api/tests/unit/test_chat_non_data_routes.py apps/api/tests/unit/test_structured_classifier.py apps/api/tests/unit/test_scope_enforcement.py apps/api/tests/unit/test_region_rls.py apps/api/tests/test_chat_ratings.py -o addopts='' -q --disable-warnings
+
+Result: 72 passed, 2 failed. The two existing document tests expect legacy document
+lookup/search while documents are disabled. ChatService and RAG code were unchanged
+in this batch. Do not enable retrieval or weaken its gates to make these tests green:
+- test_document_query_without_documents
+- test_document_query_with_documents_uses_knowledge_search
+These stale expectations need a separate test update when document behavior is reviewed.
+
+Ruff passed for new modules/tests and modified configuration. The existing Chat route
+file has two unrelated lint findings (dict comprehension and en-dash) outside this change.
+Also restored a missing AnalyticsConnection dependency alias already referenced by
+existing cancel/history routes, using the existing scoped analytics dependency.
+No migration, new packages, secret changes or actual .env edits were required.
+Earlier currency/display work and other existing uncommitted changes were preserved.
+
+BATCH 2 HANDOFF (PLAN POINTS 5-8; NOT STARTED)
+1. Map all defined measures to executable/definition-only/unsupported capabilities.
+   Resolve duplicated business formulas without letting the LLM override them.
+2. Feed InterpretedRequest directly into the governed compiler. Do not convert it
+   back into an English question. Fix multi-measure coverage and fact-grain/join rules.
+3. Implement and verify explicit comparison baselines, calendar/as-of policy,
+   grouping, post-aggregation, window/reset semantics, missing members and zero/null.
+4. Bind catalog acquisition and any caches to actual user/scope/industry/version.
+   Never pass the existing industry-only global catalog to regional users.
+5. Persist typed pending/confirmed state, revalidate it on followups, and preserve
+   confirmed filters/periods. Preview HTTP is currently stateless; pure interpreter
+   tests demonstrate the owner-bound PreviousRequest handoff, not persisted chats.
+6. Calendar/as-of data is represented but live date coverage is not discovered here.
+   Production date policy, compiler capability checks and intent-completeness
+   validation must be completed before enabling typed analytical execution.
+7. Entities currently use approved column/value identity from the existing value
+   dictionary; richer composite make/model identity may need catalog enrichment.
+8. Keep investigation execution, executive narration and report execution for Batch 3.
+9. Finish with reference-result and regression evidence before switching live Chat.
+
+WHAT IS NOT YET ESTABLISHED
+No office warehouse execution, office provider acceptance, live response accuracy,
+reference-result comparison or end-to-end improvement to ordinary Chat is claimed.
+Permission checks on future execution and persisted followups still need acceptance.
+Do not equate valid routing fixtures with verified executive answers.

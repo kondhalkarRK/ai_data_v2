@@ -2,6 +2,8 @@
 
 import type {
   ChatMessage,
+  AnalyticalProgress,
+  ChatReportPreview,
   ChartPayload,
   FailurePayload,
   ProgressState,
@@ -15,6 +17,10 @@ export function applyChatSseEvent(
   data: Record<string, unknown>,
 ): ChatMessage {
   switch (eventName) {
+    case "analysis_progress":
+      return { ...message, analysisProgress: data as unknown as AnalyticalProgress, progress: null };
+    case "report":
+      return { ...message, report: data as unknown as ChatReportPreview, progress: null };
     case "progress":
       return { ...message, progress: data as unknown as ProgressState };
     case "stage":
@@ -45,6 +51,7 @@ export function applyChatSseEvent(
       return {
         ...message,
         meta: data as unknown as ResponseMeta,
+        analysisProgress: null,
         progress: null,
         ...(data.route ? { route: String(data.route) } : {}),
       };
@@ -82,7 +89,7 @@ export function applyChatSseEvent(
       };
     }
     case "cancelled":
-      return { ...message, cancelled: true, narrative: "Cancelled.", progress: null };
+      return { ...message, cancelled: true, narrative: "Cancelled.", progress: null, analysisProgress: null };
     case "error": {
       const failure: FailurePayload = {
         category: data.category ? String(data.category) : undefined,
@@ -96,6 +103,7 @@ export function applyChatSseEvent(
         ...message,
         error: String(data.message ?? data.reason ?? "Chat failed"),
         failure,
+        analysisProgress: null,
         progress: null,
         sql: failure.sql || message.sql,
       };
@@ -104,6 +112,7 @@ export function applyChatSseEvent(
       return {
         ...message,
         complete: true,
+        analysisProgress: null,
         latencyMs: Number(data.latencyMs ?? message.latencyMs ?? 0),
         historyId: String(data.historyId ?? message.historyId ?? ""),
         progress: null,

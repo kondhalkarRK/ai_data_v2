@@ -7,6 +7,7 @@
  */
 
 import type { ChatMessage, ResponseTab } from "@/components/chat/types";
+import { analyticalPresentation } from "@/lib/analytical-response";
 
 /** Set `ASK_ME_NEW_CHAT_UI_ENABLED=true` (mapped to NEXT_PUBLIC_ in next.config.ts). */
 export const NEW_CHAT_UI_ENABLED =
@@ -41,7 +42,7 @@ export function detectAnalysisRequest(question: string): ResponseTab | null {
   return null;
 }
 
-export type AssistantView = "pending" | "data" | "text" | "card";
+export type AssistantView = "pending" | "data" | "text" | "card" | "report" | "analysis";
 
 /**
  * Which presentation an assistant message gets:
@@ -53,8 +54,12 @@ export type AssistantView = "pending" | "data" | "text" | "card";
  */
 export function assistantView(message: ChatMessage): AssistantView {
   if (message.cancelled || message.quotaNotice || message.failure || message.error) return "card";
+  if (analyticalPresentation(message)) return "analysis";
+  if (message.report) return "report";
+  if (!message.sql && message.narrative && !message.meta && !message.clarification) return "text";
   if (message.clarification && !message.sql) return "card";
   const meta = message.meta;
+  if (meta?.responseKind && ["conversation", "definition", "unavailable", "denied"].includes(meta.responseKind)) return "text";
   if (!meta) return "pending";
   const route = message.route ?? meta.route;
   if (route === "knowledge" || route === "hybrid") return "card";

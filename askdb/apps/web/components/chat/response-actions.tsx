@@ -9,6 +9,7 @@ import type { ChatMessage, ResponseRating } from "./types";
 import { SQLViewer } from "./sql-viewer";
 import { AnswerProvenance, QueryPlanNote } from "./response-card";
 import { TrustIndicators } from "./trust-indicators";
+import { AnalyticalDetails } from "./analytical-answer";
 import { useActiveIndustry, useSession } from "@/hooks/use-session";
 import { apiClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -67,10 +68,15 @@ export function ResponseActions({ message, onAsk, busy }: { message: ChatMessage
           <Dialog.Description className="mt-2 text-sm text-muted-foreground">Sources, interpretation and query details for this response.</Dialog.Description>
           <dl className="my-4 space-y-2 break-words text-xs"><div><dt>Source</dt><dd>{message.route ?? message.meta?.route ?? (message.sql ? "Business data" : "Conversation")}</dd></div>{id && <div><dt>Response ID</dt><dd>{id}</dd></div>}</dl>
           {message.meta && <div className="mb-4 space-y-4">
-            <AnswerProvenance meta={message.meta} />
+            {!message.meta.analyticalAudit && <AnswerProvenance meta={message.meta} />}
+            <AnalyticalDetails message={message} />
             {message.meta.confidence?.reasons.length ? <ul className="list-inside list-disc text-xs text-muted-foreground">{message.meta.confidence.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul> : null}
             <TrustIndicators groundedOn={message.meta.groundedOn ?? []} ambiguityFlag={Boolean(message.meta.ambiguityFlag)} alternates={message.meta.alternateInterpretations} onClarify={onAsk} />
             {message.meta.queryPlan && <QueryPlanNote plan={message.meta.queryPlan} />}
+            {message.meta.typedRequest && !message.meta.analyticalAudit && <details><summary className="cursor-pointer text-sm">Interpreted request</summary><pre className="mt-2 whitespace-pre-wrap text-xs">{JSON.stringify(message.meta.typedRequest, null, 2)}</pre></details>}
+            {message.meta.limitations?.length ? <ul className="list-inside list-disc text-sm">{message.meta.limitations.map((item,index) => <li key={index}>{item}</li>)}</ul> : null}
+            {message.meta.runUsage && <details><summary className="cursor-pointer text-sm">Execution and usage</summary><dl className="mt-2 space-y-1 text-xs">{Object.entries(message.meta.runUsage).map(([key,value]) => <div key={key}><dt className="inline font-medium">{key}: </dt><dd className="inline">{String(value ?? "Not applicable")}</dd></div>)}</dl></details>}
+            {message.report?.panels.filter(panel => panel.result?.result.sql).map(panel => <details key={panel.id}><summary className="cursor-pointer text-sm">View SQL — {panel.title ?? panel.id}</summary><SQLViewer sql={panel.result!.result.sql!} /></details>)}
             {!message.meta.ambiguityFlag && message.meta.alternateInterpretations?.length ? <div className="flex flex-wrap gap-2 text-xs"><span>Did you mean:</span>{message.meta.alternateInterpretations.map(item => <button key={item} type="button" disabled={busy || !onAsk} onClick={() => onAsk?.(item)} className="rounded-full border border-border px-2 py-1 hover:bg-muted disabled:opacity-50">{item}</button>)}</div> : null}
           </div>}
           {message.sql && <details><summary className="cursor-pointer text-sm font-medium">View SQL</summary><SQLViewer sql={message.sql} queryMeta={message.meta?.queryMeta} executionTimeMs={message.meta?.executionTimeMs} rowCount={message.meta?.rowCount} sourceDatabase={message.meta?.sourceDatabase} diff={message.sqlDiff} /></details>}

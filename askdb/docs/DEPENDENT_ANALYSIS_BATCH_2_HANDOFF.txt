@@ -1,0 +1,241 @@
+SCIO DEPENDENT ANALYSIS - BATCH 2
+27 November 2026
+Status: Gated backend interpretation, compilation and execution implemented.
+Rollout: NOT approved. The new feature remains disabled by default.
+
+1. WHAT NOW EXISTS
+
+With CHAT_DEPENDENT_ANALYSIS_ENABLED=false, ordinary Chat keeps its existing path.
+The actual .env was not changed. Both the typed execution flag AND the new dependent
+flag must be enabled for the new executor to run, and only Automotive is supported.
+
+When deliberately enabled for testing:
+  authentication, current regional access and existing safety checks
+  -> existing compact language interpretation, optionally with analysis_tasks
+  -> ordinary requests continue to the existing compiler
+  -> dependent inventory gets one independent question-versus-inventory model check
+  -> deterministic plan, expected requirements and typed output/binding construction
+  -> semantic, capability, coverage, baseline and completeness validation
+  -> approved aggregate compiler builds ONE read-only PostgreSQL CTE statement
+  -> verify existing read-only mode, SQL guards and EXPLAIN
+  -> fresh authorization check, bounded execution, cancellation
+  -> fresh authorization check, typed result/period/count/reconciliation checks
+  -> local result summary plus SQL and typed all-step results in shared Chat metadata.
+
+Classic and New Chat, streaming and ask-sync use the same backend. No frontend was
+edited. This is not the dedicated multi-step UI, business-step progress or polished
+all-step executive narration planned for Batch 3.
+
+A registered conditional comparison can also use the checked inventory: calculate
+both periods first, then filter opposite signed measure changes. It needs no separate
+source-selection task. Ordinary direct comparisons still use their existing path.
+
+2. INTERPRETATION AND COVERAGE
+
+The LLM proposes compact task clauses with operations, measures, grouping, grain,
+source dependencies, bindings, ranking and change predicates. It does not supply
+SQL, formulas, credentials, access scope or intermediate result values.
+
+The second call reviews the ORIGINAL question against that inventory and approved
+context. It checks every requested outcome, measure, filter/exclusion, grouping,
+period, comparison basis and dependency. An incomplete inventory is rejected or
+clarified; there is no third repair call. A verdict requiring dependencies cannot
+approve an interpretation that omitted its task inventory.
+
+A conservative dependency-cue veto also checks some suspicious omissions when the
+first model forgot tasks entirely. It is not a keyword router and cannot prove all
+English was understood. The model remains responsible for varied language.
+
+The server constructs a separate expected-requirement inventory from the checked
+interpretation, then checks the executable proposal against it. Additional server
+vetoes prevent task materialization from dropping top-level measures, grouping,
+grain, explicit comparisons or ranking. Filters and exclusions remain inherited.
+The ordinary compiler explicitly refuses dependent inventories instead of silently
+simplifying them. Date-only follow-ups preserve the pending task inventory.
+
+This is not independent human verification: both model calls can still agree on a
+wrong interpretation. Human-reviewed reference SQL, known results and unseen human
+questions remain mandatory for rollout. No new blind holdouts were generated.
+
+3. EXECUTION AND CONSISTENCY
+
+All supported dependent steps compile into one statement. Earlier selections become
+typed CTE relations joined by approved fields; they are not interpolated into SQL
+as result-derived strings and are not sent back to a model. One statement supplies
+one database snapshot without changing isolation after metadata queries began.
+
+The existing builder owns approved formulas, columns, primary-key/cardinality joins
+and static filters. The new compiler composes approved aggregates, selected cohorts,
+period comparisons, signed change conditions and independent reconciliation.
+It checks referenced physical sources/CTEs and applies existing read-only SQL guards.
+
+The registry already establishes read-only transactions before metadata acquisition.
+The executor verifies SHOW transaction_read_only; an off/unknown/error result fails
+closed before EXPLAIN or analytical execution. It does not silently convert an
+arbitrary read-write connection or change isolation midway through a request.
+
+Current identity, active account, regional access and semantic fingerprint are
+checked before execution and before publication. Existing fresh scope rewriting is
+used for every fact branch. Scoped SQL and its SHA-256 fingerprint accompany the
+verified result. Existing owner/scope history and feedback checks remain in place.
+
+Cancellation is checked before dispatch, before execution, while SQL runs and before
+publication. Cancelling between interpretation and inventory review prevents the
+second model call. An in-flight provider call remains bounded by the existing timeout;
+this is not a promise of instantaneous provider-side cancellation.
+
+4. RESULTS, BASELINES AND SAFETY LIMITS
+
+- Maximum four business steps and two application model calls for the whole request.
+  Ordinary analytics retains its one-call target; greetings retain their zero-call
+  fast path. The existing complete_text helper does not retry these completions.
+- Initial interpretation keeps the existing output/provider limits. Inventory review
+  allows at most 200 output tokens within the same provider limit. Each prompt is
+  bounded at 16,000 characters. No execution or result-summary model call is added.
+- All ties remain selected. Cohort/binding cap is 50. Overflow asks the user to narrow
+  and skips dependent answers; it does not choose the first 50 as winners.
+- Final display is capped per step and within SQL_MAX_RESULT_ROWS across the envelope.
+  Both total eligible groups and ranked/selected groups are tracked. Display limits
+  happen after global selection and reconciliation, with explicit truncation notes.
+- Empty source, skipped dependency, missing value, verified zero and unavailable
+  comparison side are distinct. NULL observations are not manufactured as zero.
+- A selected period is bound BEFORE calculating its previous equivalent period or
+  same-period-last-year baseline. All tied periods remain separate, with current and
+  baseline date labels retained in the result.
+- Decline contributors rank signed change ascending, not total sales or absolute
+  magnitude. Positive offsets remain part of full reconciliation.
+- The independent ungrouped headline is calculated separately from the grouped
+  breakdown. Current, baseline and change reconcile over ALL groups before display
+  limits, with absolute arithmetic tolerance 0.000001. No invented Other/residual is
+  used to force agreement. Missing sides or mismatches leave attribution unverified.
+- A lowest value is not automatically a decline. A nonnegative change gets an explicit
+  limitation rather than a fabricated dip explanation or causal assertion.
+- Typed output schemas, actual period bindings, row counts, group counts, ordering
+  and reconciliation controls are checked before publication. Corrupt/missing output
+  fails closed. Raw driver/provider errors are not returned to the user.
+- INR currency formatting and existing count/percentage formatting are reused for
+  the basic local summary; raw result values retain their original precision.
+
+5. COMPLETENESS IS STILL AN EXPLICIT LIVE INTEGRATION GAP
+
+No authoritative office load-status source has been supplied or identified. No table
+or synthetic watermark was invented. MAX(date) remains a catalog/data-as-of hint,
+never proof that a period is fully loaded.
+
+The preparation API accepts SERVER-SUPPLIED, scoped completeness descriptors with
+source/revision, covered dates and verified loaded status. The normal Chat call
+currently supplies none. Therefore closed-period extrema ask for clarification and
+execute no analytical SQL until an approved source is integrated. This is intentional
+fail-closed behaviour, not an instruction to mark data complete manually.
+
+Calendar closure excludes partial periods and resolves exact selection windows.
+For example, last N months selected as month extrema uses N closed calendar months.
+Explicit this-month-so-far ordinary questions remain on their existing partial-period
+path. Baselines outside the verified load coverage are labelled unverified even if
+observed rows exist and their arithmetic reconciles. Arithmetic is not load proof.
+
+Before office rollout, integrate an authoritative load-status/watermark source with
+scope, freshness/revision and reporting-window checks. Its evidence must be valid for
+the actual database revision being analyzed. Existing Data Trust sample scores do
+not establish complete-period loading.
+
+6. CURRENT CAPABILITY BOUNDARIES
+
+Visible tests cover five general shapes:
+  A. Find an extreme month -> select all ties -> independent headline/baseline and
+     region-model contributing factors -> reconciliation.
+  B. Find an extreme region -> rank models only inside the selected region(s).
+  C. Compare periods -> order decliners by the requested change basis.
+  D. Compare two measures -> filter opposite signed changes.
+  E. Select a fixed cohort -> compare each member with its own equivalent-period history.
+
+The dependent compiler currently supports approved fact_sales aggregates and declared
+dimension joins. Contribution decomposition requires additive sums. Multi-fact targets,
+ratio attribution, multiple comparison axes, half-year selected-period binding and
+compound time-series comparison/window combinations need registered operations and
+are rejected explicitly. Existing ordinary compiler capabilities remain available.
+
+A single SQL failure returns no verified result from that statement. It does not
+recover already-computed CTE rows after a database error. Empty branches, missing
+observations, failed reconciliation and gated supplementary evidence can return
+explicit partial answers, but generic per-branch retry/salvage is not implemented.
+
+Existing direct AskBI report flow is unchanged. Mixed dependent analysis plus report
+generation is explicitly labelled with the report part not performed. Documents stay
+gated and policy compliance unverified. Approved glossary definitions reuse the local
+handler. These boundaries must not be described as full hybrid-agent acceptance.
+
+7. PROVIDER DATA POLICY
+
+No result rows are sent to a model by this path; all summary text is generated locally.
+The independent inventory check receives the question, parsed semantic intent and the
+same approved interpretation context. As the Phase 0 report identified, that context
+can contain glossary content and scoped entity values, not only DDL. Strict DDL-only
+cloud policy and explicit endpoint trust classification have NOT been implemented by
+this batch. Do not claim them in a client presentation. Resolve that policy before
+introducing any new provider data-sharing capability.
+
+8. FILES AND CHECKPOINT
+
+New backend modules:
+  apps/api/app/services/chat/analytical_plan_factory.py
+  apps/api/app/services/chat/analytical_plan_compiler.py
+  apps/api/app/services/chat/analytical_plan_execution.py
+Existing contracts, interpreter, preparation, ordinary compiler refusal, follow-up
+state and shared Chat service were updated; config/.env.example add default-off flags.
+No frontend, semantic YAML, Insurance, sibling agentic project, actual .env, package
+dependency, database role or migration was changed by this batch.
+
+Source checkpoint before Batch 2 (local, ignored, verified ZIP/SHA-256 manifest):
+  tmp/soci-qa/dependent-analysis/checkpoint-before-batch2.zip
+616 source files. Branch: codex/dependent-analysis-contracts. No commit/push/stash/reset.
+
+9. VERIFICATION AND REMAINING ACCEPTANCE
+
+Full API suite checkpoint: 1,055 passed, 3 skipped, 2,416 warnings (245.05 seconds).
+That run preceded the final cancellation/coverage/read-only refinements. The final
+focused rerun exercises those refinements, all dependent tests and the existing
+interpretation/compiler/state/runtime/preview regression set; its result is recorded
+below:
+  275 passed, 1 skipped, 732 warnings (91.83 seconds).
+The focused set includes 87 Batch 1 contract tests, 35 Batch 2 execution/integration
+tests and 153 existing interpretation/compiler/state/runtime/preview tests. These
+counts overlap the full run; do not add them as separate business-question totals.
+Selected backend Ruff checks, Python compilation and whitespace checks passed.
+The shared service was checked for syntax/name/import errors; repository-wide lint
+was not claimed. Existing unrelated service SQL-string lint findings were not changed.
+Checkpoint comparison confirms frontend and semantic-pack files were unchanged.
+
+Visible development fixtures execute SQLGlot-adapted SQL against SQLite in memory.
+Expected numerical totals are checked separately from routing/coverage. They are NOT
+human-approved reference-SQL or blind-holdout acceptance, and no live gateway calls
+or office-warehouse queries were made. The first fake-provider two-call test reports
+synthetic token numbers; those are not real measured office costs or latency.
+
+The three skipped native PostgreSQL checks include the new opt-in dependent CTE,
+selected-period and independent-reconciliation test. They use only the pre-existing
+empty, disposable test-database guard and transactional rollback. Native PostgreSQL
+SQL/driver acceptance remains unverified here; SQLite does not substitute for it.
+
+All test invocations set TEST_DATABASE_URL=sqlite+aiosqlite:///:memory: in the child
+process and clear SCIO_TEST_POSTGRES_URL. Do not run fixture setup on a demo/client DB.
+No setup, migration, package installation or database recreation is needed now.
+Leave CHAT_DEPENDENT_ANALYSIS_ENABLED=false until the next integration/acceptance work.
+
+10. BATCH 3 HANDOFF
+
+- Add shared all-step presentation/history replay, concise business labels, SQL access,
+  answered/unanswered reasons and verified contributing-factor narration.
+- Show truthful business progress and preserve cancellation. One CTE statement does
+  not expose individual database-CTE progress; do not fabricate Step 1/2 completion
+  before results/checks actually establish it.
+- Distinguish user ambiguity from missing completeness configuration. The latter
+  needs a clear source-unavailable/admin action, not repeated requests for dates.
+- Complete concise audit integration: requirements, bindings, semantic/scope/source
+  revisions, SQL fingerprint, actual checks and usage; no secrets/private reasoning.
+- Keep the feature default off, preserve simple Chat, and do not broaden unsupported
+  operations or enable document retrieval merely to make a demo look complete.
+- Before enabling period investigations: integrate authoritative scoped load-status
+  evidence, run native PostgreSQL and office gateway tests, and obtain human-reviewed
+  reference SQL plus privately supplied unseen questions. Measure correctness,
+  question coverage, latency and real provider tokens separately.

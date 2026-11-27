@@ -61,9 +61,10 @@ def test_breakdown_when_no_ranking_hint() -> None:
 def test_comparison_from_plan_analysis() -> None:
     rows = [{"year": "2023", "revenue": 100}, {"year": "2024", "revenue": 150}]
     # "year" is a time label -> time series wins over the plan hint
-    assert describe_result(["year", "revenue"], rows, analysis="year_window_compare")[
-        "shape"
-    ] == "time_series"
+    assert (
+        describe_result(["year", "revenue"], rows, analysis="year_window_compare")["shape"]
+        == "time_series"
+    )
     rows = [{"make": "Tata", "revenue": 100}, {"make": "Kia", "revenue": 150}]
     profile = describe_result(["make", "revenue"], rows, analysis="brand_compare")
     assert profile["shape"] == "comparison"
@@ -98,6 +99,48 @@ def test_text_only_result_is_table_without_chart() -> None:
     assert profile["measures"] == []
 
 
+@pytest.mark.parametrize("first_populated", [9, 24])
+def test_sparse_comparison_measure_is_not_a_dimension(first_populated: int) -> None:
+    rows = [
+        {
+            "year": 2000 + i,
+            "alpha_revenue": 20_000_000,
+            "beta_revenue": None
+            if i < first_populated
+            else 0
+            if i == first_populated
+            else 5_000_000,
+        }
+        for i in range(first_populated + 3)
+    ]
+    profile = describe_result(list(rows[0]), rows)
+    assert profile["labelColumns"] == ["year"]
+    assert [m["column"] for m in profile["measures"]] == ["alpha_revenue", "beta_revenue"]
+    assert all(re.fullmatch(r"\d{4}", r["label"]) for r in profile["preview"])
+    assert _texts(profile)[-1] == ["₹2.00 Cr", "₹50.00 Lakh"]
+    assert any(v["text"] == "₹0" for r in profile["preview"] for v in r["values"])
+
+
+def test_all_null_currency_member_is_preserved_without_becoming_zero() -> None:
+    profile = describe_result(
+        ["year", "alpha_revenue", "beta_revenue"],
+        [
+            {"year": 2025, "alpha_revenue": 100, "beta_revenue": None},
+            {"year": 2026, "alpha_revenue": 200, "beta_revenue": None},
+        ],
+    )
+    assert profile["labelColumns"] == ["year"]
+    assert len(profile["measures"]) == 2
+    assert _texts(profile) == [["₹100", None], ["₹200", None]]
+
+
+def test_preview_preserves_more_than_three_requested_measures() -> None:
+    rows = [{"region": "West", "revenue": 100, "units": 10, "orders": 8, "asp": 10}]
+    profile = describe_result(list(rows[0]), rows)
+    assert len(profile["measures"]) == 4
+    assert len(profile["preview"][0]["values"]) == 4
+
+
 def test_large_result_flags_truncation_and_limits_preview() -> None:
     rows = [{"dealer": f"D{i}", "units_sold": 1000 - i} for i in range(200)]
     profile = describe_result(["dealer", "units_sold"], rows, row_limit=200, preview=5)
@@ -110,10 +153,29 @@ def test_large_result_flags_truncation_and_limits_preview() -> None:
 @pytest.mark.parametrize(
     ("columns", "rows", "intent"),
     [
-        (["region", "revenue"], [{"region": "N", "revenue": 1234567}, {"region": "S", "revenue": 87}], None),
-        (["model", "units_sold"], [{"model": "X", "units_sold": 12}, {"model": "Y", "units_sold": 7}], "ranking"),
-        (["month", "claims"], [{"month": "2024-01-01", "claims": 3}, {"month": "2024-02-01", "claims": 9}], None),
-        (["segment", "premium", "claims"], [{"segment": "A", "premium": 5.5, "claims": 2}, {"segment": "B", "premium": 9.25, "claims": 4}], None),
+        (
+            ["region", "revenue"],
+            [{"region": "N", "revenue": 1234567}, {"region": "S", "revenue": 87}],
+            None,
+        ),
+        (
+            ["model", "units_sold"],
+            [{"model": "X", "units_sold": 12}, {"model": "Y", "units_sold": 7}],
+            "ranking",
+        ),
+        (
+            ["month", "claims"],
+            [{"month": "2024-01-01", "claims": 3}, {"month": "2024-02-01", "claims": 9}],
+            None,
+        ),
+        (
+            ["segment", "premium", "claims"],
+            [
+                {"segment": "A", "premium": 5.5, "claims": 2},
+                {"segment": "B", "premium": 9.25, "claims": 4},
+            ],
+            None,
+        ),
     ],
 )
 def test_every_displayed_number_comes_from_a_result_row(columns, rows, intent) -> None:

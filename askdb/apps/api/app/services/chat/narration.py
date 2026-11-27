@@ -117,10 +117,27 @@ def narrate(columns: list[str], rows: list[dict[str, Any]]) -> Narration | None:
     if label_col is None or len(rows) == 1:
         return _single(rows[0], label_col, measures)
     points = _points(rows, label_col, primary.column)
+    if _is_time(label_col, points):
+        if len(measures) > 1:
+            summaries = []
+            for measure in measures[:3]:
+                series = _points(rows, label_col, measure.column)
+                if len(series) >= 2:
+                    summaries.append(_trend(series, measure, seed).summary)
+                elif series:
+                    summaries.append(
+                        f"{measure.label}: {measure.fmt(series[0][1])} in {series[0][0]}."
+                    )
+                else:
+                    summaries.append(f"{measure.label}: no available value in this result.")
+            if len(measures) > 3:
+                summaries.append(f"All {len(measures)} measures are shown in the result.")
+            return Narration(summary=" ".join(summaries))
+        if len(points) < 2:
+            return _single(rows[0], label_col, measures)
+        return _trend(points, primary, seed)
     if len(points) < 2:
         return _single(rows[0], label_col, measures)
-    if _is_time(label_col, points):
-        return _trend(points, primary, seed)
     return _ranking(points, label_col, primary, measures[1:], rows, seed)
 
 
@@ -137,7 +154,7 @@ def describe_result(
     analysis: str | None = None,
     row_limit: int | None = None,
     preview: int = 5,
-    max_measures: int = 3,
+    max_measures: int | None = None,
 ) -> dict[str, Any]:
     """Shape and display hints for the UI, derived only from the executed result.
 
@@ -162,7 +179,7 @@ def describe_result(
     measures = _measures(columns, rows)
     measure_cols = {m.column for m in measures}
     labels = [c for c in columns if c not in measure_cols]
-    shown = measures[:max_measures]
+    shown = measures if max_measures is None else measures[:max_measures]
     profile["labelColumns"] = labels
     profile["measures"] = [
         {"column": m.column, "label": m.label, "kind": m.kind, "scalePercent": m.scale_percent}
@@ -170,7 +187,7 @@ def describe_result(
     ]
 
     def row_label(row: dict[str, Any]) -> str:
-        parts = [_label(row.get(c)) for c in labels[:3] if row.get(c) is not None]
+        parts = [_label(row.get(c)) for c in labels if row.get(c) is not None]
         return " \u00b7 ".join(parts)
 
     def row_values(row: dict[str, Any]) -> list[dict[str, str | None]]:
@@ -207,12 +224,13 @@ def describe_result(
         chosen = rows[:preview]
     profile["shape"] = shape
     profile["previewTruncated"] = n > len(chosen)
-    profile["preview"] = [
-        {"label": row_label(r) or None, "values": row_values(r)} for r in chosen
-    ]
-    profile["chartSuitable"] = shape in {"time_series", "ranking", "comparison", "breakdown"} and bool(
-        measures
-    )
+    profile["preview"] = [{"label": row_label(r) or None, "values": row_values(r)} for r in chosen]
+    profile["chartSuitable"] = shape in {
+        "time_series",
+        "ranking",
+        "comparison",
+        "breakdown",
+    } and bool(measures)
     return profile
 
 
@@ -415,9 +433,7 @@ def _ranking(
         tail = f"{bottom_name} trails at {measure.fmt(bottom)}"
         highlights.append(tail + (f", {ratio:.1f}x below the leader." if ratio else "."))
     if n >= 3:
-        highlights.append(
-            f"Median across {n} {_plural(dim)}: {measure.fmt(median(values))}."
-        )
+        highlights.append(f"Median across {n} {_plural(dim)}: {measure.fmt(median(values))}.")
     leader_row = next((r for r in rows if str(r.get(label_col)) == leader), None)
     for other in others[:1]:
         value = _num(leader_row.get(other.column)) if leader_row else None
@@ -435,7 +451,8 @@ def _ranking(
                 f"{measure.fmt(middle)}; closing that gap is the biggest lever on overall {name}."
             )
             focus = (
-                f"Prioritise {leader}" + (f" and {runner_up}" if n >= 4 else "")
+                f"Prioritise {leader}"
+                + (f" and {runner_up}" if n >= 4 else "")
                 + f": review what is driving their {name} and set a target near "
                 f"{bottom_name}'s {measure.fmt(bottom)}."
             )
@@ -465,8 +482,7 @@ def _ranking(
         uplift = mean - bottom
         focus = f"Review the lower performers such as {bottom_name}"
         focus += (
-            f"; bringing it up to the average would add about {measure.fmt(uplift)} "
-            f"to {name}."
+            f"; bringing it up to the average would add about {measure.fmt(uplift)} to {name}."
             if measure.additive
             else f", which sits well below the average of {measure.fmt(mean)}."
         )
@@ -483,11 +499,15 @@ def _ranking(
 
 def _measures(columns: list[str], rows: list[dict[str, Any]]) -> list[_Measure]:
     found: list[_Measure] = []
-    sample = rows[: min(len(rows), 20)]
     for index, column in enumerate(columns):
+        # Sparse comparison measures can legitimately be NULL before a launch or
+        # outside a member's coverage. Sample populated cells, not the first years.
+        sample = [row for row in rows if row.get(column) is not None][:20]
         values = [_num(row.get(column)) for row in sample]
         numeric = [v for v in values if v is not None]
-        if not numeric or len(numeric) < len(sample) * 0.6:
+        if sample and (not numeric or len(numeric) < len(sample) * 0.6):
+            continue
+        if not sample and _kind(column.lower()) == "number":
             continue
         lowered = column.lower()
         if index == 0 and len(columns) > 1 and any(h in lowered for h in _TIME_HINTS):
@@ -495,7 +515,7 @@ def _measures(columns: list[str], rows: list[dict[str, Any]]) -> list[_Measure]:
         if lowered.endswith("_id") or lowered in {"id", "rank", "row_number"}:
             continue
         kind = _kind(lowered)
-        scale = kind == "percent" and max(abs(v) for v in numeric) <= 1.5
+        scale = kind == "percent" and bool(numeric) and max(abs(v) for v in numeric) <= 1.5
         found.append(_Measure(column=column, kind=kind, scale_percent=scale))
     return found
 
@@ -589,7 +609,7 @@ def _fmt(value: float, kind: MeasureKind, *, scale_percent: bool = False) -> str
     if size >= 10_000_000:
         text = f"{value / 10_000_000:.2f} Cr"
     elif size >= 100_000:
-        text = f"{value / 100_000:.2f} L"
+        text = f"{value / 100_000:.2f} {'Lakh' if kind == 'currency' else 'L'}"
     elif size >= 1000:
         text = f"{value:,.0f}"
     elif float(value).is_integer():

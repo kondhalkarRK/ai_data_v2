@@ -1,0 +1,108 @@
+SCIO CHAT — BATCH 3 (approved points 9–12)
+26 November 2026. Automotive / AskDB only.
+
+ROLLOUT
+CHAT_TYPED_EXECUTION_ENABLED remains false by default. No .env edits, packages,
+migrations, warehouse writes or changes to Insurance/askme-agentic. Existing Chat
+stays active with that flag off. AskBI additionally respects ASK_ME_ASKBI_ENABLED.
+The new behavior is staged pending Batch 4/5 acceptance; it is not a claim that
+every executive question now works on the office warehouse.
+
+IMPLEMENTED
+1. Investigations use the typed request and existing governed compiler/executor.
+   Additive measures can be broken down by approved dimensions (region when no
+   other breakdown is requested). Missing current periods clarify; a preceding
+   period is the disclosed default baseline when a current period is supplied.
+   One statement computes both periods, breakdowns and uncapped headline totals
+   in the same snapshot. Existing scope, joins, limits and SQL safety still apply.
+
+   Narration says "Contributing factors", shows signed changes and an explicit
+   Other / remaining groups residual. Capping the visible groups does not turn
+   their sum into the headline. Missing comparison observations are not converted
+   into zero: decomposition is marked unverified. Ratios, distinct counts and
+   complex transformed investigations need an approved decomposition and return
+   a limitation instead of a fabricated reason. No causation is inferred.
+
+2. Typed factual narration is deterministic and reads verified result fields.
+   Amounts use the existing INR formatter (rupee, Cr/Lakh); percentage fields use
+   percentage formatting and count fields have no currency symbol. No extra model
+   or analytical call is made just to enrich prose. Empty results remain distinct
+   from zero. Requested definitions are supplied from approved metadata alongside
+   analytics. Raw SQL/result/export precision remains unchanged.
+
+   Successful, scope-bound conversation state stores a server-generated evidence
+   summary. "So what?" can reuse it, separating observations, implications and
+   suggested review actions without another analytical query or operational action.
+   Without authorized prior evidence it asks for an analysis first. Suggestions are
+   deliberately conservative; this is not an autonomous business action agent.
+
+3. Explicit typed reports hand off to existing AskBI repository, validation and
+   execution. The handoff creates governed WorkspaceSpec/BiPlan panels directly,
+   rather than reinterpreting the question through another model call. Exact dates,
+   supported filters and grouping are carried over. Clear sales reports default
+   to revenue/units; missing periods become a persisted focused clarification.
+
+   A typical report has two KPIs and four charts within AskBI's six-panel maximum.
+   Requests with more measures use the available panel budget; requested grouping
+   beyond the supported budget is rejected rather than silently discarded.
+   Only representable filters are accepted. Exclusions/advanced transformations
+   unsupported by the handoff return an explicit limitation.
+
+   Existing ownership/scope and optimistic revisions apply. Follow-ups retain the
+   report ID and unrelated panel choices; stale Builder revisions are rejected.
+   Each panel uses existing AskBI execution/evidence checks. Failure preserves the
+   other verified panels with a partial-report notice. Permission denial aborts
+   the handoff, and ownership/scope is checked again before returning results.
+   Cancellation propagates; a bounded 120-second panel workflow does not loop.
+
+   Chat emits the report ID, revision, panel results and partial status, plus a
+   link using the existing askbiReport Builder parameter. Rich rendering of this
+   event in both Chat layouts belongs to Batch 4. No new frontend preview component
+   was added here. Six existing starter actions, exports and Outlook were untouched.
+
+4. Document retrieval remains disabled in typed Chat. Mixed analytics can return
+   its verified database part with unavailable-document/partial notes. Report
+   handoffs with document dependencies state that policy compliance is unverified.
+   No vector database, embeddings, policy threshold invention or retrieval fallback.
+
+FILES
+request_runtime.py: bounded investigation normalization and report clarifications.
+request_compiler.py: same-query, uncapped additive headlines/missing-group evidence.
+request_evidence.py: deterministic typed result and contribution narration.
+request_report.py: typed scope adapter into existing AskBI persistence/execution.
+service.py: shared Chat dispatch, evidence persistence, implications and report events.
+Existing Batch 1/2 modules and earlier UI/currency work remain present/uncommitted.
+
+VERIFICATION AND LIMITS
+Synthetic reference tests execute compiler SQL with the existing SQLite/SQLGlot
+dialect adapter. Provider responses are fixtures; Chat persistence and repository
+revision tests use the application database fixture. Report panel results/failures
+are mocked in handoff tests, while the existing AskBI suite separately exercises
+its execution/ownership/evidence behavior. These are not live routing accuracy,
+PostgreSQL acceptance or real browser acceptance claims.
+
+Checks cover capped decomposition reconciliation and missing baselines, report
+composition/scope, partial panel failure, persisted report IDs/revisions and
+follow-up revision advancement, implications without an additional query, missing
+report periods, and existing typed compiler/permission/transport behavior.
+Combined typed, AskBI, Chat-memory and scope/RLS sweep: 197 passed. This includes
+the existing AskBI tests and the new persistence/partial/refinement checks.
+Ruff passes for the new/modified typed modules; compileall and diff whitespace checks
+pass. Existing unrelated legacy lint findings and the two documented disabled-RAG
+expectation failures have not been changed or hidden.
+
+REMAINING ACCEPTANCE
+- Real office PostgreSQL/provider questions and measured latency/token accuracy.
+- Rich report previews and conversational treatment in both layouts (Batch 4).
+- Intent-versus-question validation, numerical/formatting holdouts, and security
+  review across every route (Batch 4/5).
+- More expressive report edits, unsupported filter operators, compound comparison
+  reports and approved weighted ratio decompositions. These currently fail visibly.
+- Optional evidence-constrained LLM narration is not introduced; prose stays local.
+- No production-readiness or security-certification claim from fixture results.
+
+BATCH 4 HANDOFF (not started)
+Review new execution boundaries/PII/provider sharing, keep scope and ownership fail
+closed, render the typed report/clarification/partial responses in Classic/New Chat,
+verify cost controls and executive acceptance cases. Preserve the default-off gate
+until independent holdouts, live performance comparison and rollout checks pass.

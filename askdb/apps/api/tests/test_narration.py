@@ -81,3 +81,32 @@ def test_phrasing_varies_between_results() -> None:
         assert story is not None
         summaries.add(story.summary.split(brand, 1)[1].split(" units")[0])
     assert len(summaries) > 1
+
+
+def test_sparse_comparison_narrates_both_series_over_their_own_coverage() -> None:
+    rows = [
+        {
+            "year": 2015 + i,
+            "alpha_revenue": (i + 1) * 10_000_000,
+            "beta_revenue": (i - 8) * 10_000_000 if i >= 9 else None,
+        }
+        for i in range(12)
+    ]
+    story = narrate(list(rows[0]), rows)
+    assert story is not None
+    assert "Alpha revenue" in story.summary
+    assert "Beta revenue" in story.summary
+    assert "2015" in story.summary and "2024" in story.summary
+    assert "₹3.00 Cr" in story.summary
+
+
+def test_missing_comparison_member_is_not_narrated_as_zero() -> None:
+    story = narrate(
+        ["year", "alpha_revenue", "beta_revenue"],
+        [
+            {"year": 2025, "alpha_revenue": 100, "beta_revenue": None},
+            {"year": 2026, "alpha_revenue": 200, "beta_revenue": None},
+        ],
+    )
+    assert story is not None
+    assert "beta revenue: no available value" in story.summary

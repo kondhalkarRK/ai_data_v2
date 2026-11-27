@@ -12,8 +12,8 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from app.core.config import Industry
-from app.services.chat.question_understanding import QuestionPlan, filter_predicate
 from app.services.chat.period_labels import period_label_sql
+from app.services.chat.question_understanding import QuestionPlan, filter_predicate
 from app.services.chat.time_periods import anchor_sql, period_predicate
 
 # Monthly series without a stated period show the latest two years.
@@ -327,6 +327,8 @@ def _join_clauses(
     required_tables: set[str],
     plan: QuestionPlan | None = None,
 ) -> list[str]:
+    seeded: list[str] = []
+    special = plan is not None and _dealer_home_region_join(plan, base_table, required_tables)
     if plan is not None and _dealer_home_region_join(plan, base_table, required_tables):
         tables = _model_tables(pack)
         physical_d = getattr(tables["dim_dealer"], "physical_name", "automotive.dim_dealer")
@@ -334,13 +336,13 @@ def _join_clauses(
         f = _ALIASES["fact_sales"]
         d = _ALIASES["dim_dealer"]
         r = _ALIASES["dim_region"]
-        return [
+        seeded = [
             f"JOIN {physical_d} {d} ON {d}.dealer_id = {f}.dealer_id",
             f"JOIN {physical_r} {r} ON {r}.region_id = {d}.region_id",
         ]
     tables = _model_tables(pack)
-    joined = {base_table}
-    clauses: list[str] = []
+    joined = {base_table, "dim_dealer", "dim_region"} if special else {base_table}
+    clauses: list[str] = list(seeded)
     emitted: set[str] = set()
     for target in sorted(required_tables):
         for rel in _relationship_path(pack, base_table, target):
@@ -357,6 +359,9 @@ def _join_clauses(
                 # The path is ordered from base, so this only occurs after a duplicate edge.
                 source, source_col = rel.from_table, rel.from_column
                 dest, dest_col = rel.to_table, rel.to_column
+            if dest in joined:
+                emitted.add(rel.name)
+                continue
             physical = getattr(tables[dest], "physical_name", dest)
             clauses.append(
                 f"JOIN {physical} {_ALIASES[dest]} ON "

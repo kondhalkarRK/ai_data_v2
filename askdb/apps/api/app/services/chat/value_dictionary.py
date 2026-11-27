@@ -144,54 +144,56 @@ def domains_for(industry: Industry, pack: Any | None = None) -> tuple[ValueDomai
     return AUTOMOTIVE_DOMAINS if industry is Industry.AUTOMOTIVE else INSURANCE_DOMAINS
 
 
-async def get_value_dictionary(
-    connection: AsyncConnection,
-    industry: Industry,
-    *,
-    pack: Any | None = None,
+async def load_value_dictionary(
+    connection: AsyncConnection, industry: Industry, *, pack: Any | None = None,
 ) -> ValueDictionarySnapshot:
-    """Load a bounded dictionary once per industry/TTL."""
-
-    async def load() -> ValueDictionarySnapshot:
-        domains = domains_for(industry, pack)
-        pieces: list[str] = []
-        for index, domain in enumerate(domains):
-            pieces.append(
-                "SELECT "
-                f"'{domain.name}' AS domain_name, "
-                f"'{domain.qualified_column}' AS column_name, "
-                "v.value, v.frequency "
-                "FROM ("
-                f"SELECT {domain.column}::text AS value, COUNT(*)::bigint AS frequency "
-                f"FROM {domain.table} "
-                f"WHERE {domain.column} IS NOT NULL AND {domain.column}::text <> '' "
-                f"GROUP BY {domain.column} "
-                "ORDER BY frequency DESC, value "
-                f"LIMIT {int(domain.max_values)}"
-                f") AS v{index}"
-            )
-        result = await connection.execute(text("\nUNION ALL\n".join(pieces)))
-        aliases_by_value = {
-            (domain.qualified_column.casefold(), value.casefold()): aliases
-            for domain in domains
-            for value, aliases in domain.value_aliases
-        }
-        values = tuple(
-            BusinessValue(
-                domain=str(row.domain_name),
-                column=str(row.column_name),
-                value=str(row.value),
-                frequency=int(row.frequency or 0),
-                aliases=aliases_by_value.get(
-                    (str(row.column_name).casefold(), str(row.value).casefold()),
-                    (),
-                ),
-            )
-            for row in result
+    """Uncached dictionary read; callers supply the correctly scoped connection."""
+    domains = domains_for(industry, pack)
+    pieces: list[str] = []
+    for index, domain in enumerate(domains):
+        pieces.append(
+            "SELECT "
+            f"'{domain.name}' AS domain_name, "
+            f"'{domain.qualified_column}' AS column_name, "
+            "v.value, v.frequency "
+            "FROM ("
+            f"SELECT {domain.column}::text AS value, COUNT(*)::bigint AS frequency "
+            f"FROM {domain.table} "
+            f"WHERE {domain.column} IS NOT NULL AND {domain.column}::text <> '' "
+            f"GROUP BY {domain.column} "
+            "ORDER BY frequency DESC, value "
+            f"LIMIT {int(domain.max_values)}"
+            f") AS v{index}"
         )
-        return ValueDictionarySnapshot(industry=industry, values=values)
+    result = await connection.execute(text("\nUNION ALL\n".join(pieces)))
+    aliases_by_value = {
+        (domain.qualified_column.casefold(), value.casefold()): aliases
+        for domain in domains
+        for value, aliases in domain.value_aliases
+    }
+    values = tuple(
+        BusinessValue(
+            domain=str(row.domain_name),
+            column=str(row.column_name),
+            value=str(row.value),
+            frequency=int(row.frequency or 0),
+            aliases=aliases_by_value.get(
+                (str(row.column_name).casefold(), str(row.value).casefold()),
+                (),
+            ),
+        )
+        for row in result
+    )
+    return ValueDictionarySnapshot(industry=industry, values=values)
 
-    return await _CACHE.get_or_set(industry.value, load)
+
+async def get_value_dictionary(
+    connection: AsyncConnection, industry: Industry, *, pack: Any | None = None,
+) -> ValueDictionarySnapshot:
+    """Legacy industry cache; typed Chat uses its own principal-bound cache."""
+    return await _CACHE.get_or_set(
+        industry.value, lambda: load_value_dictionary(connection, industry, pack=pack)
+    )
 
 
 def build_snapshot(

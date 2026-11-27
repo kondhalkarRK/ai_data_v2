@@ -8,6 +8,8 @@ import { ChatHistory } from "./chat-history";
 import { CompactDataAnswer } from "./compact-data-answer";
 import { ResponseActions } from "./response-actions";
 import { ResponseCard } from "./response-card";
+import { ReportPreview } from "./report-preview";
+import { AnalyticalAnswer, AnalyticalProgressView } from "./analytical-answer";
 import type { ChatMessage } from "./types";
 import { useChatSession } from "@/hooks/use-chat-ask";
 import { ChatQuotaWidget } from "@/components/governance/chat-quota-widget";
@@ -60,7 +62,7 @@ function AssistantAnswer({ message, question, mode }: { message: ChatMessage; qu
   const onAsk = (text: string) => { void chat.runAsk(text); };
   const view = assistantView(message);
   return <article className="min-w-0 space-y-2" aria-label="Assistant response">
-    {view === "text" ? <p className="max-w-[85ch] whitespace-pre-wrap break-words text-sm leading-relaxed">{message.narrative || "…"}</p> : mode === "new" && view === "data" ? <CompactDataAnswer message={message} requestedTab={detectAnalysisRequest(question)} busy={chat.busy} onAsk={onAsk} onAction={chat.handleAction} /> : <ResponseCard message={message} busy={chat.busy} onAsk={onAsk} onRetry={() => onAsk(question)} onAction={chat.handleAction} detailsInInfo />}
+    {message.analysisProgress ? <AnalyticalProgressView progress={message.analysisProgress} /> : view === "analysis" ? <AnalyticalAnswer message={message} chartRequested={detectAnalysisRequest(question) === "chart"} /> : view === "report" && message.report ? <ReportPreview report={message.report} /> : view === "text" ? <p className="max-w-[85ch] whitespace-pre-wrap break-words text-sm leading-relaxed">{message.narrative || "…"}</p> : mode === "new" && view === "data" ? <CompactDataAnswer message={message} requestedTab={detectAnalysisRequest(question)} busy={chat.busy} onAsk={onAsk} onAction={chat.handleAction} /> : <ResponseCard message={message} busy={chat.busy} onAsk={onAsk} onRetry={() => onAsk(question)} onAction={chat.handleAction} detailsInInfo />}
     <ResponseActions message={message} onAsk={onAsk} busy={chat.busy} />
   </article>;
 }

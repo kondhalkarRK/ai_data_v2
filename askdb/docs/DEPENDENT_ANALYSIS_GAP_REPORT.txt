@@ -1,0 +1,269 @@
+SCIO — DEPENDENT ANALYTICAL PLANNING: PRE-IMPLEMENTATION REVIEW
+Date: 26 November 2026
+Workspace: E:\ai_data_rag\ai_data_v2\askdb
+Status: Phase 0 completed for review. Batch 1 has NOT started.
+
+REVIEW GATE
+This report implements the accepted addition:
+"Before coding, produce a gap report (current flow, where plans, bindings and
+validation would fit, and the existing LLM payload contents). Stop and wait for review."
+
+Only this review document was added. No application, semantic pack, configuration,
+test, UI, migration, dependency or actual .env changes were made in this phase.
+No SQL, live provider request or office warehouse reproduction was performed.
+Earlier test totals are historical evidence; this review does not rerun or expand them.
+
+1. CURRENT FOUNDATION — RETAIN
+Authentication and server-owned identity/scope; Automotive semantic pack/glossary;
+scoped entity candidates; the existing interpretation call and typed request;
+governed compiler, approved formulas and joins; read-only/scoped execution; timeouts
+and caps; clarification/follow-up state; local result-bound narration; AskBI ownership
+and revisions; shared Classic/New rendering, info action, ratings, history and usage.
+Keep straightforward questions on the existing fast path. Keep document retrieval
+gated. No new agent framework, vector dependency or Insurance/agentic changes.
+
+Current shared backend flow:
+  ChatService.ask_stream
+  -> authentication/region/safety and conversation setup
+  -> gated typed preparation, approved context and LLM interpretation
+  -> reference/measure coverage checks
+  -> one InterpretedRequest
+  -> fixed compiler operations/CTEs
+  -> SQL safety, EXPLAIN, fresh access check and bounded execution
+  -> result profile, deterministic narration, meta/rows/SQL/report events
+  -> shared Classic/New reducer, history snapshot and info action.
+
+The default-off typed path and the preserved legacy path remain distinct. A new
+dependent-analysis flag should be independent and default off, with no auto-rollout.
+
+2. OWNING SOURCE AND VERIFIED GAPS
+apps/api/app/services/chat/request_contract.py
+  InterpretedRequest carries measures, grouping, filters, periods, comparisons,
+  windows, operations, one ranking and required evidence. EvidenceTask has IDs and
+  depends_on, and its validator checks dependency ordering. It does NOT represent
+  analytical step operations, typed intermediate outputs or executable bindings.
+
+apps/api/app/services/chat/request_runtime.py
+  Prepares one executable turn. Investigations support bounded additive comparisons;
+  they reject several transformed/ranked shapes. There is no general coordinator
+  that selects a period/region/cohort and then binds that result into another task.
+  The preceding-period investigation default is currently selected in runtime.
+
+apps/api/app/services/chat/request_compiler.py
+  Supports fixed aggregations, comparison, ranking and window/post-aggregation CTEs.
+  These CTEs are not a general user-intent dependency graph. There is no operation
+  meaning "use the period/IDs selected by step X in step Y". Multiple/time-grain
+  comparison shapes and several combinations fail explicitly.
+
+apps/api/app/services/chat/request_interpreter.py
+  Validates approved IDs/fields and conservatively checks explicit measure coverage.
+  It cannot prove that every requested analytical operation, dependency, grouping,
+  exclusion and output was retained. Evidence dependency metadata is not executed.
+
+apps/api/app/services/chat/request_evidence.py
+  Uses verified fields for bounded prose. Investigations sort the returned rows by
+  absolute change, then display five. If SQL capped an alphabetically ordered result,
+  this may rank only the returned subset rather than the largest global contributors.
+  Positive offsets and contributors to a decline are not separate analytical roles.
+  Other = headline change minus displayed contributions is a residual calculation;
+  it alone does not independently prove that the selected period/decomposition was
+  correct. The current headline is derived from the compiler's grouped results.
+
+apps/api/app/services/chat/request_dates.py and apps/api/app/schemas/semantic.py
+  Provide calendar dates, fiscal settings, comparison alignment and ranking defaults.
+  Current-period ranges can be partial. No approved loaded-period completeness source
+  is bound to an extreme-period selection. Explicit historical bounds do not themselves
+  prove the data inside them is complete.
+
+apps/web/components/chat/response-actions.tsx, types.ts and sse.ts
+  Show the interpreted request, query trace, usage and SQL in the existing info panel.
+  Existing progress describes pipeline stages, not "Step 1 of 3" business operations.
+  No shared analytical step-results contract shows the selected extreme and all
+  dependent answers together. AskBI panels are a different contract and should not
+  be mistaken for arbitrary dependent Chat steps.
+
+3. WHERE THE NEW COMPONENTS FIT
+Authentication/safety/scope
+  -> approved context + initial language interpretation
+  -> bounded AnalyticalPlan proposal
+  -> PRE-EXECUTION plan, coverage and capability validation
+  -> governed compilation of each supported operation
+  -> POST-COMPILATION SQL-versus-plan checks
+  -> scoped execution and typed result binding
+  -> POST-RESULT output, baseline, coverage and reconciliation checks
+  -> local narration of all verified steps and explicit unanswered requirements
+  -> existing Chat transport/history/info panel + business-step progress.
+
+Proposed plan contract (design only):
+  plan ID/version; original request reference; requirement IDs;
+  ordered step IDs and registered operations; dependency IDs;
+  approved measure/dimension IDs; filters/exclusions/period/grain;
+  selected baseline and provenance; ranking basis/direction/ties;
+  required output names/types; typed binding references to preceding outputs;
+  assumptions/ambiguities; requirement-to-step/output coverage map;
+  approved limits and declared unsupported parts.
+
+Permissions, provider trust, credentials and budgets remain server-owned. A model
+cannot authorize them. A binding must include output provenance and be revalidated
+against current scope/semantic version. Intermediate strings remain untrusted data
+and become bound values, not executable SQL or instructions.
+
+Prefer a single safe CTE statement where it preserves all required operations.
+Otherwise use sequential queries against a coherent snapshot. Do not change
+transaction isolation after queries have begun. Retain per-step and final access
+checks; do not send result rows to a cloud model to coordinate the steps.
+
+4. COMPLETENESS — OPTIONS FOR REVIEW
+No default based on MAX(date) is proposed.
+
+A. Semantic calendar/closure rule.
+   Configure timezone, grain, close lag, eligibility and partial-period treatment.
+   This can establish calendar eligibility, but cannot prove that all expected loads
+   or regions arrived. Label loaded-data completeness unverified without evidence.
+
+B. Approved source/load-status table or watermark service.
+   Read complete-through periods, status, source/run revision and applicable scope.
+   This gives operational evidence if it is authoritative and trustworthy. Access to
+   status must not reveal another region's data. No suitable authoritative table was
+   identified in the owning source inspected for this review; do not invent one.
+
+C. Combined policy (recommended design).
+   Semantic pack defines eligibility/baseline rules; an approved operational status
+   source supplies loaded-data evidence. Unavailable/stale evidence leads to a clear
+   uncertainty or clarification, according to the approved business rule.
+
+Existing DataQualityService evaluates samples/nulls/duplicates/date gaps. Those checks
+do not establish that an entire reporting period is fully loaded. A Data Trust score
+must not substitute for complete-period evidence.
+
+Also define whether "last 12 months" means twelve closed calendar months or twelve
+buckets including the current one before eligibility filtering. Do not silently
+change the period count. Baselines just outside the selection window need an explicit
+approved rule and must remain within the user's geographical/data access.
+
+5. TIES, CAPS AND EMPTY RESULTS — PROPOSED RULES
+Default: return all tied eligible values and flag the tie, unless the semantic pack
+provides another approved rule. Initial selected-cohort cap: 50 canonical identities.
+If ties/cohort exceed the safe limit, return the count and ask for narrower scope;
+do not execute with the first 50 or choose an arbitrary winner. The new server-derived
+binding limit is distinct from today's 32-ID model-request field and must be designed
+explicitly, not silently raised everywhere.
+No eligible result -> clear message, skip dependent tasks, no fabricated zero.
+Missing baseline -> identify what can be answered and mark change/contributors
+unverified. A lowest level does not automatically establish a decline.
+
+6. NAMED REGRESSION — REQUIRED, NOT A SPECIAL-CASE IMPLEMENTATION
+"Which month in the last 12 months had the lowest revenue, and which region and
+model contributed most to that dip?"
+
+Proposed bounded business plan:
+  1. Identify eligible month totals and all tied minimum months.
+  2. Establish an approved baseline and independently obtain headline change.
+  3. Calculate scoped current/baseline region-model breakdowns for the selected month(s).
+  4. Rank signed contributors across all eligible groups, separate positive offsets,
+     and validate reconciliation before applying display limits.
+
+Return selected month(s), headline values, baseline, change, region/model labels,
+group current/baseline/change, ranking and explicit remaining/unknown parts.
+
+Two ambiguities must not be hidden:
+  - Lowest revenue versus largest decline; "dip" requires a baseline definition.
+  - Combined region-model groups versus separate region and model breakdowns.
+Use an approved pack default and state it, or clarify. This case needs human-reviewed
+reference SQL and data. It was not reproduced against the office system in this phase.
+
+Other mandatory shapes:
+  - Find the top/bottom region, then rank models ONLY within that selected region.
+  - Compare periods, then rank declines by the specified absolute/percentage basis.
+  - Calculate changes in two measures, then filter their opposite directions.
+  - Select ranked identities first, then compare each fixed identity with its history.
+Test ties, missing periods/members, caps, exclusions, multiple groupings, zero/negative
+values, permissions, cancellation and partial execution across these general shapes.
+
+7. CURRENT LLM PAYLOAD — DATA-SHARING GAP
+request_interpreter.py serializes question + request_context.payload. That includes:
+  semantic version, current date, data-as-of and query policy;
+  selected measure IDs/labels/aliases/formulas/descriptions/capabilities;
+  approved field metadata, glossary definitions and rules;
+  scoped entity candidate IDs/VALUES/domains and model-make associations;
+  fact grain/date/key metadata and declared relationships;
+  previous interpreted request, which can contain filters and entity values.
+
+It is therefore NOT DDL-only. Sensitive field exclusions do not make all candidate
+values non-sensitive. User text itself can contain sensitive information.
+The typed factual narrator is local and does not send result rows to an LLM.
+The interpreter chooses the classifier/default model through the existing completion
+client; it does not enforce the proposed cloud/private payload classes.
+
+Review choice required: precisely define approved cloud metadata/user text versus
+strict DDL-only mode. Strict mode excludes glossary/candidate data beyond that policy.
+Keep semantic/candidate processing local or use an explicitly approved private/local
+endpoint when additional context is required. Unknown endpoint classification must
+fail closed for restricted payloads. An endpoint name or private-looking URL is not
+proof of approval. Do not expand cloud sharing by inference during implementation.
+
+8. VALIDATION AND ACCEPTANCE DESIGN
+Before execution: complete requirement coverage; supported operations; acyclic bounded
+dependencies; approved fields/formulas; typed binding compatibility; valid baselines;
+scope, completeness source and budget eligibility.
+After compilation: SQL matches dependency filters, grouping, selection, periods,
+ranking basis and required outputs. Read-only/SQL-valid does not mean question-correct.
+After execution: required columns/types, selected identities, both periods, missing
+observations, limits/ties and an independently checked decomposition/headline.
+Do not force reconciliation by inventing Other; verify grain/coverage and disclose
+a genuine residual or unknown portion. Rank globally before limiting displayed groups.
+
+Acceptance gates for the agreed human-supplied fixtures:
+  - 100% reference-SQL match under documented type/rounding/NULL/order/tie rules.
+  - Zero silently dropped requirements.
+  - At most two application-level LLM calls for the ENTIRE compound request,
+    including interpretation/planning/correction/narration, not two per step.
+  - Ordinary questions retain their existing one-call target and regression behavior.
+  - Permission denial does not cause model retry or broader data access.
+  - Every partial answer states answered parts, unanswered parts and why.
+  - Human-reviewed reference SQL and human-supplied blind holdouts remain separate
+    from implementation examples/runtime context. Do not generate our own holdouts.
+Fixture success is not a claim of 100% accuracy on arbitrary real questions.
+
+9. UI AND AUDIT DESIGN
+Keep the answer prominent and add the concise business plan/checks to the existing
+info/Expand area. Stream actual business progress such as "Step 1 of 3". Do not
+invent progress counts before a plan exists. Cancellation remains available.
+Use shared step-results events and history replay for Classic/New. Preserve SQL per
+step, result identity, report ownership/revisions, ratings and all three themes.
+
+Audit plan/version, requirement map, dependencies, binding provenance, semantic/scope
+fingerprints, completeness/baseline source, SQL fingerprints, row counts, check status,
+residual/unknown portions, skipped/failed steps, usage, timing and cancellation.
+Store concise decisions, not private reasoning or unnecessary sensitive result rows.
+
+10. CHECKPOINT AND IMPLEMENTATION BOUNDARIES
+Current branch at review: main. Git root is E:\ai_data_rag\ai_data_v2, above AskDB.
+There is substantial tracked AND untracked AskDB work from the five batches, plus
+an untracked sibling agentic directory. Do not run repository-wide add/stash/cleanup.
+
+No checkpoint commit/branch was created in Phase 0: this step is the pre-coding review.
+Before Batch 1, record a fresh scoped status and checkpoint the reviewed AskDB source,
+including relevant untracked source. Exclude .env, virtual environments, private
+captures, snapshots/backups and sibling work. A branch alone does not save dirty files.
+Use a codex/ branch when implementation begins and a reviewed scoped source checkpoint
+or equivalent recoverable source backup. Do not claim a branch is a working-tree backup.
+
+Batch 1 AFTER REVIEW: contracts, pure plan/coverage/binding validation and non-executing
+planning tests only. No new execution coordinator, SQL behavior, live provider dispatch,
+UI implementation, schema migration or flag enablement. Keep execution unconnected.
+Batch 2: bounded compilation/execution/bindings and reference-result checks.
+Batch 3: all-step narration, shared UI progress/results and audit integration.
+Batch 4: human-supplied holdouts, regression, security and matched live acceptance.
+Stop for review at the agreed batch boundaries. Keep the old workflow available.
+
+11. REVIEW DECISIONS BEFORE BATCH 1
+Confirm this gap report and the proposed plan/binding/coverage contract direction.
+Select the completeness strategy (combined policy recommended; actual source unknown).
+Define the approved cloud/private payload policy; current payload exceeds DDL-only.
+Confirm tie handling, cohort cap 50, four-step initial limit and two-call shared cap.
+Confirm combined versus separate contributor defaults and baseline policy ownership.
+Assign a human reviewer for reference SQL and privately supplied blind questions.
+Agree the scoped source checkpoint before any Batch 1 code is edited.
+
+No application changes follow this report until the requested review is complete.

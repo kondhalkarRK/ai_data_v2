@@ -1,0 +1,204 @@
+SCIO AI CHAT: DISPLAY FIX AND EXECUTIVE QUESTION REVIEW
+26 November 2026 | Scope: AskDB / Automotive only
+
+WHAT WAS FIXED NOW
+- Sparse numeric comparison columns are detected from populated cells across the
+  result. Early NULL years no longer turn the second measure into part of a label.
+- New Chat uses labelled columns for multi-measure previews, retaining every
+  detected measure. Wide previews scroll internally, with a mobile scroll hint.
+- NULL values remain unavailable (a dash); a verified zero is still zero.
+- Multi-measure time-series summaries cover up to three series separately, using
+  each series' own available dates. Further measures remain in the preview/table.
+- Full analysis tables in both layouts show currency in INR with Cr/Lakh. Exact
+  source cell values remain available on hover and source rows are not mutated.
+- Removed the revenue INR-to-USD conversion, including the stale KPI fallback.
+  Shared revenue formatting now uses INR in cards, charts, tooltips and reports.
+  Counts, percentages, and actual provider billing costs keep their own units.
+
+WHY THE FOUR SCREENSHOTS FAILED
+1. The result profiler previously counted NULL cells against a 60% numeric test
+   over the first 20 rows. A later-starting comparison series could be classified
+   as a dimension. Its raw revenue was then concatenated with the year label.
+   The underlying table in the screenshot already contained both model columns.
+2. Compact previews privileged the first measure. Labelled multi-measure columns
+   now make each series explicit rather than placing extra numbers beside labels.
+3. A definition request was sent to an analytical template. This is a separate
+   intent/route problem; changing the display cannot make that query a definition.
+4. The quarter comparison SQL selected only last quarter and grouped by year.
+   It could not compute a comparison because the baseline was absent. This is a
+   planning problem, not a formatting or narration problem.
+
+HOW THE CURRENT ASKDB PATH WORKS
+Authentication / permissions -> regional guard -> rule-based message routing ->
+conversation context -> spell/value resolution -> question plan -> semantic
+glossary/formulas -> governed compiler or template -> coverage and SQL guards ->
+optional LLM fallback -> scoped execution -> deterministic result narration ->
+shared result profile -> Classic or New Chat presentation.
+
+Having semantic YAML does not mean every request automatically uses all of it.
+QuestionPlan currently has one primary metric. Coverage checks, time parsing,
+templates, and follow-up handling must agree with that plan. The review found
+cases where those stages disagree while still producing plausible-looking SQL.
+
+REVIEW METHOD AND LIMITS
+Replayed all 20 supplied questions through the existing offline planner benchmark
+using the Automotive semantic pack and seed-backed value dictionary. Also replayed
+the model-split follow-up. Inspected generated SQL as well as route/outcome.
+No LLM calls, provider tokens, warehouse queries or customer data were used.
+The benchmark stops before execution and does not replay the complete HTTP/UI
+workflow, LLM fallback, or all non-data handlers. Therefore the observations below
+are NOT live answer accuracy scores or a production acceptance result.
+Relative dates in current SQL often use the warehouse maximum date; current year
+can use the calendar year. This policy needs to be made consistent and visible.
+
+VERIFICATION COMPLETED
+- 81 targeted frontend tests passed across Chat rendering/actions, number
+  formatting, executive presentation, report studio and report export fixtures.
+- 53 targeted backend tests passed across result profiles, narration, semantic
+  planning and regional access enforcement fixtures.
+- TypeScript validation and Ruff checks for the edited Python files passed.
+- Local browser fixtures passed 12 layout checks: Classic/New, 1440px/390px,
+  Light/Dark/AI. Checked labelled comparison columns, unavailable values,
+  internal mobile scrolling, no page overflow and no browser runtime errors.
+  Reviewed representative desktop and mobile screenshots visually.
+- Browser checks rendered the actual response components with synthetic data,
+  not a signed-in production session or office warehouse results.
+
+20-QUESTION REVIEW
+
+01. Total revenue and units sold last quarter.
+    OBSERVED: Coverage validation rejects the plan as single-metric even though
+    candidate SQL contains revenue and units. Candidate is monthly, not a total.
+    NEEDED: Typed requested-measures collection and an explicit total grain.
+
+02. Top 5 models by revenue this year.
+    OBSERVED: SQL includes the model join, revenue aggregation, current-year
+    filter, descending revenue order and LIMIT 5.
+    NEEDED: Live reconciliation, regional scope and displayed-date acceptance.
+
+03. Total revenue this month so far.
+    OBSERVED: Monthly aggregation from the start of the latest-data month.
+    NEEDED: Explicit as-of/end boundary and clear calendar versus data-date policy.
+
+04. Revenue this quarter vs last quarter.
+    OBSERVED: SQL includes ONLY last quarter and groups by year.
+    NEEDED: Explicit current and baseline intervals; delta and percentage change.
+
+05. Units sold this year vs same period last year.
+    OBSERVED: SQL selects only the current calendar year.
+    NEEDED: Two aligned YTD intervals, matched through the same effective date.
+
+06. Best and worst region last quarter.
+    OBSERVED: Defaults to units and sorts ascending, capped at 10. The screenshot
+    instead used revenue. Compact narration emphasizes the leader, while other
+    ranking insights can be outside the main answer.
+    NEEDED: Governed metric choice/clarification and explicit best AND worst,
+    including ties. Never infer both extremes from a truncated ranking.
+
+07. Revenue by region last quarter.
+    OBSERVED: SQL groups revenue by region and applies a last-quarter predicate.
+    NEEDED: Reconcile values, data completeness and scope against live PostgreSQL.
+
+08. Top dealers in [Region]. (Replayed using West.)
+    OBSERVED: Dealer and region joins, West filter, revenue DESC, LIMIT 10.
+    NEEDED: Display the approved measure and period defaults, plus user scope.
+
+09. Models declining the most vs last quarter.
+    OBSERVED: Growth ranking is recognized, but SQL compares two 12-month windows.
+    NEEDED: Preserve the requested quarter baseline and define the ranking metric.
+
+10. Now show only [Region]; then Split that by model.
+    OBSERVED: Period and West filter are retained. The first follow-up candidate
+    repeats the region join alias r, which PostgreSQL would reject. The subsequent
+    model split includes model grouping and retains West/last-quarter scope.
+    NEEDED: Compile one canonical join graph and verify the whole follow-up chain.
+
+11. Monthly revenue, last 12 months.
+    OBSERVED: Monthly SQL from the latest-data month minus 11 months.
+    NEEDED: Show whether current month is partial; confirm missing-month policy.
+
+12. Sales trend by model, last 4 quarters.
+    OBSERVED: Monthly revenue/model SQL over 12 months rather than 4 quarter bins.
+    NEEDED: Explicit measure interpretation and preserved quarter grain.
+
+13. How is revenue defined?
+    OBSERVED: Falls into a revenue-by-month template, reproducing the screenshot.
+    Approved glossary definition lookup exists separately in non_data_handlers.
+    NEEDED: Route standalone definition intents to that lookup before analytics.
+
+14. Show the SQL.
+    OBSERVED: The offline planner cannot compile this as a data query. The existing
+    SQL tab/action is available for executed answers.
+    NEEDED: Treat this as an action on the latest authorized result, not new SQL.
+
+15. Is any region's data incomplete?
+    OBSERVED: Asks for a measure rather than answering a data-quality request.
+    NEEDED: Route to recorded Data Trust evidence, with scope, freshness and caveats.
+
+16. Regional user asks for all regions and sees only their own.
+    OBSERVED: Offline planner generates the region query without an authenticated
+    regional user. Separate server code wraps analytics execution with regional
+    scope. This benchmark alone cannot establish the final authorized result.
+    NEEDED: Live restricted-user tests, including cache/history and follow-ups.
+
+17. Net profit margin (undefined).
+    OBSERVED: Stops with unsupported clarification: cost data is not recorded.
+    NEEDED: Keep this fail-closed behavior and avoid substituting ASP silently.
+
+18. Show me sales.
+    OBSERVED: Clarifies which metric is intended, without compiling SQL.
+    NEEDED: Preserve that focused clarification and correctly merge the reply.
+
+19. How are we doing?
+    OBSERVED: No deterministic compiled query; would need fallback handling.
+    NEEDED: A governed KPI-summary intent with visible scope/date defaults.
+
+20. Turnover and volume versus revenue and units.
+    OBSERVED: Synonyms generate revenue and units in candidate SQL. However,
+    equivalent explicit multi-metric wording in case 01 is rejected. It is also
+    monthly rather than a total, so SQL generation alone is not a pass.
+    NEEDED: Canonical measure normalization before both planning and coverage.
+
+NEXT STAGE: EXECUTIVE CHAT HARNESS (NOT IMPLEMENTED IN THIS DISPLAY CHANGE)
+1. Make one typed interpretation the common contract: outcome, requested measures,
+   groupings, entity filters, period, comparison baseline and missing details.
+   Normalize aliases once; compiler, coverage and narration must consume the same
+   normalized request. Reuse existing components and model budgets.
+2. Separate definition, prior-SQL, data-quality, KPI-summary, analytics and report
+   outcomes before templates. Prevent unrelated context from overriding the ask.
+3. Compile explicit total/trend/comparison shapes and one validated join graph.
+   For comparisons require BOTH members/periods before marking an answer complete.
+4. Add SQL-based driver contributions: compare verified region/model/segment
+   aggregates against the same baseline; reconcile signed contributions to the
+   total movement, including any 'Other' residual. Report coverage and partial
+   periods. Call these 'contributing factors', not proven business causes.
+5. Construct each displayed narrative number from verified result fields or
+   deterministic calculations. Validate amounts, direction, denominators and
+   rounding. Suppress unsupported text instead of inventing a cause.
+6. Test the 20 intents with multiple paraphrases and a fixed dated dataset, plus
+   missing periods, NULL/zero, ties, refunds/negatives, new models, mixed measures,
+   permission denial, partial data and cancelled/provider-failure cases.
+7. Report route correctness, SQL validity, result correctness, narrative numeric
+   correctness, visible response, model calls/tokens and latency separately.
+   Finish with live office PostgreSQL/provider acceptance. Do not call a generated
+   query or a passing fixture an accepted executive answer.
+
+DEPLOYING THIS DISPLAY FIX
+Restart the AskDB API and web dev server using the existing startup commands.
+No database schema migration, new package or .env change is required.
+Submit a new question after restart: old saved answers can retain old profiles
+and narration. This change does not rewrite persisted historical answers.
+
+MAIN SOURCE FILES
+apps/api/app/services/chat/narration.py
+apps/api/app/services/chat/pipeline.py
+apps/api/app/services/chat/question_understanding.py
+apps/api/app/services/chat/plan_coverage.py
+apps/api/app/services/chat/semantic_query_planner.py
+apps/api/app/services/chat/semantic_analytics.py
+apps/api/app/services/chat/time_periods.py
+apps/api/app/services/chat/non_data_handlers.py
+apps/api/app/services/security/region_scope.py
+apps/web/components/chat/compact-data-answer.tsx
+apps/web/components/chat/response-card.tsx
+apps/web/lib/display-currency.ts

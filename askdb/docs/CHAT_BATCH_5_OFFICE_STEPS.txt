@@ -1,0 +1,130 @@
+SCIO — OFFICE ACCEPTANCE AND ROLLBACK
+Work from the AskDB root. No Docker, reinstall or Alembic migration is needed for
+these changes. Do not recreate application databases or replace your existing keys.
+
+1. Bring the reviewed AskDB code to the office laptop using your normal Git workflow.
+   Keep the office .env private. The local project here has no running API/warehouse.
+
+2. Run the local automated checks first:
+   Use the following command to keep application fixtures in memory even if a
+   TEST_DATABASE_URL was previously set in the terminal. Native checks run separately
+   in step 9. These removals affect this test process only, not your .env or parent shell.
+   .\apps\api\.venv\Scripts\python.exe -c "import os,pytest; os.environ.pop('TEST_DATABASE_URL',None); os.environ.pop('SCIO_TEST_POSTGRES_URL',None); raise SystemExit(pytest.main(['apps/api/tests','-o','addopts=','-q','--disable-warnings','--tb=short']))"
+   npm.cmd run typecheck --workspace @nql/web
+   Native PostgreSQL checks skip unless explicitly configured. A skip is not a pass.
+
+3. Choose a fixed warehouse snapshot/version and pause demo-data refresh during the
+   paired runs. Use the same application user, regional scope, provider/model and
+   settings for both runs. Run both on the same business day, away from a period
+   boundary. Record that snapshot/version in your review notes. A dataset label or
+   unchanged MAX(date) alone does not prove the underlying data stayed unchanged.
+   For a same-model comparison, CHAT_CLASSIFIER_MODEL must be blank or the same
+   approved model in both runs. A different actual/fallback model makes the pair
+   incomparable; do not change real production routing merely for this benchmark.
+
+4. Prepare a private question file and approved reference answers.
+   docs/chat-acceptance-candidates.json contains 24 candidate cases and follow-ups.
+   It is NOT a blind holdout: the implementer has seen these questions. A reviewer
+   should author additional unseen questions privately before running acceptance.
+   Do not put private questions, reference SQL or client answers in runtime prompts,
+   semantic examples or source control. Use data/staging/chat-acceptance/ (ignored).
+
+   Questions have this format:
+   [{"id":"P01","route":"analytics","question":"Your question"}]
+   Give follow-ups the same "conversation" value. Each other question starts fresh.
+
+   A reviewer must calculate answers using independently reviewed, read-only SQL.
+   Use exact date bounds, correct joins/formulas, and the SAME regional permissions.
+   Confirm expected ordering, ties, NULL, empty results and baseline coverage.
+   Never generate the reference by copying the application's unverified answer.
+
+   Gold-file shape (format example only; 100 is illustrative, NOT an office result):
+   {"P01":{"route":"analytics","columns":["revenue"],"rows":[{"revenue":100}],
+            "text":"The independently approved expected narration"}}
+
+   Gold keys match case IDs. Actual rows/numbers go in the private gold file only.
+   Missing gold -> unreviewed/incomplete_gold, never an automatic success.
+   Matching rows alone do not complete acceptance: narration remains unreviewed
+   without an exact approved text reference. Use the saved response ID to review
+   wording and visible behavior in Chat if exact text matching is unsuitable.
+   Route, numerical results and narration are reported separately.
+   Numerical checks use a fixed 0.000001 absolute tolerance, with no large relative
+   tolerance that could hide unit errors in a very large revenue total. Report
+   panels require manual review in Builder; the runner never marks a report complete
+   from its briefing alone. Text fragments are supporting checks, not proof that
+   every numerical claim in the narration is correct.
+
+5. Capture the preserved legacy path first.
+   In the OFFICE .env, set CHAT_TYPED_EXECUTION_ENABLED=false, then restart the API
+   using your existing start command. Keep the existing frontend running normally.
+   Confirm API URL/port from your normal setup (example below uses localhost:8000).
+
+   .\apps\api\.venv\Scripts\python.exe scripts/chat_acceptance.py capture --base-url http://localhost:8000 --username YOUR_APPLICATION_LOGIN --mode legacy --dataset-label YOUR_FROZEN_DATASET_VERSION --expected-model YOUR_APPROVED_MODEL_NAME --cases docs/chat-acceptance-candidates.json --gold data/staging/chat-acceptance/gold.json --output data/staging/chat-acceptance/legacy.json
+
+   Enter the APPLICATION login password when prompted. It is not echoed or saved.
+   This is not the PostgreSQL password or model API key. HTTPS is required for a
+   remote API. HTTP is allowed for loopback only. Redirects are not followed. If your
+   deployment changed the CSRF header, supply --csrf-header with that approved name.
+   Omit --gold if references are not ready, but such results cannot pass acceptance.
+
+6. Capture typed Chat against the unchanged data/model/account.
+   Set CHAT_TYPED_EXECUTION_ENABLED=true in the office .env and restart only the API.
+   This is a controlled TEST, not production rollout. For report cases, the existing
+   ASK_ME_ASKBI_ENABLED and matching frontend feature flag must also be enabled.
+
+   .\apps\api\.venv\Scripts\python.exe scripts/chat_acceptance.py capture --base-url http://localhost:8000 --username YOUR_APPLICATION_LOGIN --mode typed --dataset-label YOUR_FROZEN_DATASET_VERSION --expected-model YOUR_APPROVED_MODEL_NAME --cases docs/chat-acceptance-candidates.json --gold data/staging/chat-acceptance/gold.json --output data/staging/chat-acceptance/typed.json
+
+   Questions consume normal quota/model tokens. Report questions create unsaved
+   reports in the application database; they do not write to the analytics warehouse.
+   The runner never enables flags, changes permissions, sends email or mutates data.
+
+7. Compare captures:
+   .\apps\api\.venv\Scripts\python.exe scripts/chat_acceptance.py compare --legacy data/staging/chat-acceptance/legacy.json --typed data/staging/chat-acceptance/typed.json --output data/staging/chat-acceptance/comparison.json
+
+   The runner checks question/gold fingerprints, account/scope fingerprint, dataset
+   label, observed mode, model and freshness. Mismatches cannot be labelled comparable.
+   Cached responses are not used for performance comparisons. Missing legacy usage
+   stays null; do not interpret it as zero tokens. Read latency, model calls, tokens,
+   estimated flags, correctness and partial outcomes separately. Repeat matched runs
+   if needed to measure variability; do not announce savings from one noisy sample.
+   rolloutApproved always remains false: the script cannot authorize deployment.
+
+8. Review the actual UI in both layouts, desktop/mobile and three themes.
+   Use response IDs to open captured conversations; inspect applied scope and SQL.
+   Verify that the SQL belongs to the displayed result. Inspect every report panel,
+   partial warning, Builder ID/revision, refinement, history replay and ratings.
+   Check greetings/definitions/clarifications without table/chart shells, sparse
+   comparisons, counts vs currency, cancellations and unavailable-source messages.
+   Check numerical statements against the gold independently, not just matching text.
+
+   Repeat the relevant cases with a dedicated regional TEST account and its own gold.
+   Never compare that capture to an admin capture. Test revoked access/history/report
+   ownership with test accounts and restore test permissions afterwards. Do not change
+   the manager's demo account or broaden reader credentials to make a test pass.
+
+9. Optional native PostgreSQL smoke tests.
+   Have IT supply an EMPTY, disposable database whose name contains "test", with a
+   test owner allowed to create a schema. Do not use askdb_app/askdb_automotive or any
+   populated database. The test refuses existing user tables/automotive schema and
+   rolls its setup back. It does not use APP_DATABASE_URL/AUTOMOTIVE_DATABASE_URL.
+
+   Run the following single command and paste ONLY the dedicated test DSN at its
+   hidden prompt (example DSN format: postgresql+psycopg://TEST_USER:PASSWORD@localhost:5432/scio_acceptance_test).
+
+   .\apps\api\.venv\Scripts\python.exe -c "import os,getpass,pytest; os.environ['SCIO_TEST_POSTGRES_URL']=getpass.getpass('EMPTY disposable test database DSN: '); os.environ['SCIO_ALLOW_EMPTY_TEST_DB_SETUP']='yes'; raise SystemExit(pytest.main(['apps/api/tests/test_chat_postgres_acceptance.py','-o','addopts=','-q']))"
+
+   The DSN is not placed in command history or saved by this command. These are native
+   PostgreSQL calculation smoke tests, not proof of every live Chat/UI question.
+
+10. Release decision and rollback.
+   Keep the flag false until route, interpreted scope, reference values, narration,
+   visible results, permissions and live cost/latency acceptance all pass review.
+   Any scoped-data leak, fabricated number or silent metric substitution blocks rollout.
+   Completeness still requires Data Trust evidence; unsupported shapes must fail clearly.
+
+   Rollback: set CHAT_TYPED_EXECUTION_ENABLED=false and restart the API. Keep the same
+   code, database and secrets. No reverse migration is needed. Retain private test
+   artifacts for review; do not upload them to Git or an unapproved AI service.
+
+Capture files contain identifiers, hashes, status and usage, not raw answers, SQL,
+questions, passwords or cookies. Treat them as internal operational data regardless.

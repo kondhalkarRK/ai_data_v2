@@ -87,6 +87,18 @@ class SemanticValueDomain(ApiModel):
     value_aliases: dict[str, list[str]] = Field(default_factory=dict)
 
 
+class SemanticQueryPolicy(ApiModel):
+    utc_offset_minutes: int = Field(ge=-720, le=840)
+    fiscal_year_start_month: int = Field(ge=1, le=12)
+    comparison_alignment: Literal["same_elapsed", "full_period"]
+    comparison_ranking: Literal["absolute_change", "percent_change"] = "absolute_change"
+    undated_ranking: Literal["available_history"]
+    undated_aggregation: Literal["clarify"]
+    equivalent_dimensions: dict[str, str] = Field(default_factory=dict)
+    executive_summary_measures: list[str] = Field(default_factory=list)
+    executive_summary_period: Literal["this_quarter"] = "this_quarter"
+
+
 class SemanticModel(ApiModel):
     version: str
     domain: str
@@ -101,6 +113,7 @@ class SemanticModel(ApiModel):
     join_paths: dict[str, Any] = Field(default_factory=dict)
     domain_rules: dict[str, list[str]] = Field(default_factory=dict)
     value_domains: dict[str, SemanticValueDomain] = Field(default_factory=dict)
+    query_policy: SemanticQueryPolicy | None = None
 
 
 class GlossaryTerm(ApiModel):

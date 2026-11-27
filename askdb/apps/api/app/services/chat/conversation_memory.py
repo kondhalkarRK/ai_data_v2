@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -187,6 +188,7 @@ class SessionMemory:
     general_chat_turns: tuple[dict[str, str], ...] = ()
     recent_turns: tuple[dict[str, str], ...] = ()
     pending: PendingClarification | None = None
+    typed_request: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -198,6 +200,7 @@ class SessionMemory:
             "generalChatTurns": list(self.general_chat_turns),
             "recentTurns": list(self.recent_turns),
             "pending": self.pending.to_dict() if self.pending else None,
+            "typedRequest": self.typed_request,
         }
 
     @classmethod
@@ -215,6 +218,7 @@ class SessionMemory:
             general_chat_turns=tuple(dict(t) for t in (raw.get("generalChatTurns") or [])),
             recent_turns=tuple(dict(t) for t in (raw.get("recentTurns") or [])),
             pending=PendingClarification.from_dict(raw["pending"]) if raw.get("pending") else None,
+            typed_request=deepcopy(raw.get("typedRequest")),
         )
 
 

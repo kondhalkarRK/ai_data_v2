@@ -1,0 +1,159 @@
+SCIO - DEPENDENT ANALYSIS BATCH 4
+27 November 2026
+Status: Acceptance harness and local security/regression work implemented.
+Live acceptance: Pending. The user will supply reviewed references and unseen inputs.
+Rollout: Not approved. Feature defaults and the actual .env remain unchanged.
+
+1. SCOPE AND OUTCOME
+
+This batch extends the existing verification tooling, not the agent architecture.
+The current simple-question path, semantic formulas, joins, regional permissions,
+SQL guards, report workflow and four-step/two-call dependent limits are retained.
+No new model call, execution capability, package, migration or database setup was added.
+
+The previous acceptance runner only inspected flat columns/rows events. Dependent
+results are stored in analyticalExecution, so that runner could not validate their
+full evidence. It now checks every step and its visible display snapshot.
+
+2. NEW ACCEPTANCE CHECKS
+
+For human-supplied dependent references, the runner checks:
+  - Interpreted intent separately from results and response state.
+  - Ordered steps/operations and dependencies, without relying on model-chosen IDs.
+  - Every approved measure, grouping, exclusion/filter, period and baseline.
+  - All result columns/rows, verification state, selected count and total group count.
+  - Independent reconciliation states and explicit unanswered parts.
+  - Displayed step identity, columns, row count and verification state against execution.
+  - Display text against the narrative being reviewed, not a different plausible answer.
+  - Exact approved narration separately from numerical correctness.
+  - The shared two-call Chat budget; AskBI retains its separate report budget.
+
+Decimal JSON strings are compared with Decimal arithmetic using an absolute tolerance
+of 0.000001, without a large relative tolerance. NULL, zero, booleans and text labels
+remain distinct; integer outputs must match exactly. Unexpected columns and
+missing/extra steps cannot silently pass.
+Ordering is exact unless the reviewer explicitly allows unordered rows; duplicate
+row multiplicity is preserved. Ties are not collapsed into a set.
+
+Incomplete references, missing narration review and missing usage remain unknown or
+incomplete, not automatic successes. A correct intent with wrong results fails.
+References carry reviewer/source-SQL hash/revision/holdout declarations; those fields
+do not independently prove human authorship, SQL correctness or unseen status.
+No reference answers or holdout questions were generated as substitutes for the user.
+
+The offline validate command checks reference contracts before any login/network
+operation. Live capture also performs that preflight before prompting for credentials.
+Captures retain bounded usage/counters, status, hashes and response IDs, not raw
+questions, SQL, result rows, prompts, provider errors, cookies or passwords.
+
+3. USAGE GAP FIXED
+
+Previous usage telemetry identified the first interpretation model but aggregated the
+second inventory check. That could hide a different fallback model in a claimed
+same-model comparison. The interpreter now records each actual call's model, input
+tokens, output tokens, estimation state and completion evidence.
+
+Shared Chat metadata/audit include modelsUsed, modelUsageComplete, initial and
+verification input/output token counts. Unknown/timeout usage is not invented as a
+completed call. A circuit-open second dispatch is not counted as an actual model call.
+If other report calls are outside the tracked interpreter records, usage completeness
+is false rather than claiming every report model was recorded by this narrow change.
+
+The paired runner supports typed-baseline/dependent captures in addition to existing
+legacy/typed comparisons. It requires matching cases, gold, principal/scope, warehouse
+revision, configured model, all observed call models and cache conditions. A fallback
+model mismatch or missing per-call evidence makes the pair incomparable. Revision
+labels are operator attestations; the reviewer must actually freeze the warehouse.
+Performance comparisons require both paired answers to pass correctness review.
+No real token savings, accuracy percentage or speedup has been measured in this batch.
+
+4. SECURITY REGRESSIONS
+
+Visible synthetic tests verify:
+  - Model-supplied SQL, provider, scope or budget authority is rejected.
+  - Excess call budgets, wrong-scope load evidence and empty source revisions fail
+    plan review before execution.
+  - Hostile text in a selected entity remains data in the CTE relation; it does not
+    become SQL or instructions and does not drop the fixture table.
+  - Timeout publishes no result rows/SQL and does not trigger an analytical retry.
+  - Scope revocation at final publication discards results, SQL and display cards.
+  - Follow-up provider payloads exclude prior result summaries and SQL.
+  - Model/circuit/timeout/empty-response usage stays distinguishable.
+  - Acceptance cannot overlook denied-response data hidden in step metadata.
+
+Existing suites also retain owner-scoped history/ratings, cancellation, current-scope
+SQL, read-only mode, row/cohort caps, sparse comparisons and missing-baseline checks.
+These are targeted security regressions, not a penetration test or compliance certificate.
+
+5. NATIVE SQL CHECKS PREPARED
+
+The opt-in PostgreSQL fixture now covers all five visible development shapes:
+  selected month and reconciled contributing factors;
+  selected region then models inside it;
+  period comparison ordered by change;
+  opposite changes in two measures;
+  fixed cohort compared with its own history.
+
+Four added cases compare final values with separately written visible reference SQL.
+The original selected-period/reconciliation case remains. These references are
+implementation fixtures, not human-reviewed office references or blind holdouts.
+The existing empty disposable test-database guard and rollback are unchanged.
+No connection to an office, demo or client warehouse was made.
+
+6. VALIDATION RESULTS
+
+Full API regression: 1,116 passed, 7 skipped, 2,569 warnings in 109.02 seconds.
+That full run preceded the final scorer assertions comparing displayed scope with
+execution scope and requiring exact integer matches. Final focused scorer/security
+rerun: 51 passed, 102 warnings. No live provider or warehouse was used.
+Frontend: 20 tests passed across shared analytical rendering, actual Classic/New Chat
+shell, history/ratings and SSE. TypeScript and the changed-type ESLint check passed.
+Selected backend Ruff, shared-service syntax/name/import, Python compilation and
+whitespace checks passed. Existing deprecation/Vite warnings remain.
+There was no layout/visual change in this batch; the previous Batch 3 browser matrix
+is historical evidence and is not misrepresented as a new live browser acceptance run.
+
+7. REMAINING RELEASE BLOCKERS
+
+PENDING - Human-reviewed reference SQL/results and unseen questions. User explicitly
+          chose to supply them later. Unknown correctness is not reported as a pass.
+PENDING - Authoritative scoped load-status integration and freshness/revision binding
+          to the data being analyzed. Normal Chat currently supplies no such source.
+          MAX(date) and Data Trust samples cannot replace it.
+PENDING - Native PostgreSQL/driver execution in a dedicated disposable test database.
+PENDING - Matched office-provider runs, real model usage/latency, actual saved-response
+          UI review, and scoped/revoked-access checks with approved test accounts.
+PENDING - Explicit cloud/private endpoint classification and approved payload policy.
+          Existing context contains glossary/candidate values/user text, not DDL only.
+          This batch verifies no prior result summary/SQL is added to follow-up model
+          context; it does not implement a universal DDL-only policy for the whole app.
+
+No gates were loosened to make a fixture/demo green. Leave dependent analysis off
+until these prerequisites and the human release review have been satisfied.
+Every harness report keeps rolloutApproved=false.
+
+8. FILES AND CHECKPOINT
+
+Updated:
+  scripts/chat_acceptance.py
+  apps/api/app/services/chat/request_interpreter.py
+  apps/api/app/services/chat/service.py
+  apps/api/app/services/chat/analytical_plan_audit.py
+  apps/api/tests/test_dependent_postgres.py
+  apps/web/components/chat/types.ts (usage model list type only)
+Added:
+  apps/api/tests/unit/test_dependent_acceptance_runner.py
+  apps/api/tests/unit/test_dependent_security.py
+  docs/DEPENDENT_ANALYSIS_BATCH_4_OFFICE_STEPS.txt
+  this report
+
+Verified ignored pre-Batch-4 source checkpoint:
+  tmp/soci-qa/dependent-analysis/checkpoint-before-batch4.zip
+629 source files. Branch: codex/dependent-analysis-contracts. No commit/push/stash/reset.
+Checkpoint comparison confirms no semantic YAML, formulas, compiler/executor behaviour,
+Insurance, sibling agentic project, dependencies or configuration defaults were changed.
+The actual .env was not edited. No migration, reinstall or database recreation is needed.
+
+Follow the separate OFFICE_STEPS file when human inputs and the live prerequisites
+are available. It contains exact PowerShell commands for preflight, safe fixtures,
+optional native tests, matched captures, comparison and rollback.

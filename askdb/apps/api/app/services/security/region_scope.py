@@ -471,6 +471,15 @@ class RegionScopedConnection:
         return getattr(self._inner, name)
 
 
+def for_current_scope(connection: Any, industry: Industry, scope: RegionScope) -> RegionScopedConnection:
+    """Bind a fresh server-derived scope without nesting stale scope wrappers."""
+    while isinstance(connection, RegionScopedConnection):
+        if connection._industry != industry:
+            raise AuthorizationError("Analytics connection belongs to another industry.")
+        connection = connection._inner
+    return RegionScopedConnection(connection, industry, scope)
+
+
 def assert_requested_region(scope: RegionScope, requested: str | None) -> None:
     """Reject a client-supplied region/zone that the caller cannot see."""
     if not requested or scope.unrestricted:

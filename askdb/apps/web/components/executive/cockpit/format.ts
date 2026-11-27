@@ -1,22 +1,7 @@
 import { formatRevenueInr } from "@/lib/display-currency";
 
-/** Source amounts are INR; this legacy function name is retained for callers. */
-
 export function formatInr(value: number | null | undefined, digits?: number): string {
-  if (typeof formatRevenueInr === "function") {
-    return formatRevenueInr(value, true, digits ?? 2);
-  }
-
-  // Defensive fallback for stale/dev HMR module graphs. Keep the source value in INR
-  // and present it using the approved display-currency rate.
-  if (value == null || !Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits ?? 2,
-  }).format(value / 95);
+  return formatRevenueInr(value, true, digits ?? 2);
 }
 
 export function formatCount(value: number | null | undefined): string {
