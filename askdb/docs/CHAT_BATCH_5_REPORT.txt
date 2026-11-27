@@ -1,0 +1,145 @@
+SCIO CHAT — BATCH 5 LOCAL VERIFICATION / OFFICE ACCEPTANCE HANDOFF
+26 November 2026. AskDB Automotive. Approved plan points 17–18.
+
+DECISION
+Local implementation and automated verification are complete for this batch.
+Production/demo rollout is NOT approved. The typed flag still defaults to false;
+no actual .env, secret, application database or analytics dataset was changed here.
+Live office holdouts, native PostgreSQL coverage and same-model comparisons remain
+pending. No model-accuracy percentage or token/latency saving is claimed.
+
+ENVIRONMENT EVIDENCE
+127.0.0.1 ports 5432, 8000, 8001 and 3000 were unavailable at the start of this batch.
+The user previously confirmed the demo warehouse is on the office laptop only.
+No live warehouse/reference query or approved-gateway before/after run was possible
+here. Two native PostgreSQL tests therefore skip explicitly, not pass implicitly.
+
+INDEPENDENT CHECKS AND GENERAL FIXES
+1. Amount change versus percentage change.
+   Previously the typed ranking request could not express the basis, and comparison
+   rankings silently selected percentage change. A reference fixture deliberately
+   makes the largest rupee decline and largest percentage decline different models.
+   It exposed the problem even though the prior SQL executed successfully.
+   RequestedRanking now represents value/absolute_change/percent_change explicitly.
+   Automotive YAML owns the unspecified comparison-ranking default: absolute_change.
+   The interpretation prompt advertises the field and applied defaults are disclosed.
+   This applies across measures/entities; there is no car-name/question patch.
+
+2. Excluded measures versus requested outputs.
+   The independent coverage veto treated an explicitly excluded measure as a required
+   output. Exclusion operators are now recognized before applying the omission veto.
+   Approved business-glossary aliases are included consistently alongside semantic
+   aliases. Coverage also applies to supported analytical parts of mixed requests.
+   This is still a conservative check, not a complete English negation parser.
+   Complex conjunctions/exclusions need live holdout evaluation; no perfection claim.
+
+3. Document-first mixed requests.
+   A document-primary decision with an additional supported analytical intent could
+   return only the document-unavailable message. It now retains the supported data
+   handoff (or report handoff where appropriate), while documents remain gated and
+   compliance remains explicitly unverified. No retrieval/vector dependency was added.
+
+4. Deterministic regression configuration.
+   The first full run found three document-test failures. Two stale tests expected
+   retrieval even with document mode off; the third inherited RAG mode from local
+   .env while intending to test legacy search. Tests now select the intended mode
+   explicitly and assert that document-off/authorized-retrieval restrictions cannot
+   be bypassed. Production knowledge/RAG code and permissions were not weakened.
+   Added a positive rejection test for attempts to use legacy search with RAG enabled.
+
+REFERENCE RESULT VERIFICATION
+- New SQL reference check calculates revenue, units and weighted ASP with separately
+  written SQL over the fixture. Compiler output is compared to those independent rows.
+- Decline-ranking fixtures prove absolute, percentage and approved-default ordering.
+- Existing suites separately test routing, typed scope, joins/formulas, regional SQL,
+  date boundaries, NULL/zero, reference values, narration, reports and visible results.
+- A correct route with wrong numbers explicitly fails the acceptance scorer.
+- Numerical checks use a fixed absolute tolerance rather than a relative tolerance
+  that would hide an incorrect unit in a very large total. NULL is not zero; ranking
+  order is retained. Missing reference answers/usage remain unknown.
+
+TEST RESULTS (counts overlap across commands)
+Initial full API sweep:
+  935 passed, 3 failed, 2 skipped; 93.08 seconds.
+  Failures were the three stale/environment-dependent document tests described above.
+
+Final full API sweep:
+  .\apps\api\.venv\Scripts\python.exe -m pytest apps/api/tests -o addopts='' -q --disable-warnings --tb=short
+  941 passed, 2 skipped; 94.50 seconds.
+  The two skips are the explicitly opt-in native PostgreSQL calculation tests.
+  These are automated API/unit/integration tests, NOT 941 real user questions sent
+  to an LLM. Test-process duration is NOT application response latency.
+
+Latest focused typed/compiler/transport/evaluator sweep:
+  137 passed, 2 native PostgreSQL skips. Follow-up evaluator integrity checks: 9 passed.
+
+Frontend:
+  npm.cmd run test --workspace @nql/web -- --run tests/unit/chat-sse.test.ts tests/unit/chat-new-ui.test.ts tests/unit/soci-chat.test.tsx tests/unit/chat-analysis-details.test.tsx tests/unit/compact-data-answer.test.tsx tests/unit/format-chat-cell.test.ts
+  40 passed. npm.cmd run typecheck --workspace @nql/web passed.
+  No frontend implementation changed in Batch 5. The 12 real-renderer browser/theme
+  configurations recorded in Batch 4 remain prior evidence, not newly run live UI tests.
+
+New modules/tests pass focused Ruff; compileall and whitespace checks pass.
+No dependencies were installed, migrations run, Docker required or Insurance/agentic
+implementation edited. One existing cross-domain security test only had its intended
+test RAG setting made explicit to remove local-environment dependence.
+
+BEFORE / AFTER — WHAT IS ACTUALLY KNOWN
+Language routing accuracy: fixture decisions pass; real same-model accuracy unmeasured.
+Analytical correctness: independent local references pass; native office values pending.
+Model usage: bookkeeping is tested; same-model before/after tokens/cost unmeasured.
+Latency: stage/HTTP capture is available; actual office comparison unmeasured.
+Security/UI: local regression/rendering evidence exists; deployment acceptance pending.
+Do not convert any of these into an advertised percentage improvement.
+
+DELIVERED ACCEPTANCE TOOLS
+scripts/chat_acceptance.py
+  Uses the real authenticated Chat HTTP workflow, including follow-up conversations.
+  Password is prompted without echo; no password argument/default/shared credential.
+  TLS is required remotely; only loopback HTTP is allowed and redirects are disabled.
+  Capture stores response IDs, hashes, status, model and usage, not raw questions,
+  answers, result rows, SQL, cookies or credentials. Outputs should still remain private.
+  Route/result/narration checks are separate. Exact text checks do not replace semantic
+  human review; report panels always require review in Builder. Incomplete gold cannot
+  become a complete pass. The comparison checks case/gold/dataset/user/scope/model
+  compatibility and treats missing usage as unknown. No automatic rollout approval.
+
+apps/api/tests/test_chat_postgres_acceptance.py
+  Opt-in native PostgreSQL math smoke tests, independent of application/warehouse DSNs.
+  Require an empty, disposable, test-named database and explicit setup permission.
+  Refuse populated databases/existing Automotive schema; test setup rolls back.
+  These were NOT executed here against PostgreSQL.
+
+docs/chat-acceptance-candidates.json
+  24 human-readable candidate questions, including grouped follow-ups, exclusions,
+  amount/percentage declines, mixed evidence, trust, reports and regional scope.
+  These are NOT genuinely blind holdouts: the implementer has seen them. A reviewer
+  must author/select additional unseen questions privately before the live run.
+  Neither the cases nor their reference SQL are included in runtime interpretation.
+
+docs/CHAT_BATCH_5_OFFICE_STEPS.txt
+  Exact staged capture, reference preparation, optional native tests and rollback steps.
+
+SUPPORTED SHAPES AND REMAINING GAPS
+The capability inventories in the earlier handoffs still apply. Multiple totals,
+approved joins/groupings, ASP, distinct counts, ranking, comparisons, supported
+windows, typed follow-ups and report handoffs have fixture/reference coverage.
+Weighted ratio decompositions/windows, arbitrary benchmarks, multi-baseline/time-
+grain comparisons, unsupported report filters/transformations and absent measures
+remain explicit limitations. Data Trust completeness is not inferred from date span.
+Unstructured evidence stays gated. No arbitrary SQL or metric substitution was added
+to make unsupported requests look successful.
+
+OFFICE RELEASE GATES — STILL REQUIRED
+1. Freeze a known data version; independently calculate scoped reference SQL answers.
+2. Run real held-out language and follow-ups with the approved provider/model.
+3. Compare legacy/typed paths using the same cases, data, account, scope and model.
+4. Verify every important number/narration statement and visible Classic/New result.
+5. Check regional restrictions, revocation, history/report ownership and failure modes.
+6. Measure actual model calls/tokens, latency, timeouts, quota and partial completion.
+7. Review deployment/provider/PII policy; only then decide whether to enable typed Chat.
+
+ROLLBACK
+Set CHAT_TYPED_EXECUTION_ENABLED=false and restart the API. The preserved legacy
+workflow remains available. No reverse migration, database recreation, secret reset
+or package reinstall is needed. No automatic rollout was performed by this batch.

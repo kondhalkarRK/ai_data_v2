@@ -133,6 +133,9 @@ class Settings(BaseSettings):
     nlq_sql_timeout_seconds: int = Field(default=10, ge=1, le=120)
     nlq_llm_timeout_seconds: int = Field(default=8, ge=1, le=60)
     nlq_default_result_limit: int = Field(default=20, ge=1, le=200)
+    chat_investigation_sql_timeout_seconds: int = Field(default=10, ge=1, le=120)
+    chat_report_workflow_timeout_seconds: int = Field(default=120, ge=10, le=300)
+    chat_interpretation_max_completion_tokens: int = Field(default=600, ge=120, le=600)
     nlq_llm_max_retries: int = Field(default=1, ge=0, le=3)
     # Complex analytics (top-N per group, growth, running totals) when an LLM key is set:
     # llm_first = planner spec -> LLM SQL -> validate -> repair, governed SQL as fallback;
@@ -159,6 +162,13 @@ class Settings(BaseSettings):
     chat_classifier_model: str = ""
     chat_structured_classifier_enabled: bool = Field(default=False)
     chat_question_rewrites_enabled: bool = Field(default=True)
+    # Batch 1: admin-only interpretation preview. Never enables analytical execution.
+    chat_request_preview_enabled: bool = Field(default=False)
+    # Batch 2 opt-in: typed analytics through the shared Chat execution pipeline.
+    chat_typed_execution_enabled: bool = Field(default=False)
+    # Dependent analysis remains independently gated; never enables the typed path.
+    chat_dependent_analysis_enabled: bool = Field(default=False)
+    chat_dependent_timeout_seconds: int = Field(default=20, ge=1, le=60)
 
     # --- mongo / qdrant ----------------------------------------------------
     mongodb_uri: str = "mongodb://localhost:27017"

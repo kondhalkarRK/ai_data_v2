@@ -1,0 +1,149 @@
+SCIO DEPENDENT ANALYSIS - BATCH 1 HANDOFF
+Status: Contracts and pure validation implemented; execution remains disconnected.
+
+APPROVED BUSINESS BEHAVIOUR
+The user approved all seven review decisions:
+1. Preserve the existing path for ordinary questions.
+2. Use dependent planning only when one analysis needs an earlier result.
+3. Default declines to the previous equivalent period; preserve explicit baselines.
+4. Exclude incomplete periods from best/worst period selection. Include current
+   partial periods for explicit "so far" requests and label them.
+5. Clarify essential missing scope; explicitly identify unanswered requirements.
+6. Preserve authentication, regional access, approved formulas and SQL guards.
+7. Implement in batches, starting with definitions/validation before execution.
+
+CHECKPOINT
+Branch: codex/dependent-analysis-contracts
+Base commit: d4bd4bb (the working tree also contains prior uncommitted batches).
+Recoverable source archive, local/ignored:
+  tmp/soci-qa/dependent-analysis/checkpoint-before-batch1.zip
+Contains 613 source files plus CHECKPOINT_MANIFEST.json with per-file SHA-256.
+Archive integrity and every stored source hash were verified. A branch alone does
+not save dirty work; this archive includes the relevant prior untracked source.
+No commit, staging, push, stash, reset or sibling-project change was performed.
+No actual .env, virtual environments, dependencies, office captures, database
+snapshots or sibling agentic project were included in this source checkpoint.
+
+FILES ADDED
+apps/api/app/services/chat/analytical_plan.py
+  Strict version-1 proposal contract, maximum four ordered steps.
+  Operations: aggregate, select_extreme, select_ranked, compare, contributors,
+  history. Approved InterpretedRequest is reused for analytical scope.
+  Output roles/types, explicit input/dependency references, entity/period bindings,
+  baseline provenance, completeness evidence, opposite-direction change predicates,
+  independent reconciliation declarations and requirement-to-output mapping.
+  Whole-request model-call limit is two, including initial interpretation.
+  All ties retained; selected cohort capped at 50; overflow asks to narrow;
+  empty selection skips dependents. Selection must precede display limits.
+  These are safety CONTRACTS, not implemented runtime behaviour.
+
+apps/api/app/services/chat/analytical_plan_validation.py
+  Pure review returning valid/partial/clarification/unsupported/invalid.
+  execution_enabled is always False. Valid means contract review passed, NOT that
+  any SQL ran or the answer was proved correct.
+  Reviews against a separately supplied expected-requirement inventory; a plan
+  cannot establish coverage by comparing only with its own declarations.
+  Binds request, authenticated principal/scope and semantic fingerprint; rejects
+  stale/foreign/no-access contexts, unapproved measures/fields/entities and formula
+  changes. Uses the current pure semantic capability inventory.
+  Checks operations, measures, filters/exclusions, grouping, dates, windows,
+  comparisons, ranking basis/direction and mapped output roles independently.
+  Extra ranking/comparison is rejected because it can change the requested answer.
+  Result references preserve field/type, period-boundary order and dependencies.
+  History must retain a selected entity cohort and member grouping.
+  Additive decline contributors require signed change ranking and a separate
+  ungrouped headline with identical scope/baseline/bindings. Ratios are unsupported
+  for initial contribution decomposition. No residual is fabricated as proof.
+  Completeness sources require a scoped reference and revision. Calendar closure
+  alone does not prove loading. Operational evidence must cover the resolved
+  selection window. Unknown/insufficient evidence cannot receive a valid plan.
+  No MAX(date), warehouse access, provider request, SQL generation or result binding
+  occurs. Mutable proposals are schema-revalidated before reference lookup.
+
+apps/api/tests/unit/test_analytical_plan.py
+  Visible synthetic contract examples, NOT blind holdouts or reference-SQL tests.
+  Five general shapes:
+    A. Month totals -> tied minimum month(s) -> independent baseline/headline
+       and region-model changes -> reconciliation declaration.
+    B. Region totals -> selected extreme region(s) -> rank models inside them.
+    C. Period comparison -> rank declines by the requested change basis.
+    D. Compare two measures -> filter opposite signed changes.
+    E. Rank a fixed cohort -> compare each member with its own history.
+  The named lowest-revenue-month regression is included as an explicit contract
+  example, with prior-month baseline and combined region-model grouping specified.
+  It is not a special-case vehicle/entity parser or a general-language benchmark.
+  Negative cases damage proposals while keeping the expected inventory fixed.
+  Tripwires cover model calls, compilation, warehouse/app SQL, retrieval and reports.
+
+WHAT HAS NOT CHANGED
+No existing checkpointed source file changed in this batch (hash comparison passed).
+No Chat/API route, interpreter prompt, model dispatch, SQL compiler/executor, YAML,
+feature configuration, database schema, UI or actual .env was edited.
+No migration, package install, database recreation or office command is needed.
+No feature was enabled. Greetings, definitions, simple analytics, comparisons,
+AskBI, history, ratings, permissions and both layouts retain their current flow.
+No Insurance or sibling agentic implementation was touched.
+
+IMPORTANT LIMITS
+1. Expected requirements are supplied to review_plan; this batch does NOT extract
+   an independent complete inventory from English or improve live interpretation.
+   The visible examples construct fixture inventories; they do not certify an LLM.
+2. Bindings are typed references only. No intermediate values are substituted.
+   Actual canonical values, ties, row counts, period boundaries and scope must be
+   checked again by future execution code.
+3. Completeness descriptors are trusted review inputs, not an installed load-status
+   service. The office authoritative source is still unidentified. Relative windows
+   must be explicitly resolved with approved calendar rules before load-proof review.
+4. The named regression explicitly chooses a combined region-model breakdown. If a
+   live question leaves combined versus separate breakdowns material and unresolved,
+   clarify; this example does not approve a hidden global default.
+5. PlanReview.covered_requirements means mapped requirements, never verified answers.
+   Partial plans do not dispatch any work in this batch.
+6. No generated SQL, numerical reconciliation, latency, live token/call consumption,
+   provider compatibility or real warehouse result has been accepted by these tests.
+7. Existing LLM context exceeds DDL-only (see Phase 0 report). This batch adds no
+   sharing and sends no result data. Cloud/private payload policy still needs explicit
+   enforcement before a later planner introduces any provider payload changes.
+
+VERIFICATION
+New contract suite: 87 passed (synthetic, no live model or warehouse).
+Ruff check and formatter: passed for the three new Python files.
+Combined interpretation/compiler/state/runtime/preview regression run: 240 passed
+(87 new contract tests plus 153 existing tests), in 65.43 seconds. There were 579
+warnings; no test failed. These remain fixture-backed, not office acceptance.
+Python compilation and git diff whitespace checks also passed. No frontend files
+changed; no new browser/UI acceptance is claimed for this backend-only batch.
+
+Command (from apps/api, explicit interpreter; no activation required):
+  .\.venv\Scripts\python.exe -m pytest tests/unit/test_analytical_plan.py
+    tests/unit/test_request_interpretation.py tests/unit/test_request_compiler.py
+    tests/unit/test_request_state_dates.py tests/unit/test_request_runtime.py
+    tests/test_chat_request_preview.py -o addopts='' -q --disable-warnings --tb=short
+Run with TEST_DATABASE_URL=sqlite+aiosqlite:///:memory: in the child process and no
+SCIO_TEST_POSTGRES_URL. Do not point automated fixture setup at an office database.
+
+BATCH 2 HANDOFF - NOT IMPLEMENTED HERE
+- Keep independent dependent-analysis enablement default off. Preserve the old path.
+- Connect the approved interpretation to an independently checkable requirement
+  inventory and bounded plan. Ordinary questions must bypass the dependent path.
+- Implement supported compilation and typed result binding. Prefer one safe CTE
+  statement; otherwise use scoped sequential queries within a coherent snapshot.
+- Resolve selected-period bindings BEFORE calculating the comparison baseline.
+  Treat request.period as the selection/search window when a period binding exists;
+  the bound period is the effective comparison period. Never compare the full search
+  window when the user asked about the selected month.
+- Resolve calendar windows and authorize/freshness-check completeness evidence for
+  the current scope. Do not substitute MAX(date) for load completeness.
+- Rank and reconcile over all eligible groups before a display cap. Independent
+  headline/decomposition must not share the same already-capped grouped result.
+- Enforce actual selected cohort size/ties/empty actions; never silently take first50.
+- Validate SQL against steps and actual result columns, member identity, baselines,
+  periods and arithmetic. Distinguish no records, NULL/incomplete and verified zero.
+  A lowest month is not automatically a decline: check the signed headline change
+  before using "dip" or naming decline contributors. If the selected month exceeds
+  its baseline, state that there was no decline under the disclosed comparison.
+- Enforce global budgets, cancellation, per-step/final permissions and provenance.
+- Human supplies/reviews reference SQL and private holdouts. Do not generate blind
+  holdouts or call these visible examples independent business acceptance.
+- UI business-step progress, all-step narration/history and audit integration remain
+  later-batch work. Stop at the agreed batch boundary for review.

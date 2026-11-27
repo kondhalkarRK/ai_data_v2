@@ -1,0 +1,158 @@
+SCIO CHAT — BATCH 4 CHECKPOINT
+26 November 2026. Approved plan points 13–16. Automotive / AskDB only.
+
+ROLLOUT
+The typed execution flag remains OFF by default. No actual .env file, credentials,
+warehouse data, migration or installed dependencies were changed. No agentic-project
+or Insurance implementation was edited. Prior uncommitted Batch 1–3 and currency/UI
+work was preserved. Do not enable typed Chat for the demo before Batch 5/live checks.
+
+13. SECURITY REVIEW AND FIXES
+- Existing authentication, server-owned industry/region context, read-only guards,
+  scoped connection, SQL validation and row limits are retained. Tests cover scope
+  revocation before execution and catalog separation by owner/scope/semantic version.
+- Typed context no longer offers email/corporate-ID/credential fields as dimensions
+  or candidate filters. This is a bounded field restriction, not comprehensive PII
+  detection or automatic masking of every possible sensitive column.
+- New typed-preparation/report failure logs omit raw traceback/provider/connection
+  details. Analytics execution logs the error class and returns its existing safe
+  message, rather than dumping raw SQL exceptions.
+- Report cancellation checks run before each next panel. Cancellation does not
+  schedule remaining panels. In-flight database work remains bounded by its existing
+  execution timeout; a browser Cancel button is not a database termination guarantee.
+- Report access is revalidated by existing owner/scope/revision checks, including
+  the final access check before returning its panel results.
+- Fixed a snapshot integration gap: the report event now populates the snapshot's
+  report ID/revision. History access and feedback can enforce report ownership and
+  persist the correct report revision. Previously saved report events are also
+  inspected when the explicit snapshot report field is absent. Deleted/unowned or
+  malformed references fail closed instead of replaying panel values.
+- No permission denial triggers another model call or a bypass query.
+
+Data sharing: the interpretation call receives user text, relevant approved semantic
+definitions and scoped entity candidates (which can include business/person names).
+It does not receive query result rows or the locally generated evidence summary.
+Do not claim DDL-only sharing or complete removal of personal information. Provider
+retention, private endpoints, database reader permissions and tenant-specific column
+classification remain deployment responsibilities. This is not an ASVS certification.
+
+14. SHARED RESPONSE CONTRACT AND BOTH CHAT LAYOUTS
+- Backend presentation kinds cover conversation, definition, clarification, data,
+  report, partial, unavailable, denied, empty, cancelled and failed outcomes.
+  Selection uses the returned workflow outcome, not the question's opening words.
+- Existing synchronous and streaming endpoints feed the same reducer. Report events
+  now survive transport, saved history replay and Classic/New layout switches.
+- Shared report previews show revision, verified KPI cards, charts, row previews,
+  panel availability and scope/coverage warnings. Failed panels show no invented
+  values. The link uses the existing askbiReport Builder route for the same report.
+  Builder checks current access and loads the latest revision; the preview remains
+  labelled with its original revision.
+- Data stays answer-first. The recent multi-column/sparse-comparison rendering is
+  retained; NULL remains different from zero. Table/Chart/Narration/SQL remain in
+  analysis. Partial data answers carry a visible warning.
+- Greetings/definitions/ordinary text stream directly. A previous-SQL request reuses
+  only authorized version/scope-bound SQL, with no new analytical query and no fake
+  empty-result table. Missing SQL gets an explicit unavailable message.
+- Completeness questions do not invent a data-quality verdict: they explain that
+  completeness is unverified and point to Data Trust. Observed date coverage alone
+  is not a completeness check.
+- The info action beside ratings retains interpretation, limitations, execution
+  details and SQL. Report-panel SQL is available there too. No new numerical trust
+  score was introduced. Existing feedback, history and theme behavior are retained.
+- Fixed the typed narration payload to include all shared narration-section fields,
+  so opening Narration does not depend on absent arrays.
+
+15. COST AND OBSERVABILITY
+- One interpretation call remains the target. No always-on LLM verifier, SQL repair
+  loop, LLM report planner or LLM narration call was added to the typed path.
+- Added an independent structural coverage veto for explicit, uniquely approved
+  measure names/aliases. It catches omissions even when SQL would be valid. Longer
+  compound names take precedence; clarification and ambiguous aliases are not
+  automatically converted into a different plan. This check does not prove complete
+  natural-language understanding or detect every possible lost exclusion/entity.
+- Ordinary Chat keeps existing NLQ SQL/LLM settings and provider quota preparation.
+  New optional .env.example settings (actual .env unchanged):
+    CHAT_INTERPRETATION_MAX_COMPLETION_TOKENS=600
+    CHAT_INVESTIGATION_SQL_TIMEOUT_SECONDS=10
+    CHAT_REPORT_WORKFLOW_TIMEOUT_SECONDS=120
+  The interpretation cap cannot exceed the existing 600-token typed cap or the
+  provider's configured completion cap. Reports remain limited to six governed panels.
+- Run metadata records initial/correction application-level model calls, input/output
+  tokens, estimated usage, interpretation/planning/execution/narration time, analytical
+  query attempts, query-cache status and fallback reason. The report meter separately
+  counts warehouse statements, including validation/metadata/timeout statements and
+  failed attempts. Analytical counting is placed at actual analytical execution.
+  Report usage callbacks preserve counts if later work is cancelled.
+- Ordinary warehouse-statement count is null when that broader counter is not used;
+  the separate analytical-query counter still records its query attempt. Zero is not
+  used to imply an unmeasured statement count.
+- Metadata is saved with the response and available in the info panel. Application
+  call counts are not a claim about low-level HTTP retries or provider billing.
+- No real gateway before/after cost or latency comparison was performed. Mock token
+  counts verify bookkeeping only; local test duration is not product latency.
+
+16. EXECUTIVE ACCEPTANCE REGISTER
+"Fixture" below means reference values or controlled provider responses, not a live
+English-understanding accuracy result. Runtime context contains no reference questions
+or reference SQL from these tests. Independent unseen holdouts belong to Batch 5.
+
+ #  Executive request                    Evidence/check or remaining limit
+ 1  Revenue + units last quarter          Multi-measure reference totals.
+ 2  Top five models this year             Ranking plus current-year reference totals.
+ 3  Revenue this month so far             Business-calendar MTD reference total.
+ 4  This quarter vs last quarter          Both periods and signed delta, elapsed policy.
+ 5  Units vs same period last year        Both sides retained; missing baseline stays NULL.
+ 6  Best/worst region last quarter        Endpoint ranking, ties and reference totals.
+ 7  Revenue by region last quarter        Grouped reference totals.
+ 8  Top dealers in permitted region       Dealer ranking + existing scoped SQL checks.
+ 9  Models declining vs last quarter      Change ranking; missing baseline is not zero.
+10  Region then model follow-ups          Typed field merge, exclusions/group retention.
+11  Monthly revenue last 12 months        Calendar buckets and reference total.
+12  Model trend last 4 quarters           Multiple grouped series and reference total.
+13  Revenue definition                    Approved definition; no analytical query.
+14  Show previous SQL                     Exact authorized SQL; no analytical query.
+15  Is a region incomplete?               Explicit unverified outcome, not a false verdict.
+16  Regional user asks all regions        Executed SQL remains scoped; revocation denies.
+17  Undefined net profit margin           Unknown measure rejected; no substitute metric.
+18  Show me sales                         Focused clarification; no analytical query.
+19  How are we doing?                     Approved YAML summary defaults: revenue/units,
+                                          this quarter. Fixture verifies these results;
+                                          live language interpretation still needs testing.
+20  Turnover / volume aliases             Approved measure identities/reference totals.
+
+Also retained: ASP zero denominators and weighted aggregation; distinct counts;
+multiple joins; running/fiscal reset totals; calendar moving averages; targets at
+supported grain; excluded filters; row caps; missing members; zero/negative baselines;
+provider failure and invalid output; quota; permission revocation; contributing-factor
+reconciliation; implications without extra SQL; partial report/refinement revisions;
+document gating. Unsupported shapes remain explicit limitations, not arbitrary SQL.
+
+VALIDATION
+- Combined backend sweep: 231 passed. Includes typed interpretation/compiler/runtime,
+  date/state, AskBI, ratings/history, existing Chat memory and regional/RLS tests.
+- Final follow-up backend checks after usage callbacks: 47 passed.
+- Final transport/runtime checks after preserving streamed line breaks and adding
+  an explicit definition source: 31 passed.
+- Frontend checks include both layouts, report identity/partial KPI, info SQL, feedback,
+  history/drafts, SSE, comparison cells and response selection: 40 passed. TypeScript
+  passes. These per-command counts overlap and should not be added as unique cases.
+- Headless Edge browser fixture: 12 passed combinations: Classic/New x 1440/390 px
+  x Light/Dark/AI. Checked report revision/link, unavailable panel, SQL details,
+  Escape/focus return, no page-level horizontal overflow and no browser exceptions.
+  This uses real rendering components with synthetic data/auth; it is not a live
+  signed-in office application session or a warehouse/provider test.
+- New typed modules pass Ruff; selected frontend components pass ESLint. compileall
+  and diff whitespace checks pass. Existing unrelated legacy lint findings were not
+  treated as new failures. The two previously documented disabled-RAG expectation
+  failures remain outside the selected sweep; no retrieval gates were weakened.
+
+Local browser fixture/screenshots: tmp/soci-qa/batch4-ui (ignored local QA artifacts).
+No client data, credentials or live result snapshots were generated for this check.
+
+BATCH 5 HANDOFF — NOT STARTED
+Run independent unseen questions against the office PostgreSQL and approved gateway,
+compare the same model/settings before and after, verify reference SQL results and
+full signed-in UI flows, and measure real latency/token/quota behavior. Revisit
+completeness-source integration, unsupported comparison/report shapes and coverage
+false positives. Review deployment permissions/provider policy and only then decide
+whether to enable the typed flag and how to roll it back. No auto-rollout occurred.

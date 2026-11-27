@@ -43,6 +43,7 @@ export function CompactDataAnswer({
   return (
     <div className="space-y-3" data-testid="compact-data-answer">
       <div className="space-y-3 rounded-[var(--radius-card)] border border-border/70 bg-background px-4 py-4">
+        {message.meta?.responseKind === "partial" && <p role="status" className="text-sm font-medium text-warning">Partial answer — see limitations in response details.</p>}
         {lead ? <p className="text-sm leading-relaxed text-foreground">{lead}</p> : null}
         {profile ? <ResultPreview profile={profile} /> : null}
       </div>
@@ -96,7 +97,7 @@ function ResultPreview({ profile }: { profile: ResultProfile }) {
     );
   }
 
-  const rows = profile.preview.filter((row) => row.values.some((v) => v.text));
+  const rows = profile.preview.filter((row) => row.values.length > 0);
   if (!rows.length) return null;
   const heading = PREVIEW_HEADING[profile.shape];
   const plus = profile.mayBeTruncated ? "+" : "";
@@ -108,7 +109,30 @@ function ResultPreview({ profile }: { profile: ResultProfile }) {
           {heading}
         </p>
       ) : null}
-      <ul className="divide-y divide-border/50 text-sm">
+      {profile.measures.length > 1 ? (
+        <div className="max-w-full overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable result preview">
+          <table className="w-full text-left text-sm" aria-label="Result preview">
+            <thead><tr className="border-b border-border text-xs text-muted-foreground">
+              <th scope="col" className="min-w-28 py-2 pr-4 font-medium">{profile.labelColumns.map(c => c.replaceAll("_", " ")).join(" / ") || "Result"}</th>
+              {profile.measures.map(m => <th scope="col" key={m.column} className="min-w-36 px-3 py-2 text-right font-medium">{m.label}</th>)}
+            </tr></thead>
+            <tbody>{rows.map((row, i) => (
+              <tr key={i} className="border-b border-border/50 last:border-0">
+                <th scope="row" className="py-2 pr-4 font-normal">{row.label ?? `Row ${i + 1}`}</th>
+                {profile.measures.map((measure) => {
+                  const text = row.values.find(value => value.column === measure.column)?.text;
+                  return (
+                    <td key={measure.column} className="whitespace-nowrap px-3 py-2 text-right tabular-nums"
+                      title={text == null ? "Not available in this result; not zero." : undefined}>
+                      {text ?? "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : <ul className="divide-y divide-border/50 text-sm">
         {rows.map((row, index) => (
           <li key={`${row.label ?? "row"}-${index}`} className="flex items-baseline justify-between gap-4 py-1.5">
             <span className={cn("truncate", !row.label && "text-muted-foreground")}>
@@ -130,7 +154,10 @@ function ResultPreview({ profile }: { profile: ResultProfile }) {
             </span>
           </li>
         ))}
-      </ul>
+      </ul>}
+      {profile.measures.length > 1 ? (
+        <p className="text-[11px] text-muted-foreground sm:hidden">Scroll sideways to see all measures.</p>
+      ) : null}
       {profile.previewTruncated ? (
         <p className="text-[11px] text-muted-foreground">
           Showing {rows.length} of {profile.rowCount.toLocaleString()}

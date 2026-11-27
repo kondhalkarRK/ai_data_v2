@@ -193,7 +193,7 @@ async def test_app_help_regions_respect_rbac(north_only, auto_pack) -> None:
 
 
 @pytest.mark.asyncio
-async def test_document_query_without_documents(memory_chat) -> None:
+async def test_document_mode_off_does_not_search_empty_store(memory_chat) -> None:
     service, conv, _ = memory_chat
     _router_on(service)
     knowledge = MagicMock()
@@ -208,11 +208,11 @@ async def test_document_query_without_documents(memory_chat) -> None:
         )
     plan.assert_not_called()
     knowledge.search_authorized.assert_not_called()
-    assert "No documents have been uploaded" in _narrative(events)
+    assert "Knowledge documents are off or unavailable" in _narrative(events)
 
 
 @pytest.mark.asyncio
-async def test_document_query_with_documents_uses_knowledge_search(memory_chat) -> None:
+async def test_document_mode_off_cannot_be_bypassed_by_existing_documents(memory_chat) -> None:
     service, conv, _ = memory_chat
     _router_on(service)
     knowledge = MagicMock()
@@ -222,13 +222,15 @@ async def test_document_query_with_documents_uses_knowledge_search(memory_chat) 
         patch("app.services.chat.service.KnowledgeService", return_value=knowledge),
         patch("app.services.chat.service.plan_turn") as plan,
         patch("app.services.chat.service.rag_enabled", return_value=False),
-        patch("app.services.chat.service.grounded_document_reply", new_callable=AsyncMock) as grounded,
+        patch(
+            "app.services.chat.service.grounded_document_reply", new_callable=AsyncMock
+        ) as grounded,
     ):
         await _collect_stream(
             service, "What does the policy document say about fraud exclusions?", conv.id
         )
     plan.assert_not_called()
-    knowledge.search_authorized.assert_called_once()
+    knowledge.search_authorized.assert_not_called()
     grounded.assert_not_called()
 
 

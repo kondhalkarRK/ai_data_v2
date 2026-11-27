@@ -49,8 +49,8 @@ const ranking: ResultProfile = {
     { column: "revenue", label: "revenue", kind: "currency" },
   ],
   preview: [
-    { label: "Nexon", values: [{ column: "units", text: "9,100" }, { column: "revenue", text: "₹91.0M" }] },
-    { label: "Punch", values: [{ column: "units", text: "7,400" }, { column: "revenue", text: "₹52.0M" }] },
+    { label: "Nexon", values: [{ column: "units", text: "9,100" }, { column: "revenue", text: "₹9.10 Cr" }] },
+    { label: "Punch", values: [{ column: "units", text: "7,400" }, { column: "revenue", text: "₹5.20 Cr" }] },
   ],
   previewTruncated: true,
   chartSuitable: true,
@@ -67,7 +67,7 @@ const single: ResultProfile = {
   rowCount: 1,
   labelColumns: [],
   measures: [{ column: "revenue", label: "revenue", kind: "currency" }],
-  preview: [{ label: null, values: [{ column: "revenue", text: "₹987.7M" }] }],
+  preview: [{ label: null, values: [{ column: "revenue", text: "₹98.77 Cr" }] }],
   previewTruncated: false,
   chartSuitable: false,
   mayBeTruncated: false,
@@ -89,7 +89,7 @@ describe("CompactDataAnswer", () => {
     const preview = within(screen.getByTestId("result-preview"));
     expect(preview.getByText("Nexon")).toBeInTheDocument();
     expect(preview.getByText("9,100")).toBeInTheDocument();
-    expect(preview.getByText(/₹52\.0M/)).toBeInTheDocument();
+    expect(preview.getByText(/₹5\.20 Cr/)).toBeInTheDocument();
     expect(preview.getByText(/Showing 2 of 8/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /view analysis/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
@@ -103,7 +103,7 @@ describe("CompactDataAnswer", () => {
     expect(screen.getByTestId("result-chart")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /hide analysis/i })).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: /table/i }));
-    const table = within(screen.getByRole("table"));
+    const table = within(screen.getByRole("table", { name: "Analysis results" }));
     expect(table.getByText("Nexon")).toBeInTheDocument();
     expect(table.getByText("Punch")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: /sql/i }));
@@ -119,7 +119,7 @@ describe("CompactDataAnswer", () => {
   it("single value shows the number large and never defaults to a chart", async () => {
     const user = userEvent.setup();
     renderAnswer(message(single, [{ revenue: 987_654_321 }]));
-    expect(within(screen.getByTestId("result-preview")).getByText("₹987.7M")).toBeInTheDocument();
+    expect(within(screen.getByTestId("result-preview")).getByText("₹98.77 Cr")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /view analysis/i }));
     expect(screen.queryByTestId("result-chart")).not.toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
@@ -136,5 +136,37 @@ describe("CompactDataAnswer", () => {
     renderAnswer(message(ranking, rankingRows));
     await user.click(screen.getByRole("button", { name: /view analysis/i }));
     expect(screen.getAllByRole("button", { name: "What about South?" })).toHaveLength(1);
+  });
+
+  it("aligns sparse comparison measures under headers and preserves null versus zero", async () => {
+    const profile: ResultProfile = {
+      ...ranking, shape: "time_series", rowCount: 3, labelColumns: ["year"],
+      previewTruncated: false,
+      measures: [
+        { column: "alpha_revenue", label: "Alpha revenue", kind: "currency" },
+        { column: "beta_revenue", label: "Beta revenue", kind: "currency" },
+      ],
+      preview: [
+        { label: "2024", values: [{ column: "alpha_revenue", text: "₹2 Cr" }, { column: "beta_revenue", text: null }] },
+        { label: "2025", values: [{ column: "alpha_revenue", text: "₹3 Cr" }, { column: "beta_revenue", text: "₹0" }] },
+        { label: "2026", values: [{ column: "alpha_revenue", text: "₹4 Cr" }, { column: "beta_revenue", text: "₹5 Lakh" }] },
+      ],
+    };
+    renderAnswer(message(profile, [
+      { year: 2024, alpha_revenue: 20000000, beta_revenue: null },
+      { year: 2025, alpha_revenue: 30000000, beta_revenue: 0 },
+      { year: 2026, alpha_revenue: 40000000, beta_revenue: 500000 },
+    ]));
+    const table = within(screen.getByRole("table", { name: "Result preview" }));
+    expect(table.getAllByRole("columnheader").map(el => el.textContent)).toEqual(["year", "Alpha revenue", "Beta revenue"]);
+    expect(table.getAllByRole("rowheader").map(el => el.textContent)).toEqual(["2024", "2025", "2026"]);
+    expect(table.getByText("—")).toHaveAttribute("title", "Not available in this result; not zero.");
+    expect(table.getByText("₹0")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Scrollable result preview" })).toHaveAttribute("tabindex", "0");
+    await userEvent.setup().click(screen.getByRole("button", { name: /view analysis/i }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: /table/i }));
+    const analysis = within(screen.getByRole("table", { name: "Analysis results" }));
+    expect(analysis.getByText("₹5 Lakh")).toHaveAttribute("title", "500000");
+    expect(analysis.getByText("₹0")).toBeVisible();
   });
 });

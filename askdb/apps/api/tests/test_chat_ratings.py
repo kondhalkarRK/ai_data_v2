@@ -245,3 +245,24 @@ async def test_authentication_required(chat_feedback):
     e.app.dependency_overrides.pop(get_current_user)
     e.client.headers.pop("authorization")
     assert (await e.client.get(e.url)).status_code == 401
+
+
+async def test_old_report_events_still_enforce_report_ownership(chat_feedback):
+    e = chat_feedback
+    e.row.response_snapshot = {
+        "scope": "admin:all",
+        "events": [
+            {
+                "event": "report",
+                "data": {
+                    "reportId": str(uuid.uuid4()),
+                    "revision": 2,
+                    "panels": [{"secret": "protected report value"}],
+                },
+            }
+        ],
+    }
+    await e.session.commit()
+    assert (await e.client.get(e.url)).status_code == 403
+    history = (await e.client.get(f"/api/v1/chat/conversations/{e.conversation.id}")).json()
+    assert "protected report value" not in str(history)

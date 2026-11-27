@@ -23,6 +23,7 @@ from app.api.deps import (
     get_app_session,
     get_app_settings,
     get_optional_scoped_analytics,
+    get_scoped_analytics,
     get_semantic_service,
 )
 from app.core.config import Industry, Settings
@@ -32,8 +33,17 @@ from app.models.enums import Role
 from app.models.user import User
 from app.schemas.common import ApiModel
 from app.semantic.service import SemanticService
+from app.services.chat.non_data_handlers import definition_from_metadata
 from app.services.chat.profiler import PROFILER
 from app.services.chat.query_cache import QUERY_CACHE
+from app.services.chat.request_context import (
+    ContextBudgetError,
+    RequestPrincipal,
+    ScopedCatalog,
+    build_request_context,
+)
+from app.services.chat.request_contract import ContractModel
+from app.services.chat.request_interpreter import InterpretationInput, RoutePreview, preview_request
 from app.services.chat.responses import (
     check_access,
     owned_response,
@@ -42,6 +52,7 @@ from app.services.chat.responses import (
     scope_key,
 )
 from app.services.chat.service import ChatService, recovery_frames
+from app.services.chat.value_dictionary import cached_value_dictionary
 from app.services.governance import (
     active_llm,
     enforce_quota,
@@ -50,6 +61,7 @@ from app.services.governance import (
     sync_llm_config,
 )
 from app.services.llm import circuit_stats, model_catalog
+from app.services.security.region_scope import forbidden_zones
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -115,7 +127,7 @@ async def _save_response(session, service, user, frames):
     events = _sse_events_from_frames(frames)
     # Progress frames are transient. Fold tokens to avoid thousands of JSON objects.
     text = "".join(str(e["data"].get("token", "")) for e in events if e["event"] == "token")
-    stored = [e for e in events if e["event"] not in {"token", "progress", "stage"}]
+    stored = [e for e in events if e["event"] not in {"token", "progress", "analysis_progress", "stage"}]
     if text:
         stored.insert(0, {"event": "token", "data": {"token": text}})
     documents = sorted(
@@ -130,6 +142,14 @@ async def _save_response(session, service, user, frames):
         "scope": scope_key(user, service._region_scope),
         "events": stored,
         "documents": documents,
+        "report": next(
+            (
+                {"id": e["data"]["reportId"], "revision": e["data"]["revision"]}
+                for e in events
+                if e["event"] == "report"
+            ),
+            None,
+        ),
     }
     conversation = await session.get(Conversation, row.conversation_id)
     if conversation:
@@ -143,7 +163,81 @@ class SaveQuestionRequest(ApiModel):
     sql_text: str | None = None
 
 
-OptionalAnalyticsConnection = Annotated[AsyncConnection | None, Depends(get_optional_scoped_analytics)]
+OptionalAnalyticsConnection = Annotated[
+    AsyncConnection | None, Depends(get_optional_scoped_analytics)
+]
+AnalyticsConnection = Annotated[AsyncConnection, Depends(get_scoped_analytics)]
+
+
+class RoutePreviewRequest(ContractModel):
+    question: str = Field(min_length=1, max_length=4000)
+
+
+@router.post("/chat/route-preview", response_model=RoutePreview)
+async def chat_route_preview(
+    body: RoutePreviewRequest,
+    user: RequireAdmin,
+    industry: ActiveIndustry,
+    scope: RegionScopeDep,
+    session: Annotated[AsyncSession, Depends(get_app_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    semantic_service: Annotated[SemanticService, Depends(get_semantic_service)],
+) -> RoutePreview:
+    """Admin-only Batch 1 preview. No analytics connection, SQL, retrieval or report work.
+
+    Only an unrestricted administrator may consume the existing global catalog cache.
+    Scoped catalog acquisition and persisted typed conversation handoff belong to Batch 2.
+    """
+    if not settings.chat_request_preview_enabled or industry != Industry.AUTOMOTIVE:
+        raise NotFoundError("Typed interpretation preview is not enabled.")
+    if forbidden_zones(body.question, scope):
+        return RoutePreview(
+            status="denied",
+            original_question=body.question,
+            reason="The requested region is outside your access.",
+        )
+    await _prepare_question(session, settings, user)
+    principal = RequestPrincipal(user.id, scope, industry)
+    pack = await semantic_service.get_pack(industry)
+    snapshot = cached_value_dictionary(industry) if scope.unrestricted else None
+    catalog = ScopedCatalog(principal.binding, snapshot) if snapshot is not None else None
+    try:
+        context = build_request_context(
+            body.question, pack=pack, principal=principal, catalog=catalog
+        )
+    except ContextBudgetError:
+        return RoutePreview(
+            status="unavailable", reason="Relevant context exceeds the interpretation budget."
+        )
+    result = await preview_request(
+        settings=settings,
+        incoming=InterpretationInput(
+            body.question,
+            principal,
+            context,
+            user.full_name,
+        ),
+    )
+    if result.request and "glossary" in result.routes:
+        result.approved_definitions = {
+            term: definition_from_metadata(term, pack, industry)
+            for term in result.request.definition_terms
+        }
+    if result.usage.calls:
+        await record_question_usage(
+            session,
+            user_id=user.id,
+            question=f"[Routing preview] [run:{result.request_id}] {body.question}",
+            industry=industry.value,
+            mode=execution_mode(cache_hit=False, llm_used=True, path="request_preview"),
+            model_name=result.usage.model,
+            prompt_tokens=result.usage.input_tokens,
+            completion_tokens=result.usage.output_tokens,
+            response_time_ms=result.usage.elapsed_ms,
+            query_history_id=None,
+        )
+        await session.commit()
+    return result
 
 
 @router.post("/chat/ask")

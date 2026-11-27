@@ -1,0 +1,199 @@
+SCIO - BATCH 4 ACCEPTANCE HARNESS
+27 November 2026
+
+Current position
+The harness is ready for reviewer-supplied questions and reference answers. No live
+acceptance is claimed. Do not repeat package installation, database creation or
+migrations. Do not replace the office .env or API keys. Work from the AskDB root.
+
+1. WHAT YOU NEED BEFORE LIVE TESTING
+
+A human reviewer supplies:
+  - Unseen questions, including follow-ups, simple-question regressions and the five
+    dependent shapes. Do not use implementation examples as blind holdouts.
+  - Independently reviewed read-only reference SQL and its results for every step.
+  - A frozen warehouse revision, exact dates, approved semantic definitions, and the
+    SAME application user/region permissions for the reference and Chat request.
+  - Reviewed narration and confirmation of the expected periods, baseline, ordering,
+    ties, NULL, zeros, empty results and any partial/unanswered parts.
+
+The already-known regression is not an unseen holdout:
+  Which month in the last 12 months had the lowest revenue, and which region and
+  model contributed most to that dip?
+It must retain month totals, selected month(s), baseline, region-model changes and
+independent reconciliation. Other shapes: selected region then its models; period
+comparison then decliners; opposite changes in two measures; a fixed selected cohort
+compared with each member's history. Human review owns their precise business meaning.
+
+Authoritative, scoped load-status integration is STILL missing in normal Chat.
+Do not enable complete-period investigations until that source has been connected
+and validated. A calendar rule, MAX(date), synthetic fixture or high Data Trust score
+does not prove that all expected office loads arrived. The harness cannot supply it.
+
+2. KEEP PRIVATE INPUTS OUT OF GIT
+
+Create an ignored local folder:
+  New-Item -ItemType Directory -Force data/staging/dependent-acceptance
+
+Put reviewer-authored cases.json, gold.json and reference.sql there. Keep unseen
+questions/reference SQL out of runtime prompts, semantic examples and AI chats.
+Do not upload client answers to an unapproved model to create the references.
+
+Case-file format only; the placeholder below is not an acceptance question:
+  [{"id":"H01","route":"analytics","question":"REVIEWER_SUPPLIED_QUESTION"}]
+Give related follow-ups the same "conversation" value. Other cases start fresh.
+Use the same cases and gold files in both captures. Include the old simple-question
+regression set in the paired runs; new dependent capability must not replace it.
+Include the previously observed high-token question if its exact text is available;
+measure it again rather than treating the historical roughly 4,000-token observation
+as a matched baseline. Keep initial and verification usage separate.
+
+3. REFERENCE FILE CONTRACT
+
+gold.json is an object keyed by case ID. Ordinary simple questions keep the existing
+format from CHAT_BATCH_5_OFFICE_STEPS.txt. Dependent references use these fields:
+
+  route: expected interpreted intent (analytics or investigation)
+  text: complete independently approved narration, not a few matching fragments
+  reference:
+    kind: human_reference
+    reviewer: responsible human reviewer identifier
+    reviewedAt: review date
+    datasetRevision: the frozen warehouse revision
+    sqlSha256: SHA-256 of the independently reviewed reference SQL file
+    holdout: true only for human-supplied unseen questions; false for known regressions
+  analysis:
+    status: expected completed/partial/empty/clarification state
+    scope: exact permitted scope labels, e.g. ["West"]
+    checks: independent reconciliation checks, or [] when not applicable
+    unanswered: expected [{"status":"...","reason":"..."}], or []
+    steps: every step in execution order, including supporting steps
+
+Each reference step must explicitly include ALL these fields:
+  operation: aggregate/select_extreme/select_ranked/compare/contributors/history
+  dependsOn: zero-based indexes of required earlier steps; [] for none
+  measures: approved measure IDs, in order
+  grouping: approved dimension IDs, in order
+  filters: [{"field":"approved.field","operator":"eq","values":["reviewed value"]}]
+  period: {"start":"YYYY-MM-DD","endExclusive":"YYYY-MM-DD"}
+    Use explicit null bounds only for approved all-history scope.
+  comparisonPeriods: [{"currentStart":"...","currentEnd":"...",
+                       "baselineStart":"...","baselineEnd":"..."}], or []
+  baseline: previous_period/same_period_last_year/etc., or null
+  status: completed/empty/partial/skipped/clarification
+  verified: true/false
+  columns: exact output column names, in order
+  rows: independently calculated row objects, including every declared column
+  totalGroups: independently verified full group count
+  selectedGroups: independently verified selected count
+  rowOrder: ordered, or unordered only when the reference explicitly permits it
+
+Do not copy Scio's unverified answer into gold. Expected steps are matched by order,
+operation and dependency indexes, not by the model's arbitrary internal step names.
+All returned fields and all comparison members must be accounted for. Empty arrays
+and null baselines must be explicit, not omitted. A missing reference is not a pass.
+Reference reconciliation objects use zero-based headlineStep/contributorStep indexes,
+the approved measure ID, and passed true/false. Hashes/metadata are reviewer
+declarations, not cryptographic proof that a person authored the SQL or a holdout.
+
+Get the reference-file hash locally:
+  (Get-FileHash -Algorithm SHA256 -LiteralPath data/staging/dependent-acceptance/reference.sql).Hash.ToLower()
+
+Decimal outputs allow only 0.000001 absolute difference; integer outputs match exactly. No relative
+tolerance hides large revenue errors. Decimal strings from PostgreSQL JSON retain
+precision during comparison. Text labels, NULL, booleans, duplicates and column sets
+remain distinct. Rows are compared in order unless explicitly marked unordered.
+
+4. VALIDATE INPUTS WITHOUT CALLING THE API OR LLM
+
+  .\apps\api\.venv\Scripts\python.exe scripts/chat_acceptance.py validate --cases data/staging/dependent-acceptance/cases.json --gold data/staging/dependent-acceptance/gold.json --warehouse-revision YOUR_FROZEN_REVISION
+
+This reads local files only. It checks IDs, complete reference fields, reviewed
+provenance, revision, bounds, ordered dependencies and row/column coverage. It reports
+missing references separately. Passing preflight does not mean the answers are correct.
+
+5. RUN SAFE LOCAL REGRESSION CHECKS
+
+  .\apps\api\.venv\Scripts\python.exe -c "import os,pytest; os.environ['TEST_DATABASE_URL']='sqlite+aiosqlite:///:memory:'; os.environ.pop('SCIO_TEST_POSTGRES_URL',None); raise SystemExit(pytest.main(['apps/api/tests','-o','addopts=','-q','--disable-warnings','--tb=short']))"
+
+This child process uses an in-memory fixture application database. It does not use
+your live demo database. Native checks skip until separately opted in. A skip is not
+PostgreSQL acceptance. Do not invent holdouts to turn a pending item green.
+
+6. OPTIONAL NATIVE POSTGRESQL FIXTURE CHECK
+
+Use only an EMPTY disposable test database supplied for this purpose, with "test"
+in its name. NEVER use askdb_app, askdb_automotive or a populated/client database.
+The existing guard refuses user tables/automotive schema. Setup rolls back.
+
+  .\apps\api\.venv\Scripts\python.exe -c "import os,getpass,pytest; os.environ['TEST_DATABASE_URL']='sqlite+aiosqlite:///:memory:'; os.environ['SCIO_TEST_POSTGRES_URL']=getpass.getpass('EMPTY disposable PostgreSQL test DSN: '); os.environ['SCIO_ALLOW_EMPTY_TEST_DB_SETUP']='yes'; raise SystemExit(pytest.main(['apps/api/tests/test_chat_postgres_acceptance.py','apps/api/tests/test_dependent_postgres.py','-o','addopts=','-q','--disable-warnings']))"
+
+Paste only that dedicated test DSN at the hidden prompt. It is not stored in shell
+history. These visible synthetic SQL checks cover the five shapes; they are not
+human-reviewed office references, live Chat acceptance or blind holdouts.
+
+7. MATCHED LIVE CAPTURES - ONLY AFTER COMPLETENESS/POLICY PREREQUISITES
+
+Freeze the warehouse. Keep the same user/scope, semantic pack, business day, provider,
+classifier/default model, budgets and quota settings. Do not change reader access to
+make a test pass. Use approved test accounts. Normal quotas/model charges still apply.
+
+First capture the current typed path with dependent analysis disabled:
+  CHAT_TYPED_EXECUTION_ENABLED=true
+  CHAT_DEPENDENT_ANALYSIS_ENABLED=false
+Restart only the API using your normal command, then run:
+
+  .\apps\api\.venv\Scripts\python.exe scripts/chat_acceptance.py capture --base-url http://localhost:8000 --username YOUR_APPLICATION_LOGIN --mode typed-baseline --warehouse-revision YOUR_FROZEN_REVISION --dataset-label YOUR_DATASET_LABEL --expected-model YOUR_APPROVED_MODEL --cases data/staging/dependent-acceptance/cases.json --gold data/staging/dependent-acceptance/gold.json --output data/staging/dependent-acceptance/baseline.json
+
+The application login password is prompted, not saved. Use your actual local API port.
+Remote APIs require HTTPS. Redirects are blocked. Reports can create unsaved reports
+in the application DB; use only approved cases/accounts. No warehouse mutation occurs
+from this capture command. The command never flips feature flags or permissions.
+
+For the controlled candidate test only, after its prerequisites are satisfied:
+  CHAT_TYPED_EXECUTION_ENABLED=true
+  CHAT_DEPENDENT_ANALYSIS_ENABLED=true
+Restart the API. Keep all other conditions identical. Then run:
+
+  .\apps\api\.venv\Scripts\python.exe scripts/chat_acceptance.py capture --base-url http://localhost:8000 --username YOUR_APPLICATION_LOGIN --mode dependent --warehouse-revision YOUR_FROZEN_REVISION --dataset-label YOUR_DATASET_LABEL --expected-model YOUR_APPROVED_MODEL --cases data/staging/dependent-acceptance/cases.json --gold data/staging/dependent-acceptance/gold.json --output data/staging/dependent-acceptance/candidate.json
+
+8. COMPARE AND REVIEW
+
+  .\apps\api\.venv\Scripts\python.exe scripts/chat_acceptance.py compare --legacy data/staging/dependent-acceptance/baseline.json --typed data/staging/dependent-acceptance/candidate.json --output data/staging/dependent-acceptance/comparison.json
+
+The existing option/field names legacy/typed are retained for compatibility; the
+report identifies typed-baseline/dependent. It checks case/gold/user/scope hashes,
+revision, model configuration, actual models for every observed call, cache state
+and actual typed execution. Missing per-call telemetry or a different fallback model
+makes a pair incomparable. Labels and revision text alone do not prove a frozen DB.
+The existing data-as-of metadata comparison is also conservative: a date on one side
+and missing/different metadata on the other makes the pair incomparable. Do not
+remove that check to manufacture a speedup; resolve the live metadata discrepancy.
+
+Review intent routing, question coverage, result correctness, narration, model-call
+budget, input/output tokens, estimated flags and latency separately. Initial and
+inventory-check tokens/models are now recorded separately. A correct route with
+wrong numbers still fails. Unknown checks stay unknown. A partly matched reference
+does not pass. Performance comparisons require both answers to have passed review.
+
+The captures contain hashes/IDs, states, usage and timing, not raw questions, result
+rows, SQL, cookies, passwords or prompts. Treat even those captures as internal data.
+Raw reference inputs remain private. Review the actual saved response in both Chat
+layouts: every step, date, baseline, missing side, SQL, partial note and exact value.
+Repeat security cases for an approved regional test account with its OWN references.
+Test scope revocation, other-user history/report access, cancellation and stale data.
+
+9. ACCEPTANCE AND ROLLBACK
+
+Required: 100% human reference-result matches on the approved fixture set; zero
+silently dropped requirements; at most two application model calls per compound
+request; no simple-question regression; all critical security cases fail closed.
+Do not claim universal accuracy or latency savings from synthetic fixtures.
+
+rolloutApproved always stays false in the harness. Human review still owns rollout.
+Strict DDL-only cloud policy and endpoint trust classification remain unresolved;
+current approved interpretation context includes glossary/entity values and user text.
+No result rows are sent by this dependent path, but that does not make it DDL-only.
+
+Rollback after the controlled test: CHAT_DEPENDENT_ANALYSIS_ENABLED=false and restart
+the API. Keep the typed/simple path and existing data. No reverse migration is needed.

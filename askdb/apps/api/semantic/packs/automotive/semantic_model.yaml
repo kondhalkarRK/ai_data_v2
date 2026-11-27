@@ -2,6 +2,20 @@ version: "2.0"
 domain: Automotive Sales
 description: India passenger-vehicle sales analytics across orders, vehicles, people, regions, targets and dealers.
 
+# Typed Chat only. Existing legacy Chat/Insurance behavior is not changed by these policies.
+query_policy:
+  utc_offset_minutes: 330
+  fiscal_year_start_month: 4
+  comparison_alignment: same_elapsed
+  comparison_ranking: absolute_change
+  undated_ranking: available_history
+  undated_aggregation: clarify
+  executive_summary_measures: [revenue, units_sold]
+  executive_summary_period: this_quarter
+  equivalent_dimensions:
+    dim_carline.make: dim_targets.make
+    fact_sales.sales_date: dim_targets.year_month
+
 tables:
   fact_sales:
     type: fact

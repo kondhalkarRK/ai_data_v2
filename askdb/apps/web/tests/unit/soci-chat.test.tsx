@@ -15,6 +15,7 @@ vi.mock("@/components/governance/chat-quota-widget", () => ({ ChatQuotaWidget: (
 import { ChatModeShell } from "@/components/chat/chat-mode-shell";
 import { chatGreeting } from "@/lib/chat-greeting";
 import { BrandWordmark } from "@/components/brand/wordmark";
+import { analyticalMessage } from "../fixtures/analytical";
 
 const frames = [
   { event: "stage", data: { stage: "accepted", historyId: "response-1" } },
@@ -40,6 +41,45 @@ function setup() {
   const view = render(<QueryClientProvider client={client}><ChatModeShell enabled /></QueryClientProvider>);
   return { ...view, client, user: userEvent.setup(), renderAgain: () => view.rerender(<QueryClientProvider client={client}><ChatModeShell enabled /></QueryClientProvider>) };
 }
+
+it("shares multi-step results, SQL, ratings and saved replay across Classic and New", async () => {
+  const message = analyticalMessage();
+  const analysisFrames = [
+    { event: "stage", data: { stage: "accepted", historyId: message.historyId } },
+    { event: "sql", data: { sql: message.sql, path: "dependent_analysis" } },
+    { event: "meta", data: message.meta },
+    { event: "token", data: { token: message.narrative } },
+    { event: "done", data: { historyId: message.historyId, conversationId: "conversation-1" } },
+  ];
+  mocks.post.mockResolvedValue({ events: analysisFrames });
+  mocks.get.mockImplementation(async (path: string) => {
+    if (path === "/api/v1/chat/conversations") return { items: [{ id: "conversation-1", title: "Linked analysis", updatedAt: "2026-11-27T10:00:00Z" }], hasMore: false };
+    if (path === "/api/v1/chat/conversations/conversation-1") return { id: "conversation-1", hasMore: false, turns: [{ responseId: message.historyId, question: "Highest region then models", canRate: true, events: analysisFrames }] };
+    return { feedback: null };
+  });
+  const e = setup();
+  await e.user.type(screen.getByRole("textbox"), "Highest region then models{Enter}");
+  expect(await screen.findByRole("region", { name: "Multi-step analysis" })).toBeInTheDocument();
+  expect(screen.queryByText(/Dataset Trust:/)).not.toBeInTheDocument();
+  await e.user.click(screen.getByRole("button", { name: "Thumbs up" }));
+  await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(1));
+  await e.user.click(screen.getByRole("button", { name: "New" }));
+  expect(screen.getByRole("region", { name: "Multi-step analysis" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Thumbs up" })).toHaveAttribute("aria-pressed", "true");
+  await e.user.click(screen.getByRole("button", { name: "How Scio handled this" }));
+  const info = screen.getByRole("dialog", { name: "How Scio handled this" });
+  expect(within(info).getByRole("region", { name: "Analysis plan and checks" })).toBeInTheDocument();
+  await e.user.click(within(info).getByText("View SQL", { exact: true }));
+  expect(info.querySelector("pre")).toBeVisible();
+  expect(info.querySelector("pre")).toHaveTextContent(/WITH[\s\S]*approved[\s\S]*AS/);
+  await e.user.keyboard("{Escape}");
+  await e.user.click(screen.getByRole("button", { name: "New chat" }));
+  await e.user.click(screen.getByRole("button", { name: "Chat history" }));
+  await e.user.click(await screen.findByRole("button", { name: /Linked analysis/ }));
+  expect(await screen.findByRole("region", { name: "Multi-step analysis" })).toBeInTheDocument();
+  expect(screen.getAllByText(/Search period: 2026-01-01/).length).toBeGreaterThan(0);
+  expect(mocks.post).toHaveBeenCalledTimes(1);
+});
 
 it("renders Scio as one word and derives greetings only from the authenticated name", () => {
   render(<BrandWordmark />);
@@ -137,4 +177,26 @@ it("keeps an in-flight request and the next draft when the layout changes", asyn
   expect(await screen.findByText("Hello Anita")).toBeInTheDocument();
   expect(screen.getByRole("textbox")).toHaveValue("My next question");
   expect(mocks.post).toHaveBeenCalledTimes(1);
+});
+
+it.each(["classic", "new"])("%s renders the same partial report identity and verified KPI", async mode => {
+  window.localStorage.setItem("askMeChatMode", mode);
+  const id="11111111-1111-4111-8111-111111111111";
+  const reportFrames=[
+    {event:"report",data:{reportId:id,revision:3,partial:true,briefing:"One verified KPI; one chart failed.",panels:[
+      {id:"kpi-revenue",title:"Revenue",kind:"kpi",status:"verified",result:{result:{columns:["revenue"],rows:[{revenue:10000000}],sql:"SELECT verified_revenue"}}},
+      {id:"chart-region",title:"Region",kind:"chart",status:"unavailable"}]}},
+    {event:"meta",data:{responseKind:"partial",rowCount:0}},
+    {event:"done",data:{historyId:"response-1",conversationId:"conversation-1"}}
+  ];
+  mocks.post.mockResolvedValueOnce({events:reportFrames});
+  const e=setup();
+  await e.user.type(await screen.findByRole("textbox"),"Create report{Enter}");
+  expect(await screen.findByRole("region",{name:"AskBI report preview"})).toBeInTheDocument();
+  expect(screen.getByText("Revision 3")).toBeInTheDocument();
+  expect(screen.getByRole("link",{name:"Open in Analytics Builder"})).toHaveAttribute("href",`/analytics-builder?askbiReport=${id}`);
+  expect(screen.getAllByText("₹1 Cr").length).toBeGreaterThan(0);
+  expect(screen.getByText(/Partial report\./)).toBeInTheDocument();
+  await e.user.click(screen.getByRole("button",{name:"How Scio handled this"}));
+  expect(await screen.findByText("View SQL — Revenue")).toBeInTheDocument();
 });

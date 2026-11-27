@@ -266,7 +266,7 @@ export function ResponseCard({
               {tab === "table" ? (
                 message.columns && message.rows ? (
                   <div className="data-table-wrap">
-                    <table className="data-table">
+                    <table className="data-table" aria-label="Analysis results">
                       <thead className="bg-muted/40">
                         <tr>
                           {message.columns.map((column) => (
@@ -283,8 +283,8 @@ export function ResponseCard({
                         {message.rows.slice(0, 100).map((row, index) => (
                           <tr key={index} className="border-t border-border/50">
                             {message.columns?.map((column) => (
-                              <td key={column} className="px-3 py-2 font-mono">
-                                {formatChatCell(row[column], column)}
+                              <td key={column} className="whitespace-nowrap px-3 py-2 font-mono" title={row[column] == null ? "Not available in this result; not zero." : String(row[column])}>
+                                {formatChatCell(row[column], column, meta?.resultProfile?.measures.find(measure => measure.column === column)?.kind)}
                               </td>
                             ))}
                           </tr>

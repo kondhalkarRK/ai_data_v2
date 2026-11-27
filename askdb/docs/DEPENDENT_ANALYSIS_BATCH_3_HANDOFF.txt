@@ -1,0 +1,149 @@
+SCIO DEPENDENT ANALYSIS - BATCH 3
+27 November 2026
+Status: Shared presentation, local narration, progress, replay and audit implemented.
+Rollout: Still disabled by default. This is not office/live-data acceptance.
+
+1. WHAT CHANGED
+
+Classic and New Chat now use the same multi-step answer component for the actual
+dependent-analysis response. Ordinary greetings, definitions, simple data answers
+and reports keep their current rendering path.
+
+The dependent answer shows:
+  - A concise verified headline and the permitted regional scope.
+  - Every planned step in order, with readable business labels and its actual state.
+  - Applied search dates, comparison dates, baseline origin and filters.
+  - All requested result columns, not only a single headline measure.
+  - Rounded INR Cr/Lakh display plus expandable original exact values.
+  - Optional charts for verified observations with a suitable single category axis.
+    Comparison charts pair the same measure's current and baseline series; other
+    measures remain in the table. Charts represent the displayed observations.
+  - Clear partial, missing, skipped, tied-selection overflow and unanswered messages.
+
+Supporting aggregate tables can be expanded without obscuring the selected result.
+Unverified contributor observations remain explicitly labelled in the info panel;
+they are not displayed as verified contributing factors in the main answer.
+
+The existing info icon contains the plan/dependencies, checks, source-completeness
+state, usage, run references and View SQL. No numerical trust score was introduced.
+Existing response ratings and SQL access remain available in both layouts.
+
+2. NARRATION AND PARTIAL ANSWERS
+
+The server builds the display snapshot and fallback narrative from checked results.
+It makes no new LLM call and runs no additional analytical query for presentation.
+Approved glossary definitions requested with analysis are retained in both the rich
+answer and text, instead of disappearing behind the new rendering path.
+
+Narration distinguishes a verified zero from no matching records or a missing value.
+Contributor text uses checked signed changes, is labelled contributing factors and
+does not assert causation. Failed reconciliation suppresses contributor assertions.
+Mixed document/report requests retain their explicit unavailable/not-performed notes.
+
+The analysis date is anchored during preparation and reused by execution and display.
+History stores the versioned display snapshot; it does not resolve last month again
+at reload or silently rerun the analysis. Older Batch 2 snapshots have a local
+fallback that retains their saved values and makes missing display details explicit.
+
+3. TRUTHFUL PROGRESS AND CANCELLATION
+
+The existing single PostgreSQL CTE statement cannot provide reliable per-CTE progress.
+While it runs, Chat says the linked steps are running and waiting for checked results.
+Only after the results have been validated does it emit Reviewed step X of N with
+actual step states. It never invents individual database-step completion percentages.
+
+The existing cancellation control remains available. Progress is cleared on terminal
+events and is not persisted for history replay. Explicit cancellation retains a
+structural audit, without publishing result rows. In-flight provider cancellation
+still depends on the existing timeout; instantaneous provider abort is not promised.
+
+4. COMPLETENESS CONFIGURATION
+
+Missing approved load-status evidence now returns a source-unavailable message with
+an administrator action, rather than repeatedly asking the user to choose dates.
+It executes no analytical SQL and does not save that configuration problem as a new
+user clarification. MAX(date) is still not evidence that a period is fully loaded.
+
+An authoritative office load-status source has not yet been supplied/integrated.
+Normal Chat therefore cannot execute investigations requiring verified complete
+periods until that integration exists. Synthetic tests provide explicit test evidence;
+they do not mark office data complete or bypass the production check.
+
+5. PERSISTENT AUDIT AND SECURITY
+
+The bounded analyticalAudit record is stored in the existing QueryHistory
+trust_breakdown JSON, tied to the response/run ID. It includes approved operations,
+dependency bindings, coverage mapping, semantic/scope fingerprints, hashed source
+revisions, baseline origin, issue codes, actual check states, counts and model usage.
+
+It does not duplicate questions, prompts, SQL text, result values/rows or customer
+filter values. The existing authorized response snapshot separately retains the
+rendered answer/SQL as before. This is per-response audit storage, not a new Admin
+audit screen, retention policy or compliance certification.
+
+Existing response ownership, industry and current regional-access checks govern
+history and ratings. Scope/semantic access is rechecked before results are published;
+results are discarded when access changes. No credentials are added to the UI.
+
+No result rows go to an LLM in this dependent path. As the earlier gap report states,
+the interpretation context can include glossary text and approved entity candidates,
+not just DDL. Strict DDL-only cloud policy/endpoint trust classification is still a
+separate unresolved policy requirement. Do not claim that it has been implemented.
+
+6. VERIFICATION
+
+API suite checkpoint: 1,075 passed, 3 skipped, 2,470 warnings in 318.96 seconds.
+That run preceded the final glossary-display and anchored-relative-date assertions.
+Final focused rerun: all 62 tests passed, covering presentation/audit, dependent Chat,
+shared runtime, history ownership, regional revocation and existing response ratings.
+
+Frontend: 52 tests passed across the analytical response, actual Classic/New shell,
+SSE reducer, existing compact answer and currency/cell-format regression tests.
+TypeScript and selected frontend ESLint checks passed. Selected backend Ruff checks,
+shared-service syntax/name/import checks and whitespace checks passed.
+The suites report existing Python asyncio deprecations and Vite CJS warnings; they
+are not warning-free builds or proof of production compatibility.
+
+Local Edge checks used the actual shared Chat components with synthetic responses:
+  Classic and New x 1440/390 px x Light/Dark/AI (12 combinations).
+  Checked ordered steps, displayed and exact values, chart expansion, SQL, keyboard
+  focus restoration, responsive overflow and zero analytical requests during replay.
+  Additional checks exercised partial results, reduced motion, pending progress and
+  the cancellation control. Browser traffic was limited to localhost.
+This verifies local component behaviour, not a signed-in office/provider acceptance
+run. Backend fixtures verify actual cancellation outcomes separately.
+
+The three skipped tests require an explicitly opted-in empty disposable PostgreSQL
+database. Native PostgreSQL driver/CTE execution, office gateway cost/latency, human-
+reviewed reference SQL and privately supplied unseen questions remain unverified.
+Visible synthetic fixtures are not holdouts. No human holdouts were fabricated.
+
+7. FILES, CHECKPOINT AND SETUP
+
+New backend modules:
+  apps/api/app/services/chat/analytical_plan_presentation.py
+  apps/api/app/services/chat/analytical_plan_audit.py
+New frontend modules:
+  apps/web/components/chat/analytical-answer.tsx
+  apps/web/lib/analytical-response.ts
+Existing shared Chat service/preparation, response persistence, frontend response
+types/SSE/workspace/info action and focused tests were updated.
+
+Local ignored pre-Batch-3 checkpoint:
+  tmp/soci-qa/dependent-analysis/checkpoint-before-batch3.zip
+622 source files, verified ZIP and SHA-256 manifest.
+Branch: codex/dependent-analysis-contracts. No commit, push, stash or reset performed.
+Checkpoint comparison confirms semantic packs, Insurance, configuration defaults,
+dependencies and unrelated source files were not changed by this batch.
+
+No migration, package installation, venv recreation or database recreation is needed.
+The actual .env was not edited. Keep CHAT_DEPENDENT_ANALYSIS_ENABLED=false and do not
+enable the feature merely because synthetic tests pass.
+
+8. NEXT ACCEPTANCE WORK
+
+Integrate authoritative scoped load-status evidence. Then run native PostgreSQL and
+office-provider acceptance against human-reviewed reference SQL and human-supplied
+holdouts. Measure question coverage, result correctness, latency and actual provider
+usage independently. Resolve endpoint data-sharing policy and approve staged rollout
+before enabling dependent investigations for the leadership demo.

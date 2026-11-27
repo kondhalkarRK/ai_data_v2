@@ -1,0 +1,203 @@
+SCIO AI CHAT — BATCH 2 CHECKPOINT
+Date: 26 November 2026
+Scope: AskDB Automotive, approved plan points 5–8 only.
+
+STATUS AND ROLLOUT
+The typed interpretation can now feed the existing shared Chat executor directly.
+It does not rewrite the interpretation into English or ask an LLM to generate SQL.
+Classic and New Chat use the same streaming/synchronous backend workflow.
+
+The execution gate remains OFF by default:
+  CHAT_TYPED_EXECUTION_ENABLED=false
+The independent admin routing preview gate remains unchanged:
+  CHAT_REQUEST_PREVIEW_ENABLED=false
+
+No actual .env file was changed. Existing Chat remains the active path with the
+execution gate off. Do not switch the demo to typed execution until the remaining
+batches and live office acceptance are complete. Opt-in testing uses
+CHAT_TYPED_EXECUTION_ENABLED=true followed by an API restart. Roll back by setting
+it false and restarting. This is a staged backend feature, not a readiness claim.
+
+No migration or new package installation is required. Typed state uses the existing
+conversations.session_memory JSON column. Existing installation/migration steps do
+not need to be repeated for this batch. No analytics data or credentials were changed.
+Insurance and askme-agentic were not edited. Earlier uncommitted UI/currency work
+was preserved; no new visual redesign was made in this batch.
+
+POINT 5 — AUTHORITATIVE DEFINITIONS AND CAPABILITIES
+The typed compiler reads aggregate expressions from the active Automotive YAML.
+Expressions are parsed as one SQLGlot expression. Undeclared columns, unsupported
+functions, subqueries, windows inside base formulas and chained expressions are
+rejected. The model cannot supply formulas, physical joins or permissions.
+
+Current Automotive measure inventory:
+  revenue                 Executable: SUM(total_sales), sales fact.
+  units_sold              Executable: SUM(order_qty), sales fact.
+  orders                  Executable: COUNT(DISTINCT order_id), sales fact.
+  average_selling_price   Executable: aggregate revenue / aggregate units;
+                          floating division and NULL for a zero denominator.
+  active_salespeople      Executable: COUNT(DISTINCT sales_person_id) in the
+                          selected sales records, as currently defined in YAML.
+  target_units            Specialized: monthly targets, compatible make/time grain.
+  target_revenue          Specialized: monthly targets, compatible make/time grain.
+
+Targets have no approved region/model/dealer allocation. Regional users cannot
+query those target measures through this path. Supported actuals can still return
+with an explicit target limitation. Targets remain full monthly values; daily
+proration is not invented. A missing target stays NULL, not zero.
+
+Semantic definition gap to retain visibly: "Active Salespeople" currently means
+salespeople represented in the selected transactions. Its formula does not itself
+apply dim_salesman.active=true. An explicit active-status filter is supported and
+tested. Changing that business definition requires approval; this batch does not
+silently change it.
+
+Capabilities and query policies are included in the compact interpretation context.
+All current approved measures are searched/retained in this small pack. Unsupported
+configured formulas become definition-only; useful executable measures can return
+as a labelled partial result. Unknown measures are rejected, not substituted.
+
+The legacy path remains available behind the disabled execution gate and still
+uses its existing plan representation. A drift regression compares its five shared
+Automotive formulas against YAML; changing one side alone fails that check. The
+new typed path has no duplicate hardcoded business formulas.
+
+POINT 6 — DIRECT COMPILATION
+Supported and fixture-verified:
+  - Multiple totals/measures; weighted ASP; distinct counts; explicit active filters.
+  - Multiple groupings and declared dimension joins, including salesperson names.
+  - Rankings, per-group top N, ties, best/worst endpoints and a safe row cap.
+  - Member comparisons, exclusions and aggregate-result filters.
+  - Actual versus target values, variance and attainment where grain permits.
+  - One post-aggregation stage (sum/count/distinct count/average/min/max).
+  - Running totals with calendar/fiscal/quarter resets at supported grains.
+  - Calendar-bucket moving averages, period growth and contribution share.
+
+Compatible measures share one fact aggregation. Different sources aggregate first
+and then join at common grouping keys. Raw sales are never joined to raw targets.
+Forward many-to-one/one-to-one joins must use declared primary keys; emitted joins
+are checked too. A dealer/home-region join no longer drops additional vehicle joins
+or emits duplicate aliases. Disabled/custom unapproved join plans fail closed.
+
+The existing shared executor retains SQL safety checks, EXPLAIN, timeout, limits,
+history, ratings linkage and usage tracking. Typed SQL is not automatically rewritten
+or repaired into another query. An execution/validation failure does not confirm
+conversation state.
+
+SQL is emitted for populated and zero-row executions. For regional users, the SQL
+event and stored successful SQL match the scoped statement sent to the connection.
+Internal count/coverage columns are removed before returning result rows/charts.
+The verified group count is used for a visible "Showing N of M groups" notice.
+Two scalar totals are not treated as chart axes.
+
+POINT 7 — PERIODS AND COMPARISONS
+Automotive YAML now owns the typed-query calendar/default policy:
+  - UTC offset +330 minutes (India); fiscal year starts in April.
+  - Undated clear rankings use available history through today in permitted scope.
+  - Other undated aggregations clarify rather than guessing a period.
+  - Relative current periods end tomorrow, exclusive, using the business date.
+  - Partial comparisons default to aligned elapsed periods; full-period comparison
+    remains explicit. Same-period-last-year aligns the corresponding inclusive
+    calendar date, with a documented Feb 29 -> Feb 28 clamp.
+
+Warehouse MAX(date) is freshness context, not the calendar anchor. Requested periods
+and current calendar date remain distinct from latest available data. The compiled
+query includes actual observed start/through dates per period/source; those coverage
+values are exposed in metadata and context when records exist. This establishes
+observed endpoints, not proof that every day within that span is complete.
+
+Period results retain current, baseline, absolute change and percentage change.
+Percent change divides by the absolute baseline. Zero/missing baselines produce
+NULL percentages. Requested members without records remain missing/NULL; verified
+zeros stay zero. Empty scalar sources do not fabricate an aggregate zero.
+
+Moving averages use observed values within the requested number of calendar buckets;
+missing buckets are not silently filled with zero. Growth uses the immediately
+preceding calendar bucket, not the last available older row.
+
+POINT 8 — CONTINUITY AND CLARIFICATION
+Pending and successful requests retain the complete typed scope. A follow-up declares
+which fields changed. The server merges those fields rather than accepting model
+changes to unrelated measures, grouping, filters or periods. Replacing one filter
+field preserves other fields, exclusions and both ends of range filters.
+
+A date-only clarification reply retains all measures and grouping. A new definition
+or greeting does not execute the preceding analytical request. Changed member filters
+do not intersect an obsolete comparison list. Expired state, turn limits, owner/scope
+changes, semantic revisions and revoked entity references are revalidated.
+
+Only successful verified execution confirms the request. Greetings work without a
+catalog/provider call. A provider/metadata problem returns unavailable rather than
+claiming the user omitted a metric. Real model interpretation remains fallible;
+fixture follow-up tests do not prove every live paraphrase avoids clarification loops.
+
+SCOPED METADATA
+The new path loads the dictionary through a fresh server-scoped connection. Cache
+keys include user, industry, regional scope and semantic fingerprint; TTL is five
+minutes. It does not reuse the legacy industry-wide dictionary for regional users.
+Scope wrappers are rebound rather than nested. Access is checked again before SQL.
+Metadata acquisition and model interpretation retain existing timeout bounds.
+
+The model receives relevant approved definitions/schema and scoped entity candidates.
+Do not claim this path shares DDL only: candidate values are also context. No query
+result rows are sent to the interpreter. Detailed provider/PII/security review belongs
+to Batch 4; this batch is not security certification.
+
+EXPLICIT LIMITS — NO SILENT DOWNGRADE
+  - One period baseline with no simultaneous time-grain comparison/window transform.
+  - One member-comparison axis; multi-axis comparison needs an aligned plan.
+  - Benchmark comparisons need an approved benchmark plan.
+  - Cumulative/rolling ASP and other ratios need weighted numerator/denominator plans.
+  - Post-aggregation does not silently drop other measures or sum ratios.
+  - Compound target/window/member transformation shapes remain unsupported.
+  - A small source-plan registry currently covers sales and monthly targets only.
+  - Unknown/unavailable entities and over-budget context cannot be assumed correct.
+  - The enabled typed path requires AI interpretation for substantive questions;
+    it fails visibly on provider failure. Full automatic legacy fallback is not added.
+  - Report execution, "why" investigations, "so what" synthesis and document retrieval
+    remain gated in the typed path until Batch 3. Recognizing a route is not execution.
+  - Detailed executive narration and intent-versus-question validation are not
+    declared complete here; these are subsequent acceptance work.
+
+VERIFICATION
+Focused result: 121 passed. Provider/warehouse fixtures, real Chat persistence and
+HTTP handlers are used in these suites:
+  apps/api/tests/unit/test_request_interpretation.py
+  apps/api/tests/test_chat_request_preview.py
+  apps/api/tests/unit/test_request_compiler.py
+  apps/api/tests/unit/test_request_runtime.py
+  apps/api/tests/unit/test_request_state_dates.py
+
+The compiler reference tests execute SQL through a SQLite/SQLGlot dialect adapter,
+with expected values calculated separately from synthetic fixture rows. They do not
+verify PostgreSQL-specific planning, real warehouse values or office gateway accuracy.
+Both HTTP transports, SQL visibility on empty/populated results, persisted scope,
+revocation, cache isolation, token accounting and no-English-reparse tripwires are
+tested. One interpretation call, zero SQL correction calls in the tested typed flows.
+Provider token numbers in these tests are fixtures, not real cost measurements.
+
+Run from the AskDB root (no activation required with this explicit interpreter):
+.\apps\api\.venv\Scripts\python.exe -m pytest apps/api/tests/unit/test_request_interpretation.py apps/api/tests/test_chat_request_preview.py apps/api/tests/unit/test_request_compiler.py apps/api/tests/unit/test_request_runtime.py apps/api/tests/unit/test_request_state_dates.py -o addopts='' -q --disable-warnings --tb=short
+
+Regression sweep: 200 passed; two pre-existing document-mode expectation failures
+also recorded in the Batch 1 handoff:
+  test_document_query_without_documents
+  test_document_query_with_documents_uses_knowledge_search
+Those tests expect retrieval while document mode is disabled. Gates were preserved;
+neither the failures nor RAG were "fixed" by enabling document access.
+
+New modules/tests pass Ruff; compileall passes. Existing lint findings in legacy
+modules (SQL-string construction and an existing except/pass) remain outside scope.
+No office provider, PostgreSQL instance, browser or real client data was used here.
+
+BATCH 3 HANDOFF — NOT IMPLEMENTED
+1. Add bounded, reconciled contributing-factor analysis through the typed request.
+   Establish current/baseline results before breakdowns; preserve missing-data limits.
+2. Add evidence-grounded implications and narration that checks every numerical claim.
+   Keep observed association separate from causation; no speculative reasons.
+3. Hand the authorized full scope to existing AskBI, preserving IDs/revisions, budgets
+   and starter presets. Do not generate a report merely because a chart was requested.
+4. Recognize compound definitions/analysis and document dependencies centrally.
+   Retain document gating and explicitly unverified compliance when evidence is absent.
+5. Preserve this gate until later security, UI, intent coverage and holdout acceptance.
+   Do not claim 100% question coverage from fixture results.
